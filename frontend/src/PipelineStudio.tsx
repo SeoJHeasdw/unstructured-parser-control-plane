@@ -443,6 +443,7 @@ function Studio({ formats, onOpenDocuments, onOpenLiveDocuments, initialFormat, 
               <ZoomControls design={design} />
               {!design && <Panel position="top-left" className="ps-kpi" aria-label="운영 지표">
                 <span><small>유입</small><b>{t.arrivalsPerMin}</b><i>/분</i></span>
+                <span title="압축 항목·첨부·내장 개체에서 나온 하위 문서"><small>파생</small><b>{t.derivedPerMin}</b><i>/분</i></span>
                 <span><small>완료</small><b>{t.completedPerMin}</b><i>/분</i></span>
                 <span><small>처리 중</small><b>{t.processing}</b></span>
                 <span><small>대기</small><b>{t.queued}</b></span>

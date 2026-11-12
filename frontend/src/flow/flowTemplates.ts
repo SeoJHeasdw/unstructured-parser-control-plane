@@ -2,7 +2,7 @@ import { autoLayout, NODE_SIZE } from './flowLayout';
 import type { FlowDirection, FlowDoc, FlowEdge, FlowEdgeData, FlowLibrary, FlowNode, FlowNodeData, NodeKind } from './flowTypes';
 
 export const OVERVIEW_ID = 'overview';
-const STORAGE_KEY = 'document-ops:flows:v2';
+const STORAGE_KEY = 'document-ops:flows:v3';
 
 let seq = 0;
 export const uid = (prefix: string) => `${prefix}-${Date.now().toString(36)}${(seq++).toString(36)}`;
@@ -79,7 +79,7 @@ function pdf(): FlowDoc {
     makeNode('layer', 'task', '텍스트 계층 확인', { icon: 'detect', engine: '페이지별 텍스트 비율', description: '페이지마다 추출 가능한 텍스트가 있는지 확인합니다.', input: 'PDF 페이지', output: '텍스트/스캔 판정', capacity: 6, duration: 0.8, failRate: 0.004 }),
     makeNode('scan', 'gateway', '스캔 페이지 포함?'),
     makeNode('ocr', 'task', 'OCR 인식', { icon: 'ocr', engine: 'OCR 모델 후보', description: '스캔·이미지 페이지에서 문자와 영역을 인식합니다.', input: '스캔 페이지 이미지', output: '인식 텍스트, 영역 좌표', capacity: 2, duration: 6, failRate: 0.1, retries: 1 }),
-    makeNode('layout', 'task', '레이아웃 파싱', { icon: 'parse', engine: 'Docling', description: '본문, 읽기 순서, 표와 페이지 위치를 추출합니다.', input: 'PDF, OCR 텍스트', output: '본문, 표, 페이지 위치', capacity: 4, duration: 3.2, failRate: 0.03, retries: 1 }),
+    makeNode('layout', 'task', '레이아웃 파싱', { icon: 'parse', engine: 'Docling', description: '본문, 읽기 순서, 표와 페이지 위치를 추출합니다. PDF 첨부 파일은 하위 문서로 다시 보냅니다.', input: 'PDF, OCR 텍스트', output: '본문, 표, 페이지 위치', capacity: 4, duration: 3.2, failRate: 0.03, retries: 1, spawnRate: 0.05, spawnMax: 2 }),
     makeNode('table', 'task', '표 · 숫자 검증', { icon: 'quality', engine: '셀 수 · 단위 검사', description: '표의 행·열 수와 숫자·단위가 원문과 맞는지 검사합니다.', input: '추출된 표', output: '검증 결과, 경고', capacity: 4, duration: 1.2, failRate: 0.01 }),
     makeNode('ocr-review', 'exception', 'OCR 재검토 대기', { description: '자동 재시도 후에도 인식에 실패한 문서입니다.', assignee: '문서 품질 담당' }),
     makeNode('out', 'end', 'PDF 처리 완료'),
@@ -99,7 +99,7 @@ function office(): FlowDoc {
     makeNode('in', 'start', 'Office 수신'),
     makeNode('legacy', 'gateway', '레거시 형식?'),
     makeNode('convert', 'task', '레거시 변환', { icon: 'convert', engine: '문서 변환 도구 후보', description: '구형 형식을 최신 형식으로 변환합니다. 변환 손실은 경고로 남깁니다.', input: 'DOC · PPT', output: '변환된 문서', capacity: 2, duration: 4, failRate: 0.06 }),
-    makeNode('parse', 'task', '구조 파싱', { icon: 'parse', engine: 'Docling', description: '본문, 표, 슬라이드와 원문 위치를 추출합니다.', input: 'DOCX · DOCM · PPTX', output: '본문, 표, 슬라이드', capacity: 4, duration: 2.6, failRate: 0.02 }),
+    makeNode('parse', 'task', '구조 파싱', { icon: 'parse', engine: 'Docling', description: '본문, 표, 슬라이드와 원문 위치를 추출합니다. 내장 개체(문서 속 문서)는 하위 문서로 다시 보냅니다.', input: 'DOCX · DOCM · PPTX', output: '본문, 표, 슬라이드', capacity: 4, duration: 2.6, failRate: 0.02, spawnRate: 0.12, spawnMax: 3 }),
     makeNode('convert-fail', 'exception', '변환 실패 검토', { description: '변환 도구가 처리하지 못한 레거시 문서입니다.' }),
     makeNode('out', 'end', 'Office 처리 완료'),
   ];
@@ -118,7 +118,7 @@ function sheet(): FlowDoc {
     makeNode('in', 'start', '스프레드시트 수신'),
     makeNode('kind', 'gateway', 'XLS 여부'),
     makeNode('convert', 'task', 'XLS 변환', { icon: 'convert', engine: '문서 변환 도구 후보', capacity: 2, duration: 2.5, failRate: 0.04, description: '구형 XLS를 변환합니다.' }),
-    makeNode('workbook', 'task', '워크북 구조 분석', { icon: 'sheet', engine: '시트 · 셀 · 병합', description: '시트 구성과 셀 주소, 병합 영역을 읽습니다.', input: '워크북', output: '시트 목록, 셀 주소', capacity: 4, duration: 1.6, failRate: 0.01 }),
+    makeNode('workbook', 'task', '워크북 구조 분석', { icon: 'sheet', engine: '시트 · 셀 · 병합', description: '시트 구성과 셀 주소, 병합 영역을 읽습니다. 내장 개체는 하위 문서로 다시 보냅니다.', input: '워크북', output: '시트 목록, 셀 주소', capacity: 4, duration: 1.6, failRate: 0.01, spawnRate: 0.06, spawnMax: 2 }),
     makeNode('cells', 'task', '셀 값 · 수식 추출', { icon: 'sheet', engine: '값 · 수식 보존', description: '셀 값과 수식을 시트·셀 위치와 함께 추출합니다.', input: '시트 구조', output: '값, 수식, 셀 위치', capacity: 4, duration: 2.2, failRate: 0.02 }),
     makeNode('links', 'task', '셀 참조 · 링크 추출', { icon: 'relation', engine: '외부 참조 · 문서번호', description: '하이퍼링크, 외부 참조 수식, 셀 안의 문서번호를 찾습니다.', input: '셀 값, 수식', output: '참조 후보, 셀 위치', capacity: 4, duration: 1.3, failRate: 0.01 }),
     makeNode('out', 'end', '스프레드시트 완료'),
@@ -138,7 +138,7 @@ function mail(): FlowDoc {
     makeNode('split', 'task', '본문 · 첨부 분리', { icon: 'mail', engine: 'EML · MSG 파서', description: '메일 본문과 첨부를 분리하고 부모-자식 관계를 기록합니다.', capacity: 3, duration: 1.8, failRate: 0.03 }),
     makeNode('has', 'gateway', '첨부 있음?'),
     makeNode('body', 'task', '본문 텍스트 추출', { icon: 'text', engine: '본문 · 헤더', capacity: 4, duration: 0.8, failRate: 0.005 }),
-    makeNode('attach', 'task', '첨부 재투입', { icon: 'split', engine: '첨부별 형식 판별로 전달', description: '첨부 파일을 개별 문서로 등록해 형식 판별로 다시 보냅니다.', capacity: 3, duration: 1.2, failRate: 0.01 }),
+    makeNode('attach', 'task', '첨부 재투입', { icon: 'split', engine: '첨부별 형식 판별로 전달', description: '첨부 파일을 개별 문서로 등록해 형식 판별로 다시 보냅니다.', capacity: 3, duration: 1.2, failRate: 0.01, spawnRate: 1, spawnMax: 3 }),
     makeNode('out', 'end', '메일 처리 완료'),
   ];
   const edges = [
@@ -190,7 +190,7 @@ function zip(): FlowDoc {
   const nodes = [
     makeNode('in', 'start', '압축 파일 수신'),
     makeNode('check', 'task', '압축 상태 확인', { icon: 'detect', engine: '암호 · 손상 검사', description: '암호화·손상 여부를 확인합니다.', capacity: 4, duration: 1, failRate: 0.14, retries: 0 }),
-    makeNode('extract', 'task', '내부 파일 분리', { icon: 'split', engine: '상위-하위 관계 기록', description: '내부 항목을 개별 문서로 분리하고 상위 압축 파일과의 관계를 기록합니다.', capacity: 2, duration: 3, failRate: 0.02 }),
+    makeNode('extract', 'task', '내부 파일 분리', { icon: 'split', engine: '상위-하위 관계 기록', description: '내부 항목을 개별 문서로 분리하고 상위 압축 파일과의 관계를 기록한 뒤 형식 판별로 다시 보냅니다.', capacity: 2, duration: 3, failRate: 0.02, spawnRate: 1, spawnMax: 6 }),
     makeNode('blocked', 'exception', '압축 예외 검토', { description: '암호가 걸렸거나 손상된 압축 파일입니다.' }),
     makeNode('out', 'end', '압축 처리 완료'),
   ];

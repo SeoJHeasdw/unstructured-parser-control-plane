@@ -8,7 +8,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from app.config import Settings
 from app.middleware import LocalRequestGuard
-from app.routers.live import router as live_router
+from app.routers.live import router as live_router, summary_router as live_summary_router
 from app.routers.models import router as models_router
 from app.service import DocumentService
 
@@ -28,6 +28,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app = FastAPI(title="Unstructured Review Local API", version="0.3.0", lifespan=lifespan)
     app.state.settings = settings
     app.add_middleware(LocalRequestGuard, max_upload_bytes=settings.max_upload_bytes)
+    app.include_router(live_summary_router)
     app.include_router(live_router)
     app.include_router(models_router)
 

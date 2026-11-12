@@ -99,6 +99,7 @@ Mock 모델과 로컬 API 상태명은 프로토타입 계약이다. 운영 계�
 | `frontend/src/main.tsx` | React 진입점과 스타일 로드 | 진입점은 조립만 유지 |
 | `frontend/src/App.tsx` | 앱 셸, 내비게이션·작업 탭, Mock 데이터 로딩, 문서 선택과 가상 파일 추가, 모델 예시 화면 | 화면 조립, API 접근, 파일 시뮬레이션, 탐색 상태를 나눠 역할 집중. 데이터 읽기와 에러 처리의 단일 진입점 마련 |
 | `frontend/src/Dashboard.tsx` | 예시 현황 집계, 차트·위젯, 브라우저 위젯 설정 | 순수 집계 함수와 저장/복원 로직을 UI에서 분리. 예시/실측 지표의 출처 명시 |
+| `frontend/src/StructurePanel.tsx`, `ModelWorkspace.tsx` | 실제 문서 구조 분석 결과(계보 트리·링크 표·플래그·전체 요약), 모델 연결 상태와 확인 | 표시 전용. 분석·호출은 백엔드 |
 | `frontend/src/LiveWorkspace.tsx` | 실제 로컬 업로드·처리 동작, 목록·결과 표시와 상태 폴링 | 화면/요청 상태를 더 명확히 분리하고 이전 결과와 경고의 표시 계약 유지 |
 | `frontend/src/api/live.ts` | 실제 파일 API 요청, 응답 타입과 오류 처리. 결과 부재 409와 손상 409를 현재는 오류 메시지로 구분 | 메시지 의존을 없앨 안정적 오류 코드와 버전 정책 정의 |
 | `frontend/src/DocumentBrowser.tsx` | Mock 문서 목록, 필터, 가상 파일 선택·드롭 | 목록 탐색과 실제 업로드 UI의 데이터 출처를 계속 명확하게 구분 |
@@ -122,6 +123,8 @@ Mock 모델과 로컬 API 상태명은 프로토타입 계약이다. 운영 계�
 | `backend/main.py` | FastAPI 앱 조립, 초기화, Mock 응답과 라이브 라우터 연결 | 앱 설정·생명주기와 API 계약 관리 |
 | `backend/app/routers/live.py`, `models.py` | 로컬 문서 API와 응답 모델 | 인증·인가, 페이징, 버전·오류 계약은 운영 요구에 맞춰 확장 |
 | `backend/app/service.py`, `repository.py`, `config.py` | 업로드·단일 워커와 대기열·종료/복구, SQLite 상태·이력, 런타임 설정 | 서비스·저장소 경계를 유지하고 내구성 있는 작업 실행은 별도 설계 |
+| `backend/app/structure.py`, `cfb.py` | 실제 파일 구조 분석: 시그니처 기반 형식 판별, 압축·메일·OLE/Office/HWP 내장 개체·PDF 첨부 펼치기, 링크·문서번호 후보, 암호화·DRM 의심·불일치·매크로 표시. `cfb.py`는 표준 라이브러리만 쓰는 OLE 복합 문서 읽기 | 링크 대상 해석(업로드 문서와 매칭)·순환 탐지, 형식 판별 결과를 파서 선택에 연결 |
+| `backend/app/llm.py`, `routers/models.py`, `filelock.py` | `.env` 모델 연결과 연결 확인, OS 독립 실행 잠금 | 용도별 모델 어댑터, 비밀 관리 |
 | `backend/app/adapters/` | 텍스트/CSV·선택적 Docling 파서와 확장자 기반 선택 | 실제 형식 판별, 위치가 있는 구조화 결과, 추가 파서와 OCR을 별도 어댑터로 확장 |
 | `backend/app/middleware.py` | 로컬 API의 Origin 및 요청 크기 제한 | 인증·인가의 대체가 아님. 배포 경계와 운영 보안은 별도 설계 |
 | `mock-data/data.json` | 가상 문서·참조·활동 예시 | 실제 운영 데이터와 별개로 유지하고 스키마 검증 |

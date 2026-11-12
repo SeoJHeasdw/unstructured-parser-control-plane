@@ -55,5 +55,9 @@ class Settings:
         return self.runtime_dir / "results"
 
     @property
+    def structures(self) -> Path:
+        return self.runtime_dir / "structure"
+
+    @property
     def database(self) -> Path:
         return self.runtime_dir / "documents.sqlite3"

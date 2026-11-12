@@ -22,6 +22,10 @@
 | `POST /api/live/documents/{id}/process` | 기존 원본에 대한 처리 요청. 요청 바디 불필요 | `202`, 접수 시 `status: "processing"` | `404` 문서 없음, `409` 이미 처리/대기 중, `503` 대기열 만석 또는 작업자 사용 불가 |
 | `GET /api/live/documents/{id}/result` | 마지막 성공 결과 | `200`, `ParseResult` | `404` 문서 없음, `409` 성공 결과 없음 **또는 결과 포인터·파일·메타데이터 오류** |
 | `GET /api/live/documents/{id}/history` | 상태 변경·접수 실패 이벤트 | `200`, `{ "id": ..., "history": [...] }` | `404` 문서 없음 |
+| `POST /api/live/documents/{id}/structure` | 원본 구조 분석(하위 문서·링크·플래그). 원본·처리 상태는 바꾸지 않고 `runtime/structure/{id}.json`에 저장 | `200`, `{id,name,format,inspected_at,root,summary}` | `404` 문서 없음, `409` 저장 경로 확인 불가, `403` 허용되지 않은 Origin |
+| `GET /api/live/documents/{id}/structure` | 마지막 구조 분석 결과 | `200` | `404` 문서 없음, `409` 분석 결과 없음·읽기 실패 |
+| `GET /api/live/structure-summary` | 분석한 문서 전체 합계: 원본 대비 발견 문서 배율, 최대 깊이, 링크·하위 문서·플래그 종류별 수 | `200` | |
+| `GET /api/models`, `POST /api/models/{key}/test`, `POST /api/models/{key}/models` | `.env`의 모델 연결 상태(키 값 제외), 사용자가 누를 때만 짧은 채팅 요청·모델 목록 조회 | `200` | `404` 연결 없음, `409` 미설정, `403` 허용되지 않은 Origin |
 
 `202`는 요청이 **접수되었다는 뜻**이다. 반환된 스냅샷의 `processing`은 실행 중 **또는 메모리 대기열에서 대기 중**을 뜻하며, 결과가 준비됐음을 의미하지 않는다. 아주 빠른 처리는 응답 후 조회 시 이미 끝나 있을 수 있다. 목록을 다시 조회하거나 상세 문서를 폴링해 최종 상태를 확인한다.
 
@@ -113,6 +117,19 @@ Content-Type: text/plain
 ```
 
 `history`는 이벤트 삽입 순서다. 대기열 포화·워커 불가로 **접수되지 않은 요청**도 그때의 문서 `status`와 사유 메시지로 기록될 수 있다. 이력 문자열은 설명용이며 버전이 고정된 이벤트 코드가 아니다. 이력만으로 각 실행의 결과·시작/종료·원문 버전이 완전하게 재현되는 감사 추적을 보장하지 않는다.
+
+### 구조 분석 결과 (`root` 노드)
+
+| 필드 | 뜻 |
+|---|---|
+| `name`, `ext`, `size`, `location` | 표시 이름, 이름의 확장자, 바이트 수, 상위 문서 안 위치(압축 경로·`첨부: 이름`·내장 경로) |
+| `kind` | `file`(원본) · `archive-entry` · `attachment` · `embedded` |
+| `detected` | 파일 앞부분으로 판별한 실제 형식(`docx`, `xlsx`, `pptx`, `doc`, `xls`, `ppt`, `msg`, `mime`, `pdf`, `zip`, `hwp`, `hwpx`, `html`, `text`, `xml`, `image`, `encrypted-ooxml`, `ole`, `unknown`) |
+| `flags` | `encrypted`, `drm-suspect`(Office·PDF 확장자인데 형식을 알 수 없음), `format-mismatch`, `macro`, `has-images`, `image-only`, `duplicate`(같은 내용이 이미 나옴), `unreadable`, `truncated`(한도 초과), `too-large` |
+| `links[]` | `{kind, target, location, evidence}`. `kind`: `hyperlink`, `url`, `unc-path`, `file-path`, `doc-number`(후보), `external-workbook`, `field-link`, `linked-object`, `template`, `linked-image`, `subdocument`, `pdf-remote`, `external`. `location`은 `시트!셀`, `본문 문단 N`, `슬라이드 N`, `N행` 등 |
+| `children[]`, `stats`, `hash`, `duplicate_of` | 하위 문서, 이미지·페이지·시트 수 등, 내용 해시 앞 16자, 중복일 때 처음 나온 위치 |
+
+한도(기본): 깊이 8, 노드 1,500, 메모리로 여는 하위 문서 합계 300MB·개당 100MB, 링크 3,000. 하위 문서는 메모리에서만 열고 디스크에 풀지 않는다. 문서번호 후보 정규식은 `DOCOPS_DOCNUMBER_PATTERN`으로 바꿀 수 있다. 레거시 DOC·XLS·PPT 본문은 형식을 완전히 해석하지 않고 UTF-16·CP949로 훑어 후보만 찾는다(`stats.crude_text`). PDF 본문 텍스트 안의 문서번호는 아직 찾지 않는다(링크 주석·실행 동작·첨부만).
 
 ## 4. 결과가 없을 때와 오류 계약
 

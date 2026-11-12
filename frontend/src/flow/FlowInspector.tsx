@@ -118,6 +118,8 @@ function NodeDesign({ library, flow, node, onNodeData, onNodeKind, onSelectEdge,
         <NumberField label="평균 처리 시간" value={data.duration ?? 2} min={0.2} max={60} step={0.1} onCommit={duration => set({ duration })} suffix="초" />
         <NumberField label="자동 재시도" value={data.retries ?? 0} min={0} max={5} onCommit={retries => set({ retries })} suffix="회" />
         <NumberField label="모의 실패율" value={pct(data.failRate)} min={0} max={100} step={0.5} onCommit={value => set({ failRate: value / 100 })} suffix="%" />
+        {data.kind === 'task' && <NumberField label="하위 문서 생성 확률" value={pct(data.spawnRate)} min={0} max={100} onCommit={value => set({ spawnRate: value / 100 })} suffix="%" />}
+        {data.kind === 'task' && <NumberField label="최대 하위 문서" value={data.spawnMax ?? 1} min={1} max={20} onCommit={spawnMax => set({ spawnMax })} suffix="개" />}
         {data.kind === 'review' && <NumberField label="사람 검토 비율" value={pct(data.holdRate)} min={0} max={100} onCommit={value => set({ holdRate: value / 100 })} suffix="%" />}
         {data.kind === 'review' && <NumberField label="목표 처리" value={data.sla ?? 30} min={1} max={1440} onCommit={sla => set({ sla })} suffix="분" />}
       </div>
@@ -261,7 +263,7 @@ function NodeMonitor({ library, flow, node, snapshot, sim, metrics, onNavigate, 
 
     {data.kind !== 'gateway' && data.kind !== 'start' && data.kind !== 'end' && <Section title={`문서 ${docs.length}건`} aside={<div className="fi-filter">{(['all', 'held', 'failed', 'queued', 'processing'] as const).map(value => <button key={value} className={filter === value ? 'is-on' : ''} onClick={() => setFilter(value)}>{value === 'all' ? '전체' : STATE_LABEL[value]}</button>)}</div>}>
       {shown.length ? <ul className="fi-docs">{shown.slice(0, 40).map(doc => <li key={doc.id} className={`is-${doc.state}`}>
-        <div className="fi-doc-main"><b title={doc.name}>{doc.priority && <ChevronsUp size={12} />}{doc.name}</b><span><em className={`fi-state is-${doc.state}`}>{STATE_LABEL[doc.state]}</em>{childFlow && <>{nodeLabel(library, doc.node).label} · </>}{doc.state === 'processing' ? `${Math.round(doc.progress * 100)}%` : wait(snapshot.now - doc.enteredAt)}{doc.reason && <> · {doc.reason}</>}</span></div>
+        <div className="fi-doc-main"><b title={doc.parentName ? `${doc.name} ← ${doc.parentName}` : doc.name}>{doc.priority && <ChevronsUp size={12} />}{doc.depth > 0 && <i className="fi-depth">{'↳'.repeat(Math.min(doc.depth, 3))}</i>}{doc.name}</b><span><em className={`fi-state is-${doc.state}`}>{STATE_LABEL[doc.state]}</em>{childFlow && <>{nodeLabel(library, doc.node).label} · </>}{doc.state === 'processing' ? `${Math.round(doc.progress * 100)}%` : wait(snapshot.now - doc.enteredAt)}{doc.reason && <> · {doc.reason}</>}</span></div>
         {!childFlow && <div className="fi-doc-actions">
           {doc.state === 'held' && data.kind === 'review' && <><button onClick={() => act(doc, 'approve')} aria-label={`${doc.name} 승인`} title="승인"><Check size={13} /></button><button onClick={() => act(doc, 'reject')} aria-label={`${doc.name} 반려`} title="반려"><X size={13} /></button></>}
           {doc.state === 'failed' && <><button onClick={() => act(doc, 'retry')} aria-label={`${doc.name} 재시도`} title="재시도"><RotateCcw size={13} /></button><button onClick={() => act(doc, 'skip')} aria-label={`${doc.name} 건너뛰기`} title="이 단계 건너뛰기"><SkipForward size={13} /></button></>}

@@ -408,3 +408,10 @@
 .ps-kpi>button.is-warn{box-shadow:inset 0 -2px 0 #f59e0b}.ps-kpi>button.is-error{box-shadow:inset 0 -2px 0 var(--err)}
 .ps-kpi>button:disabled{opacity:1;cursor:default}
 .ps-kpi .ps-kpi-more{border-right:0;font-size:12px;font-weight:650;color:var(--brand-ink);align-items:center}
+
+.fx-counters .is-spawn,.fx-counters .is-spawn b{color:#0f766e}
+.fx-spawn{color:#0f766e;font-weight:600}
+.fx-sub-spawn{margin-left:auto;font-size:10.5px;font-weight:700;color:#0f766e;background:#e6f6f3;border-radius:4px;padding:1px 5px}
+.fx-sub-spawn+.fx-subflow-open{margin-left:0}
+.fi-depth{font-style:normal;color:#0f766e;margin-right:2px}
+.fd-lineage{max-width:220px;overflow:hidden;text-overflow:ellipsis;color:#0f766e!important}

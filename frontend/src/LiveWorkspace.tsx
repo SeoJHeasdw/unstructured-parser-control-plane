@@ -3,6 +3,7 @@ import { AlertCircle, AlertTriangle, ArrowRight, CheckCircle2, ChevronRight, Clo
 import { getLiveDocument, getLiveResult, listLiveDocuments, processLiveDocument, uploadLiveDocument } from './api/live';
 import type { LiveDoc, LiveResult, LiveStatus } from './api/live';
 import './live.css';
+import { StructureOverviewStrip, StructurePanel } from './StructurePanel';
 
 type Filter = 'all' | LiveStatus;
 const statuses: Record<LiveStatus, { label: string; description: string }> = {
@@ -51,6 +52,7 @@ export default function LiveWorkspace() {
  const [resultError,setResultError]=useState('');
  const [processingId,setProcessingId]=useState<string|null>(null);
  const [pollExhausted,setPollExhausted]=useState(false);
+ const [structureKey,setStructureKey]=useState(0);
  const pollCount=useRef(0);
  const watchedJobs=useRef(new Set<string>());
  const inputRef=useRef<HTMLInputElement>(null);
@@ -149,6 +151,7 @@ export default function LiveWorkspace() {
  return <div className="live-root">
   <div className="live-mode-banner"><div className="live-mode-icon"><Server size={18}/></div><div><strong>실제 파일 작업 공간</strong><p>선택하거나 끌어온 파일은 이 컴퓨터의 백엔드 저장소에 업로드됩니다. 파싱은 직접 실행할 때 시작합니다.</p></div><span>LOCAL BACKEND</span></div>
   <div className="live-summary"><div><span>저장된 문서</span><strong>{counts.all}<small>건</small></strong></div><div><span>처리 대기</span><strong>{counts.uploaded}<small>건</small></strong></div><div><span>처리 중 / 대기</span><strong>{counts.processing}<small>건</small></strong></div><div><span>처리 완료</span><strong>{counts.completed}<small>건</small></strong></div><div><span>실패 · 미지원</span><strong>{counts.failed+counts.unsupported}<small>건</small></strong></div></div>
+  <StructureOverviewStrip documents={documents} refreshKey={structureKey} onInspected={()=>setStructureKey(value=>value+1)}/>
   <div className={'live-dropzone '+(dragging?'live-dropzone-over':'')+(uploading?' live-dropzone-busy':'')} onDragOver={e=>{e.preventDefault();if(!uploading)setDragging(true)}} onDragLeave={e=>{if(!e.currentTarget.contains(e.relatedTarget as Node|null))setDragging(false)}} onDrop={onDrop}>
    <div className="live-drop-icon">{uploading?<LoaderCircle className="live-spin" size={21}/>:<UploadCloud size={21}/>}</div><div className="live-drop-text"><strong>{uploading?`로컬에 저장하는 중 ${uploadProgress.done} / ${uploadProgress.total}`:'실제 파일을 여기에 놓아 업로드'}</strong><p>파일을 선택하거나 놓으면 즉시 로컬에 저장됩니다. 원본 파일은 자동으로 파싱되지 않습니다.</p></div><button className="live-primary" disabled={uploading} onClick={()=>inputRef.current?.click()}><UploadCloud size={15}/> 파일 선택</button><input type="file" multiple hidden ref={inputRef} onChange={event=>{if(event.target.files)void upload(Array.from(event.target.files));event.target.value=''}} aria-label="로컬에 업로드할 파일 선택"/>
   </div>
@@ -168,6 +171,7 @@ export default function LiveWorkspace() {
     <dl className="live-detail-meta"><div><dt>파일 형식</dt><dd>{current.format || '확장자 없음'}</dd></div><div><dt>파일 크기</dt><dd>{displaySize(current.size_bytes)}</dd></div><div><dt>저장 시각</dt><dd>{displayDate(current.created_at)}</dd></div><div><dt>마지막 변경</dt><dd>{displayDate(current.updated_at)}</dd></div><div><dt>적용 파서</dt><dd>{current.parser || '아직 지정되지 않음'}</dd></div></dl>
     {(current.status==='failed'||current.status==='unsupported')&&current.error&&<div className="live-error-detail"><span><AlertTriangle size={15}/> 처리 오류</span><pre>{current.error}</pre><p>파서 미설치 또는 모델 파일 미준비가 원인일 수 있습니다. 오류 내용을 확인해 주세요.</p></div>}
     <div className="live-actions"><button className="live-primary" disabled={current.status==='processing'||!!processingId} onClick={()=>void process(current)}>{processingId===current.id?<LoaderCircle size={15} className="live-spin"/>:<Play size={15}/>} {current.status==='uploaded'?'파싱 실행':'다시 파싱 실행'}</button><span>이 버튼을 누르면 실제 처리가 시작됩니다.</span></div>
+    <StructurePanel key={current.id} doc={current} onInspected={()=>setStructureKey(value=>value+1)}/>
     <div className="live-result"><div className="live-result-head"><div><FileCode2 size={16}/><strong>파싱 결과</strong></div>{result&&<span>{result.parser} {result.parser_version}</span>}</div>{resultLoading?<div className="live-result-placeholder"><LoaderCircle className="live-spin" size={17}/> 결과를 불러오는 중</div>:resultError?<div className="live-result-placeholder live-result-error" role="alert"><AlertCircle size={17}/> {resultError}</div>:result?<>{result.is_stale&&<div className="live-feedback live-feedback-warning" role="status" style={{margin:'0 19px 10px'}}><AlertTriangle size={16}/><span><strong>이전 성공 결과 · 현재 작업 결과 아님</strong><br/>현재 처리 상태와 별개로 마지막 성공 결과를 표시합니다.</span></div>}{Array.isArray(result.warnings)&&result.warnings.length>0&&<div className="live-feedback live-feedback-warning" role="alert" style={{margin:'0 19px 10px'}}><AlertTriangle size={16}/><span><strong>파싱 경고</strong>{result.warnings.map((warning,index)=><span key={index} style={{display:'block',marginTop:'4px'}}>{warning}</span>)}</span></div>}<pre className="live-result-content">{result.markdown || '텍스트 결과가 비어 있습니다.'}</pre></>:<div className="live-result-placeholder">{current.status==='uploaded'?'파싱을 실행하면 추출 결과가 여기에 표시됩니다.':'이전에 성공한 파싱 결과가 없습니다.'}</div>}<div className="live-result-foot">결과는 서식이 적용되지 않은 텍스트로 표시됩니다.</div></div></>}
    </section>
   </div>

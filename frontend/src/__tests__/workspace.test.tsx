@@ -72,7 +72,7 @@ describe('문서 운영 Mock 콘솔',()=>{
     expect(screen.getByRole('heading',{name:'Office 문서'})).toBeTruthy();
     await user.click(screen.getByRole('button',{name:'설계'}));
     await user.click(screen.getByRole('button',{name:'작업 추가'}));
-    await waitFor(()=>expect(localStorage.getItem('document-ops:flows:v2')).toContain('새 작업'));
+    await waitFor(()=>expect(localStorage.getItem('document-ops:flows:v3')).toContain('새 작업'));
   });
   it('대시보드의 처리 흐름에서 주의가 필요한 단계로 바로 들어가 개입한다',async()=>{
     const user=userEvent.setup();render(<App/>);

@@ -39,11 +39,11 @@ export default function FlowDock({ snapshot, library, tab, onTab, onNavigate }: 
       {tab === 'events' ? (events.length ? <ul className="fd-events">{events.map(event => { const Icon = LEVEL[event.level].icon; const target = event.node ? where(event.node) : null; return <li key={event.id} className={`is-${event.level}`}>
         <time>{event.clock}</time><Icon size={13} /><span>{event.text}</span>{target && <button onClick={() => onNavigate(target.flowId, target.nodeId)}>{target.flow} › {target.node}</button>}
       </li>; })}</ul> : <p className="fd-empty"><CircleAlert size={14} /> 선택한 종류의 이벤트가 없습니다.</p>)
-        : <table className="fd-table"><thead><tr><th>문서</th><th>형식</th><th>현재 위치</th><th>상태</th><th>머문 시간</th><th>사유</th></tr></thead><tbody>
+        : <table className="fd-table"><thead><tr><th>문서</th><th>형식</th><th>계보</th><th>현재 위치</th><th>상태</th><th>머문 시간</th><th>사유</th></tr></thead><tbody>
           {docs.slice(0, 150).map(doc => { const at = where(doc.node); return <tr key={doc.id} className={`is-${doc.state}`} onClick={() => onNavigate(at.flowId, at.nodeId)} tabIndex={0} onKeyDown={event => { if (event.key === 'Enter') onNavigate(at.flowId, at.nodeId); }}>
-            <td><b>{doc.name}</b><small>{doc.id}</small></td><td><span className="fd-ext">{doc.ext}</span></td><td>{at.flow} › {at.node}</td><td><em className={`fd-state is-${doc.state}`}>{STATE[doc.state]}</em></td><td>{wait(snapshot.now - doc.enteredAt)}</td><td className="fd-reason">{doc.reason ?? ''}</td>
+            <td><b>{doc.name}</b><small>{doc.id}</small></td><td><span className="fd-ext">{doc.ext}</span></td><td className="fd-lineage" title={doc.parentName}>{doc.depth ? <>{`깊이 ${doc.depth}`} · {doc.parentName}</> : '원본'}</td><td>{at.flow} › {at.node}</td><td><em className={`fd-state is-${doc.state}`}>{STATE[doc.state]}</em></td><td>{wait(snapshot.now - doc.enteredAt)}</td><td className="fd-reason">{doc.reason ?? ''}</td>
           </tr>; })}
-          {!docs.length && <tr><td colSpan={6} className="fd-empty">조건에 맞는 문서가 없습니다.</td></tr>}
+          {!docs.length && <tr><td colSpan={7} className="fd-empty">조건에 맞는 문서가 없습니다.</td></tr>}
         </tbody></table>}
     </div>
   </section>;

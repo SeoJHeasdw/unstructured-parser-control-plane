@@ -44,3 +44,22 @@ export async function getLiveResult(id:string, signal:AbortSignal):Promise<LiveR
  if (detail === '완료된 파싱 결과가 없습니다.') return null;
  throw new Error(typeof detail === 'string' ? detail : '결과를 불러오지 못했습니다. (HTTP 409)');
 }
+
+/* ----- 구조 분석: 하위 문서와 링크. 사용자가 요청할 때만 실행한다. ----- */
+export type StructLink = { kind: string; target: string; location: string; evidence: string };
+export type StructNode = { name: string; ext: string; size: number; kind: string; location: string; detected: string | null; flags: string[]; stats: Record<string, unknown>; links: StructLink[]; children: StructNode[]; hash: string | null; duplicate_of: string | null };
+export type StructSummary = { documents: number; derived: number; max_depth: number; links: number; by_child_kind: Record<string, number>; by_link_kind: Record<string, number>; flags: Record<string, number>; detected: Record<string, number> };
+export type LiveStructure = { id: string; name: string; format: string; inspected_at: string; root: StructNode; summary: StructSummary };
+export type StructureOverview = { documents_total: number; inspected: number; documents: number; derived: number; max_depth: number; links: number; with_children: number; with_links: number; expansion: number | null; by_child_kind: Record<string, number>; by_link_kind: Record<string, number>; flags: Record<string, number> };
+
+export async function inspectLiveDocument(id:string):Promise<LiveStructure> {
+ return readResponse<LiveStructure>(await fetch(`${documentUrl(id)}/structure`,{method:'POST'}));
+}
+export async function getLiveStructure(id:string, signal?:AbortSignal):Promise<LiveStructure|null> {
+ const response = await fetch(`${documentUrl(id)}/structure`,{signal});
+ if (response.status === 409) return null;
+ return readResponse<LiveStructure>(response);
+}
+export async function getStructureOverview():Promise<StructureOverview> {
+ return readResponse<StructureOverview>(await fetch('/api/live/structure-summary'));
+}

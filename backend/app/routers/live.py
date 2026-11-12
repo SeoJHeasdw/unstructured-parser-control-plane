@@ -4,6 +4,13 @@ from app.models import DocumentHistory, DocumentList, LiveDocument, ParseResult
 from app.service import Conflict, InvalidName, MissingDocument, QueueUnavailable, TooLarge
 
 router = APIRouter(prefix="/api/live/documents", tags=["local documents"])
+summary_router = APIRouter(prefix="/api/live", tags=["local documents"])
+
+
+@summary_router.get("/structure-summary")
+def structure_summary(request: Request):
+    return request.app.state.documents.structure_summary()
+
 
 @router.get("", response_model=DocumentList)
 def list_documents(request: Request):
@@ -53,3 +60,23 @@ def get_history(doc_id: str, request: Request):
         return {"id": doc_id, "history": request.app.state.documents.repo.history(doc_id)}
     except MissingDocument:
         raise HTTPException(404, "문서를 찾을 수 없습니다.")
+
+
+@router.post("/{doc_id}/structure")
+def inspect_structure(doc_id: str, request: Request):
+    try:
+        return request.app.state.documents.inspect(doc_id)
+    except MissingDocument:
+        raise HTTPException(404, "문서를 찾을 수 없습니다.")
+    except Conflict as exc:
+        raise HTTPException(409, str(exc))
+
+
+@router.get("/{doc_id}/structure")
+def get_structure(doc_id: str, request: Request):
+    try:
+        return request.app.state.documents.structure(doc_id)
+    except MissingDocument:
+        raise HTTPException(404, "문서를 찾을 수 없습니다.")
+    except Conflict as exc:
+        raise HTTPException(409, str(exc))

@@ -69,6 +69,7 @@ function Counters({ metric, kind }: { metric: NodeMetric; kind: NodeKind }) {
     <span>처리 <b>{metric.processing}</b>{kind !== 'subflow' && <i>/{metric.capacity}</i>}</span>
     {(metric.held > 0 || kind === 'review') && <span className={metric.held ? 'is-warn' : ''}>보류 <b>{metric.held}</b></span>}
     {metric.failed > 0 && <span className="is-error">실패 <b>{metric.failed}</b></span>}
+    {metric.spawned > 0 && <span className="is-spawn" title="최근 1분 동안 만든 하위 문서">파생 <b>{metric.spawned}</b></span>}
     <em>{metric.throughput}<small>/분</small></em>
   </div>;
 }
@@ -81,7 +82,7 @@ function DesignMeta({ data, flowFormats }: { data: FlowNodeData; flowFormats: (i
   }
   if (data.kind === 'review') return <div className="fx-meta"><span>보류 {Math.round((data.holdRate ?? 0) * 100)}%</span><i />{data.assignee && <span>{data.assignee}</span>}</div>;
   if (data.kind === 'exception') return <div className="fx-meta"><span>{data.assignee ?? '담당자 확인'}</span></div>;
-  return <div className="fx-meta"><span>{KIND_META[data.kind].label}</span><i /><span>동시 {data.capacity ?? '-'}</span><i /><span>{data.duration ?? '-'}초</span>{(data.failRate ?? 0) > 0 && <><i /><span>실패 {Math.round((data.failRate ?? 0) * 1000) / 10}%</span></>}</div>;
+  return <div className="fx-meta"><span>{KIND_META[data.kind].label}</span><i /><span>동시 {data.capacity ?? '-'}</span><i /><span>{data.duration ?? '-'}초</span>{(data.failRate ?? 0) > 0 && <><i /><span>실패 {Math.round((data.failRate ?? 0) * 1000) / 10}%</span></>}{(data.spawnRate ?? 0) > 0 && <><i /><span className="fx-spawn">하위 문서 ≤{data.spawnMax ?? 1}</span></>}</div>;
 }
 
 export const FlowNodeView = memo(function FlowNodeView({ id, data, selected }: NodeProps<FlowNode>) {
@@ -118,7 +119,7 @@ export const FlowNodeView = memo(function FlowNodeView({ id, data, selected }: N
   if (kind === 'subflow') {
     const formats = data.subflow ? ui.flowFormats(data.subflow) : [];
     return <div className={`fx-box fx-subflow${state}`}>
-      <div className="fx-sub-head"><span className="fx-icon"><Icon size={15} /></span>{!monitor && <span className="fx-sub-tag">하위 흐름</span>}<button className="fx-subflow-open nodrag" onClick={open} disabled={!data.subflow} aria-label={`${data.label} 하위 흐름 열기`} title="하위 흐름 열기"><Maximize2 size={12} /></button>{monitor && <span className={`fx-status is-${status}`} title={STATUS_LABEL[status]}>{status === 'paused' ? <CirclePause size={14} /> : <i />}</span>}</div>
+      <div className="fx-sub-head"><span className="fx-icon"><Icon size={15} /></span>{!monitor && <span className="fx-sub-tag">하위 흐름</span>}{metric && metric.spawned > 0 && <span className="fx-sub-spawn" title="최근 1분 동안 만든 하위 문서">파생 {metric.spawned}</span>}<button className="fx-subflow-open nodrag" onClick={open} disabled={!data.subflow} aria-label={`${data.label} 하위 흐름 열기`} title="하위 흐름 열기"><Maximize2 size={12} /></button>{monitor && <span className={`fx-status is-${status}`} title={STATUS_LABEL[status]}>{status === 'paused' ? <CirclePause size={14} /> : <i />}</span>}</div>
       <Label id={id} data={data} />
       {metric ? <div className="fx-sub-grid">
         <span className={metric.queued >= 12 ? 'is-warn' : ''}>대기<b>{n(metric.queued)}</b></span><span>처리<b>{metric.processing}</b></span>

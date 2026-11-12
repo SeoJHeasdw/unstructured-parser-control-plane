@@ -7,16 +7,16 @@ import type { FlowLibrary, NodeKind, TaskIcon } from './flowTypes';
  * 실제 파일·백엔드·모델에는 어떤 요청도 보내지 않는다.
  */
 export type DocState = 'queued' | 'processing' | 'held' | 'failed';
-export type SimDoc = { id: string; name: string; ext: string; node: string; state: DocState; progress: number; need: number; enteredAt: number; createdAt: number; attempts: number; priority: boolean; reason?: string; hops: number };
+export type SimDoc = { id: string; name: string; ext: string; node: string; state: DocState; progress: number; need: number; enteredAt: number; createdAt: number; attempts: number; priority: boolean; reason?: string; hops: number; depth: number; parent?: string; parentName?: string; root: string };
 export type NodeStatus = 'idle' | 'busy' | 'warn' | 'error' | 'paused';
-export type NodeMetric = { kind: NodeKind; queued: number; processing: number; held: number; failed: number; capacity: number; throughput: number; done: number; failedTotal: number; paused: boolean; bypass: boolean; forced?: string; oldestWait: number; status: NodeStatus };
+export type NodeMetric = { kind: NodeKind; spawned: number; queued: number; processing: number; held: number; failed: number; capacity: number; throughput: number; done: number; failedTotal: number; paused: boolean; bypass: boolean; forced?: string; oldestWait: number; status: NodeStatus };
 export type SimEvent = { id: number; t: number; clock: string; level: 'info' | 'warn' | 'error' | 'action'; text: string; node?: string; doc?: string };
-export type SimTotals = { arrivals: number; inFlight: number; queued: number; processing: number; held: number; failed: number; completed: number; completedPerMin: number; arrivalsPerMin: number };
+export type SimTotals = { arrivals: number; inFlight: number; queued: number; processing: number; held: number; failed: number; completed: number; completedPerMin: number; arrivalsPerMin: number; derived: number; derivedPerMin: number; maxDepth: number };
 export type SimSnapshot = { now: number; clock: string; running: boolean; speed: number; rate: number; metrics: Record<string, NodeMetric>; traffic: Record<string, number>; docs: SimDoc[]; events: SimEvent[]; totals: SimTotals; version: number };
 export type DocAction = 'approve' | 'reject' | 'retry' | 'skip' | 'prioritize' | 'cancel';
 
 type REdge = { viewKey: string; to: string; formats?: string[]; weight: number; isDefault: boolean; exception: boolean; label: string };
-type RNode = { id: string; flowId: string; nodeId: string; kind: NodeKind; icon?: TaskIcon; label: string; capacity: number; duration: number; failRate: number; retries: number; holdRate: number; out: REdge[]; instant: boolean; completes: boolean };
+type RNode = { id: string; flowId: string; nodeId: string; kind: NodeKind; icon?: TaskIcon; label: string; capacity: number; duration: number; failRate: number; retries: number; holdRate: number; spawnRate: number; spawnMax: number; out: REdge[]; instant: boolean; completes: boolean };
 type Control = { paused: boolean; bypass: boolean; forced?: string; capacity?: number };
 
 const TICK_MS = 500;
@@ -40,6 +40,13 @@ const ERRORS: Partial<Record<TaskIcon, string[]>> = {
   convert: ['변환 도구 응답 없음', '지원하지 않는 레거시 서식'], detect: ['암호로 보호된 압축 파일', '손상된 파일 헤더'],
   sheet: ['외부 연결 수식 해석 실패'], mail: ['첨부 인코딩 오류'], text: ['인코딩 판별 실패'], relation: ['참조 대상 조회 시간 초과'], index: ['인덱스 쓰기 지연'],
 };
+/** 하위 문서 형식 분포(모의). 압축·메일·내장 개체마다 다르게 둔다. */
+const CHILD_MIX: Record<string, [string, number][]> = {
+  zip: [['PDF', 28], ['XLSX', 18], ['DOCX', 14], ['JPG', 10], ['PNG', 5], ['EML', 6], ['ZIP', 6], ['TXT', 5], ['DOC', 4], ['HEIC', 2], ['TIFF', 2]],
+  mail: [['PDF', 34], ['XLSX', 24], ['DOCX', 14], ['JPG', 10], ['MSG', 6], ['ZIP', 6], ['PPTX', 6]],
+  embedded: [['XLSX', 45], ['DOCX', 20], ['PDF', 20], ['PNG', 10], ['MSG', 5]],
+};
+const MAX_DEPTH = 4;
 const HOLDS = ['표 구조 신뢰도 0.71', '숫자·단위 불일치 의심', '스캔 페이지 포함', '참조 문서번호 미확인', '원문 위치 누락'];
 
 function mulberry32(seed: number) { return () => { seed |= 0; seed = (seed + 0x6d2b79f5) | 0; let t = Math.imul(seed ^ (seed >>> 15), 1 | seed); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
@@ -53,6 +60,11 @@ export class FlowSimulator {
   private docs: SimDoc[] = [];
   private controls = new Map<string, Control>();
   private completions = new Map<string, number[]>();
+  private spawnLog = new Map<string, number[]>();
+  private derivedLog: number[] = [];
+  private derived = 0;
+  private maxDepth = 0;
+  private reentry = '';
   private failedTotals = new Map<string, number>();
   private doneTotals = new Map<string, number>();
   private trafficLog = new Map<string, number[]>();
@@ -171,7 +183,7 @@ export class FlowSimulator {
   }
   entryOf(flowId: string) { return this.flowEntries.get(flowId) ?? null; }
   reset() {
-    this.docs = []; this.controls.clear(); this.completions.clear(); this.failedTotals.clear(); this.doneTotals.clear(); this.trafficLog.clear();
+    this.docs = []; this.controls.clear(); this.completions.clear(); this.spawnLog.clear(); this.derivedLog = []; this.derived = 0; this.maxDepth = 0; this.failedTotals.clear(); this.doneTotals.clear(); this.trafficLog.clear();
     this.arrivalsLog = []; this.completedLog = []; this.warned.clear(); this.events = []; this.completed = 0; this.arrivals = 0; this.now = 0; this.carry = 0;
     this.log('action', '운영자 · 모의 운영 초기화'); this.emit();
   }
@@ -190,6 +202,7 @@ export class FlowSimulator {
         this.nodes.set(rid(doc.id, node.id), {
           id: rid(doc.id, node.id), flowId: doc.id, nodeId: node.id, kind, icon: node.data.icon, label: node.data.label,
           capacity: Math.max(1, node.data.capacity ?? 3), duration: Math.max(0.2, node.data.duration ?? 2), failRate: clamp01(node.data.failRate ?? 0), retries: Math.max(0, node.data.retries ?? 0), holdRate: clamp01(node.data.holdRate ?? 0),
+          spawnRate: clamp01(node.data.spawnRate ?? 0), spawnMax: Math.max(1, Math.round(node.data.spawnMax ?? 1)),
           out: [], instant, completes: false,
         });
         if (kind === 'start' && !this.flowEntries.has(doc.id)) this.flowEntries.set(doc.id, rid(doc.id, node.id));
@@ -214,6 +227,8 @@ export class FlowSimulator {
     }
     for (const node of this.nodes.values()) if (node.kind === 'end' && node.out.length === 0) node.completes = true;
     this.entry = this.flowEntries.get(OVERVIEW_ID) ?? [...this.flowEntries.values()][0] ?? '';
+    // 하위 문서는 수집 다음 단계(형식 판별)로 다시 들어간다.
+    this.reentry = this.nodes.get(this.entry)?.out[0]?.to ?? this.entry;
   }
 
   private step(dt: number) {
@@ -252,7 +267,8 @@ export class FlowSimulator {
     const names = NAMES[ext] ?? ['문서_#'];
     const name = `${names[Math.floor(this.random() * names.length)].replace('#', String(1000 + Math.floor(this.random() * 9000)))}.${ext.toLowerCase()}`;
     this.serial += 1; this.arrivals += 1; this.arrivalsLog.push(this.now);
-    const doc: SimDoc = { id: `SIM-${String(this.serial).padStart(5, '0')}`, name, ext, node: this.entry, state: 'queued', progress: 0, need: 1, enteredAt: this.now, createdAt: this.now, attempts: 0, priority: false, hops: 0 };
+    const id = `SIM-${String(this.serial).padStart(5, '0')}`;
+    const doc: SimDoc = { id, name, ext, node: this.entry, state: 'queued', progress: 0, need: 1, enteredAt: this.now, createdAt: this.now, attempts: 0, priority: false, hops: 0, depth: 0, root: id };
     this.docs.push(doc);
     this.settle(doc, 0);
   }
@@ -286,8 +302,30 @@ export class FlowSimulator {
       return;
     }
     this.tally(node.id);
+    if (node.spawnRate > 0 && doc.depth < MAX_DEPTH && this.random() < node.spawnRate) this.spawnChildren(doc, node);
     if (node.kind === 'review' && this.random() < node.holdRate) { doc.state = 'held'; doc.progress = 0; doc.reason = HOLDS[Math.floor(this.random() * HOLDS.length)]; return; }
     this.route(doc, false);
+  }
+
+  /** 문서 속 문서: 상위 문서와 연결된 하위 문서를 만들어 형식 판별로 다시 보낸다. */
+  private spawnChildren(parent: SimDoc, node: RNode) {
+    if (!this.reentry) return;
+    const mix = CHILD_MIX[node.flowId === 'zip' ? 'zip' : node.flowId === 'mail' ? 'mail' : 'embedded'] ?? CHILD_MIX.embedded;
+    const count = 1 + Math.floor(this.random() * node.spawnMax);
+    for (let i = 0; i < count; i++) {
+      const total = mix.reduce((sum, [, weight]) => sum + weight, 0);
+      let pick = this.random() * total, ext = mix[0][0];
+      for (const [format, weight] of mix) { pick -= weight; if (pick <= 0) { ext = format; break; } }
+      const names = NAMES[ext] ?? ['문서_#'];
+      this.serial += 1;
+      const child: SimDoc = { id: `SIM-${String(this.serial).padStart(5, '0')}`, name: `${names[Math.floor(this.random() * names.length)].replace('#', String(1000 + Math.floor(this.random() * 9000)))}.${ext.toLowerCase()}`, ext, node: this.reentry, state: 'queued', progress: 0, need: 1, enteredAt: this.now, createdAt: this.now, attempts: 0, priority: false, hops: 0, depth: parent.depth + 1, parent: parent.id, parentName: parent.name, root: parent.root };
+      this.docs.push(child);
+      this.derived += 1; this.derivedLog.push(this.now);
+      this.maxDepth = Math.max(this.maxDepth, child.depth);
+      this.settle(child, 0);
+    }
+    const log = this.spawnLog.get(node.id) ?? []; for (let i = 0; i < count; i++) log.push(this.now); this.spawnLog.set(node.id, log);
+    if (count >= 4 || parent.depth >= 2) this.log('info', `${this.where(node.id)} · ${parent.name}에서 하위 문서 ${count}건 생성 (깊이 ${parent.depth + 1})`, node.id, parent.id);
   }
 
   private route(doc: SimDoc, manual: boolean, depth = 0) {
@@ -371,7 +409,7 @@ export class FlowSimulator {
       const oldestWait = here.reduce((max, doc) => doc.state === 'processing' ? max : Math.max(max, this.now - doc.enteredAt), 0);
       const paused = !!control?.paused;
       const status: NodeStatus = paused ? 'paused' : failed ? 'error' : held || (capacity && queued >= Math.max(8, capacity * 4)) ? 'warn' : processing || queued ? 'busy' : 'idle';
-      metrics[node.id] = { kind: node.kind, queued, processing, held, failed, capacity, throughput: prune(this.completions.get(node.id) ?? []).length, done: this.doneTotals.get(node.id) ?? 0, failedTotal: this.failedTotals.get(node.id) ?? 0, paused, bypass: !!control?.bypass, forced: control?.forced, oldestWait, status };
+      metrics[node.id] = { kind: node.kind, spawned: prune(this.spawnLog.get(node.id) ?? []).length, queued, processing, held, failed, capacity, throughput: prune(this.completions.get(node.id) ?? []).length, done: this.doneTotals.get(node.id) ?? 0, failedTotal: this.failedTotals.get(node.id) ?? 0, paused, bypass: !!control?.bypass, forced: control?.forced, oldestWait, status };
     }
     const traffic: Record<string, number> = {};
     for (const [key, list] of this.trafficLog) { const count = prune(list).length; if (count) traffic[key] = count; }
@@ -379,7 +417,7 @@ export class FlowSimulator {
     return {
       now: this.now, clock: this.clock(), running: this.running, speed: this.speed, rate: this.rate, metrics, traffic,
       docs: this.docs.map(doc => ({ ...doc })), events: this.events.slice(-200).reverse(),
-      totals: { arrivals: this.arrivals, inFlight: this.docs.length, queued: count('queued'), processing: count('processing'), held: count('held'), failed: count('failed'), completed: this.completed, completedPerMin: prune(this.completedLog).length, arrivalsPerMin: prune(this.arrivalsLog).length },
+      totals: { arrivals: this.arrivals, inFlight: this.docs.length, queued: count('queued'), processing: count('processing'), held: count('held'), failed: count('failed'), completed: this.completed, completedPerMin: prune(this.completedLog).length, arrivalsPerMin: prune(this.arrivalsLog).length, derived: this.derived, derivedPerMin: prune(this.derivedLog).length, maxDepth: this.maxDepth },
       version: this.eventSerial * 100000 + Math.round(this.now * 10),
     };
   }
@@ -391,12 +429,12 @@ export const worst = (a: NodeStatus, b: NodeStatus) => ORDER.indexOf(a) >= ORDER
 
 /** 하위 흐름 노드처럼 여러 실행 노드를 묶어 보여 줄 때 합산한다. */
 export function aggregate(metrics: Record<string, NodeMetric>, flowId: string): NodeMetric {
-  const result: NodeMetric = { kind: 'subflow', queued: 0, processing: 0, held: 0, failed: 0, capacity: 0, throughput: 0, done: 0, failedTotal: 0, paused: false, bypass: false, oldestWait: 0, status: 'idle' };
+  const result: NodeMetric = { kind: 'subflow', spawned: 0, queued: 0, processing: 0, held: 0, failed: 0, capacity: 0, throughput: 0, done: 0, failedTotal: 0, paused: false, bypass: false, oldestWait: 0, status: 'idle' };
   for (const [id, metric] of Object.entries(metrics)) {
     if (!id.startsWith(`${flowId}::`)) continue;
     result.queued += metric.queued; result.processing += metric.processing; result.held += metric.held; result.failed += metric.failed;
     result.capacity += metric.capacity; result.failedTotal += metric.failedTotal; result.oldestWait = Math.max(result.oldestWait, metric.oldestWait);
-    result.paused ||= metric.paused; result.status = worst(result.status, metric.status);
+    result.paused ||= metric.paused; result.status = worst(result.status, metric.status); result.spawned += metric.spawned;
     if (metric.kind === 'end') { result.throughput += metric.throughput; result.done += metric.done; }
   }
   return result;

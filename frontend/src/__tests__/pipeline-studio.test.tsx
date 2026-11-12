@@ -44,7 +44,7 @@ describe('형식과 경로', () => {
     expect(screen.getByRole('heading', { name: '.heic 처리' })).toBeTruthy();
     expect(screen.getByRole('button', { name: '설계' }).getAttribute('aria-pressed')).toBe('true');
     expect(screen.getByText(/실제 파서는 등록되지 않습니다/)).toBeTruthy();
-    await waitFor(() => expect(store.get('document-ops:flows:v2')).toContain('custom-heic'));
+    await waitFor(() => expect(store.get('document-ops:flows:v3')).toContain('custom-heic'));
     expect(onlyGets()).toBe(true);
   });
 
@@ -101,7 +101,7 @@ describe('설계 모드', () => {
     expect(screen.getByText('OCR 인식')).toBeTruthy();
     await user.click(screen.getByRole('button', { name: '설계' }));
     await user.click(screen.getByRole('button', { name: '가로 자동 정렬' }));
-    await waitFor(() => expect(JSON.parse(store.get('document-ops:flows:v2')!).flows.pdf.direction).toBe('LR'));
+    await waitFor(() => expect(JSON.parse(store.get('document-ops:flows:v3')!).flows.pdf.direction).toBe('LR'));
   });
 });
 
@@ -138,6 +138,17 @@ describe('모의 운영 엔진', () => {
     expect(doc).toBeTruthy();
     sim.moveDoc(doc!.id, sim.entryOf(flowId)!);
     expect(sim.getSnapshot().docs.find(item => item.id === doc!.id)?.node.startsWith(`${flowId}::`)).toBe(true);
+  });
+
+  it('압축·첨부·내장 개체 단계는 상위 문서와 연결된 하위 문서를 만들어 형식 판별로 다시 보낸다', () => {
+    const sim = new FlowSimulator(defaultLibrary(), 300);
+    const { totals, docs, metrics } = sim.getSnapshot();
+    expect(totals.derived).toBeGreaterThan(0);
+    expect(totals.maxDepth).toBeGreaterThanOrEqual(1);
+    const child = docs.find(doc => doc.depth > 0)!;
+    expect(child.parent && child.parentName && child.root !== child.id).toBeTruthy();
+    expect(metrics['zip::extract'].spawned + metrics['mail::attach'].spawned).toBeGreaterThan(0);
+    expect(docs.filter(doc => doc.depth > 4)).toHaveLength(0);
   });
 
   it('실패가 쌓인 단계를 재시도하고, 우회하면 처리 없이 다음 단계로 넘긴다', () => {

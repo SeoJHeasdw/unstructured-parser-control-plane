@@ -42,6 +42,7 @@ export default function LiveFlowPanel({ simulator, active, onOpen }: Props) {
     </header>
     <div className="lf-kpis">
       <div><span>유입</span><b>{t.arrivalsPerMin}<small>/분</small></b></div>
+      <div title="압축 항목·첨부·내장 개체에서 나와 형식 판별로 다시 들어간 문서"><span>파생 문서</span><b>{t.derivedPerMin}<small>/분</small></b><em>{t.arrivals ? `원본 대비 ×${((t.arrivals + t.derived) / t.arrivals).toFixed(2)} · 최대 깊이 ${t.maxDepth}` : ''}</em></div>
       <div><span>완료</span><b>{t.completedPerMin}<small>/분</small></b></div>
       <div><span>처리 중</span><b>{t.processing}</b></div>
       <div><span>대기</span><b>{t.queued}</b></div>

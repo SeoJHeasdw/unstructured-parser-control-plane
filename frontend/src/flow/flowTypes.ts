@@ -20,6 +20,9 @@ export type FlowNodeData = {
   holdRate?: number;
   assignee?: string;
   sla?: number;
+  /** 처리 성공 시 하위 문서(압축 항목·첨부·내장 개체)를 만들 확률과 최대 개수 */
+  spawnRate?: number;
+  spawnMax?: number;
   /** 하위 흐름 노드가 여는 흐름 ID */
   subflow?: string;
 };

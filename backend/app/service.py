@@ -13,7 +13,8 @@ from app.adapters.base import ParserError, UnsupportedFormat
 from app.adapters.registry import ParserRegistry
 from app.config import Settings
 from app.filelock import try_lock, unlock
-from app.repository import DocumentRepository
+from app.repository import DocumentRepository, now
+from app.structure import inspect_file
 
 logger = logging.getLogger(__name__)
 _ID = re.compile(r"^[0-9a-f]{32}$")
@@ -57,6 +58,7 @@ class DocumentService:
         self.settings.runtime_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
         self.settings.uploads.mkdir(mode=0o700, exist_ok=True)
         self.settings.results.mkdir(mode=0o700, exist_ok=True)
+        self.settings.structures.mkdir(mode=0o700, exist_ok=True)
         self.lock_file = (self.settings.runtime_dir / "server.lock").open("a+")
         try:
             try_lock(self.lock_file)
@@ -227,6 +229,54 @@ class DocumentService:
         finally:
             if temp_path:
                 temp_path.unlink(missing_ok=True)
+
+    def _source_path(self, doc: dict) -> Path:
+        source_name = doc["source_file"]
+        if source_name != Path(source_name).name or not source_name.startswith(doc["id"]):
+            raise Conflict("저장된 파일 경로를 확인할 수 없습니다.")
+        return self.settings.uploads / source_name
+
+    def inspect(self, doc_id: str) -> dict:
+        """원본을 바꾸지 않고 구조(하위 문서·링크)를 분석해 결과를 보관한다. 사용자가 요청할 때만 실행한다."""
+        doc = self.get(doc_id)
+        result = inspect_file(self._source_path(doc), doc["name"])
+        payload = {"id": doc_id, "name": doc["name"], "format": doc["format"], "inspected_at": now(), **result}
+        target = self.settings.structures / f"{doc_id}.json"
+        temp = self.settings.structures / f"{doc_id}.{uuid4().hex}.tmp"
+        with open(temp, "w", encoding="utf-8") as output:
+            json.dump(payload, output, ensure_ascii=False)
+        os.replace(temp, target)
+        return payload
+
+    def structure(self, doc_id: str) -> dict:
+        self.get(doc_id)
+        try:
+            return json.loads((self.settings.structures / f"{doc_id}.json").read_text(encoding="utf-8"))
+        except FileNotFoundError as exc:
+            raise Conflict("구조 분석 결과가 없습니다.") from exc
+        except (OSError, ValueError) as exc:
+            raise Conflict("저장된 구조 분석 결과를 읽을 수 없습니다.") from exc
+
+    def structure_summary(self) -> dict:
+        docs = self.repo.list_all()
+        total = {"documents_total": len(docs), "inspected": 0, "documents": 0, "derived": 0, "max_depth": 0, "links": 0,
+                 "by_child_kind": {}, "by_link_kind": {}, "flags": {}, "with_children": 0, "with_links": 0}
+        for doc in docs:
+            try:
+                summary = json.loads((self.settings.structures / f"{doc['id']}.json").read_text(encoding="utf-8"))["summary"]
+            except (OSError, ValueError, KeyError):
+                continue
+            total["inspected"] += 1
+            for key in ("documents", "derived", "links"):
+                total[key] += summary.get(key, 0)
+            total["max_depth"] = max(total["max_depth"], summary.get("max_depth", 0))
+            total["with_children"] += 1 if summary.get("derived") else 0
+            total["with_links"] += 1 if summary.get("links") else 0
+            for key in ("by_child_kind", "by_link_kind", "flags"):
+                for name, count in summary.get(key, {}).items():
+                    total[key][name] = total[key].get(name, 0) + count
+        total["expansion"] = round(total["documents"] / total["inspected"], 2) if total["inspected"] else None
+        return total
 
     def result(self, doc_id: str) -> dict:
         doc = self.get(doc_id)
