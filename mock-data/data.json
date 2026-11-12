@@ -1,0 +1,25 @@
+{
+  "asOf": "2026-11-12 09:42",
+  "documents": [
+    {"id":"DOC-0842","name":"제조기록서_BMR-2026-0842.pdf","source":"품질 문서함","format":"PDF","size":"8.4 MB","updated":"오늘 09:42","status":"검토 필요","stage":"품질 확인","parser":"Docling + OCR","ocr":true,"note":"스캔 2페이지에서 표 구조 확인이 필요합니다.","pages":12,"refs":1,"text":"제조기록서 BMR-2026-0842\n\n제품명: 예시 제품 A\n제조번호: LOT-2026-0812\n\n3. 제조 공정 확인\n본 작업은 SOP-PD-0076 Rev.3에 따라 수행한다. 공정별 기록 및 검토 결과는 아래 표를 참조한다.\n\n공정 | 확인 항목 | 결과\n원료 투입 | 중량 확인 | 적합\n배양 | 온도 확인 | 적합","compare":"제조기록서 BMR-2026-0842\n\n제품명: 예시 제품 A\n제조번호: LOT-2026-0812\n\n3. 제조 공정 확인\n본 작업은 SOP-PD-0076 Rev.3에 따라 수행한다.\n\n공정 | 확인 항목 | 결과\n원료 투입 | 중량 확인 | 적합\n배양 | 온도 확인 | 적합"},
+    {"id":"DOC-0841","name":"설비점검_관리대장_2026.xlsx","source":"운영 자료실","format":"XLSX","size":"2.1 MB","updated":"오늘 09:38","status":"처리 완료","stage":"인덱스 반영","parser":"Spreadsheet","ocr":false,"note":"시트 4개, 문서 참조 2건을 추출했습니다.","pages":4,"refs":2,"text":"Sheet: 점검 이력\nB12: SOP-QC-0040 Rev.5 참조\nC12: 정기 점검 완료\n\nSheet: 설비 목록\n설비 ID | 설비명 | 상태\nEQ-001 | 교반기 | 운영","compare":"Sheet: 점검 이력\nB12: SOP-QC-0040 Rev.5 참조\nC12: 정기 점검 완료\n\nSheet: 설비 목록\n설비 ID | 설비명 | 상태\nEQ-001 | 교반기 | 운영"},
+    {"id":"DOC-0840","name":"시험성적서_COA-260118.pdf","source":"시험 문서함","format":"PDF","size":"3.8 MB","updated":"오늘 09:26","status":"처리 완료","stage":"인덱스 반영","parser":"Docling","ocr":false,"note":"텍스트 및 표 추출을 완료했습니다.","pages":6,"refs":1,"text":"시험성적서 COA-260118\n\n시험 항목 | 결과 | 기준\n외관 | 적합 | 적합\npH | 7.2 | 6.8–7.6","compare":"시험성적서 COA-260118\n\n시험 항목 | 결과 | 기준\n외관 | 적합 | 적합\npH | 7.2 | 6.8–7.6"},
+    {"id":"DOC-0839","name":"현장_기록_20261112.heic","source":"현장 자료함","format":"HEIC","size":"4.6 MB","updated":"오늘 09:15","status":"형식 확인 필요","stage":"형식 확인","parser":"미지정","ocr":false,"note":"새로운 파일 형식이 발견되어 처리 경로 확인이 필요합니다.","pages":0,"refs":0,"text":"아직 파싱된 결과가 없습니다.","compare":"아직 파싱된 결과가 없습니다."},
+    {"id":"DOC-0838","name":"변경관리_회의자료_v2.pptx","source":"협업 문서함","format":"PPTX","size":"12.5 MB","updated":"오늘 08:57","status":"처리 중","stage":"파싱","parser":"Docling","ocr":false,"note":"문서 구조를 추출하는 중입니다.","pages":18,"refs":0,"text":"처리 중인 예시 문서입니다.","compare":"처리 중인 예시 문서입니다."},
+    {"id":"DOC-0837","name":"장비운영_기록_보관.zip","source":"운영 자료실","format":"ZIP","size":"28.1 MB","updated":"오늘 08:41","status":"처리 실패","stage":"압축 해제","parser":"Archive","ocr":false,"note":"일부 파일이 암호로 보호되어 있습니다.","pages":0,"refs":0,"text":"파싱 결과가 없습니다. 압축 파일에 암호가 설정되어 있습니다.","compare":"파싱 결과가 없습니다."},
+    {"id":"DOC-0836","name":"일탈보고서_DEV-2026-018.docx","source":"품질 문서함","format":"DOCX","size":"1.3 MB","updated":"어제 17:32","status":"처리 완료","stage":"인덱스 반영","parser":"Docling","ocr":false,"note":"본문과 표를 추출했습니다.","pages":5,"refs":1,"text":"일탈보고서 DEV-2026-018\n\n개요: 예시 일탈 사항\n관련 문서: SOP-QC-0040 Rev.5","compare":"일탈보고서 DEV-2026-018\n\n개요: 예시 일탈 사항\n관련 문서: SOP-QC-0040 Rev.5"},
+    {"id":"DOC-0835","name":"SOP-QC-0040_품질관리_Rev5.pdf","source":"품질 문서함","format":"PDF","size":"1.8 MB","updated":"어제 16:12","status":"처리 완료","stage":"인덱스 반영","parser":"Docling","ocr":false,"note":"참조 대상 문서입니다.","pages":8,"refs":0,"text":"SOP-QC-0040 Rev.5\n\n품질관리 절차에 관한 예시 문서입니다.","compare":"SOP-QC-0040 Rev.5\n\n품질관리 절차에 관한 예시 문서입니다."}
+  ],
+  "relations": [
+    {"id":"REL-01","sourceId":"DOC-0841","source":"설비점검_관리대장_2026.xlsx","location":"점검 이력 · B12","target":"SOP-QC-0040 Rev.5","targetId":"DOC-0835","evidence":"SOP-QC-0040 Rev.5 참조","method":"문서번호 패턴","status":"연결 완료"},
+    {"id":"REL-02","sourceId":"DOC-0842","source":"제조기록서_BMR-2026-0842.pdf","location":"3페이지 · 본문","target":"SOP-PD-0076 Rev.3","targetId":null,"evidence":"SOP-PD-0076 Rev.3에 따라 수행","method":"문서번호 패턴","status":"대상 미발견"},
+    {"id":"REL-03","sourceId":"DOC-0836","source":"일탈보고서_DEV-2026-018.docx","location":"2페이지 · 관련 문서","target":"SOP-QC-0040 Rev.5","targetId":"DOC-0835","evidence":"관련 문서: SOP-QC-0040 Rev.5","method":"문서번호 패턴","status":"연결 완료"},
+    {"id":"REL-04","sourceId":"DOC-0841","source":"설비점검_관리대장_2026.xlsx","location":"설비 목록 · D8","target":"설비 운영 절차서","targetId":null,"evidence":"관련 절차서 확인","method":"문구 기반 후보","status":"후보 확인 필요"}
+  ],
+  "activity": [
+    {"time":"09:42","title":"제조기록서 품질 확인 필요","description":"2페이지의 표 구조를 확인해 주세요.","type":"warning","documentId":"DOC-0842"},
+    {"time":"09:38","title":"설비점검 관리대장 처리 완료","description":"4개 시트 · 문서 참조 2건 추출","type":"success","documentId":"DOC-0841"},
+    {"time":"09:15","title":"새로운 파일 형식 발견","description":"HEIC · 처리 경로가 지정되지 않았습니다.","type":"new","documentId":"DOC-0839"},
+    {"time":"08:41","title":"압축 파일 처리 실패","description":"암호로 보호된 파일이 있습니다.","type":"error","documentId":"DOC-0837"}
+  ]
+}

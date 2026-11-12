@@ -1,0 +1,14 @@
+node_modules/
+dist/
+backend/.venv/
+__pycache__/
+*.pyc
+.env
+.env.*
+!.env.example
+.DS_Store
+runtime/
+
+frontend/*.tsbuildinfo
+offline/
+.pytest_cache/
