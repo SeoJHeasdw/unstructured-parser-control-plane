@@ -198,6 +198,8 @@ func render(_ job: Job) {
                 context.stroke(CGRect(x: x, y: y - 50, width: width, height: 64))
                 _ = wrap(context, value, x + 8, y - 7, width - 16, 9.5, blue, true)
                 y -= 64
+            case "spacer":
+                y -= block.width ?? 16
             case "footnote":
                 footnoteIndex += 1
                 single(context, String(footnoteIndex), min(x + 155, x + width - 10), y + 17, 6.8, blue)

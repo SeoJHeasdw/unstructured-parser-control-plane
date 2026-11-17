@@ -1,0 +1,5292 @@
+[
+  {
+    "file_id": "SOP-B1",
+    "path": "01_sop/SOP-QC-0012_시험기기_교정_Rev.2.docx",
+    "format": "docx",
+    "true_format": "docx",
+    "priority": "P0",
+    "purposes": [
+      "parse",
+      "lineage",
+      "chunking",
+      "embedding_eval",
+      "vectordb"
+    ],
+    "language": "ko",
+    "department": "QC",
+    "doc_number": "SOP-QC-0012",
+    "revision": "Rev.2",
+    "issued": "2025-06-10",
+    "family_id": "SOP-QC-0012",
+    "is_latest_expected": null,
+    "latest_status_expected": "hold",
+    "duplicate_of": null,
+    "pages": 4,
+    "scanned_pages": [],
+    "elements": {
+      "headings": 13,
+      "paragraphs": 23,
+      "lists": 6,
+      "tables": 3,
+      "images": 0,
+      "captions": 3,
+      "uncaptioned_images": 0,
+      "footnotes": 0,
+      "repeated_header_lines": 4,
+      "page_number_lines": 4,
+      "textboxes": 0
+    },
+    "tables": [
+      {
+        "id": "t1",
+        "title": "결재란",
+        "rows": 3,
+        "cols": 4,
+        "spans_pages": false,
+        "header_repeated": false,
+        "merged_cells": false
+      },
+      {
+        "id": "t2",
+        "title": "표 1. 시험기기 교정 기준",
+        "rows": 15,
+        "cols": 5,
+        "spans_pages": false,
+        "header_repeated": false,
+        "merged_cells": false
+      },
+      {
+        "id": "t3",
+        "title": "개정 이력",
+        "rows": 2,
+        "cols": 3,
+        "spans_pages": false,
+        "header_repeated": false,
+        "merged_cells": false
+      }
+    ],
+    "embedded_children": [],
+    "links": [
+      {
+        "kind": "doc_number",
+        "target": "FRM-QC-0012-A",
+        "location": "§6.1 교정 일정 확인표",
+        "expected_state": "missing",
+        "expected_target_file_ids": [],
+        "latest_file_id": null
+      },
+      {
+        "kind": "doc_number",
+        "target": "FRM-QC-0012-B",
+        "location": "§6.1 허용 오차 이탈 조사표",
+        "expected_state": "missing",
+        "expected_target_file_ids": [],
+        "latest_file_id": null
+      },
+      {
+        "kind": "doc_number",
+        "target": "FRM-QC-0012-C",
+        "location": "§6.1 교정 결과 인계서",
+        "expected_state": "missing",
+        "expected_target_file_ids": [],
+        "latest_file_id": null
+      }
+    ],
+    "pair_with": null,
+    "notes": "동일 Rev.2의 두 시행일 및 저울 교정 주기가 다르며 개정 이력은 동일하다.",
+    "flags": {
+      "encrypted": false,
+      "password": null,
+      "extension_mismatch": false,
+      "macro": false,
+      "truncated": false,
+      "empty": false
+    },
+    "bytes": 42444,
+    "sha256": "3b32fa69ed5a52e043c9ccef8414be667af7c05ebacd5d30ae1e819b445cedf2"
+  },
+  {
+    "file_id": "SOP-B2",
+    "path": "01_sop/SOP-QC-0012_시험기기교정_Rev2_수정.docx",
+    "format": "docx",
+    "true_format": "docx",
+    "priority": "P0",
+    "purposes": [
+      "parse",
+      "lineage",
+      "chunking",
+      "embedding_eval",
+      "vectordb"
+    ],
+    "language": "ko",
+    "department": "QC",
+    "doc_number": "SOP-QC-0012",
+    "revision": "Rev.2",
+    "issued": "2025-06-12",
+    "family_id": "SOP-QC-0012",
+    "is_latest_expected": null,
+    "latest_status_expected": "hold",
+    "duplicate_of": null,
+    "pages": 4,
+    "scanned_pages": [],
+    "elements": {
+      "headings": 13,
+      "paragraphs": 23,
+      "lists": 6,
+      "tables": 3,
+      "images": 0,
+      "captions": 3,
+      "uncaptioned_images": 0,
+      "footnotes": 0,
+      "repeated_header_lines": 4,
+      "page_number_lines": 4,
+      "textboxes": 0
+    },
+    "tables": [
+      {
+        "id": "t1",
+        "title": "결재란",
+        "rows": 3,
+        "cols": 4,
+        "spans_pages": false,
+        "header_repeated": false,
+        "merged_cells": false
+      },
+      {
+        "id": "t2",
+        "title": "표 1. 시험기기 교정 기준",
+        "rows": 15,
+        "cols": 5,
+        "spans_pages": false,
+        "header_repeated": false,
+        "merged_cells": false
+      },
+      {
+        "id": "t3",
+        "title": "개정 이력",
+        "rows": 2,
+        "cols": 3,
+        "spans_pages": false,
+        "header_repeated": false,
+        "merged_cells": false
+      }
+    ],
+    "embedded_children": [],
+    "links": [
+      {
+        "kind": "doc_number",
+        "target": "FRM-QC-0012-A",
+        "location": "§6.1 교정 일정 확인표",
+        "expected_state": "missing",
+        "expected_target_file_ids": [],
+        "latest_file_id": null
+      },
+      {
+        "kind": "doc_number",
+        "target": "FRM-QC-0012-B",
+        "location": "§6.1 허용 오차 이탈 조사표",
+        "expected_state": "missing",
+        "expected_target_file_ids": [],
+        "latest_file_id": null
+      },
+      {
+        "kind": "doc_number",
+        "target": "FRM-QC-0012-C",
+        "location": "§6.1 교정 결과 인계서",
+        "expected_state": "missing",
+        "expected_target_file_ids": [],
+        "latest_file_id": null
+      }
+    ],
+    "pair_with": null,
+    "notes": "동일 Rev.2의 두 시행일 및 저울 교정 주기가 다르며 개정 이력은 동일하다.",
+    "flags": {
+      "encrypted": false,
+      "password": null,
+      "extension_mismatch": false,
+      "macro": false,
+      "truncated": false,
+      "empty": false
+    },
+    "bytes": 42457,
+    "sha256": "5ce09376e31f1746e1b05bde163c1121432b8f538603655160dcf58306bb5398"
+  },
+  {
+    "file_id": "SOP-A3",
+    "path": "01_sop/SOP-QC-0040 세척 밸리데이션 절차 Rev.5 (최종).docx",
+    "format": "docx",
+    "true_format": "docx",
+    "priority": "P0",
+    "purposes": [
+      "parse",
+      "compare",
+      "structure",
+      "lineage",
+      "chunking",
+      "embedding_eval",
+      "vectordb"
+    ],
+    "language": "ko",
+    "department": "QC",
+    "doc_number": "SOP-QC-0040",
+    "revision": "Rev.5",
+    "issued": "2026-02-14",
+    "family_id": "SOP-QC-0040",
+    "is_latest_expected": true,
+    "latest_status_expected": "confirmed",
+    "duplicate_of": null,
+    "pages": 6,
+    "scanned_pages": [],
+    "elements": {
+      "headings": 21,
+      "paragraphs": 33,
+      "lists": 6,
+      "tables": 5,
+      "images": 2,
+      "captions": 7,
+      "uncaptioned_images": 0,
+      "footnotes": 1,
+      "repeated_header_lines": 6,
+      "page_number_lines": 6,
+      "textboxes": 0
+    },
+    "tables": [
+      {
+        "id": "t1",
+        "title": "결재란",
+        "rows": 3,
+        "cols": 4,
+        "spans_pages": false,
+        "header_repeated": false,
+        "merged_cells": false
+      },
+      {
+        "id": "t2",
+        "title": "용어 정의표",
+        "rows": 8,
+        "cols": 2,
+        "spans_pages": false,
+        "header_repeated": false,
+        "merged_cells": false
+      },
+      {
+        "id": "t3",
+        "title": "표 1. 세척 후 허용 기준",
+        "rows": 6,
+        "cols": 4,
+        "spans_pages": false,
+        "header_repeated": false,
+        "merged_cells": false
+      },
+      {
+        "id": "t4",
+        "title": "표 2. 스왑 채취 위치",
+        "rows": 21,
+        "cols": 6,
+        "spans_pages": true,
+        "header_repeated": true,
+        "merged_cells": false
+      },
+      {
+        "id": "t5",
+        "title": "개정 이력",
+        "rows": 4,
+        "cols": 3,
+        "spans_pages": false,
+        "header_repeated": false,
+        "merged_cells": false
+      }
+    ],
+    "embedded_children": [],
+    "links": [
+      {
+        "kind": "doc_number",
+        "target": "SOP-QC-0012 Rev.2",
+        "location": "§8 참고 문서",
+        "expected_state": "ambiguous",
+        "expected_target_file_ids": [
+          "SOP-B1",
+          "SOP-B2"
+        ],
+        "latest_file_id": null
+      },
+      {
+        "kind": "doc_number",
+        "target": "WI-QC-052",
+        "location": "§8 참고 문서",
+        "expected_state": "linked",
+        "expected_target_file_ids": [
+          "SOP-C2"
+        ],
+        "latest_file_id": null
+      },
+      {
+        "kind": "doc_number",
+        "target": "SOP-EQ-0101",
+        "location": "§8 참고 문서",
+        "expected_state": "missing",
+        "expected_target_file_ids": [],
+        "latest_file_id": null
+      },
+      {
+        "kind": "shared_path",
+        "target": "\\\\fabrikam-fs01\\qa\\SOP\\SOP-QC-0012_Rev2.docx",
+        "location": "§8 시험기기 교정 파일",
+        "expected_state": "ambiguous",
+        "expected_target_file_ids": [
+          "SOP-B1",
+          "SOP-B2"
+        ],
+        "latest_file_id": null
+      },
+      {
+        "kind": "url",
+        "target": "https://intranet.fabrikam.example/sop/SOP-QC-0040",
+        "location": "§8 인트라넷",
+        "expected_state": "external",
+        "expected_target_file_ids": [],
+        "latest_file_id": null
+      }
+    ],
+    "pair_with": "SOP-A3P",
+    "notes": "최신 개정. TOC 기준 500 ppb 및 시각 검사 기준 추가.",
+    "flags": {
+      "encrypted": false,
+      "password": null,
+      "extension_mismatch": false,
+      "macro": false,
+      "truncated": false,
+      "empty": false
+    },
+    "bytes": 110106,
+    "sha256": "f7cc96b4ee1b974fcc3978738af6e145a9733cf934c9aa253573e7663737b2e0"
+  },
+  {
+    "file_id": "SOP-A3P",
+    "path": "01_sop/SOP-QC-0040_Rev5.pdf",
+    "format": "pdf",
+    "true_format": "pdf",
+    "priority": "P0",
+    "purposes": [
+      "parse",
+      "compare",
+      "structure",
+      "lineage",
+      "chunking",
+      "embedding_eval",
+      "vectordb"
+    ],
+    "language": "ko",
+    "department": "QC",
+    "doc_number": "SOP-QC-0040",
+    "revision": "Rev.5",
+    "issued": "2026-02-14",
+    "family_id": "SOP-QC-0040",
+    "is_latest_expected": true,
+    "latest_status_expected": "confirmed",
+    "duplicate_of": null,
+    "pages": 6,
+    "scanned_pages": [],
+    "elements": {
+      "headings": 21,
+      "paragraphs": 33,
+      "lists": 6,
+      "tables": 5,
+      "images": 2,
+      "captions": 7,
+      "uncaptioned_images": 0,
+      "footnotes": 1,
+      "repeated_header_lines": 6,
+      "page_number_lines": 6,
+      "textboxes": 0
+    },
+    "tables": [
+      {
+        "id": "t1",
+        "title": "결재란",
+        "rows": 3,
+        "cols": 4,
+        "spans_pages": false,
+        "header_repeated": false,
+        "merged_cells": false
+      },
+      {
+        "id": "t2",
+        "title": "용어 정의표",
+        "rows": 8,
+        "cols": 2,
+        "spans_pages": false,
+        "header_repeated": false,
+        "merged_cells": false
+      },
+      {
+        "id": "t3",
+        "title": "표 1. 세척 후 허용 기준",
+        "rows": 6,
+        "cols": 4,
+        "spans_pages": false,
+        "header_repeated": false,
+        "merged_cells": false
+      },
+      {
+        "id": "t4",
+        "title": "표 2. 스왑 채취 위치",
+        "rows": 21,
+        "cols": 6,
+        "spans_pages": true,
+        "header_repeated": true,
+        "merged_cells": false
+      },
+      {
+        "id": "t5",
+        "title": "개정 이력",
+        "rows": 4,
+        "cols": 3,
+        "spans_pages": false,
+        "header_repeated": false,
+        "merged_cells": false
+      }
+    ],
+    "embedded_children": [],
+    "links": [
+      {
+        "kind": "doc_number",
+        "target": "SOP-QC-0012 Rev.2",
+        "location": "§8 참고 문서",
+        "expected_state": "ambiguous",
+        "expected_target_file_ids": [
+          "SOP-B1",
+          "SOP-B2"
+        ],
+        "latest_file_id": null
+      },
+      {
+        "kind": "doc_number",
+        "target": "WI-QC-052",
+        "location": "§8 참고 문서",
+        "expected_state": "linked",
+        "expected_target_file_ids": [
+          "SOP-C2"
+        ],
+        "latest_file_id": null
+      },
+      {
+        "kind": "doc_number",
+        "target": "SOP-EQ-0101",
+        "location": "§8 참고 문서",
+        "expected_state": "missing",
+        "expected_target_file_ids": [],
+        "latest_file_id": null
+      },
+      {
+        "kind": "shared_path",
+        "target": "\\\\fabrikam-fs01\\qa\\SOP\\SOP-QC-0012_Rev2.docx",
+        "location": "§8 시험기기 교정 파일",
+        "expected_state": "ambiguous",
+        "expected_target_file_ids": [
+          "SOP-B1",
+          "SOP-B2"
+        ],
+        "latest_file_id": null
+      },
+      {
+        "kind": "url",
+        "target": "https://intranet.fabrikam.example/sop/SOP-QC-0040",
+        "location": "§8 인트라넷",
+        "expected_state": "external",
+        "expected_target_file_ids": [],
+        "latest_file_id": null
+      }
+    ],
+    "pair_with": "SOP-A3",
+    "notes": "SOP-A3의 동일 페이지·내용을 유지한 디지털 PDF.",
+    "flags": {
+      "encrypted": false,
+      "password": null,
+      "extension_mismatch": false,
+      "macro": false,
+      "truncated": false,
+      "empty": false
+    },
+    "bytes": 138736,
+    "sha256": "68f45b929e5890aaf8987f6f2e4c85fef4ba5ca5288aaab47f35f49d3b311bf1"
+  },
+  {
+    "file_id": "SOP-A1",
+    "path": "01_sop/SOP-QC-0040_세척밸리데이션_Rev.3.docx",
+    "format": "docx",
+    "true_format": "docx",
+    "priority": "P0",
+    "purposes": [
+      "parse",
+      "compare",
+      "structure",
+      "lineage",
+      "chunking",
+      "embedding_eval",
+      "vectordb"
+    ],
+    "language": "ko",
+    "department": "QC",
+    "doc_number": "SOP-QC-0040",
+    "revision": "Rev.3",
+    "issued": "2024-03-11",
+    "family_id": "SOP-QC-0040",
+    "is_latest_expected": false,
+    "latest_status_expected": "confirmed",
+    "duplicate_of": null,
+    "pages": 6,
+    "scanned_pages": [],
+    "elements": {
+      "headings": 20,
+      "paragraphs": 31,
+      "lists": 6,
+      "tables": 5,
+      "images": 1,
+      "captions": 6,
+      "uncaptioned_images": 0,
+      "footnotes": 1,
+      "repeated_header_lines": 6,
+      "page_number_lines": 6,
+      "textboxes": 0
+    },
+    "tables": [
+      {
+        "id": "t1",
+        "title": "결재란",
+        "rows": 3,
+        "cols": 4,
+        "spans_pages": false,
+        "header_repeated": false,
+        "merged_cells": false
+      },
+      {
+        "id": "t2",
+        "title": "용어 정의표",
+        "rows": 8,
+        "cols": 2,
+        "spans_pages": false,
+        "header_repeated": false,
+        "merged_cells": false
+      },
+      {
+        "id": "t3",
+        "title": "표 1. 세척 후 허용 기준",
+        "rows": 6,
+        "cols": 4,
+        "spans_pages": false,
+        "header_repeated": false,
+        "merged_cells": false
+      },
+      {
+        "id": "t4",
+        "title": "표 2. 스왑 채취 위치",
+        "rows": 20,
+        "cols": 6,
+        "spans_pages": true,
+        "header_repeated": true,
+        "merged_cells": false
+      },
+      {
+        "id": "t5",
+        "title": "개정 이력",
+        "rows": 2,
+        "cols": 3,
+        "spans_pages": false,
+        "header_repeated": false,
+        "merged_cells": false
+      }
+    ],
+    "embedded_children": [],
+    "links": [
+      {
+        "kind": "doc_number",
+        "target": "SOP-QC-0012 Rev.2",
+        "location": "§8 참고 문서",
+        "expected_state": "ambiguous",
+        "expected_target_file_ids": [
+          "SOP-B1",
+          "SOP-B2"
+        ],
+        "latest_file_id": null
+      },
+      {
+        "kind": "doc_number",
+        "target": "WI-QC-052",
+        "location": "§8 참고 문서",
+        "expected_state": "linked",
+        "expected_target_file_ids": [
+          "SOP-C2"
+        ],
+        "latest_file_id": null
+      },
+      {
+        "kind": "doc_number",
+        "target": "SOP-EQ-0101",
+        "location": "§8 참고 문서",
+        "expected_state": "missing",
+        "expected_target_file_ids": [],
+        "latest_file_id": null
+      },
+      {
+        "kind": "shared_path",
+        "target": "\\\\fabrikam-fs01\\qa\\SOP\\SOP-QC-0012_Rev2.docx",
+        "location": "§8 시험기기 교정 파일",
+        "expected_state": "ambiguous",
+        "expected_target_file_ids": [
+          "SOP-B1",
+          "SOP-B2"
+        ],
+        "latest_file_id": null
+      },
+      {
+        "kind": "url",
+        "target": "https://intranet.fabrikam.example/sop/SOP-QC-0040",
+        "location": "§8 인트라넷",
+        "expected_state": "external",
+        "expected_target_file_ids": [],
+        "latest_file_id": null
+      }
+    ],
+    "pair_with": null,
+    "notes": "잔류 20 ppm, 채취 위치 20개.",
+    "flags": {
+      "encrypted": false,
+      "password": null,
+      "extension_mismatch": false,
+      "macro": false,
+      "truncated": false,
+      "empty": false
+    },
+    "bytes": 76328,
+    "sha256": "2b4c5eb427ad0a967c42ecc97fc93d34d4d0887b626f151bdfa8f162372164f0"
+  },
+  {
+    "file_id": "SOP-A2",
+    "path": "01_sop/SOP-QC-0040_세척밸리데이션_Rev.4.docx",
+    "format": "docx",
+    "true_format": "docx",
+    "priority": "P0",
+    "purposes": [
+      "parse",
+      "compare",
+      "structure",
+      "lineage",
+      "chunking",
+      "embedding_eval",
+      "vectordb"
+    ],
+    "language": "ko",
+    "department": "QC",
+    "doc_number": "SOP-QC-0040",
+    "revision": "Rev.4",
+    "issued": "2025-01-20",
+    "family_id": "SOP-QC-0040",
+    "is_latest_expected": false,
+    "latest_status_expected": "confirmed",
+    "duplicate_of": null,
+    "pages": 6,
+    "scanned_pages": [],
+    "elements": {
+      "headings": 20,
+      "paragraphs": 31,
+      "lists": 6,
+      "tables": 5,
+      "images": 1,
+      "captions": 6,
+      "uncaptioned_images": 0,
+      "footnotes": 1,
+      "repeated_header_lines": 6,
+      "page_number_lines": 6,
+      "textboxes": 0
+    },
+    "tables": [
+      {
+        "id": "t1",
+        "title": "결재란",
+        "rows": 3,
+        "cols": 4,
+        "spans_pages": false,
+        "header_repeated": false,
+        "merged_cells": false
+      },
+      {
+        "id": "t2",
+        "title": "용어 정의표",
+        "rows": 8,
+        "cols": 2,
+        "spans_pages": false,
+        "header_repeated": false,
+        "merged_cells": false
+      },
+      {
+        "id": "t3",
+        "title": "표 1. 세척 후 허용 기준",
+        "rows": 6,
+        "cols": 4,
+        "spans_pages": false,
+        "header_repeated": false,
+        "merged_cells": false
+      },
+      {
+        "id": "t4",
+        "title": "표 2. 스왑 채취 위치",
+        "rows": 21,
+        "cols": 6,
+        "spans_pages": true,
+        "header_repeated": true,
+        "merged_cells": false
+      },
+      {
+        "id": "t5",
+        "title": "개정 이력",
+        "rows": 3,
+        "cols": 3,
+        "spans_pages": false,
+        "header_repeated": false,
+        "merged_cells": false
+      }
+    ],
+    "embedded_children": [],
+    "links": [
+      {
+        "kind": "doc_number",
+        "target": "SOP-QC-0012 Rev.2",
+        "location": "§8 참고 문서",
+        "expected_state": "ambiguous",
+        "expected_target_file_ids": [
+          "SOP-B1",
+          "SOP-B2"
+        ],
+        "latest_file_id": null
+      },
+      {
+        "kind": "doc_number",
+        "target": "WI-QC-052",
+        "location": "§8 참고 문서",
+        "expected_state": "linked",
+        "expected_target_file_ids": [
+          "SOP-C2"
+        ],
+        "latest_file_id": null
+      },
+      {
+        "kind": "doc_number",
+        "target": "SOP-EQ-0101",
+        "location": "§8 참고 문서",
+        "expected_state": "missing",
+        "expected_target_file_ids": [],
+        "latest_file_id": null
+      },
+      {
+        "kind": "shared_path",
+        "target": "\\\\fabrikam-fs01\\qa\\SOP\\SOP-QC-0012_Rev2.docx",
+        "location": "§8 시험기기 교정 파일",
+        "expected_state": "ambiguous",
+        "expected_target_file_ids": [
+          "SOP-B1",
+          "SOP-B2"
+        ],
+        "latest_file_id": null
+      },
+      {
+        "kind": "url",
+        "target": "https://intranet.fabrikam.example/sop/SOP-QC-0040",
+        "location": "§8 인트라넷",
+        "expected_state": "external",
+        "expected_target_file_ids": [],
+        "latest_file_id": null
+      }
+    ],
+    "pair_with": null,
+    "notes": "이전 개정. 잔류 10 ppm 및 21번 채취점 추가.",
+    "flags": {
+      "encrypted": false,
+      "password": null,
+      "extension_mismatch": false,
+      "macro": false,
+      "truncated": false,
+      "empty": false
+    },
+    "bytes": 76429,
+    "sha256": "6b1715846813ba268484919ced2a1559288752ddd731ba8480b5e991e7ca922d"
+  },
+  {
+    "file_id": "SOP-C1",
+    "path": "01_sop/SOP-QC-014_HPLC_시스템적합성_v3.docx",
+    "format": "docx",
+    "true_format": "docx",
+    "priority": "P0",
+    "purposes": [
+      "parse",
+      "chunking",
+      "embedding_eval",
+      "vectordb"
+    ],
+    "language": "ko",
+    "department": "QC",
+    "doc_number": "SOP-QC-014",
+    "revision": "v3",
+    "issued": "2026-04-06",
+    "family_id": "SOP-QC-014",
+    "is_latest_expected": true,
+    "latest_status_expected": "single",
+    "duplicate_of": null,
+    "pages": 3,
+    "scanned_pages": [],
+    "elements": {
+      "headings": 8,
+      "paragraphs": 23,
+      "lists": 1,
+      "tables": 2,
+      "images": 1,
+      "captions": 3,
+      "uncaptioned_images": 0,
+      "footnotes": 0,
+      "repeated_header_lines": 3,
+      "page_number_lines": 3,
+      "textboxes": 0
+    },
+    "tables": [
+      {
+        "id": "t1",
+        "title": "표 1. 이동상 준비 단계",
+        "rows": 4,
+        "cols": 3,
+        "spans_pages": false,
+        "header_repeated": false,
+        "merged_cells": false
+      },
+      {
+        "id": "t2",
+        "title": "표 2. 시스템 적합성 판정",
+        "rows": 4,
+        "cols": 3,
+        "spans_pages": false,
+        "header_repeated": false,
+        "merged_cells": false
+      }
+    ],
+    "embedded_children": [],
+    "links": [
+      {
+        "kind": "doc_number",
+        "target": "SOP-QC-0012",
+        "location": "§6 참고",
+        "expected_state": "ambiguous",
+        "expected_target_file_ids": [
+          "SOP-B1",
+          "SOP-B2"
+        ],
+        "latest_file_id": null
+      }
+    ],
+    "pair_with": null,
+    "notes": "",
+    "flags": {
+      "encrypted": false,
+      "password": null,
+      "extension_mismatch": false,
+      "macro": false,
+      "truncated": false,
+      "empty": false
+    },
+    "bytes": 69182,
+    "sha256": "6e5973f9bae9faafa74353af1f7c2d2505f2d350e51bef1a3a72755a8adf5993"
+  },
+  {
+    "file_id": "SOP-A4",
+    "path": "01_sop/복사본 - SOP-QC-0040_세척밸리데이션_Rev.4.docx",
+    "format": "docx",
+    "true_format": "docx",
+    "priority": "P0",
+    "purposes": [
+      "parse",
+      "lineage",
+      "structure"
+    ],
+    "language": "ko",
+    "department": "QC",
+    "doc_number": "SOP-QC-0040",
+    "revision": "Rev.4",
+    "issued": "2025-01-20",
+    "family_id": "SOP-QC-0040",
+    "is_latest_expected": false,
+    "latest_status_expected": "confirmed",
+    "duplicate_of": "SOP-A2",
+    "pages": 6,
+    "scanned_pages": [],
+    "elements": {
+      "headings": 20,
+      "paragraphs": 31,
+      "lists": 6,
+      "tables": 5,
+      "images": 1,
+      "captions": 6,
+      "uncaptioned_images": 0,
+      "footnotes": 1,
+      "repeated_header_lines": 6,
+      "page_number_lines": 6,
+      "textboxes": 0
+    },
+    "tables": [
+      {
+        "id": "t1",
+        "title": "결재란",
+        "rows": 3,
+        "cols": 4,
+        "spans_pages": false,
+        "header_repeated": false,
+        "merged_cells": false
+      },
+      {
+        "id": "t2",
+        "title": "용어 정의표",
+        "rows": 8,
+        "cols": 2,
+        "spans_pages": false,
+        "header_repeated": false,
+        "merged_cells": false
+      },
+      {
+        "id": "t3",
+        "title": "표 1. 세척 후 허용 기준",
+        "rows": 6,
+        "cols": 4,
+        "spans_pages": false,
+        "header_repeated": false,
+        "merged_cells": false
+      },
+      {
+        "id": "t4",
+        "title": "표 2. 스왑 채취 위치",
+        "rows": 21,
+        "cols": 6,
+        "spans_pages": true,
+        "header_repeated": true,
+        "merged_cells": false
+      },
+      {
+        "id": "t5",
+        "title": "개정 이력",
+        "rows": 3,
+        "cols": 3,
+        "spans_pages": false,
+        "header_repeated": false,
+        "merged_cells": false
+      }
+    ],
+    "embedded_children": [],
+    "links": [
+      {
+        "kind": "doc_number",
+        "target": "SOP-QC-0012 Rev.2",
+        "location": "§8 참고 문서",
+        "expected_state": "ambiguous",
+        "expected_target_file_ids": [
+          "SOP-B1",
+          "SOP-B2"
+        ],
+        "latest_file_id": null
+      },
+      {
+        "kind": "doc_number",
+        "target": "WI-QC-052",
+        "location": "§8 참고 문서",
+        "expected_state": "linked",
+        "expected_target_file_ids": [
+          "SOP-C2"
+        ],
+        "latest_file_id": null
+      },
+      {
+        "kind": "doc_number",
+        "target": "SOP-EQ-0101",
+        "location": "§8 참고 문서",
+        "expected_state": "missing",
+        "expected_target_file_ids": [],
+        "latest_file_id": null
+      },
+      {
+        "kind": "shared_path",
+        "target": "\\\\fabrikam-fs01\\qa\\SOP\\SOP-QC-0012_Rev2.docx",
+        "location": "§8 시험기기 교정 파일",
+        "expected_state": "ambiguous",
+        "expected_target_file_ids": [
+          "SOP-B1",
+          "SOP-B2"
+        ],
+        "latest_file_id": null
+      },
+      {
+        "kind": "url",
+        "target": "https://intranet.fabrikam.example/sop/SOP-QC-0040",
+        "location": "§8 인트라넷",
+        "expected_state": "external",
+        "expected_target_file_ids": [],
+        "latest_file_id": null
+      }
+    ],
+    "pair_with": null,
+    "notes": "SOP-A2의 바이트 동일 복사본.",
+    "flags": {
+      "encrypted": false,
+      "password": null,
+      "extension_mismatch": false,
+      "macro": false,
+      "truncated": false,
+      "empty": false
+    },
+    "bytes": 76429,
+    "sha256": "6b1715846813ba268484919ced2a1559288752ddd731ba8480b5e991e7ca922d"
+  },
+  {
+    "file_id": "RPT-2",
+    "path": "02_reports/DEV-2026-0117_일탈보고서_온도이탈.docx",
+    "format": "docx",
+    "true_format": "docx",
+    "priority": "P0",
+    "purposes": [
+      "parse",
+      "compare",
+      "structure",
+      "lineage",
+      "chunking",
+      "embedding_eval",
+      "vectordb"
+    ],
+    "language": "ko",
+    "department": "QA",
+    "doc_number": "DEV-2026-0117",
+    "revision": null,
+    "issued": "2026-10-08",
+    "family_id": "DEV-2026-0117",
+    "is_latest_expected": true,
+    "latest_status_expected": "confirmed",
+    "duplicate_of": null,
+    "pages": 4,
+    "scanned_pages": [],
+    "elements": {
+      "headings": 8,
+      "paragraphs": 24,
+      "lists": 3,
+      "tables": 2,
+      "images": 1,
+      "captions": 3,
+      "uncaptioned_images": 0,
+      "footnotes": 0,
+      "repeated_header_lines": 4,
+      "page_number_lines": 4,
+      "textboxes": 0
+    },
+    "tables": [
+      {
+        "id": "t1",
+        "title": "표 1. 사건 타임라인",
+        "rows": 6,
+        "cols": 3,
+        "spans_pages": false,
+        "header_repeated": false,
+        "merged_cells": false
+      },
+      {
+        "id": "t2",
+        "title": "표 2. 영향 로트",
+        "rows": 2,
+        "cols": 5,
+        "spans_pages": false,
+        "header_repeated": false,
+        "merged_cells": false
+      }
+    ],
+    "embedded_children": [],
+    "links": [
+      {
+        "kind": "doc_number",
+        "target": "CAPA-2026-0042",
+        "location": "p.4 §5 시정 및 예방 조치",
+        "expected_state": "linked",
+        "expected_target_file_ids": [
+          "RPT-3"
+        ],
+        "latest_file_id": null
+      }
+    ],
+    "pair_with": "RPT-2P",
+    "notes": "",
+    "flags": {
+      "encrypted": false,
+      "password": null,
+      "extension_mismatch": false,
+      "macro": false,
+      "truncated": false,
+      "empty": false
+    },
+    "bytes": 83980,
+    "sha256": "33997b4437cc881959ff81d92852193766163d414f714c8bb4fc580154d0e88e"
+  },
+  {
+    "file_id": "RPT-2P",
+    "path": "02_reports/DEV-2026-0117_일탈보고서_첨부포함.pdf",
+    "format": "pdf",
+    "true_format": "pdf",
+    "priority": "P0",
+    "purposes": [
+      "parse",
+      "compare",
+      "structure",
+      "lineage",
+      "chunking",
+      "embedding_eval",
+      "vectordb"
+    ],
+    "language": "ko",
+    "department": "QA",
+    "doc_number": "DEV-2026-0117",
+    "revision": null,
+    "issued": "2026-10-08",
+    "family_id": "DEV-2026-0117",
+    "is_latest_expected": true,
+    "latest_status_expected": "confirmed",
+    "duplicate_of": null,
+    "pages": 4,
+    "scanned_pages": [],
+    "elements": {
+      "headings": 8,
+      "paragraphs": 24,
+      "lists": 3,
+      "tables": 2,
+      "images": 1,
+      "captions": 3,
+      "uncaptioned_images": 0,
+      "footnotes": 0,
+      "repeated_header_lines": 4,
+      "page_number_lines": 4,
+      "textboxes": 0
+    },
+    "tables": [
+      {
+        "id": "t1",
+        "title": "표 1. 사건 타임라인",
+        "rows": 6,
+        "cols": 3,
+        "spans_pages": false,
+        "header_repeated": false,
+        "merged_cells": false
+      },
+      {
+        "id": "t2",
+        "title": "표 2. 영향 로트",
+        "rows": 2,
+        "cols": 5,
+        "spans_pages": false,
+        "header_repeated": false,
+        "merged_cells": false
+      }
+    ],
+    "embedded_children": [
+      {
+        "name": "온도기록_원본_EQ-FRZ-D_2026-10-03.csv",
+        "kind": "pdf_attachment",
+        "path_inside": "온도기록_원본_EQ-FRZ-D_2026-10-03.csv",
+        "true_format": "csv"
+      },
+      {
+        "name": "현장사진_냉동고D.jpg",
+        "kind": "pdf_attachment",
+        "path_inside": "현장사진_냉동고D.jpg",
+        "true_format": "jpg"
+      }
+    ],
+    "links": [
+      {
+        "kind": "doc_number",
+        "target": "CAPA-2026-0042",
+        "location": "p.4 §5 시정 및 예방 조치",
+        "expected_state": "linked",
+        "expected_target_file_ids": [
+          "RPT-3"
+        ],
+        "latest_file_id": null
+      }
+    ],
+    "pair_with": "RPT-2",
+    "notes": "원본 온도기록 CSV 및 현장 사진을 PDF 파일 첨부로 포함.",
+    "flags": {
+      "encrypted": false,
+      "password": null,
+      "extension_mismatch": false,
+      "macro": false,
+      "truncated": false,
+      "empty": false
+    },
+    "bytes": 109048,
+    "sha256": "9195a1dae5ac8b08695c20a2a8e65a25f4c9a0677d95e3a9a6e42d36279f4437"
+  },
+  {
+    "file_id": "RPT-1",
+    "path": "02_reports/RPT-EQ-2026-031_냉각수순환설비_정기점검보고서.docx",
+    "format": "docx",
+    "true_format": "docx",
+    "priority": "P0",
+    "purposes": [
+      "parse",
+      "compare",
+      "structure",
+      "lineage",
+      "chunking",
+      "embedding_eval",
+      "vectordb"
+    ],
+    "language": "ko",
+    "department": "설비",
+    "doc_number": "RPT-EQ-2026-031",
+    "revision": null,
+    "issued": "2026-10-15",
+    "family_id": "RPT-EQ-2026-031",
+    "is_latest_expected": true,
+    "latest_status_expected": "confirmed",
+    "duplicate_of": null,
+    "pages": 7,
+    "scanned_pages": [],
+    "elements": {
+      "headings": 10,
+      "paragraphs": 26,
+      "lists": 3,
+      "tables": 3,
+      "images": 9,
+      "captions": 9,
+      "uncaptioned_images": 3,
+      "footnotes": 0,
+      "repeated_header_lines": 7,
+      "page_number_lines": 7,
+      "textboxes": 0
+    },
+    "tables": [
+      {
+        "id": "t1",
+        "title": "표 1. 점검 결과",
+        "rows": 12,
+        "cols": 6,
+        "spans_pages": false,
+        "header_repeated": false,
+        "merged_cells": false
+      },
+      {
+        "id": "t2",
+        "title": "표 2. 현장 계측 기록",
+        "rows": 4,
+        "cols": 4,
+        "spans_pages": false,
+        "header_repeated": false,
+        "merged_cells": false
+      },
+      {
+        "id": "t3",
+        "title": "검토 및 승인",
+        "rows": 3,
+        "cols": 3,
+        "spans_pages": false,
+        "header_repeated": false,
+        "merged_cells": false
+      }
+    ],
+    "embedded_children": [],
+    "links": [
+      {
+        "kind": "doc_number",
+        "target": "SOP-QC-0040 Rev.4",
+        "location": "p.7 §8 참고 문서",
+        "expected_state": "outdated",
+        "expected_target_file_ids": [
+          "SOP-A2",
+          "SOP-A4"
+        ],
+        "latest_file_id": "SOP-A3"
+      },
+      {
+        "kind": "doc_number",
+        "target": "SOP-EQ-0101",
+        "location": "p.7 §8 참고 문서",
+        "expected_state": "missing",
+        "expected_target_file_ids": [],
+        "latest_file_id": null
+      },
+      {
+        "kind": "doc_number",
+        "target": "SOP-QC-014",
+        "location": "p.7 §8 참고 문서",
+        "expected_state": "linked",
+        "expected_target_file_ids": [
+          "SOP-C1"
+        ],
+        "latest_file_id": null
+      },
+      {
+        "kind": "shared_path",
+        "target": "\\\\fabrikam-fs01\\eng\\equipment\\EQ-COOL-02\\점검이력.xlsx",
+        "location": "p.7 §8 참고 문서",
+        "expected_state": "missing",
+        "expected_target_file_ids": [],
+        "latest_file_id": null
+      }
+    ],
+    "pair_with": "RPT-1P",
+    "notes": "",
+    "flags": {
+      "encrypted": false,
+      "password": null,
+      "extension_mismatch": false,
+      "macro": false,
+      "truncated": false,
+      "empty": false
+    },
+    "bytes": 306943,
+    "sha256": "3a6dd243c56653a6705300e06105aa5042ee93a6388fba1f697f4313cef668e2"
+  },
+  {
+    "file_id": "RPT-1P",
+    "path": "02_reports/RPT-EQ-2026-031_점검보고서_서명본.pdf",
+    "format": "pdf",
+    "true_format": "pdf",
+    "priority": "P0",
+    "purposes": [
+      "parse",
+      "ocr",
+      "compare",
+      "structure",
+      "lineage",
+      "chunking",
+      "embedding_eval",
+      "vectordb"
+    ],
+    "language": "ko",
+    "department": "설비",
+    "doc_number": "RPT-EQ-2026-031",
+    "revision": null,
+    "issued": "2026-10-15",
+    "family_id": "RPT-EQ-2026-031",
+    "is_latest_expected": true,
+    "latest_status_expected": "confirmed",
+    "duplicate_of": null,
+    "pages": 7,
+    "scanned_pages": [
+      4
+    ],
+    "elements": {
+      "headings": 10,
+      "paragraphs": 26,
+      "lists": 3,
+      "tables": 3,
+      "images": 9,
+      "captions": 9,
+      "uncaptioned_images": 3,
+      "footnotes": 0,
+      "repeated_header_lines": 7,
+      "page_number_lines": 7,
+      "textboxes": 0
+    },
+    "tables": [
+      {
+        "id": "t1",
+        "title": "표 1. 점검 결과",
+        "rows": 12,
+        "cols": 6,
+        "spans_pages": false,
+        "header_repeated": false,
+        "merged_cells": false
+      },
+      {
+        "id": "t2",
+        "title": "표 2. 현장 계측 기록",
+        "rows": 4,
+        "cols": 4,
+        "spans_pages": false,
+        "header_repeated": false,
+        "merged_cells": false
+      },
+      {
+        "id": "t3",
+        "title": "검토 및 승인",
+        "rows": 3,
+        "cols": 3,
+        "spans_pages": false,
+        "header_repeated": false,
+        "merged_cells": false
+      }
+    ],
+    "embedded_children": [],
+    "links": [
+      {
+        "kind": "doc_number",
+        "target": "SOP-QC-0040 Rev.4",
+        "location": "p.7 §8 참고 문서",
+        "expected_state": "outdated",
+        "expected_target_file_ids": [
+          "SOP-A2",
+          "SOP-A4"
+        ],
+        "latest_file_id": "SOP-A3"
+      },
+      {
+        "kind": "doc_number",
+        "target": "SOP-EQ-0101",
+        "location": "p.7 §8 참고 문서",
+        "expected_state": "missing",
+        "expected_target_file_ids": [],
+        "latest_file_id": null
+      },
+      {
+        "kind": "doc_number",
+        "target": "SOP-QC-014",
+        "location": "p.7 §8 참고 문서",
+        "expected_state": "linked",
+        "expected_target_file_ids": [
+          "SOP-C1"
+        ],
+        "latest_file_id": null
+      },
+      {
+        "kind": "shared_path",
+        "target": "\\\\fabrikam-fs01\\eng\\equipment\\EQ-COOL-02\\점검이력.xlsx",
+        "location": "p.7 §8 참고 문서",
+        "expected_state": "missing",
+        "expected_target_file_ids": [],
+        "latest_file_id": null
+      }
+    ],
+    "pair_with": "RPT-1",
+    "notes": "4쪽 현장 확인서는 붉은 승인 도장과 수기 체크가 있는 스캔. 마지막 장 서명 이미지.",
+    "flags": {
+      "encrypted": false,
+      "password": null,
+      "extension_mismatch": false,
+      "macro": false,
+      "truncated": false,
+      "empty": false
+    },
+    "bytes": 665633,
+    "sha256": "734d5fdf85bcc77eecbabf5335301e0c52c68d8cfa094586001234bfda0d845c"
+  },
+  {
+    "file_id": "COA-1",
+    "path": "03_certificates/COA_FBX-101_Lot-2026A031.pdf",
+    "format": "pdf",
+    "true_format": "pdf",
+    "priority": "P0",
+    "purposes": [
+      "parse",
+      "compare",
+      "structure",
+      "lineage",
+      "chunking",
+      "embedding_eval",
+      "vectordb"
+    ],
+    "language": "ko",
+    "department": "QC",
+    "doc_number": "COA-FBX101-2026A031",
+    "revision": null,
+    "issued": "2026-10-14",
+    "family_id": "COA-FBX101-2026A031",
+    "is_latest_expected": true,
+    "latest_status_expected": "confirmed",
+    "duplicate_of": null,
+    "pages": 3,
+    "scanned_pages": [],
+    "elements": {
+      "headings": 5,
+      "paragraphs": 24,
+      "lists": 0,
+      "tables": 2,
+      "images": 1,
+      "captions": 2,
+      "uncaptioned_images": 1,
+      "footnotes": 0,
+      "repeated_header_lines": 3,
+      "page_number_lines": 3,
+      "textboxes": 0
+    },
+    "tables": [
+      {
+        "id": "t1",
+        "title": "표 1. 시험 결과",
+        "rows": 24,
+        "cols": 5,
+        "spans_pages": true,
+        "header_repeated": true,
+        "merged_cells": false
+      },
+      {
+        "id": "t2",
+        "title": "표 2. 원료 정보",
+        "rows": 3,
+        "cols": 9,
+        "spans_pages": false,
+        "header_repeated": false,
+        "merged_cells": false
+      }
+    ],
+    "embedded_children": [],
+    "links": [
+      {
+        "kind": "doc_number",
+        "target": "SPEC-FBX101 Rev.2",
+        "location": "p.1 §1 제품 정보",
+        "expected_state": "missing",
+        "expected_target_file_ids": [],
+        "latest_file_id": null
+      }
+    ],
+    "pair_with": "COA-1S",
+    "notes": "",
+    "flags": {
+      "encrypted": false,
+      "password": null,
+      "extension_mismatch": false,
+      "macro": false,
+      "truncated": false,
+      "empty": false
+    },
+    "bytes": 60879,
+    "sha256": "80c48f9588565de3a3120c23424218782a121f6ca375cb3734689e6e9bb9f0c3"
+  },
+  {
+    "file_id": "COA-1S",
+    "path": "03_certificates/COA_FBX-101_Lot-2026A031_스캔.pdf",
+    "format": "pdf",
+    "true_format": "pdf",
+    "priority": "P0",
+    "purposes": [
+      "ocr",
+      "compare",
+      "structure",
+      "lineage",
+      "chunking",
+      "embedding_eval",
+      "vectordb"
+    ],
+    "language": "ko",
+    "department": "QC",
+    "doc_number": "COA-FBX101-2026A031",
+    "revision": null,
+    "issued": "2026-10-14",
+    "family_id": "COA-FBX101-2026A031",
+    "is_latest_expected": true,
+    "latest_status_expected": "confirmed",
+    "duplicate_of": null,
+    "pages": 3,
+    "scanned_pages": [
+      1,
+      2,
+      3
+    ],
+    "elements": {
+      "headings": 5,
+      "paragraphs": 24,
+      "lists": 0,
+      "tables": 2,
+      "images": 1,
+      "captions": 2,
+      "uncaptioned_images": 1,
+      "footnotes": 0,
+      "repeated_header_lines": 3,
+      "page_number_lines": 3,
+      "textboxes": 0,
+      "handwritten_annotations": 1
+    },
+    "tables": [
+      {
+        "id": "t1",
+        "title": "표 1. 시험 결과",
+        "rows": 24,
+        "cols": 5,
+        "spans_pages": true,
+        "header_repeated": true,
+        "merged_cells": false
+      },
+      {
+        "id": "t2",
+        "title": "표 2. 원료 정보",
+        "rows": 3,
+        "cols": 9,
+        "spans_pages": false,
+        "header_repeated": false,
+        "merged_cells": false
+      }
+    ],
+    "embedded_children": [],
+    "links": [
+      {
+        "kind": "doc_number",
+        "target": "SPEC-FBX101 Rev.2",
+        "location": "p.1 §1 제품 정보",
+        "expected_state": "missing",
+        "expected_target_file_ids": [],
+        "latest_file_id": null
+      }
+    ],
+    "pair_with": "COA-1",
+    "notes": "COA-1 전 페이지를 스캔화했으며 2쪽에 스캔본 전용 수기 확인을 추가했다.",
+    "flags": {
+      "encrypted": false,
+      "password": null,
+      "extension_mismatch": false,
+      "macro": false,
+      "truncated": false,
+      "empty": false
+    },
+    "bytes": 1405189,
+    "sha256": "a773e3f5ebee271090715435fae35d1022598bf6de6bce722188dbad4aab1cff"
+  },
+  {
+    "file_id": "XLS-2",
+    "path": "04_spreadsheets/교정일정_2026.xlsx",
+    "format": "xlsx",
+    "true_format": "xlsx",
+    "priority": "P0",
+    "purposes": [
+      "parse",
+      "structure",
+      "chunking",
+      "embedding_eval",
+      "vectordb"
+    ],
+    "language": "ko",
+    "department": "설비",
+    "doc_number": null,
+    "revision": null,
+    "issued": "2026-10-15",
+    "family_id": null,
+    "is_latest_expected": true,
+    "latest_status_expected": "single",
+    "duplicate_of": null,
+    "pages": null,
+    "scanned_pages": [],
+    "elements": {
+      "tables": 1
+    },
+    "tables": [
+      {
+        "id": "t1",
+        "title": "일정",
+        "rows": 40,
+        "cols": 26,
+        "spans_pages": false,
+        "header_repeated": false,
+        "merged_cells": true
+      }
+    ],
+    "embedded_children": [],
+    "links": [],
+    "pair_with": null,
+    "notes": "",
+    "flags": {
+      "encrypted": false,
+      "password": null,
+      "extension_mismatch": false,
+      "macro": false,
+      "truncated": false,
+      "empty": false
+    },
+    "sheets": [
+      "일정"
+    ],
+    "bytes": 9487,
+    "sha256": "b18d44517fbef68bb1331b85f6ea67dd091a63e1604b532e8d7fa94cdb1db1ed"
+  },
+  {
+    "file_id": "XLS-3",
+    "path": "04_spreadsheets/온도기록_냉장고A_2026-10.csv",
+    "format": "csv",
+    "true_format": "csv",
+    "priority": "P0",
+    "purposes": [
+      "parse",
+      "compare",
+      "chunking",
+      "embedding_eval",
+      "vectordb"
+    ],
+    "language": "ko",
+    "department": "생산",
+    "doc_number": null,
+    "revision": null,
+    "issued": "2026-10-15",
+    "family_id": null,
+    "is_latest_expected": true,
+    "latest_status_expected": "single",
+    "duplicate_of": null,
+    "pages": null,
+    "scanned_pages": [],
+    "elements": {
+      "tables": 1
+    },
+    "tables": [
+      {
+        "id": "t1",
+        "title": "냉장고 A 온도 기록",
+        "rows": 8928,
+        "cols": 5,
+        "spans_pages": false,
+        "header_repeated": false,
+        "merged_cells": false
+      }
+    ],
+    "embedded_children": [],
+    "links": [],
+    "pair_with": "XLS-3C",
+    "notes": "첫 기록의 경보 열에는 가상 고지를 넣었다. 고온 구간은 냉동고 D 일탈과 무관하다.",
+    "flags": {
+      "encrypted": false,
+      "password": null,
+      "extension_mismatch": false,
+      "macro": false,
+      "truncated": false,
+      "empty": false
+    },
+    "encoding": "utf-8-sig",
+    "bytes": 286011,
+    "sha256": "c4e12b01ab714def2cc2b3165b666cdf764137e700b95780041ef828268481fb"
+  },
+  {
+    "file_id": "XLS-1",
+    "path": "04_spreadsheets/장비마스터_목록_2026.xlsx",
+    "format": "xlsx",
+    "true_format": "xlsx",
+    "priority": "P0",
+    "purposes": [
+      "parse",
+      "structure",
+      "lineage",
+      "chunking",
+      "embedding_eval",
+      "vectordb"
+    ],
+    "language": "ko",
+    "department": "설비",
+    "doc_number": "REG-EQ-2026-001",
+    "revision": null,
+    "issued": "2026-10-15",
+    "family_id": "REG-EQ-2026-001",
+    "is_latest_expected": true,
+    "latest_status_expected": "single",
+    "duplicate_of": null,
+    "pages": null,
+    "scanned_pages": [],
+    "elements": {
+      "tables": 2
+    },
+    "tables": [
+      {
+        "id": "t1",
+        "title": "장비",
+        "rows": 60,
+        "cols": 8,
+        "spans_pages": false,
+        "header_repeated": false,
+        "merged_cells": false
+      },
+      {
+        "id": "t2",
+        "title": "교정",
+        "rows": 2,
+        "cols": 3,
+        "spans_pages": false,
+        "header_repeated": false,
+        "merged_cells": false
+      }
+    ],
+    "embedded_children": [],
+    "links": [
+      {
+        "kind": "doc_number",
+        "target": "SOP-QC-0012",
+        "location": "장비!D4",
+        "expected_state": "ambiguous",
+        "expected_target_file_ids": [
+          "SOP-B1",
+          "SOP-B2"
+        ],
+        "latest_file_id": null
+      },
+      {
+        "kind": "doc_number",
+        "target": "SOP-QC-014",
+        "location": "장비!D5",
+        "expected_state": "linked",
+        "expected_target_file_ids": [
+          "SOP-C1"
+        ],
+        "latest_file_id": null
+      },
+      {
+        "kind": "doc_number",
+        "target": "SOP-EQ-0101",
+        "location": "장비!D6",
+        "expected_state": "missing",
+        "expected_target_file_ids": [],
+        "latest_file_id": null
+      },
+      {
+        "kind": "doc_number",
+        "target": "SOP-QC-0040 Rev.3",
+        "location": "장비!D7",
+        "expected_state": "outdated",
+        "expected_target_file_ids": [
+          "SOP-A1"
+        ],
+        "latest_file_id": "SOP-A3"
+      },
+      {
+        "kind": "doc_number",
+        "target": "SOP-EQ-0102",
+        "location": "장비!D8",
+        "expected_state": "linked",
+        "expected_target_file_ids": [
+          "SOP-C3"
+        ],
+        "latest_file_id": null
+      },
+      {
+        "kind": "doc_number",
+        "target": "SOP-QC-0040 Rev.5",
+        "location": "장비!D9",
+        "expected_state": "linked",
+        "expected_target_file_ids": [
+          "SOP-A3",
+          "SOP-A3P"
+        ],
+        "latest_file_id": "SOP-A3"
+      },
+      {
+        "kind": "doc_number",
+        "target": "SOP-QC-0012",
+        "location": "장비!D10",
+        "expected_state": "ambiguous",
+        "expected_target_file_ids": [
+          "SOP-B1",
+          "SOP-B2"
+        ],
+        "latest_file_id": null
+      },
+      {
+        "kind": "doc_number",
+        "target": "SOP-QC-014",
+        "location": "장비!D11",
+        "expected_state": "linked",
+        "expected_target_file_ids": [
+          "SOP-C1"
+        ],
+        "latest_file_id": null
+      },
+      {
+        "kind": "doc_number",
+        "target": "SOP-EQ-0101",
+        "location": "장비!D12",
+        "expected_state": "missing",
+        "expected_target_file_ids": [],
+        "latest_file_id": null
+      },
+      {
+        "kind": "doc_number",
+        "target": "SOP-QC-0040 Rev.3",
+        "location": "장비!D13",
+        "expected_state": "outdated",
+        "expected_target_file_ids": [
+          "SOP-A1"
+        ],
+        "latest_file_id": "SOP-A3"
+      },
+      {
+        "kind": "doc_number",
+        "target": "SOP-EQ-0102",
+        "location": "장비!D14",
+        "expected_state": "linked",
+        "expected_target_file_ids": [
+          "SOP-C3"
+        ],
+        "latest_file_id": null
+      },
+      {
+        "kind": "doc_number",
+        "target": "SOP-QC-0040 Rev.5",
+        "location": "장비!D15",
+        "expected_state": "linked",
+        "expected_target_file_ids": [
+          "SOP-A3",
+          "SOP-A3P"
+        ],
+        "latest_file_id": "SOP-A3"
+      },
+      {
+        "kind": "doc_number",
+        "target": "SOP-QC-0012",
+        "location": "장비!D16",
+        "expected_state": "ambiguous",
+        "expected_target_file_ids": [
+          "SOP-B1",
+          "SOP-B2"
+        ],
+        "latest_file_id": null
+      },
+      {
+        "kind": "doc_number",
+        "target": "SOP-QC-014",
+        "location": "장비!D17",
+        "expected_state": "linked",
+        "expected_target_file_ids": [
+          "SOP-C1"
+        ],
+        "latest_file_id": null
+      },
+      {
+        "kind": "doc_number",
+        "target": "SOP-EQ-0101",
+        "location": "장비!D18",
+        "expected_state": "missing",
+        "expected_target_file_ids": [],
+        "latest_file_id": null
+      },
+      {
+        "kind": "doc_number",
+        "target": "SOP-QC-0040 Rev.3",
+        "location": "장비!D19",
+        "expected_state": "outdated",
+        "expected_target_file_ids": [
+          "SOP-A1"
+        ],
+        "latest_file_id": "SOP-A3"
+      },
+      {
+        "kind": "doc_number",
+        "target": "SOP-EQ-0102",
+        "location": "장비!D20",
+        "expected_state": "linked",
+        "expected_target_file_ids": [
+          "SOP-C3"
+        ],
+        "latest_file_id": null
+      },
+      {
+        "kind": "doc_number",
+        "target": "SOP-QC-0040 Rev.5",
+        "location": "장비!D21",
+        "expected_state": "linked",
+        "expected_target_file_ids": [
+          "SOP-A3",
+          "SOP-A3P"
+        ],
+        "latest_file_id": "SOP-A3"
+      },
+      {
+        "kind": "doc_number",
+        "target": "SOP-QC-0012",
+        "location": "장비!D22",
+        "expected_state": "ambiguous",
+        "expected_target_file_ids": [
+          "SOP-B1",
+          "SOP-B2"
+        ],
+        "latest_file_id": null
+      },
+      {
+        "kind": "doc_number",
+        "target": "SOP-QC-014",
+        "location": "장비!D23",
+        "expected_state": "linked",
+        "expected_target_file_ids": [
+          "SOP-C1"
+        ],
+        "latest_file_id": null
+      },
+      {
+        "kind": "doc_number",
+        "target": "SOP-EQ-0101",
+        "location": "장비!D24",
+        "expected_state": "missing",
+        "expected_target_file_ids": [],
+        "latest_file_id": null
+      },
+      {
+        "kind": "doc_number",
+        "target": "SOP-QC-0040 Rev.3",
+        "location": "장비!D25",
+        "expected_state": "outdated",
+        "expected_target_file_ids": [
+          "SOP-A1"
+        ],
+        "latest_file_id": "SOP-A3"
+      },
+      {
+        "kind": "doc_number",
+        "target": "SOP-EQ-0102",
+        "location": "장비!D26",
+        "expected_state": "linked",
+        "expected_target_file_ids": [
+          "SOP-C3"
+        ],
+        "latest_file_id": null
+      },
+      {
+        "kind": "doc_number",
+        "target": "SOP-QC-0040 Rev.5",
+        "location": "장비!D27",
+        "expected_state": "linked",
+        "expected_target_file_ids": [
+          "SOP-A3",
+          "SOP-A3P"
+        ],
+        "latest_file_id": "SOP-A3"
+      },
+      {
+        "kind": "doc_number",
+        "target": "SOP-QC-0012",
+        "location": "장비!D28",
+        "expected_state": "ambiguous",
+        "expected_target_file_ids": [
+          "SOP-B1",
+          "SOP-B2"
+        ],
+        "latest_file_id": null
+      },
+      {
+        "kind": "doc_number",
+        "target": "SOP-QC-014",
+        "location": "장비!D29",
+        "expected_state": "linked",
+        "expected_target_file_ids": [
+          "SOP-C1"
+        ],
+        "latest_file_id": null
+      },
+      {
+        "kind": "doc_number",
+        "target": "SOP-EQ-0101",
+        "location": "장비!D30",
+        "expected_state": "missing",
+        "expected_target_file_ids": [],
+        "latest_file_id": null
+      },
+      {
+        "kind": "doc_number",
+        "target": "SOP-QC-0040 Rev.3",
+        "location": "장비!D31",
+        "expected_state": "outdated",
+        "expected_target_file_ids": [
+          "SOP-A1"
+        ],
+        "latest_file_id": "SOP-A3"
+      },
+      {
+        "kind": "doc_number",
+        "target": "SOP-EQ-0102",
+        "location": "장비!D32",
+        "expected_state": "linked",
+        "expected_target_file_ids": [
+          "SOP-C3"
+        ],
+        "latest_file_id": null
+      },
+      {
+        "kind": "doc_number",
+        "target": "SOP-QC-0040 Rev.5",
+        "location": "장비!D33",
+        "expected_state": "linked",
+        "expected_target_file_ids": [
+          "SOP-A3",
+          "SOP-A3P"
+        ],
+        "latest_file_id": "SOP-A3"
+      },
+      {
+        "kind": "doc_number",
+        "target": "SOP-QC-0012",
+        "location": "장비!D34",
+        "expected_state": "ambiguous",
+        "expected_target_file_ids": [
+          "SOP-B1",
+          "SOP-B2"
+        ],
+        "latest_file_id": null
+      },
+      {
+        "kind": "doc_number",
+        "target": "SOP-QC-014",
+        "location": "장비!D35",
+        "expected_state": "linked",
+        "expected_target_file_ids": [
+          "SOP-C1"
+        ],
+        "latest_file_id": null
+      },
+      {
+        "kind": "doc_number",
+        "target": "SOP-EQ-0101",
+        "location": "장비!D36",
+        "expected_state": "missing",
+        "expected_target_file_ids": [],
+        "latest_file_id": null
+      },
+      {
+        "kind": "doc_number",
+        "target": "SOP-QC-0040 Rev.3",
+        "location": "장비!D37",
+        "expected_state": "outdated",
+        "expected_target_file_ids": [
+          "SOP-A1"
+        ],
+        "latest_file_id": "SOP-A3"
+      },
+      {
+        "kind": "doc_number",
+        "target": "SOP-EQ-0102",
+        "location": "장비!D38",
+        "expected_state": "linked",
+        "expected_target_file_ids": [
+          "SOP-C3"
+        ],
+        "latest_file_id": null
+      },
+      {
+        "kind": "doc_number",
+        "target": "SOP-QC-0040 Rev.5",
+        "location": "장비!D39",
+        "expected_state": "linked",
+        "expected_target_file_ids": [
+          "SOP-A3",
+          "SOP-A3P"
+        ],
+        "latest_file_id": "SOP-A3"
+      },
+      {
+        "kind": "doc_number",
+        "target": "SOP-QC-0012",
+        "location": "장비!D40",
+        "expected_state": "ambiguous",
+        "expected_target_file_ids": [
+          "SOP-B1",
+          "SOP-B2"
+        ],
+        "latest_file_id": null
+      },
+      {
+        "kind": "doc_number",
+        "target": "SOP-QC-014",
+        "location": "장비!D41",
+        "expected_state": "linked",
+        "expected_target_file_ids": [
+          "SOP-C1"
+        ],
+        "latest_file_id": null
+      },
+      {
+        "kind": "doc_number",
+        "target": "SOP-EQ-0101",
+        "location": "장비!D42",
+        "expected_state": "missing",
+        "expected_target_file_ids": [],
+        "latest_file_id": null
+      },
+      {
+        "kind": "doc_number",
+        "target": "SOP-QC-0040 Rev.3",
+        "location": "장비!D43",
+        "expected_state": "outdated",
+        "expected_target_file_ids": [
+          "SOP-A1"
+        ],
+        "latest_file_id": "SOP-A3"
+      },
+      {
+        "kind": "doc_number",
+        "target": "SOP-EQ-0102",
+        "location": "장비!D44",
+        "expected_state": "linked",
+        "expected_target_file_ids": [
+          "SOP-C3"
+        ],
+        "latest_file_id": null
+      },
+      {
+        "kind": "doc_number",
+        "target": "SOP-QC-0040 Rev.5",
+        "location": "장비!D45",
+        "expected_state": "linked",
+        "expected_target_file_ids": [
+          "SOP-A3",
+          "SOP-A3P"
+        ],
+        "latest_file_id": "SOP-A3"
+      },
+      {
+        "kind": "doc_number",
+        "target": "SOP-QC-0012",
+        "location": "장비!D46",
+        "expected_state": "ambiguous",
+        "expected_target_file_ids": [
+          "SOP-B1",
+          "SOP-B2"
+        ],
+        "latest_file_id": null
+      },
+      {
+        "kind": "doc_number",
+        "target": "SOP-QC-014",
+        "location": "장비!D47",
+        "expected_state": "linked",
+        "expected_target_file_ids": [
+          "SOP-C1"
+        ],
+        "latest_file_id": null
+      },
+      {
+        "kind": "doc_number",
+        "target": "SOP-EQ-0101",
+        "location": "장비!D48",
+        "expected_state": "missing",
+        "expected_target_file_ids": [],
+        "latest_file_id": null
+      },
+      {
+        "kind": "doc_number",
+        "target": "SOP-QC-0040 Rev.3",
+        "location": "장비!D49",
+        "expected_state": "outdated",
+        "expected_target_file_ids": [
+          "SOP-A1"
+        ],
+        "latest_file_id": "SOP-A3"
+      },
+      {
+        "kind": "doc_number",
+        "target": "SOP-EQ-0102",
+        "location": "장비!D50",
+        "expected_state": "linked",
+        "expected_target_file_ids": [
+          "SOP-C3"
+        ],
+        "latest_file_id": null
+      },
+      {
+        "kind": "doc_number",
+        "target": "SOP-QC-0040 Rev.5",
+        "location": "장비!D51",
+        "expected_state": "linked",
+        "expected_target_file_ids": [
+          "SOP-A3",
+          "SOP-A3P"
+        ],
+        "latest_file_id": "SOP-A3"
+      },
+      {
+        "kind": "doc_number",
+        "target": "SOP-QC-0012",
+        "location": "장비!D52",
+        "expected_state": "ambiguous",
+        "expected_target_file_ids": [
+          "SOP-B1",
+          "SOP-B2"
+        ],
+        "latest_file_id": null
+      },
+      {
+        "kind": "doc_number",
+        "target": "SOP-QC-014",
+        "location": "장비!D53",
+        "expected_state": "linked",
+        "expected_target_file_ids": [
+          "SOP-C1"
+        ],
+        "latest_file_id": null
+      },
+      {
+        "kind": "doc_number",
+        "target": "SOP-EQ-0101",
+        "location": "장비!D54",
+        "expected_state": "missing",
+        "expected_target_file_ids": [],
+        "latest_file_id": null
+      },
+      {
+        "kind": "doc_number",
+        "target": "SOP-QC-0040 Rev.3",
+        "location": "장비!D55",
+        "expected_state": "outdated",
+        "expected_target_file_ids": [
+          "SOP-A1"
+        ],
+        "latest_file_id": "SOP-A3"
+      },
+      {
+        "kind": "doc_number",
+        "target": "SOP-EQ-0102",
+        "location": "장비!D56",
+        "expected_state": "linked",
+        "expected_target_file_ids": [
+          "SOP-C3"
+        ],
+        "latest_file_id": null
+      },
+      {
+        "kind": "doc_number",
+        "target": "SOP-QC-0040 Rev.5",
+        "location": "장비!D57",
+        "expected_state": "linked",
+        "expected_target_file_ids": [
+          "SOP-A3",
+          "SOP-A3P"
+        ],
+        "latest_file_id": "SOP-A3"
+      },
+      {
+        "kind": "doc_number",
+        "target": "SOP-QC-0012",
+        "location": "장비!D58",
+        "expected_state": "ambiguous",
+        "expected_target_file_ids": [
+          "SOP-B1",
+          "SOP-B2"
+        ],
+        "latest_file_id": null
+      },
+      {
+        "kind": "doc_number",
+        "target": "SOP-QC-014",
+        "location": "장비!D59",
+        "expected_state": "linked",
+        "expected_target_file_ids": [
+          "SOP-C1"
+        ],
+        "latest_file_id": null
+      },
+      {
+        "kind": "doc_number",
+        "target": "SOP-EQ-0101",
+        "location": "장비!D60",
+        "expected_state": "missing",
+        "expected_target_file_ids": [],
+        "latest_file_id": null
+      },
+      {
+        "kind": "doc_number",
+        "target": "SOP-QC-0040 Rev.3",
+        "location": "장비!D61",
+        "expected_state": "outdated",
+        "expected_target_file_ids": [
+          "SOP-A1"
+        ],
+        "latest_file_id": "SOP-A3"
+      },
+      {
+        "kind": "doc_number",
+        "target": "SOP-EQ-0102",
+        "location": "장비!D62",
+        "expected_state": "linked",
+        "expected_target_file_ids": [
+          "SOP-C3"
+        ],
+        "latest_file_id": null
+      },
+      {
+        "kind": "doc_number",
+        "target": "SOP-QC-0040 Rev.5",
+        "location": "장비!D63",
+        "expected_state": "linked",
+        "expected_target_file_ids": [
+          "SOP-A3",
+          "SOP-A3P"
+        ],
+        "latest_file_id": "SOP-A3"
+      },
+      {
+        "kind": "hyperlink",
+        "target": "../01_sop/SOP-QC-014_HPLC_시스템적합성_v3.docx",
+        "location": "장비!H6",
+        "expected_state": "linked",
+        "expected_target_file_ids": [
+          "SOP-C1"
+        ],
+        "latest_file_id": null
+      },
+      {
+        "kind": "shared_path",
+        "target": "\\\\fabrikam-fs01\\qa\\교정\\원본성적서.pdf",
+        "location": "장비!H7",
+        "expected_state": "missing",
+        "expected_target_file_ids": [],
+        "latest_file_id": null
+      },
+      {
+        "kind": "url",
+        "target": "https://intranet.fabrikam.example/calibration/calendar",
+        "location": "장비!H8",
+        "expected_state": "external",
+        "expected_target_file_ids": [],
+        "latest_file_id": null
+      },
+      {
+        "kind": "external_workbook",
+        "target": "[교정일정_2026.xlsx]",
+        "location": "교정!B4",
+        "expected_state": "linked",
+        "expected_target_file_ids": [
+          "XLS-2"
+        ],
+        "latest_file_id": null
+      },
+      {
+        "kind": "external_workbook",
+        "target": "[구매요청_집계.xlsx]",
+        "location": "교정!B5",
+        "expected_state": "missing",
+        "expected_target_file_ids": [],
+        "latest_file_id": null
+      }
+    ],
+    "pair_with": null,
+    "notes": "",
+    "flags": {
+      "encrypted": false,
+      "password": null,
+      "extension_mismatch": false,
+      "macro": false,
+      "truncated": false,
+      "empty": false
+    },
+    "sheets": [
+      "장비",
+      "교정"
+    ],
+    "bytes": 11816,
+    "sha256": "6a8d03ce4300e10a8983d1026738d8539492b5d31b43ff87aaa7c47e54f51dda"
+  },
+  {
+    "file_id": "PPT-1",
+    "path": "05_presentations/2026_Q3_품질지표_리뷰.pptx",
+    "format": "pptx",
+    "true_format": "pptx",
+    "priority": "P0",
+    "purposes": [
+      "parse",
+      "ocr",
+      "chunking",
+      "structure",
+      "lineage",
+      "embedding_eval",
+      "vectordb"
+    ],
+    "language": "ko",
+    "department": "QA",
+    "doc_number": "PPT-QA-2026-Q3",
+    "revision": null,
+    "issued": "2026-10-20",
+    "family_id": "PPT-QA-2026-Q3",
+    "is_latest_expected": true,
+    "latest_status_expected": "single",
+    "duplicate_of": null,
+    "pages": 12,
+    "scanned_pages": [],
+    "elements": {
+      "native_tables": 1,
+      "image_only_tables": 1,
+      "native_charts": 1,
+      "images": 3,
+      "captions": 2,
+      "speaker_notes": 1
+    },
+    "tables": [
+      {
+        "id": "t1",
+        "title": "분기별 주요 품질 지표",
+        "rows": 4,
+        "cols": 5,
+        "spans_pages": false,
+        "header_repeated": false,
+        "merged_cells": false
+      },
+      {
+        "id": "t2",
+        "title": "현장 자료 캡처",
+        "rows": 4,
+        "cols": 3,
+        "spans_pages": false,
+        "header_repeated": false,
+        "merged_cells": false
+      }
+    ],
+    "embedded_children": [],
+    "links": [
+      {
+        "kind": "doc_number",
+        "target": "DEV-2026-0117",
+        "location": "슬라이드 9 후속 조사",
+        "expected_state": "linked",
+        "expected_target_file_ids": [
+          "RPT-2",
+          "RPT-2P"
+        ],
+        "latest_file_id": null
+      },
+      {
+        "kind": "doc_number",
+        "target": "CAPA-2026-0042",
+        "location": "슬라이드 9 후속 조사",
+        "expected_state": "linked",
+        "expected_target_file_ids": [
+          "RPT-3"
+        ],
+        "latest_file_id": null
+      },
+      {
+        "kind": "url",
+        "target": "https://intranet.fabrikam.example/quality/review/2026-q3",
+        "location": "슬라이드 9 인트라넷",
+        "expected_state": "external",
+        "expected_target_file_ids": [],
+        "latest_file_id": null
+      }
+    ],
+    "pair_with": null,
+    "notes": "",
+    "flags": {
+      "encrypted": false,
+      "password": null,
+      "extension_mismatch": false,
+      "macro": false,
+      "truncated": false,
+      "empty": false
+    },
+    "slides": 12,
+    "bytes": 167026,
+    "sha256": "35b135bb84075969320265a78c4f45d6c45d6310cdc6d9a5c675e6e11cf89e9b"
+  },
+  {
+    "file_id": "EML-1",
+    "path": "06_mail/FW_ 냉각수설비 점검결과 공유.eml",
+    "format": "eml",
+    "true_format": "eml",
+    "priority": "P0",
+    "purposes": [
+      "structure",
+      "lineage",
+      "parse",
+      "embedding_eval",
+      "vectordb"
+    ],
+    "language": "ko",
+    "department": "설비",
+    "doc_number": null,
+    "revision": null,
+    "issued": "2026-10-16",
+    "family_id": null,
+    "is_latest_expected": true,
+    "latest_status_expected": "single",
+    "duplicate_of": null,
+    "pages": null,
+    "scanned_pages": [],
+    "elements": {
+      "tables": 1
+    },
+    "tables": [
+      {
+        "id": "t1",
+        "title": "HTML 점검 상태",
+        "rows": 2,
+        "cols": 3,
+        "spans_pages": false,
+        "header_repeated": false,
+        "merged_cells": false
+      }
+    ],
+    "embedded_children": [
+      {
+        "name": "RPT-EQ-2026-031_냉각수순환설비_정기점검보고서.docx",
+        "kind": "email_attachment",
+        "path_inside": "RPT-EQ-2026-031_냉각수순환설비_정기점검보고서.docx",
+        "true_format": "docx"
+      },
+      {
+        "name": "장비마스터_목록_2026.xlsx",
+        "kind": "email_attachment",
+        "path_inside": "장비마스터_목록_2026.xlsx",
+        "true_format": "xlsx"
+      }
+    ],
+    "links": [
+      {
+        "kind": "doc_number",
+        "target": "RPT-EQ-2026-031",
+        "location": "본문 및 HTML 대체 본문",
+        "expected_state": "linked",
+        "expected_target_file_ids": [
+          "RPT-1",
+          "RPT-1P"
+        ],
+        "latest_file_id": null
+      }
+    ],
+    "pair_with": null,
+    "notes": "",
+    "flags": {
+      "encrypted": false,
+      "password": null,
+      "extension_mismatch": false,
+      "macro": false,
+      "truncated": false,
+      "empty": false
+    },
+    "bytes": 438961,
+    "sha256": "2580978dba2af09e3a25169df21084c2011ce280f59813e1ce0ff0a0f04cbe22"
+  },
+  {
+    "file_id": "EML-2",
+    "path": "06_mail/RE_ 일탈 DEV-2026-0117 원인조사 요청.eml",
+    "format": "eml",
+    "true_format": "eml",
+    "priority": "P0",
+    "purposes": [
+      "structure",
+      "lineage",
+      "parse",
+      "embedding_eval",
+      "vectordb"
+    ],
+    "language": "ko",
+    "department": "QA",
+    "doc_number": null,
+    "revision": null,
+    "issued": "2026-10-07",
+    "family_id": null,
+    "is_latest_expected": true,
+    "latest_status_expected": "single",
+    "duplicate_of": null,
+    "pages": null,
+    "scanned_pages": [],
+    "elements": {},
+    "tables": [],
+    "embedded_children": [
+      {
+        "name": "원인조사_요청_원본.eml",
+        "kind": "email_attachment",
+        "path_inside": "원인조사_요청_원본.eml",
+        "true_format": "eml"
+      },
+      {
+        "name": "현장사진_모음.zip",
+        "kind": "email_attachment",
+        "path_inside": "원인조사_요청_원본.eml!/현장사진_모음.zip",
+        "true_format": "zip"
+      },
+      {
+        "name": "현장사진_냉동고D.jpg",
+        "kind": "zip_entry",
+        "path_inside": "원인조사_요청_원본.eml!/현장사진_모음.zip!/현장사진_냉동고D.jpg",
+        "true_format": "jpg"
+      },
+      {
+        "name": "냉동고_내부랙.jpg",
+        "kind": "zip_entry",
+        "path_inside": "원인조사_요청_원본.eml!/현장사진_모음.zip!/냉동고_내부랙.jpg",
+        "true_format": "jpg"
+      },
+      {
+        "name": "시료_보관준비대.jpg",
+        "kind": "zip_entry",
+        "path_inside": "원인조사_요청_원본.eml!/현장사진_모음.zip!/시료_보관준비대.jpg",
+        "true_format": "jpg"
+      }
+    ],
+    "links": [
+      {
+        "kind": "doc_number",
+        "target": "DEV-2026-0117",
+        "location": "본문 및 인용문",
+        "expected_state": "linked",
+        "expected_target_file_ids": [
+          "RPT-2",
+          "RPT-2P"
+        ],
+        "latest_file_id": null
+      },
+      {
+        "kind": "doc_number",
+        "target": "DEV-2026-0117",
+        "location": "원인조사_요청_원본.eml 본문",
+        "expected_state": "linked",
+        "expected_target_file_ids": [
+          "RPT-2",
+          "RPT-2P"
+        ],
+        "latest_file_id": null
+      }
+    ],
+    "pair_with": null,
+    "notes": "",
+    "flags": {
+      "encrypted": false,
+      "password": null,
+      "extension_mismatch": false,
+      "macro": false,
+      "truncated": false,
+      "empty": false
+    },
+    "bytes": 96683,
+    "sha256": "a52d168fcbec49a33a7a80eaf8be8931c1c680ebdfe720a3a1bda14ecad7db98"
+  },
+  {
+    "file_id": "ZIP-2",
+    "path": "07_archives/윈도우압축_cp949.zip",
+    "format": "zip",
+    "true_format": "zip",
+    "priority": "P0",
+    "purposes": [
+      "structure",
+      "embedding_eval"
+    ],
+    "language": "ko",
+    "department": "QC",
+    "doc_number": null,
+    "revision": null,
+    "issued": "2026-10-15",
+    "family_id": null,
+    "is_latest_expected": true,
+    "latest_status_expected": "single",
+    "duplicate_of": null,
+    "pages": null,
+    "scanned_pages": [],
+    "elements": {},
+    "tables": [],
+    "embedded_children": [
+      {
+        "name": "현장인계_안내.docx",
+        "kind": "zip_entry",
+        "path_inside": "현장인계_안내.docx",
+        "true_format": "docx"
+      },
+      {
+        "name": "작업메모.txt",
+        "kind": "zip_entry",
+        "path_inside": "작업메모.txt",
+        "true_format": "txt"
+      },
+      {
+        "name": "계통그림.png",
+        "kind": "zip_entry",
+        "path_inside": "계통그림.png",
+        "true_format": "png"
+      }
+    ],
+    "links": [],
+    "pair_with": null,
+    "notes": "중앙 디렉터리와 로컬 헤더에 CP949 이름. UTF-8 플래그 없음.",
+    "flags": {
+      "encrypted": false,
+      "password": null,
+      "extension_mismatch": false,
+      "macro": false,
+      "truncated": false,
+      "empty": false
+    },
+    "bytes": 72807,
+    "sha256": "4cbc3b56ec5663c4176acb81d3ad36e269da521cc458ad96bf6e896253ed3935"
+  },
+  {
+    "file_id": "ZIP-1",
+    "path": "07_archives/점검자료_2026-10.zip",
+    "format": "zip",
+    "true_format": "zip",
+    "priority": "P0",
+    "purposes": [
+      "structure",
+      "embedding_eval"
+    ],
+    "language": "ko",
+    "department": "설비",
+    "doc_number": null,
+    "revision": null,
+    "issued": "2026-10-15",
+    "family_id": null,
+    "is_latest_expected": true,
+    "latest_status_expected": "single",
+    "duplicate_of": null,
+    "pages": null,
+    "scanned_pages": [],
+    "elements": {},
+    "tables": [],
+    "embedded_children": [
+      {
+        "name": "RPT-EQ-2026-031_냉각수순환설비_정기점검보고서.docx",
+        "kind": "zip_entry",
+        "path_inside": "보고서/RPT-EQ-2026-031_냉각수순환설비_정기점검보고서.docx",
+        "true_format": "docx"
+      },
+      {
+        "name": "온도기록_원본_EQ-FRZ-D_2026-10-03.csv",
+        "kind": "zip_entry",
+        "path_inside": "기록/온도기록_원본_EQ-FRZ-D_2026-10-03.csv",
+        "true_format": "csv"
+      },
+      {
+        "name": "냉각수설비_전경.jpg",
+        "kind": "zip_entry",
+        "path_inside": "사진/냉각수설비_전경.jpg",
+        "true_format": "jpg"
+      },
+      {
+        "name": "펌프P2_근접.jpg",
+        "kind": "zip_entry",
+        "path_inside": "사진/펌프P2_근접.jpg",
+        "true_format": "jpg"
+      },
+      {
+        "name": "배관_부식부위.jpg",
+        "kind": "zip_entry",
+        "path_inside": "사진/배관_부식부위.jpg",
+        "true_format": "jpg"
+      },
+      {
+        "name": "제어반_외함.jpg",
+        "kind": "zip_entry",
+        "path_inside": "사진/제어반_외함.jpg",
+        "true_format": "jpg"
+      },
+      {
+        "name": "사진원본.zip",
+        "kind": "zip_entry",
+        "path_inside": "사진원본.zip",
+        "true_format": "zip"
+      },
+      {
+        "name": "배관_상부.jpg",
+        "kind": "zip_entry",
+        "path_inside": "사진원본.zip!/배관_상부.jpg",
+        "true_format": "jpg"
+      },
+      {
+        "name": "순환_전경.jpg",
+        "kind": "zip_entry",
+        "path_inside": "사진원본.zip!/순환_전경.jpg",
+        "true_format": "jpg"
+      },
+      {
+        "name": "접합부_근접.jpg",
+        "kind": "zip_entry",
+        "path_inside": "사진원본.zip!/접합부_근접.jpg",
+        "true_format": "jpg"
+      },
+      {
+        "name": "탱크_상면.jpg",
+        "kind": "zip_entry",
+        "path_inside": "사진원본.zip!/탱크_상면.jpg",
+        "true_format": "jpg"
+      },
+      {
+        "name": "펌프_마운트.jpg",
+        "kind": "zip_entry",
+        "path_inside": "사진원본.zip!/펌프_마운트.jpg",
+        "true_format": "jpg"
+      }
+    ],
+    "links": [],
+    "pair_with": null,
+    "notes": "UTF-8 플래그를 사용하는 경로와 중첩 ZIP.",
+    "flags": {
+      "encrypted": false,
+      "password": null,
+      "extension_mismatch": false,
+      "macro": false,
+      "truncated": false,
+      "empty": false
+    },
+    "bytes": 668165,
+    "sha256": "bfdbd7c0d73381095c3c20ad488d4419a722f6c2476f46b36c255ee8fddeb6c6"
+  },
+  {
+    "file_id": "SCN-1",
+    "path": "08_scans/스캔_교정성적서_2026-09.pdf",
+    "format": "pdf",
+    "true_format": "pdf",
+    "priority": "P0",
+    "purposes": [
+      "ocr",
+      "parse",
+      "chunking",
+      "embedding_eval"
+    ],
+    "language": "ko",
+    "department": "QC",
+    "doc_number": null,
+    "revision": null,
+    "issued": "2026-09-23",
+    "family_id": null,
+    "is_latest_expected": true,
+    "latest_status_expected": "single",
+    "duplicate_of": null,
+    "pages": 3,
+    "scanned_pages": [
+      1,
+      2,
+      3
+    ],
+    "elements": {
+      "tables": 3,
+      "handwritten_marks": 3
+    },
+    "tables": [
+      {
+        "id": "t1",
+        "title": "EQ-PRS-04 측정 결과",
+        "rows": 5,
+        "cols": 5,
+        "spans_pages": false,
+        "header_repeated": false,
+        "merged_cells": false
+      },
+      {
+        "id": "t2",
+        "title": "EQ-TEMP-11 측정 결과",
+        "rows": 5,
+        "cols": 5,
+        "spans_pages": false,
+        "header_repeated": false,
+        "merged_cells": false
+      },
+      {
+        "id": "t3",
+        "title": "EQ-VIB-02 측정 결과",
+        "rows": 5,
+        "cols": 5,
+        "spans_pages": false,
+        "header_repeated": false,
+        "merged_cells": false
+      }
+    ],
+    "embedded_children": [],
+    "links": [],
+    "pair_with": null,
+    "notes": "200 dpi 회색조 모사. 1쪽 얼룩, 3쪽 PDF 회전 90도.",
+    "flags": {
+      "encrypted": false,
+      "password": null,
+      "extension_mismatch": false,
+      "macro": false,
+      "truncated": false,
+      "empty": false
+    },
+    "bytes": 775488,
+    "sha256": "c2b6e69168075c57eb5b12fd48641341d25fc163806f9a79bb89acaa0c0191dd"
+  },
+  {
+    "file_id": "SCN-2",
+    "path": "08_scans/현장일지_사진.jpg",
+    "format": "jpg",
+    "true_format": "jpg",
+    "priority": "P0",
+    "purposes": [
+      "ocr",
+      "chunking",
+      "embedding_eval"
+    ],
+    "language": "ko",
+    "department": "설비",
+    "doc_number": null,
+    "revision": null,
+    "issued": "2026-10-14",
+    "family_id": null,
+    "is_latest_expected": true,
+    "latest_status_expected": "single",
+    "duplicate_of": null,
+    "pages": 1,
+    "scanned_pages": [
+      1
+    ],
+    "elements": {
+      "tables": 1
+    },
+    "tables": [
+      {
+        "id": "t1",
+        "title": "현장 운전 일지",
+        "rows": 4,
+        "cols": 4,
+        "spans_pages": false,
+        "header_repeated": false,
+        "merged_cells": false
+      }
+    ],
+    "embedded_children": [],
+    "links": [],
+    "pair_with": null,
+    "notes": "",
+    "flags": {
+      "encrypted": false,
+      "password": null,
+      "extension_mismatch": false,
+      "macro": false,
+      "truncated": false,
+      "empty": false
+    },
+    "bytes": 111668,
+    "sha256": "43d8ee7b1736d6a5bee2c163c44021ed2eb87237fe920800f67ec551e172e359"
+  },
+  {
+    "file_id": "IMG-5",
+    "path": "09_images/냉각수계통_PID.png",
+    "format": "png",
+    "true_format": "png",
+    "priority": "P0",
+    "purposes": [
+      "ocr",
+      "embedding_eval",
+      "structure"
+    ],
+    "language": "ko",
+    "department": "설비",
+    "doc_number": null,
+    "revision": null,
+    "issued": "2026-10-15",
+    "family_id": null,
+    "is_latest_expected": true,
+    "latest_status_expected": "single",
+    "duplicate_of": null,
+    "pages": null,
+    "scanned_pages": [],
+    "elements": {},
+    "tables": [],
+    "embedded_children": [],
+    "links": [],
+    "pair_with": null,
+    "notes": "",
+    "flags": {
+      "encrypted": false,
+      "password": null,
+      "extension_mismatch": false,
+      "macro": false,
+      "truncated": false,
+      "empty": false
+    },
+    "bytes": 39079,
+    "sha256": "3d0d3a03f8a26698ac3dbfcab5f43c6fda48c69665e0f6078f249f4ed4113829"
+  },
+  {
+    "file_id": "IMG-1",
+    "path": "09_images/냉각수설비_전경.jpg",
+    "format": "jpg",
+    "true_format": "jpg",
+    "priority": "P0",
+    "purposes": [
+      "structure",
+      "chunking"
+    ],
+    "language": "ko",
+    "department": "설비",
+    "doc_number": null,
+    "revision": null,
+    "issued": "2026-10-15",
+    "family_id": null,
+    "is_latest_expected": true,
+    "latest_status_expected": "single",
+    "duplicate_of": null,
+    "pages": null,
+    "scanned_pages": [],
+    "elements": {},
+    "tables": [],
+    "embedded_children": [],
+    "links": [],
+    "pair_with": null,
+    "notes": "무문자 합성 사진.",
+    "flags": {
+      "encrypted": false,
+      "password": null,
+      "extension_mismatch": false,
+      "macro": false,
+      "truncated": false,
+      "empty": false
+    },
+    "bytes": 51247,
+    "sha256": "ff6f2d56e7aff64bc093c48c6b9086c1b68b51c30eed8067c4c4ac5eac0a6609"
+  },
+  {
+    "file_id": "IMG-3",
+    "path": "09_images/배관_부식부위.jpg",
+    "format": "jpg",
+    "true_format": "jpg",
+    "priority": "P0",
+    "purposes": [
+      "structure",
+      "chunking"
+    ],
+    "language": "ko",
+    "department": "설비",
+    "doc_number": null,
+    "revision": null,
+    "issued": "2026-10-15",
+    "family_id": null,
+    "is_latest_expected": true,
+    "latest_status_expected": "single",
+    "duplicate_of": null,
+    "pages": null,
+    "scanned_pages": [],
+    "elements": {},
+    "tables": [],
+    "embedded_children": [],
+    "links": [],
+    "pair_with": null,
+    "notes": "무문자 합성 사진.",
+    "flags": {
+      "encrypted": false,
+      "password": null,
+      "extension_mismatch": false,
+      "macro": false,
+      "truncated": false,
+      "empty": false
+    },
+    "bytes": 40654,
+    "sha256": "3a9478db958fd12a7a6a11327be288eb555cd3ace033487b724f53f4a182c317"
+  },
+  {
+    "file_id": "IMG-4",
+    "path": "09_images/진동추이_2026Q3.png",
+    "format": "png",
+    "true_format": "png",
+    "priority": "P0",
+    "purposes": [
+      "ocr",
+      "embedding_eval",
+      "chunking"
+    ],
+    "language": "ko",
+    "department": "설비",
+    "doc_number": null,
+    "revision": null,
+    "issued": "2026-10-15",
+    "family_id": null,
+    "is_latest_expected": true,
+    "latest_status_expected": "single",
+    "duplicate_of": null,
+    "pages": null,
+    "scanned_pages": [],
+    "elements": {},
+    "tables": [],
+    "embedded_children": [],
+    "links": [],
+    "pair_with": null,
+    "notes": "",
+    "flags": {
+      "encrypted": false,
+      "password": null,
+      "extension_mismatch": false,
+      "macro": false,
+      "truncated": false,
+      "empty": false
+    },
+    "bytes": 27222,
+    "sha256": "a2935a4dee903f104e718e54b4ab10cd165dda011de2c8663a63409cfdae3422"
+  },
+  {
+    "file_id": "IMG-2",
+    "path": "09_images/펌프P2_근접.jpg",
+    "format": "jpg",
+    "true_format": "jpg",
+    "priority": "P0",
+    "purposes": [
+      "structure",
+      "chunking"
+    ],
+    "language": "ko",
+    "department": "설비",
+    "doc_number": null,
+    "revision": null,
+    "issued": "2026-10-15",
+    "family_id": null,
+    "is_latest_expected": true,
+    "latest_status_expected": "single",
+    "duplicate_of": null,
+    "pages": null,
+    "scanned_pages": [],
+    "elements": {},
+    "tables": [],
+    "embedded_children": [],
+    "links": [],
+    "pair_with": null,
+    "notes": "무문자 합성 사진.",
+    "flags": {
+      "encrypted": false,
+      "password": null,
+      "extension_mismatch": false,
+      "macro": false,
+      "truncated": false,
+      "empty": false
+    },
+    "bytes": 42836,
+    "sha256": "44ab4aa9b4a9a4ec9ceb6ca61ef0d3898629ef188d47ff5980e3e710a8ebe379"
+  },
+  {
+    "file_id": "EDGE-3",
+    "path": "10_edge_cases/빈문서.docx",
+    "format": "docx",
+    "true_format": "docx",
+    "priority": "P0",
+    "purposes": [
+      "parse",
+      "structure"
+    ],
+    "language": "ko",
+    "department": "QA",
+    "doc_number": null,
+    "revision": null,
+    "issued": "2026-10-15",
+    "family_id": null,
+    "is_latest_expected": true,
+    "latest_status_expected": "single",
+    "duplicate_of": null,
+    "pages": 1,
+    "scanned_pages": [],
+    "elements": {},
+    "tables": [],
+    "embedded_children": [],
+    "links": [],
+    "pair_with": null,
+    "notes": "",
+    "flags": {
+      "encrypted": false,
+      "password": null,
+      "extension_mismatch": false,
+      "macro": false,
+      "truncated": false,
+      "empty": true
+    },
+    "bytes": 36776,
+    "sha256": "983825c4808b145fc219efaf9c565f65654d8ddf9101da97e610a684e78d1fe9"
+  },
+  {
+    "file_id": "EDGE-1",
+    "path": "10_edge_cases/암호설정_공급계약_요약.pdf",
+    "format": "pdf",
+    "true_format": "pdf",
+    "priority": "P0",
+    "purposes": [
+      "structure",
+      "parse"
+    ],
+    "language": "ko",
+    "department": "생산",
+    "doc_number": null,
+    "revision": null,
+    "issued": "2026-10-15",
+    "family_id": null,
+    "is_latest_expected": true,
+    "latest_status_expected": "single",
+    "duplicate_of": null,
+    "pages": 1,
+    "scanned_pages": [],
+    "elements": {
+      "headings": 3,
+      "paragraphs": 4,
+      "lists": 0,
+      "tables": 1,
+      "images": 0,
+      "captions": 1,
+      "uncaptioned_images": 0,
+      "footnotes": 0,
+      "repeated_header_lines": 1,
+      "page_number_lines": 1,
+      "textboxes": 0
+    },
+    "tables": [
+      {
+        "id": "t1",
+        "title": "표 1. 공급 일정",
+        "rows": 2,
+        "cols": 3,
+        "spans_pages": false,
+        "header_repeated": false,
+        "merged_cells": false
+      }
+    ],
+    "embedded_children": [],
+    "links": [],
+    "pair_with": null,
+    "notes": "",
+    "flags": {
+      "encrypted": true,
+      "password": "fabrikam-test",
+      "extension_mismatch": false,
+      "macro": false,
+      "truncated": false,
+      "empty": false
+    },
+    "bytes": 17060,
+    "sha256": "2ad1c1c772974b082fda2f3bfc9857fa4cb2149f1acd9d6ca4cb40589742f997"
+  },
+  {
+    "file_id": "EDGE-2",
+    "path": "10_edge_cases/확장자불일치_보고서.docx",
+    "format": "docx",
+    "true_format": "pdf",
+    "priority": "P0",
+    "purposes": [
+      "structure",
+      "lineage",
+      "compare"
+    ],
+    "language": "ko",
+    "department": "설비",
+    "doc_number": "RPT-EQ-2026-031",
+    "revision": null,
+    "issued": "2026-10-15",
+    "family_id": "RPT-EQ-2026-031",
+    "is_latest_expected": true,
+    "latest_status_expected": "confirmed",
+    "duplicate_of": "RPT-1P",
+    "pages": 7,
+    "scanned_pages": [
+      4
+    ],
+    "elements": {
+      "headings": 10,
+      "paragraphs": 26,
+      "lists": 3,
+      "tables": 3,
+      "images": 9,
+      "captions": 9,
+      "uncaptioned_images": 3,
+      "footnotes": 0,
+      "repeated_header_lines": 7,
+      "page_number_lines": 7,
+      "textboxes": 0
+    },
+    "tables": [
+      {
+        "id": "t1",
+        "title": "표 1. 점검 결과",
+        "rows": 12,
+        "cols": 6,
+        "spans_pages": false,
+        "header_repeated": false,
+        "merged_cells": false
+      },
+      {
+        "id": "t2",
+        "title": "표 2. 현장 계측 기록",
+        "rows": 4,
+        "cols": 4,
+        "spans_pages": false,
+        "header_repeated": false,
+        "merged_cells": false
+      },
+      {
+        "id": "t3",
+        "title": "검토 및 승인",
+        "rows": 3,
+        "cols": 3,
+        "spans_pages": false,
+        "header_repeated": false,
+        "merged_cells": false
+      }
+    ],
+    "embedded_children": [],
+    "links": [
+      {
+        "kind": "doc_number",
+        "target": "SOP-QC-0040 Rev.4",
+        "location": "p.7 §8 참고 문서",
+        "expected_state": "outdated",
+        "expected_target_file_ids": [
+          "SOP-A2",
+          "SOP-A4"
+        ],
+        "latest_file_id": "SOP-A3"
+      },
+      {
+        "kind": "doc_number",
+        "target": "SOP-EQ-0101",
+        "location": "p.7 §8 참고 문서",
+        "expected_state": "missing",
+        "expected_target_file_ids": [],
+        "latest_file_id": null
+      },
+      {
+        "kind": "doc_number",
+        "target": "SOP-QC-014",
+        "location": "p.7 §8 참고 문서",
+        "expected_state": "linked",
+        "expected_target_file_ids": [
+          "SOP-C1"
+        ],
+        "latest_file_id": null
+      },
+      {
+        "kind": "shared_path",
+        "target": "\\\\fabrikam-fs01\\eng\\equipment\\EQ-COOL-02\\점검이력.xlsx",
+        "location": "p.7 §8 참고 문서",
+        "expected_state": "missing",
+        "expected_target_file_ids": [],
+        "latest_file_id": null
+      }
+    ],
+    "pair_with": null,
+    "notes": "RPT-1P와 바이트가 동일한 PDF. 이름만 DOCX.",
+    "flags": {
+      "encrypted": false,
+      "password": null,
+      "extension_mismatch": true,
+      "macro": false,
+      "truncated": false,
+      "empty": false
+    },
+    "bytes": 665633,
+    "sha256": "734d5fdf85bcc77eecbabf5335301e0c52c68d8cfa094586001234bfda0d845c"
+  },
+  {
+    "file_id": "SOP-C3",
+    "path": "01_sop/SOP-EQ-0102_냉동고_관리.docx",
+    "format": "docx",
+    "true_format": "docx",
+    "priority": "P1",
+    "purposes": [
+      "parse",
+      "chunking",
+      "embedding_eval",
+      "vectordb"
+    ],
+    "language": "ko",
+    "department": "설비",
+    "doc_number": "SOP-EQ-0102",
+    "revision": "Rev.3",
+    "issued": "2026-05-09",
+    "family_id": "SOP-EQ-0102",
+    "is_latest_expected": true,
+    "latest_status_expected": "single",
+    "duplicate_of": null,
+    "pages": 3,
+    "scanned_pages": [],
+    "elements": {
+      "headings": 6,
+      "paragraphs": 23,
+      "lists": 1,
+      "tables": 1,
+      "images": 0,
+      "captions": 1,
+      "uncaptioned_images": 0,
+      "footnotes": 0,
+      "repeated_header_lines": 3,
+      "page_number_lines": 3,
+      "textboxes": 1
+    },
+    "tables": [
+      {
+        "id": "t1",
+        "title": "표 1. 관리 설비",
+        "rows": 2,
+        "cols": 3,
+        "spans_pages": false,
+        "header_repeated": false,
+        "merged_cells": false
+      }
+    ],
+    "embedded_children": [],
+    "links": [
+      {
+        "kind": "doc_number",
+        "target": "DEV-2026-0117",
+        "location": "§4 관련 기록",
+        "expected_state": "linked",
+        "expected_target_file_ids": [
+          "RPT-2",
+          "RPT-2P"
+        ],
+        "latest_file_id": null
+      }
+    ],
+    "pair_with": null,
+    "notes": "",
+    "flags": {
+      "encrypted": false,
+      "password": null,
+      "extension_mismatch": false,
+      "macro": false,
+      "truncated": false,
+      "empty": false
+    },
+    "bytes": 41284,
+    "sha256": "36196464431b7f63a5fa87fc6826f87542ec186702ad3cce30d461575bef1513"
+  },
+  {
+    "file_id": "SOP-B0",
+    "path": "01_sop/SOP-QC-0012_시험기기_교정_Rev.1.pdf",
+    "format": "pdf",
+    "true_format": "pdf",
+    "priority": "P1",
+    "purposes": [
+      "parse",
+      "lineage",
+      "chunking",
+      "embedding_eval",
+      "vectordb"
+    ],
+    "language": "ko",
+    "department": "QC",
+    "doc_number": "SOP-QC-0012",
+    "revision": "Rev.1",
+    "issued": "2023-09-01",
+    "family_id": "SOP-QC-0012",
+    "is_latest_expected": false,
+    "latest_status_expected": "hold",
+    "duplicate_of": null,
+    "pages": 4,
+    "scanned_pages": [],
+    "elements": {
+      "headings": 13,
+      "paragraphs": 23,
+      "lists": 6,
+      "tables": 3,
+      "images": 0,
+      "captions": 3,
+      "uncaptioned_images": 0,
+      "footnotes": 0,
+      "repeated_header_lines": 4,
+      "page_number_lines": 4,
+      "textboxes": 0
+    },
+    "tables": [
+      {
+        "id": "t1",
+        "title": "결재란",
+        "rows": 3,
+        "cols": 4,
+        "spans_pages": false,
+        "header_repeated": false,
+        "merged_cells": false
+      },
+      {
+        "id": "t2",
+        "title": "표 1. 시험기기 교정 기준",
+        "rows": 15,
+        "cols": 5,
+        "spans_pages": false,
+        "header_repeated": false,
+        "merged_cells": false
+      },
+      {
+        "id": "t3",
+        "title": "개정 이력",
+        "rows": 1,
+        "cols": 3,
+        "spans_pages": false,
+        "header_repeated": false,
+        "merged_cells": false
+      }
+    ],
+    "embedded_children": [],
+    "links": [
+      {
+        "kind": "doc_number",
+        "target": "FRM-QC-0012-A",
+        "location": "§6.1 교정 일정 확인표",
+        "expected_state": "missing",
+        "expected_target_file_ids": [],
+        "latest_file_id": null
+      },
+      {
+        "kind": "doc_number",
+        "target": "FRM-QC-0012-B",
+        "location": "§6.1 허용 오차 이탈 조사표",
+        "expected_state": "missing",
+        "expected_target_file_ids": [],
+        "latest_file_id": null
+      },
+      {
+        "kind": "doc_number",
+        "target": "FRM-QC-0012-C",
+        "location": "§6.1 교정 결과 인계서",
+        "expected_state": "missing",
+        "expected_target_file_ids": [],
+        "latest_file_id": null
+      }
+    ],
+    "pair_with": null,
+    "notes": "카탈로그에 지정된 2023년 시행일의 구판.",
+    "flags": {
+      "encrypted": false,
+      "password": null,
+      "extension_mismatch": false,
+      "macro": false,
+      "truncated": false,
+      "empty": false
+    },
+    "bytes": 49706,
+    "sha256": "5b6fc3f81b7f2a09d6f3d62f5ee973452744610ee255a39cf6de238a1af5cebc"
+  },
+  {
+    "file_id": "SOP-C2",
+    "path": "01_sop/WI-QC-052_pH미터_일상점검.docx",
+    "format": "docx",
+    "true_format": "docx",
+    "priority": "P1",
+    "purposes": [
+      "parse",
+      "chunking",
+      "embedding_eval",
+      "vectordb"
+    ],
+    "language": "ko",
+    "department": "QC",
+    "doc_number": "WI-QC-052",
+    "revision": "Rev.2",
+    "issued": "2026-08-03",
+    "family_id": "WI-QC-052",
+    "is_latest_expected": true,
+    "latest_status_expected": "single",
+    "duplicate_of": null,
+    "pages": 3,
+    "scanned_pages": [],
+    "elements": {
+      "headings": 6,
+      "paragraphs": 22,
+      "lists": 1,
+      "tables": 1,
+      "images": 0,
+      "captions": 1,
+      "uncaptioned_images": 0,
+      "footnotes": 0,
+      "repeated_header_lines": 3,
+      "page_number_lines": 3,
+      "textboxes": 0
+    },
+    "tables": [
+      {
+        "id": "t1",
+        "title": "표 1. 작업 전 체크리스트",
+        "rows": 5,
+        "cols": 3,
+        "spans_pages": false,
+        "header_repeated": false,
+        "merged_cells": false
+      }
+    ],
+    "embedded_children": [],
+    "links": [
+      {
+        "kind": "doc_number",
+        "target": "SOP-QC-0012",
+        "location": "p.3 §4 참고",
+        "expected_state": "ambiguous",
+        "expected_target_file_ids": [
+          "SOP-B1",
+          "SOP-B2"
+        ],
+        "latest_file_id": null
+      }
+    ],
+    "pair_with": null,
+    "notes": "",
+    "flags": {
+      "encrypted": false,
+      "password": null,
+      "extension_mismatch": false,
+      "macro": false,
+      "truncated": false,
+      "empty": false
+    },
+    "bytes": 41317,
+    "sha256": "c2ac233ae75cfdbab9355c038c50248f33f302d0a58fd9d4d809489d322028c4"
+  },
+  {
+    "file_id": "RPT-3",
+    "path": "02_reports/CAPA-2026-0042_시정예방조치_계획.docx",
+    "format": "docx",
+    "true_format": "docx",
+    "priority": "P1",
+    "purposes": [
+      "parse",
+      "chunking",
+      "embedding_eval",
+      "vectordb"
+    ],
+    "language": "ko",
+    "department": "QA",
+    "doc_number": "CAPA-2026-0042",
+    "revision": null,
+    "issued": "2026-10-15",
+    "family_id": "CAPA-2026-0042",
+    "is_latest_expected": true,
+    "latest_status_expected": "single",
+    "duplicate_of": null,
+    "pages": 4,
+    "scanned_pages": [],
+    "elements": {
+      "headings": 7,
+      "paragraphs": 25,
+      "lists": 1,
+      "tables": 1,
+      "images": 0,
+      "captions": 1,
+      "uncaptioned_images": 0,
+      "footnotes": 0,
+      "repeated_header_lines": 4,
+      "page_number_lines": 4,
+      "textboxes": 0
+    },
+    "tables": [
+      {
+        "id": "t1",
+        "title": "표 1. 조치 일정",
+        "rows": 4,
+        "cols": 4,
+        "spans_pages": false,
+        "header_repeated": false,
+        "merged_cells": false
+      }
+    ],
+    "embedded_children": [],
+    "links": [
+      {
+        "kind": "doc_number",
+        "target": "DEV-2026-0117",
+        "location": "p.1 §1 계획 범위",
+        "expected_state": "linked",
+        "expected_target_file_ids": [
+          "RPT-2",
+          "RPT-2P"
+        ],
+        "latest_file_id": null
+      },
+      {
+        "kind": "doc_number",
+        "target": "SOP-EQ-0102",
+        "location": "p.4 §5 참고 문서",
+        "expected_state": "linked",
+        "expected_target_file_ids": [
+          "SOP-C3"
+        ],
+        "latest_file_id": null
+      }
+    ],
+    "pair_with": null,
+    "notes": "",
+    "flags": {
+      "encrypted": false,
+      "password": null,
+      "extension_mismatch": false,
+      "macro": false,
+      "truncated": false,
+      "empty": false
+    },
+    "bytes": 41502,
+    "sha256": "17f464ea2faa688137576e3f5733500f3c4d4f67994fadbf3d9e76de15b62f22"
+  },
+  {
+    "file_id": "RPT-4",
+    "path": "02_reports/월간_품질동향_보고서_2026-10.pdf",
+    "format": "pdf",
+    "true_format": "pdf",
+    "priority": "P1",
+    "purposes": [
+      "parse",
+      "chunking",
+      "embedding_eval",
+      "vectordb"
+    ],
+    "language": "ko",
+    "department": "QA",
+    "doc_number": "RPT-QA-2026-010",
+    "revision": null,
+    "issued": "2026-11-12",
+    "family_id": "RPT-QA-2026-010",
+    "is_latest_expected": true,
+    "latest_status_expected": "single",
+    "duplicate_of": null,
+    "pages": 10,
+    "scanned_pages": [],
+    "elements": {
+      "headings": 12,
+      "paragraphs": 43,
+      "lists": 0,
+      "tables": 3,
+      "images": 4,
+      "captions": 7,
+      "uncaptioned_images": 0,
+      "footnotes": 1,
+      "repeated_header_lines": 10,
+      "page_number_lines": 10,
+      "textboxes": 1
+    },
+    "tables": [
+      {
+        "id": "t1",
+        "title": "표 1. 월간 지표",
+        "rows": 3,
+        "cols": 4,
+        "spans_pages": false,
+        "header_repeated": false,
+        "merged_cells": false
+      },
+      {
+        "id": "t2",
+        "title": "표 2. 시험 보류",
+        "rows": 2,
+        "cols": 2,
+        "spans_pages": false,
+        "header_repeated": false,
+        "merged_cells": false
+      },
+      {
+        "id": "t3",
+        "title": "표 3. 다음 달 검토",
+        "rows": 2,
+        "cols": 2,
+        "spans_pages": false,
+        "header_repeated": false,
+        "merged_cells": false
+      }
+    ],
+    "embedded_children": [],
+    "links": [],
+    "pair_with": null,
+    "notes": "2–6쪽 2단 연속 구역 및 여백 주의 상자. 네 개의 도표와 세 개의 표를 포함한다.",
+    "flags": {
+      "encrypted": false,
+      "password": null,
+      "extension_mismatch": false,
+      "macro": false,
+      "truncated": false,
+      "empty": false
+    },
+    "bytes": 173519,
+    "sha256": "40c1d3e06aae49dfbc93d4226f045f3753ed064e49dbe9a96bc0087cea99a156"
+  },
+  {
+    "file_id": "COA-3",
+    "path": "03_certificates/COA_FBX-101_Lot-2026A032.docx",
+    "format": "docx",
+    "true_format": "docx",
+    "priority": "P1",
+    "purposes": [
+      "parse",
+      "compare",
+      "structure",
+      "lineage",
+      "chunking",
+      "embedding_eval",
+      "vectordb"
+    ],
+    "language": "ko",
+    "department": "QC",
+    "doc_number": "COA-FBX101-2026A032",
+    "revision": null,
+    "issued": "2026-10-14",
+    "family_id": "COA-FBX101-2026A032",
+    "is_latest_expected": true,
+    "latest_status_expected": "single",
+    "duplicate_of": null,
+    "pages": 3,
+    "scanned_pages": [],
+    "elements": {
+      "headings": 5,
+      "paragraphs": 25,
+      "lists": 0,
+      "tables": 2,
+      "images": 1,
+      "captions": 2,
+      "uncaptioned_images": 1,
+      "footnotes": 1,
+      "repeated_header_lines": 3,
+      "page_number_lines": 3,
+      "textboxes": 0
+    },
+    "tables": [
+      {
+        "id": "t1",
+        "title": "표 1. 시험 결과",
+        "rows": 24,
+        "cols": 5,
+        "spans_pages": true,
+        "header_repeated": true,
+        "merged_cells": false
+      },
+      {
+        "id": "t2",
+        "title": "표 2. 원료 정보",
+        "rows": 3,
+        "cols": 9,
+        "spans_pages": false,
+        "header_repeated": false,
+        "merged_cells": false
+      }
+    ],
+    "embedded_children": [],
+    "links": [
+      {
+        "kind": "doc_number",
+        "target": "SPEC-FBX101 Rev.2",
+        "location": "p.1 §1 제품 정보",
+        "expected_state": "missing",
+        "expected_target_file_ids": [],
+        "latest_file_id": null
+      }
+    ],
+    "pair_with": null,
+    "notes": "",
+    "flags": {
+      "encrypted": false,
+      "password": null,
+      "extension_mismatch": false,
+      "macro": false,
+      "truncated": false,
+      "empty": false
+    },
+    "bytes": 50185,
+    "sha256": "9efbc3af6ee69414f5e5d46c5d9e659d38d3b92f5d1910a41d8a882d0278fa31"
+  },
+  {
+    "file_id": "COA-2",
+    "path": "03_certificates/시험성적서_원료검수_2026-10.xlsx",
+    "format": "xlsx",
+    "true_format": "xlsx",
+    "priority": "P1",
+    "purposes": [
+      "parse",
+      "structure",
+      "chunking",
+      "embedding_eval",
+      "vectordb"
+    ],
+    "language": "ko",
+    "department": "QC",
+    "doc_number": null,
+    "revision": null,
+    "issued": "2026-10-15",
+    "family_id": null,
+    "is_latest_expected": true,
+    "latest_status_expected": "single",
+    "duplicate_of": null,
+    "pages": null,
+    "scanned_pages": [],
+    "elements": {
+      "tables": 4
+    },
+    "tables": [
+      {
+        "id": "t1",
+        "title": "요약",
+        "rows": 3,
+        "cols": 7,
+        "spans_pages": false,
+        "header_repeated": false,
+        "merged_cells": true
+      },
+      {
+        "id": "t2",
+        "title": "원자료",
+        "rows": 600,
+        "cols": 12,
+        "spans_pages": false,
+        "header_repeated": false,
+        "merged_cells": false
+      },
+      {
+        "id": "t3",
+        "title": "기준",
+        "rows": 1,
+        "cols": 3,
+        "spans_pages": false,
+        "header_repeated": false,
+        "merged_cells": false
+      },
+      {
+        "id": "t4",
+        "title": "차트",
+        "rows": 12,
+        "cols": 2,
+        "spans_pages": false,
+        "header_repeated": false,
+        "merged_cells": false
+      }
+    ],
+    "embedded_children": [],
+    "links": [],
+    "pair_with": null,
+    "notes": "",
+    "flags": {
+      "encrypted": false,
+      "password": null,
+      "extension_mismatch": false,
+      "macro": false,
+      "truncated": false,
+      "empty": false
+    },
+    "sheets": [
+      "요약",
+      "원자료",
+      "기준",
+      "차트"
+    ],
+    "bytes": 53149,
+    "sha256": "bb92bbc1195daf9c1a55fda20e810c47fd78e96d1b2e1f3f12fa451fd0d14566"
+  },
+  {
+    "file_id": "XLS-4",
+    "path": "04_spreadsheets/배치기록_요약_2026Q3.xlsx",
+    "format": "xlsx",
+    "true_format": "xlsx",
+    "priority": "P1",
+    "purposes": [
+      "parse",
+      "chunking",
+      "embedding_eval",
+      "vectordb"
+    ],
+    "language": "ko",
+    "department": "생산",
+    "doc_number": null,
+    "revision": null,
+    "issued": "2026-10-15",
+    "family_id": null,
+    "is_latest_expected": true,
+    "latest_status_expected": "single",
+    "duplicate_of": null,
+    "pages": null,
+    "scanned_pages": [],
+    "elements": {
+      "tables": 1
+    },
+    "tables": [
+      {
+        "id": "t1",
+        "title": "배치 요약",
+        "rows": 301,
+        "cols": 40,
+        "spans_pages": false,
+        "header_repeated": false,
+        "merged_cells": true
+      }
+    ],
+    "embedded_children": [],
+    "links": [],
+    "pair_with": null,
+    "notes": "두 단계 표 머리글 바로 위에 행을 삽입하지 않도록 1행 A1 셀 메모와 첫 두 식별 열 머리글에 가상 고지를 표시했다.",
+    "flags": {
+      "encrypted": false,
+      "password": null,
+      "extension_mismatch": false,
+      "macro": false,
+      "truncated": false,
+      "empty": false
+    },
+    "sheets": [
+      "배치 요약"
+    ],
+    "bytes": 49117,
+    "sha256": "ff125df96eddde413c7ed90bb94134f96809eb2ea7a8cf05678928c240bdcb3c"
+  },
+  {
+    "file_id": "XLS-3C",
+    "path": "04_spreadsheets/온도기록_냉장고A_2026-10_cp949.csv",
+    "format": "csv",
+    "true_format": "csv",
+    "priority": "P1",
+    "purposes": [
+      "parse",
+      "compare",
+      "chunking",
+      "embedding_eval",
+      "vectordb"
+    ],
+    "language": "ko",
+    "department": "생산",
+    "doc_number": null,
+    "revision": null,
+    "issued": "2026-10-15",
+    "family_id": null,
+    "is_latest_expected": true,
+    "latest_status_expected": "single",
+    "duplicate_of": null,
+    "pages": null,
+    "scanned_pages": [],
+    "elements": {
+      "tables": 1
+    },
+    "tables": [
+      {
+        "id": "t1",
+        "title": "냉장고 A 온도 기록",
+        "rows": 2000,
+        "cols": 5,
+        "spans_pages": false,
+        "header_repeated": false,
+        "merged_cells": false
+      }
+    ],
+    "embedded_children": [],
+    "links": [],
+    "pair_with": "XLS-3",
+    "notes": "첫 기록의 경보 열에는 가상 고지를 넣었다. 고온 구간은 냉동고 D 일탈과 무관하다.",
+    "flags": {
+      "encrypted": false,
+      "password": null,
+      "extension_mismatch": false,
+      "macro": false,
+      "truncated": false,
+      "empty": false
+    },
+    "encoding": "cp949",
+    "bytes": 64129,
+    "sha256": "8713abeaf4bea8ec46368b4e6c18d9e4fe7b0ae88aa2fd2538a622cebe3ec978"
+  },
+  {
+    "file_id": "PPT-2",
+    "path": "05_presentations/설비교체_검토_v2.pptx",
+    "format": "pptx",
+    "true_format": "pptx",
+    "priority": "P1",
+    "purposes": [
+      "parse",
+      "lineage",
+      "compare",
+      "structure",
+      "chunking",
+      "embedding_eval",
+      "vectordb"
+    ],
+    "language": "ko",
+    "department": "설비",
+    "doc_number": "PPT-EQ-2026-005",
+    "revision": "v2",
+    "issued": "2026-10-27",
+    "family_id": "PPT-EQ-2026-005",
+    "is_latest_expected": false,
+    "latest_status_expected": "confirmed",
+    "duplicate_of": null,
+    "pages": 8,
+    "scanned_pages": [],
+    "elements": {
+      "native_tables": 1,
+      "native_charts": 1,
+      "images": 1,
+      "captions": 1,
+      "ole_objects": 0
+    },
+    "tables": [
+      {
+        "id": "t1",
+        "title": "교체안 비교",
+        "rows": 3,
+        "cols": 4,
+        "spans_pages": false,
+        "header_repeated": false,
+        "merged_cells": false
+      }
+    ],
+    "embedded_children": [],
+    "links": [
+      {
+        "kind": "doc_number",
+        "target": "RPT-EQ-2026-031",
+        "location": "슬라이드 8 원본 근거",
+        "expected_state": "linked",
+        "expected_target_file_ids": [
+          "RPT-1",
+          "RPT-1P"
+        ],
+        "latest_file_id": null
+      }
+    ],
+    "pair_with": null,
+    "notes": "",
+    "flags": {
+      "encrypted": false,
+      "password": null,
+      "extension_mismatch": false,
+      "macro": false,
+      "truncated": false,
+      "empty": false
+    },
+    "slides": 8,
+    "bytes": 96828,
+    "sha256": "4e3f956221aab9984ce8d9a430c21a4814e565e3c72bd964bdf5fc43223e90a7"
+  },
+  {
+    "file_id": "PPT-3",
+    "path": "05_presentations/설비교체_검토_v3_최종.pptx",
+    "format": "pptx",
+    "true_format": "pptx",
+    "priority": "P1",
+    "purposes": [
+      "parse",
+      "lineage",
+      "compare",
+      "structure",
+      "chunking",
+      "embedding_eval",
+      "vectordb"
+    ],
+    "language": "ko",
+    "department": "설비",
+    "doc_number": "PPT-EQ-2026-005",
+    "revision": "v3",
+    "issued": "2026-11-09",
+    "family_id": "PPT-EQ-2026-005",
+    "is_latest_expected": true,
+    "latest_status_expected": "confirmed",
+    "duplicate_of": null,
+    "pages": 8,
+    "scanned_pages": [],
+    "elements": {
+      "native_tables": 1,
+      "native_charts": 1,
+      "images": 1,
+      "captions": 1,
+      "ole_objects": 1
+    },
+    "tables": [
+      {
+        "id": "t1",
+        "title": "교체안 비교",
+        "rows": 3,
+        "cols": 4,
+        "spans_pages": false,
+        "header_repeated": false,
+        "merged_cells": false
+      }
+    ],
+    "embedded_children": [
+      {
+        "name": "교정일정_2026.xlsx",
+        "kind": "ole_object",
+        "path_inside": "ppt/embeddings/Microsoft_Excel_Sheet2.xlsx",
+        "true_format": "xlsx"
+      }
+    ],
+    "links": [
+      {
+        "kind": "doc_number",
+        "target": "RPT-EQ-2026-031",
+        "location": "슬라이드 8 원본 근거",
+        "expected_state": "linked",
+        "expected_target_file_ids": [
+          "RPT-1",
+          "RPT-1P"
+        ],
+        "latest_file_id": null
+      },
+      {
+        "kind": "hyperlink",
+        "target": "../04_spreadsheets/교정일정_2026.xlsx",
+        "location": "슬라이드 8 교정 일정 첨부",
+        "expected_state": "linked",
+        "expected_target_file_ids": [
+          "XLS-2"
+        ],
+        "latest_file_id": null
+      }
+    ],
+    "pair_with": null,
+    "notes": "",
+    "flags": {
+      "encrypted": false,
+      "password": null,
+      "extension_mismatch": false,
+      "macro": false,
+      "truncated": false,
+      "empty": false
+    },
+    "slides": 8,
+    "bytes": 106021,
+    "sha256": "bf78ead3e5befb354fcfc113b5267d1e8e7bc4cc52614a207b68cd8a3b5172a3"
+  },
+  {
+    "file_id": "EML-3",
+    "path": "06_mail/회의록_공유_2026-10-20.eml",
+    "format": "eml",
+    "true_format": "eml",
+    "priority": "P1",
+    "purposes": [
+      "structure",
+      "parse",
+      "lineage",
+      "embedding_eval",
+      "vectordb"
+    ],
+    "language": "ko",
+    "department": "QA",
+    "doc_number": null,
+    "revision": null,
+    "issued": "2026-10-20",
+    "family_id": null,
+    "is_latest_expected": true,
+    "latest_status_expected": "single",
+    "duplicate_of": null,
+    "pages": null,
+    "scanned_pages": [],
+    "elements": {},
+    "tables": [],
+    "embedded_children": [],
+    "links": [
+      {
+        "kind": "doc_number",
+        "target": "CAPA-2026-0042",
+        "location": "본문 조치 1",
+        "expected_state": "linked",
+        "expected_target_file_ids": [
+          "RPT-3"
+        ],
+        "latest_file_id": null
+      },
+      {
+        "kind": "doc_number",
+        "target": "SOP-EQ-0102",
+        "location": "본문 조치 2",
+        "expected_state": "linked",
+        "expected_target_file_ids": [
+          "SOP-C3"
+        ],
+        "latest_file_id": null
+      },
+      {
+        "kind": "doc_number",
+        "target": "RPT-EQ-2026-031",
+        "location": "본문 조치 3",
+        "expected_state": "linked",
+        "expected_target_file_ids": [
+          "RPT-1",
+          "RPT-1P"
+        ],
+        "latest_file_id": null
+      }
+    ],
+    "pair_with": null,
+    "notes": "",
+    "flags": {
+      "encrypted": false,
+      "password": null,
+      "extension_mismatch": false,
+      "macro": false,
+      "truncated": false,
+      "empty": false
+    },
+    "bytes": 1071,
+    "sha256": "c30675215a0570cbfbfaa7641e48080e2cf4a788a5f593cf261ab49742661f6a"
+  },
+  {
+    "file_id": "ZIP-3",
+    "path": "07_archives/감사대응_자료.zip",
+    "format": "zip",
+    "true_format": "zip",
+    "priority": "P1",
+    "purposes": [
+      "structure",
+      "embedding_eval"
+    ],
+    "language": "ko",
+    "department": "QA",
+    "doc_number": null,
+    "revision": null,
+    "issued": "2026-10-15",
+    "family_id": null,
+    "is_latest_expected": true,
+    "latest_status_expected": "single",
+    "duplicate_of": null,
+    "pages": null,
+    "scanned_pages": [],
+    "elements": {},
+    "tables": [],
+    "embedded_children": [
+      {
+        "name": "RE_ 일탈 DEV-2026-0117 원인조사 요청.eml",
+        "kind": "zip_entry",
+        "path_inside": "RE_ 일탈 DEV-2026-0117 원인조사 요청.eml",
+        "true_format": "eml"
+      },
+      {
+        "name": "COA_FBX-101_Lot-2026A031_스캔.pdf",
+        "kind": "zip_entry",
+        "path_inside": "COA_FBX-101_Lot-2026A031_스캔.pdf",
+        "true_format": "pdf"
+      },
+      {
+        "name": "원인조사_요청_원본.eml",
+        "kind": "email_attachment",
+        "path_inside": "RE_ 일탈 DEV-2026-0117 원인조사 요청.eml!/원인조사_요청_원본.eml",
+        "true_format": "eml"
+      },
+      {
+        "name": "현장사진_모음.zip",
+        "kind": "email_attachment",
+        "path_inside": "RE_ 일탈 DEV-2026-0117 원인조사 요청.eml!/원인조사_요청_원본.eml!/현장사진_모음.zip",
+        "true_format": "zip"
+      },
+      {
+        "name": "현장사진_냉동고D.jpg",
+        "kind": "zip_entry",
+        "path_inside": "RE_ 일탈 DEV-2026-0117 원인조사 요청.eml!/원인조사_요청_원본.eml!/현장사진_모음.zip!/현장사진_냉동고D.jpg",
+        "true_format": "jpg"
+      },
+      {
+        "name": "냉동고_내부랙.jpg",
+        "kind": "zip_entry",
+        "path_inside": "RE_ 일탈 DEV-2026-0117 원인조사 요청.eml!/원인조사_요청_원본.eml!/현장사진_모음.zip!/냉동고_내부랙.jpg",
+        "true_format": "jpg"
+      },
+      {
+        "name": "시료_보관준비대.jpg",
+        "kind": "zip_entry",
+        "path_inside": "RE_ 일탈 DEV-2026-0117 원인조사 요청.eml!/원인조사_요청_원본.eml!/현장사진_모음.zip!/시료_보관준비대.jpg",
+        "true_format": "jpg"
+      }
+    ],
+    "links": [],
+    "pair_with": null,
+    "notes": "ZIP → EML → EML → ZIP → JPG 중첩.",
+    "flags": {
+      "encrypted": false,
+      "password": null,
+      "extension_mismatch": false,
+      "macro": false,
+      "truncated": false,
+      "empty": false
+    },
+    "bytes": 1466897,
+    "sha256": "722af682e54a1184e8f7ff15a5172aaac53150c8a610a9471077d50990bfd092"
+  },
+  {
+    "file_id": "SCN-3",
+    "path": "08_scans/보관조건_점검표.tif",
+    "format": "tif",
+    "true_format": "tif",
+    "priority": "P1",
+    "purposes": [
+      "ocr",
+      "parse",
+      "embedding_eval"
+    ],
+    "language": "ko",
+    "department": "생산",
+    "doc_number": null,
+    "revision": null,
+    "issued": "2026-10-15",
+    "family_id": null,
+    "is_latest_expected": true,
+    "latest_status_expected": "single",
+    "duplicate_of": null,
+    "pages": 3,
+    "scanned_pages": [
+      1,
+      2,
+      3
+    ],
+    "elements": {
+      "tables": 3
+    },
+    "tables": [
+      {
+        "id": "t1",
+        "title": "EQ-FRZ-D 보관 조건",
+        "rows": 4,
+        "cols": 4,
+        "spans_pages": false,
+        "header_repeated": false,
+        "merged_cells": false
+      },
+      {
+        "id": "t2",
+        "title": "EQ-UF-03 보관 조건",
+        "rows": 4,
+        "cols": 4,
+        "spans_pages": false,
+        "header_repeated": false,
+        "merged_cells": false
+      },
+      {
+        "id": "t3",
+        "title": "EQ-INC-H 보관 조건",
+        "rows": 4,
+        "cols": 4,
+        "spans_pages": false,
+        "header_repeated": false,
+        "merged_cells": false
+      }
+    ],
+    "embedded_children": [],
+    "links": [],
+    "pair_with": null,
+    "notes": "",
+    "flags": {
+      "encrypted": false,
+      "password": null,
+      "extension_mismatch": false,
+      "macro": false,
+      "truncated": false,
+      "empty": false
+    },
+    "bytes": 4290064,
+    "sha256": "9eb792c2ea1b2ae742e9056978ab882e9e0147deedc28c6be1caff96d3a99753"
+  },
+  {
+    "file_id": "SCN-4",
+    "path": "08_scans/설비명판_EQ-UF-03.png",
+    "format": "png",
+    "true_format": "png",
+    "priority": "P1",
+    "purposes": [
+      "ocr",
+      "structure",
+      "embedding_eval"
+    ],
+    "language": "ko",
+    "department": "설비",
+    "doc_number": null,
+    "revision": null,
+    "issued": "2026-10-15",
+    "family_id": null,
+    "is_latest_expected": true,
+    "latest_status_expected": "single",
+    "duplicate_of": null,
+    "pages": 1,
+    "scanned_pages": [
+      1
+    ],
+    "elements": {},
+    "tables": [],
+    "embedded_children": [],
+    "links": [],
+    "pair_with": null,
+    "notes": "",
+    "flags": {
+      "encrypted": false,
+      "password": null,
+      "extension_mismatch": false,
+      "macro": false,
+      "truncated": false,
+      "empty": false
+    },
+    "bytes": 59331,
+    "sha256": "d31b7df47ee437905056a10d0b93f2f295c3ec81175e2d19e3a338d0e978bc66"
+  },
+  {
+    "file_id": "IMG-6",
+    "path": "09_images/공정흐름도_FBX101.png",
+    "format": "png",
+    "true_format": "png",
+    "priority": "P1",
+    "purposes": [
+      "ocr",
+      "embedding_eval"
+    ],
+    "language": "ko",
+    "department": "생산",
+    "doc_number": null,
+    "revision": null,
+    "issued": "2026-10-15",
+    "family_id": null,
+    "is_latest_expected": true,
+    "latest_status_expected": "single",
+    "duplicate_of": null,
+    "pages": null,
+    "scanned_pages": [],
+    "elements": {},
+    "tables": [],
+    "embedded_children": [],
+    "links": [],
+    "pair_with": null,
+    "notes": "",
+    "flags": {
+      "encrypted": false,
+      "password": null,
+      "extension_mismatch": false,
+      "macro": false,
+      "truncated": false,
+      "empty": false
+    },
+    "bytes": 33453,
+    "sha256": "51d4e72d863b6126fc20a54a02bbe82dd3780a2403f2c2164b0d2d3b066cf347"
+  },
+  {
+    "file_id": "IMG-7",
+    "path": "09_images/시료보관_냉동고_내부.jpg",
+    "format": "jpg",
+    "true_format": "jpg",
+    "priority": "P1",
+    "purposes": [
+      "structure",
+      "chunking"
+    ],
+    "language": "ko",
+    "department": "설비",
+    "doc_number": null,
+    "revision": null,
+    "issued": "2026-10-15",
+    "family_id": null,
+    "is_latest_expected": true,
+    "latest_status_expected": "single",
+    "duplicate_of": null,
+    "pages": null,
+    "scanned_pages": [],
+    "elements": {},
+    "tables": [],
+    "embedded_children": [],
+    "links": [],
+    "pair_with": null,
+    "notes": "무문자 합성 사진.",
+    "flags": {
+      "encrypted": false,
+      "password": null,
+      "extension_mismatch": false,
+      "macro": false,
+      "truncated": false,
+      "empty": false
+    },
+    "bytes": 26790,
+    "sha256": "a5734cb9923928e154acefb0163a7ead01936b1c995f3703c241cce714b4a8e3"
+  },
+  {
+    "file_id": "EDGE-5",
+    "path": "10_edge_cases/대용량_교육자료_120쪽.pdf",
+    "format": "pdf",
+    "true_format": "pdf",
+    "priority": "P1",
+    "purposes": [
+      "parse",
+      "chunking",
+      "vectordb",
+      "embedding_eval"
+    ],
+    "language": "ko",
+    "department": "생산",
+    "doc_number": null,
+    "revision": null,
+    "issued": "2026-10-15",
+    "family_id": null,
+    "is_latest_expected": true,
+    "latest_status_expected": "single",
+    "duplicate_of": null,
+    "pages": 120,
+    "scanned_pages": [],
+    "elements": {
+      "headings": 121,
+      "paragraphs": 841,
+      "lists": 0,
+      "tables": 30,
+      "images": 0,
+      "captions": 30,
+      "uncaptioned_images": 0,
+      "footnotes": 0,
+      "repeated_header_lines": 120,
+      "page_number_lines": 120,
+      "textboxes": 0
+    },
+    "tables": [
+      {
+        "id": "t1",
+        "title": "표 1. 설비 인계 실습 기록",
+        "rows": 3,
+        "cols": 4,
+        "spans_pages": false,
+        "header_repeated": false,
+        "merged_cells": false
+      },
+      {
+        "id": "t2",
+        "title": "표 2. 설비 인계 실습 기록",
+        "rows": 3,
+        "cols": 4,
+        "spans_pages": false,
+        "header_repeated": false,
+        "merged_cells": false
+      },
+      {
+        "id": "t3",
+        "title": "표 3. 설비 인계 실습 기록",
+        "rows": 3,
+        "cols": 4,
+        "spans_pages": false,
+        "header_repeated": false,
+        "merged_cells": false
+      },
+      {
+        "id": "t4",
+        "title": "표 4. 설비 인계 실습 기록",
+        "rows": 3,
+        "cols": 4,
+        "spans_pages": false,
+        "header_repeated": false,
+        "merged_cells": false
+      },
+      {
+        "id": "t5",
+        "title": "표 5. 설비 인계 실습 기록",
+        "rows": 3,
+        "cols": 4,
+        "spans_pages": false,
+        "header_repeated": false,
+        "merged_cells": false
+      },
+      {
+        "id": "t6",
+        "title": "표 6. 시료 보관 실습 기록",
+        "rows": 3,
+        "cols": 4,
+        "spans_pages": false,
+        "header_repeated": false,
+        "merged_cells": false
+      },
+      {
+        "id": "t7",
+        "title": "표 7. 시료 보관 실습 기록",
+        "rows": 3,
+        "cols": 4,
+        "spans_pages": false,
+        "header_repeated": false,
+        "merged_cells": false
+      },
+      {
+        "id": "t8",
+        "title": "표 8. 시료 보관 실습 기록",
+        "rows": 3,
+        "cols": 4,
+        "spans_pages": false,
+        "header_repeated": false,
+        "merged_cells": false
+      },
+      {
+        "id": "t9",
+        "title": "표 9. 시료 보관 실습 기록",
+        "rows": 3,
+        "cols": 4,
+        "spans_pages": false,
+        "header_repeated": false,
+        "merged_cells": false
+      },
+      {
+        "id": "t10",
+        "title": "표 10. 시료 보관 실습 기록",
+        "rows": 3,
+        "cols": 4,
+        "spans_pages": false,
+        "header_repeated": false,
+        "merged_cells": false
+      },
+      {
+        "id": "t11",
+        "title": "표 11. 기기 교정 실습 기록",
+        "rows": 3,
+        "cols": 4,
+        "spans_pages": false,
+        "header_repeated": false,
+        "merged_cells": false
+      },
+      {
+        "id": "t12",
+        "title": "표 12. 기기 교정 실습 기록",
+        "rows": 3,
+        "cols": 4,
+        "spans_pages": false,
+        "header_repeated": false,
+        "merged_cells": false
+      },
+      {
+        "id": "t13",
+        "title": "표 13. 기기 교정 실습 기록",
+        "rows": 3,
+        "cols": 4,
+        "spans_pages": false,
+        "header_repeated": false,
+        "merged_cells": false
+      },
+      {
+        "id": "t14",
+        "title": "표 14. 기기 교정 실습 기록",
+        "rows": 3,
+        "cols": 4,
+        "spans_pages": false,
+        "header_repeated": false,
+        "merged_cells": false
+      },
+      {
+        "id": "t15",
+        "title": "표 15. 기기 교정 실습 기록",
+        "rows": 3,
+        "cols": 4,
+        "spans_pages": false,
+        "header_repeated": false,
+        "merged_cells": false
+      },
+      {
+        "id": "t16",
+        "title": "표 16. 시험 데이터 실습 기록",
+        "rows": 3,
+        "cols": 4,
+        "spans_pages": false,
+        "header_repeated": false,
+        "merged_cells": false
+      },
+      {
+        "id": "t17",
+        "title": "표 17. 시험 데이터 실습 기록",
+        "rows": 3,
+        "cols": 4,
+        "spans_pages": false,
+        "header_repeated": false,
+        "merged_cells": false
+      },
+      {
+        "id": "t18",
+        "title": "표 18. 시험 데이터 실습 기록",
+        "rows": 3,
+        "cols": 4,
+        "spans_pages": false,
+        "header_repeated": false,
+        "merged_cells": false
+      },
+      {
+        "id": "t19",
+        "title": "표 19. 시험 데이터 실습 기록",
+        "rows": 3,
+        "cols": 4,
+        "spans_pages": false,
+        "header_repeated": false,
+        "merged_cells": false
+      },
+      {
+        "id": "t20",
+        "title": "표 20. 시험 데이터 실습 기록",
+        "rows": 3,
+        "cols": 4,
+        "spans_pages": false,
+        "header_repeated": false,
+        "merged_cells": false
+      },
+      {
+        "id": "t21",
+        "title": "표 21. 품질 일탈 실습 기록",
+        "rows": 3,
+        "cols": 4,
+        "spans_pages": false,
+        "header_repeated": false,
+        "merged_cells": false
+      },
+      {
+        "id": "t22",
+        "title": "표 22. 품질 일탈 실습 기록",
+        "rows": 3,
+        "cols": 4,
+        "spans_pages": false,
+        "header_repeated": false,
+        "merged_cells": false
+      },
+      {
+        "id": "t23",
+        "title": "표 23. 품질 일탈 실습 기록",
+        "rows": 3,
+        "cols": 4,
+        "spans_pages": false,
+        "header_repeated": false,
+        "merged_cells": false
+      },
+      {
+        "id": "t24",
+        "title": "표 24. 품질 일탈 실습 기록",
+        "rows": 3,
+        "cols": 4,
+        "spans_pages": false,
+        "header_repeated": false,
+        "merged_cells": false
+      },
+      {
+        "id": "t25",
+        "title": "표 25. 품질 일탈 실습 기록",
+        "rows": 3,
+        "cols": 4,
+        "spans_pages": false,
+        "header_repeated": false,
+        "merged_cells": false
+      },
+      {
+        "id": "t26",
+        "title": "표 26. 원자료 정합성 실습 기록",
+        "rows": 3,
+        "cols": 4,
+        "spans_pages": false,
+        "header_repeated": false,
+        "merged_cells": false
+      },
+      {
+        "id": "t27",
+        "title": "표 27. 원자료 정합성 실습 기록",
+        "rows": 3,
+        "cols": 4,
+        "spans_pages": false,
+        "header_repeated": false,
+        "merged_cells": false
+      },
+      {
+        "id": "t28",
+        "title": "표 28. 원자료 정합성 실습 기록",
+        "rows": 3,
+        "cols": 4,
+        "spans_pages": false,
+        "header_repeated": false,
+        "merged_cells": false
+      },
+      {
+        "id": "t29",
+        "title": "표 29. 원자료 정합성 실습 기록",
+        "rows": 3,
+        "cols": 4,
+        "spans_pages": false,
+        "header_repeated": false,
+        "merged_cells": false
+      },
+      {
+        "id": "t30",
+        "title": "표 30. 원자료 정합성 실습 기록",
+        "rows": 3,
+        "cols": 4,
+        "spans_pages": false,
+        "header_repeated": false,
+        "merged_cells": false
+      }
+    ],
+    "embedded_children": [],
+    "links": [],
+    "pair_with": null,
+    "notes": "",
+    "flags": {
+      "encrypted": false,
+      "password": null,
+      "extension_mismatch": false,
+      "macro": false,
+      "truncated": false,
+      "empty": false
+    },
+    "bytes": 281749,
+    "sha256": "1d165b66a8a42b5ee85589f4f6e900fcad51ad959da89d98b8d616175a676c04"
+  },
+  {
+    "file_id": "EDGE-4",
+    "path": "10_edge_cases/손상된파일_일부잘림.docx",
+    "format": "docx",
+    "true_format": "docx",
+    "priority": "P1",
+    "purposes": [
+      "parse",
+      "structure"
+    ],
+    "language": "ko",
+    "department": "QA",
+    "doc_number": null,
+    "revision": null,
+    "issued": "2026-10-15",
+    "family_id": null,
+    "is_latest_expected": true,
+    "latest_status_expected": "single",
+    "duplicate_of": null,
+    "pages": null,
+    "scanned_pages": [],
+    "elements": {},
+    "tables": [],
+    "embedded_children": [],
+    "links": [],
+    "pair_with": null,
+    "notes": "SOP-C1 원본 앞쪽 60 %만 남겨 중앙 디렉터리가 없는 파일.",
+    "flags": {
+      "encrypted": false,
+      "password": null,
+      "extension_mismatch": false,
+      "macro": false,
+      "truncated": true,
+      "empty": false
+    },
+    "bytes": 41509,
+    "sha256": "bd86b72f8aa2ee3112f89babe1b291bbb89659ceba880d116edab38bb32edd72"
+  },
+  {
+    "file_id": "EDGE-6",
+    "path": "10_edge_cases/이미지만_있는_문서.pdf",
+    "format": "pdf",
+    "true_format": "pdf",
+    "priority": "P1",
+    "purposes": [
+      "ocr",
+      "parse",
+      "chunking"
+    ],
+    "language": "ko",
+    "department": "설비",
+    "doc_number": null,
+    "revision": null,
+    "issued": "2026-10-15",
+    "family_id": null,
+    "is_latest_expected": true,
+    "latest_status_expected": "single",
+    "duplicate_of": null,
+    "pages": 2,
+    "scanned_pages": [
+      1,
+      2
+    ],
+    "elements": {},
+    "tables": [],
+    "embedded_children": [],
+    "links": [],
+    "pair_with": null,
+    "notes": "사진 두 장만 포함하며 문구 및 텍스트 레이어 없음.",
+    "flags": {
+      "encrypted": false,
+      "password": null,
+      "extension_mismatch": false,
+      "macro": false,
+      "truncated": false,
+      "empty": false
+    },
+    "bytes": 79605,
+    "sha256": "419a842d876719c2c0ae2d74cffecbf737a15608c6b6bc7531ecc73f434815f8"
+  },
+  {
+    "file_id": "SOP-C4",
+    "path": "01_sop/문서번호없는_파일명_보관조건.docx",
+    "format": "docx",
+    "true_format": "docx",
+    "priority": "P2",
+    "purposes": [
+      "parse",
+      "lineage",
+      "embedding_eval",
+      "vectordb"
+    ],
+    "language": "ko",
+    "department": "QC",
+    "doc_number": "SOP-QC-0040",
+    "revision": "Rev.2",
+    "issued": "2024-01-08",
+    "family_id": "SOP-QC-0040",
+    "is_latest_expected": false,
+    "latest_status_expected": "confirmed",
+    "duplicate_of": null,
+    "pages": 1,
+    "scanned_pages": [],
+    "elements": {
+      "headings": 3,
+      "paragraphs": 6,
+      "lists": 0,
+      "tables": 1,
+      "images": 0,
+      "captions": 1,
+      "uncaptioned_images": 0,
+      "footnotes": 0,
+      "repeated_header_lines": 1,
+      "page_number_lines": 1,
+      "textboxes": 0
+    },
+    "tables": [
+      {
+        "id": "t1",
+        "title": "표 1. 보관 조건",
+        "rows": 3,
+        "cols": 3,
+        "spans_pages": false,
+        "header_repeated": false,
+        "merged_cells": false
+      }
+    ],
+    "embedded_children": [],
+    "links": [
+      {
+        "kind": "doc_number",
+        "target": "SOP-QC-0040 Rev.2",
+        "location": "p.1 표지",
+        "expected_state": "outdated",
+        "expected_target_file_ids": [
+          "SOP-C4"
+        ],
+        "latest_file_id": "SOP-A3"
+      }
+    ],
+    "pair_with": null,
+    "notes": "파일명에 번호가 없고 표지에만 구판 Rev.2 식별자가 있다. 표지 식별자를 계보와 참조 정답에 포함했다.",
+    "flags": {
+      "encrypted": false,
+      "password": null,
+      "extension_mismatch": false,
+      "macro": false,
+      "truncated": false,
+      "empty": false
+    },
+    "bytes": 39345,
+    "sha256": "58b119e6b8f395fa40bc71cec43445717ae1289b96ffde80dfa72ebf31aa6f21"
+  },
+  {
+    "file_id": "EDGE-7",
+    "path": "10_edge_cases/0byte.txt",
+    "format": "txt",
+    "true_format": "txt",
+    "priority": "P2",
+    "purposes": [
+      "parse",
+      "structure"
+    ],
+    "language": "ko",
+    "department": "QA",
+    "doc_number": null,
+    "revision": null,
+    "issued": "2026-10-15",
+    "family_id": null,
+    "is_latest_expected": true,
+    "latest_status_expected": "single",
+    "duplicate_of": null,
+    "pages": null,
+    "scanned_pages": [],
+    "elements": {},
+    "tables": [],
+    "embedded_children": [],
+    "links": [],
+    "pair_with": null,
+    "notes": "",
+    "flags": {
+      "encrypted": false,
+      "password": null,
+      "extension_mismatch": false,
+      "macro": false,
+      "truncated": false,
+      "empty": true
+    },
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "file_id": "EDGE-8",
+    "path": "10_edge_cases/README_현장공유.md",
+    "format": "md",
+    "true_format": "md",
+    "priority": "P2",
+    "purposes": [
+      "parse",
+      "structure",
+      "lineage",
+      "embedding_eval"
+    ],
+    "language": "ko",
+    "department": "생산",
+    "doc_number": null,
+    "revision": null,
+    "issued": "2026-10-15",
+    "family_id": null,
+    "is_latest_expected": true,
+    "latest_status_expected": "single",
+    "duplicate_of": null,
+    "pages": null,
+    "scanned_pages": [],
+    "elements": {
+      "tables": 1
+    },
+    "tables": [
+      {
+        "id": "t1",
+        "title": "파일 목록",
+        "rows": 3,
+        "cols": 3,
+        "spans_pages": false,
+        "header_repeated": false,
+        "merged_cells": false
+      }
+    ],
+    "embedded_children": [],
+    "links": [
+      {
+        "kind": "hyperlink",
+        "target": "../01_sop/SOP-QC-014_HPLC_시스템적합성_v3.docx",
+        "location": "파일 목록 Markdown 링크",
+        "expected_state": "linked",
+        "expected_target_file_ids": [
+          "SOP-C1"
+        ],
+        "latest_file_id": null
+      },
+      {
+        "kind": "hyperlink",
+        "target": "../04_spreadsheets/교정일정_2026.xlsx",
+        "location": "파일 목록 Markdown 링크",
+        "expected_state": "linked",
+        "expected_target_file_ids": [
+          "XLS-2"
+        ],
+        "latest_file_id": null
+      },
+      {
+        "kind": "hyperlink",
+        "target": "../05_presentations/2026_Q3_품질지표_리뷰.pptx",
+        "location": "파일 목록 Markdown 링크",
+        "expected_state": "linked",
+        "expected_target_file_ids": [
+          "PPT-1"
+        ],
+        "latest_file_id": null
+      }
+    ],
+    "pair_with": null,
+    "notes": "",
+    "flags": {
+      "encrypted": false,
+      "password": null,
+      "extension_mismatch": false,
+      "macro": false,
+      "truncated": false,
+      "empty": false
+    },
+    "bytes": 632,
+    "sha256": "b8025c9b89438024c080c4f4d61d19b087358af24fbf215e360bc4839046cdeb"
+  },
+  {
+    "file_id": "EDGE-9",
+    "path": "10_edge_cases/특수문자_파일명 #1 (복사) [최종]…v2.docx",
+    "format": "docx",
+    "true_format": "docx",
+    "priority": "P2",
+    "purposes": [
+      "parse",
+      "chunking",
+      "embedding_eval",
+      "vectordb"
+    ],
+    "language": "ko",
+    "department": "QA",
+    "doc_number": null,
+    "revision": null,
+    "issued": "2026-10-15",
+    "family_id": null,
+    "is_latest_expected": true,
+    "latest_status_expected": "single",
+    "duplicate_of": null,
+    "pages": 1,
+    "scanned_pages": [],
+    "elements": {
+      "headings": 2,
+      "paragraphs": 3,
+      "lists": 0,
+      "tables": 0,
+      "images": 0,
+      "captions": 0,
+      "uncaptioned_images": 0,
+      "footnotes": 0,
+      "repeated_header_lines": 1,
+      "page_number_lines": 1,
+      "textboxes": 0
+    },
+    "tables": [],
+    "embedded_children": [],
+    "links": [],
+    "pair_with": null,
+    "notes": "",
+    "flags": {
+      "encrypted": false,
+      "password": null,
+      "extension_mismatch": false,
+      "macro": false,
+      "truncated": false,
+      "empty": false
+    },
+    "bytes": 38543,
+    "sha256": "d2887876a0d9731d78e135a81c645e7dc773b779b742cfd61c178846741475c3"
+  }
+]

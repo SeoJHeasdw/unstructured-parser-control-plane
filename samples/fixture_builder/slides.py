@@ -1,6 +1,8 @@
 from pptx import Presentation
 from pptx.chart.data import CategoryChartData
 from pptx.enum.chart import XL_CHART_TYPE, XL_LEGEND_POSITION
+from pptx.enum.shapes import PROG_ID
+from PIL import Image, ImageDraw
 from pptx.dml.color import RGBColor as Color
 from pptx.oxml.xmlchemy import OxmlElement
 from pptx.util import Inches as I, Pt as PtSlide
@@ -186,8 +188,26 @@ def replacement(revision,filename,fid,assets):
     text_frame(deck,fid,7,'최종 검토',(
         '벤더 C가 정비 대응을 견적에 포함하여 이번 개정에서 권고안으로 바뀌었다.' if latest else
         '벤더 B가 공사비와 반입 소요일에서 우선 검토 대상이다.'))
-    text_frame(deck,fid,8,'검토 이력','원본 근거 RPT-EQ-2026-031 · 냉각수 순환설비 정기점검 보고서\n담당 설비팀 박O수')
+    review=text_frame(deck,fid,8,'검토 이력','원본 근거 RPT-EQ-2026-031 · 냉각수 순환설비 정기점검 보고서\n담당 설비팀 박O수')
     link(fid,'RPT-EQ-2026-031','슬라이드 8 원본 근거','linked',['RPT-1','RPT-1P'])
+    if latest:
+        document_link='../'+MANIFEST['XLS-2']['path']
+        icon=Image.new('RGB',(160,116),'#edf4f6')
+        draw=ImageDraw.Draw(icon)
+        draw.rounded_rectangle((40,12,119,104),radius=7,outline='#234D62',width=4)
+        for y in [37,55,73]:
+            draw.line((53,y,106,y),fill='#347288',width=4)
+        icon_path=WORK/'embedded-sheet-icon.png'
+        icon.save(icon_path)
+        review.shapes.add_ole_object(str(file_path('XLS-2')),PROG_ID.XLSX,I(1.1),I(4),
+                                     width=I(1.36),height=I(.98),icon_file=str(icon_path),
+                                     icon_width=I(1.36),icon_height=I(.98))
+        add_text(review,2.65,4.25,8.8,.48,'첨부 · 교정일정_2026.xlsx',16,link_to=document_link)
     deck.save(target)
+    if latest:
+        with zipfile.ZipFile(target) as package:
+            embedded=next(name for name in package.namelist() if name.startswith('ppt/embeddings/') and name.endswith('.xlsx') and package.read(name)==file_path('XLS-2').read_bytes())
+        child(fid,file_path('XLS-2').name,'ole_object','xlsx',embedded)
+        link(fid,document_link,'슬라이드 8 교정 일정 첨부','linked',['XLS-2'],kind='hyperlink')
     MANIFEST[fid]['slides']=len(deck.slides)
-    MANIFEST[fid]['elements']=dict(native_tables=1,native_charts=1,images=1,captions=1)
+    MANIFEST[fid]['elements']=dict(native_tables=1,native_charts=1,images=1,captions=1,ole_objects=int(latest))

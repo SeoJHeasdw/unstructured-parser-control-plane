@@ -1,0 +1,33 @@
+{
+  "file_id": "IMG-4",
+  "title": "2026년 냉각수 펌프 진동 추이",
+  "key_values": [],
+  "tables": [],
+  "captions": [],
+  "numbers_with_units": [],
+  "headings": [],
+  "text_snippets": [],
+  "visible_image_text": [
+    "냉각수 펌프 진동 추이",
+    "2026-07",
+    "2026-08",
+    "2026-09",
+    "2026-10",
+    "mm/s",
+    "P-1",
+    "P-2",
+    "4.5 mm/s"
+  ],
+  "visual_evidence": [
+    {
+      "question_id": "q-079",
+      "text": "4.5 mm/s",
+      "location": "그림 우측 점선"
+    },
+    {
+      "question_id": "q-080",
+      "text": "P-1",
+      "location": "그림 아래 범례"
+    }
+  ]
+}

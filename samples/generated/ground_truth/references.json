@@ -1,0 +1,1469 @@
+[
+  {
+    "source_file_id": "SOP-B1",
+    "location": "§6.1 교정 일정 확인표",
+    "written_as": "FRM-QC-0012-A",
+    "kind": "doc_number",
+    "expected_state": "missing",
+    "expected_target_file_ids": [],
+    "latest_file_id": null
+  },
+  {
+    "source_file_id": "SOP-B1",
+    "location": "§6.1 허용 오차 이탈 조사표",
+    "written_as": "FRM-QC-0012-B",
+    "kind": "doc_number",
+    "expected_state": "missing",
+    "expected_target_file_ids": [],
+    "latest_file_id": null
+  },
+  {
+    "source_file_id": "SOP-B1",
+    "location": "§6.1 교정 결과 인계서",
+    "written_as": "FRM-QC-0012-C",
+    "kind": "doc_number",
+    "expected_state": "missing",
+    "expected_target_file_ids": [],
+    "latest_file_id": null
+  },
+  {
+    "source_file_id": "SOP-B2",
+    "location": "§6.1 교정 일정 확인표",
+    "written_as": "FRM-QC-0012-A",
+    "kind": "doc_number",
+    "expected_state": "missing",
+    "expected_target_file_ids": [],
+    "latest_file_id": null
+  },
+  {
+    "source_file_id": "SOP-B2",
+    "location": "§6.1 허용 오차 이탈 조사표",
+    "written_as": "FRM-QC-0012-B",
+    "kind": "doc_number",
+    "expected_state": "missing",
+    "expected_target_file_ids": [],
+    "latest_file_id": null
+  },
+  {
+    "source_file_id": "SOP-B2",
+    "location": "§6.1 교정 결과 인계서",
+    "written_as": "FRM-QC-0012-C",
+    "kind": "doc_number",
+    "expected_state": "missing",
+    "expected_target_file_ids": [],
+    "latest_file_id": null
+  },
+  {
+    "source_file_id": "SOP-A3",
+    "location": "§8 참고 문서",
+    "written_as": "SOP-QC-0012 Rev.2",
+    "kind": "doc_number",
+    "expected_state": "ambiguous",
+    "expected_target_file_ids": [
+      "SOP-B1",
+      "SOP-B2"
+    ],
+    "latest_file_id": null
+  },
+  {
+    "source_file_id": "SOP-A3",
+    "location": "§8 참고 문서",
+    "written_as": "WI-QC-052",
+    "kind": "doc_number",
+    "expected_state": "linked",
+    "expected_target_file_ids": [
+      "SOP-C2"
+    ],
+    "latest_file_id": null
+  },
+  {
+    "source_file_id": "SOP-A3",
+    "location": "§8 참고 문서",
+    "written_as": "SOP-EQ-0101",
+    "kind": "doc_number",
+    "expected_state": "missing",
+    "expected_target_file_ids": [],
+    "latest_file_id": null
+  },
+  {
+    "source_file_id": "SOP-A3",
+    "location": "§8 시험기기 교정 파일",
+    "written_as": "\\\\fabrikam-fs01\\qa\\SOP\\SOP-QC-0012_Rev2.docx",
+    "kind": "shared_path",
+    "expected_state": "ambiguous",
+    "expected_target_file_ids": [
+      "SOP-B1",
+      "SOP-B2"
+    ],
+    "latest_file_id": null
+  },
+  {
+    "source_file_id": "SOP-A3",
+    "location": "§8 인트라넷",
+    "written_as": "https://intranet.fabrikam.example/sop/SOP-QC-0040",
+    "kind": "url",
+    "expected_state": "external",
+    "expected_target_file_ids": [],
+    "latest_file_id": null
+  },
+  {
+    "source_file_id": "SOP-A3P",
+    "location": "§8 참고 문서",
+    "written_as": "SOP-QC-0012 Rev.2",
+    "kind": "doc_number",
+    "expected_state": "ambiguous",
+    "expected_target_file_ids": [
+      "SOP-B1",
+      "SOP-B2"
+    ],
+    "latest_file_id": null
+  },
+  {
+    "source_file_id": "SOP-A3P",
+    "location": "§8 참고 문서",
+    "written_as": "WI-QC-052",
+    "kind": "doc_number",
+    "expected_state": "linked",
+    "expected_target_file_ids": [
+      "SOP-C2"
+    ],
+    "latest_file_id": null
+  },
+  {
+    "source_file_id": "SOP-A3P",
+    "location": "§8 참고 문서",
+    "written_as": "SOP-EQ-0101",
+    "kind": "doc_number",
+    "expected_state": "missing",
+    "expected_target_file_ids": [],
+    "latest_file_id": null
+  },
+  {
+    "source_file_id": "SOP-A3P",
+    "location": "§8 시험기기 교정 파일",
+    "written_as": "\\\\fabrikam-fs01\\qa\\SOP\\SOP-QC-0012_Rev2.docx",
+    "kind": "shared_path",
+    "expected_state": "ambiguous",
+    "expected_target_file_ids": [
+      "SOP-B1",
+      "SOP-B2"
+    ],
+    "latest_file_id": null
+  },
+  {
+    "source_file_id": "SOP-A3P",
+    "location": "§8 인트라넷",
+    "written_as": "https://intranet.fabrikam.example/sop/SOP-QC-0040",
+    "kind": "url",
+    "expected_state": "external",
+    "expected_target_file_ids": [],
+    "latest_file_id": null
+  },
+  {
+    "source_file_id": "SOP-A1",
+    "location": "§8 참고 문서",
+    "written_as": "SOP-QC-0012 Rev.2",
+    "kind": "doc_number",
+    "expected_state": "ambiguous",
+    "expected_target_file_ids": [
+      "SOP-B1",
+      "SOP-B2"
+    ],
+    "latest_file_id": null
+  },
+  {
+    "source_file_id": "SOP-A1",
+    "location": "§8 참고 문서",
+    "written_as": "WI-QC-052",
+    "kind": "doc_number",
+    "expected_state": "linked",
+    "expected_target_file_ids": [
+      "SOP-C2"
+    ],
+    "latest_file_id": null
+  },
+  {
+    "source_file_id": "SOP-A1",
+    "location": "§8 참고 문서",
+    "written_as": "SOP-EQ-0101",
+    "kind": "doc_number",
+    "expected_state": "missing",
+    "expected_target_file_ids": [],
+    "latest_file_id": null
+  },
+  {
+    "source_file_id": "SOP-A1",
+    "location": "§8 시험기기 교정 파일",
+    "written_as": "\\\\fabrikam-fs01\\qa\\SOP\\SOP-QC-0012_Rev2.docx",
+    "kind": "shared_path",
+    "expected_state": "ambiguous",
+    "expected_target_file_ids": [
+      "SOP-B1",
+      "SOP-B2"
+    ],
+    "latest_file_id": null
+  },
+  {
+    "source_file_id": "SOP-A1",
+    "location": "§8 인트라넷",
+    "written_as": "https://intranet.fabrikam.example/sop/SOP-QC-0040",
+    "kind": "url",
+    "expected_state": "external",
+    "expected_target_file_ids": [],
+    "latest_file_id": null
+  },
+  {
+    "source_file_id": "SOP-A2",
+    "location": "§8 참고 문서",
+    "written_as": "SOP-QC-0012 Rev.2",
+    "kind": "doc_number",
+    "expected_state": "ambiguous",
+    "expected_target_file_ids": [
+      "SOP-B1",
+      "SOP-B2"
+    ],
+    "latest_file_id": null
+  },
+  {
+    "source_file_id": "SOP-A2",
+    "location": "§8 참고 문서",
+    "written_as": "WI-QC-052",
+    "kind": "doc_number",
+    "expected_state": "linked",
+    "expected_target_file_ids": [
+      "SOP-C2"
+    ],
+    "latest_file_id": null
+  },
+  {
+    "source_file_id": "SOP-A2",
+    "location": "§8 참고 문서",
+    "written_as": "SOP-EQ-0101",
+    "kind": "doc_number",
+    "expected_state": "missing",
+    "expected_target_file_ids": [],
+    "latest_file_id": null
+  },
+  {
+    "source_file_id": "SOP-A2",
+    "location": "§8 시험기기 교정 파일",
+    "written_as": "\\\\fabrikam-fs01\\qa\\SOP\\SOP-QC-0012_Rev2.docx",
+    "kind": "shared_path",
+    "expected_state": "ambiguous",
+    "expected_target_file_ids": [
+      "SOP-B1",
+      "SOP-B2"
+    ],
+    "latest_file_id": null
+  },
+  {
+    "source_file_id": "SOP-A2",
+    "location": "§8 인트라넷",
+    "written_as": "https://intranet.fabrikam.example/sop/SOP-QC-0040",
+    "kind": "url",
+    "expected_state": "external",
+    "expected_target_file_ids": [],
+    "latest_file_id": null
+  },
+  {
+    "source_file_id": "SOP-C1",
+    "location": "§6 참고",
+    "written_as": "SOP-QC-0012",
+    "kind": "doc_number",
+    "expected_state": "ambiguous",
+    "expected_target_file_ids": [
+      "SOP-B1",
+      "SOP-B2"
+    ],
+    "latest_file_id": null
+  },
+  {
+    "source_file_id": "SOP-A4",
+    "location": "§8 참고 문서",
+    "written_as": "SOP-QC-0012 Rev.2",
+    "kind": "doc_number",
+    "expected_state": "ambiguous",
+    "expected_target_file_ids": [
+      "SOP-B1",
+      "SOP-B2"
+    ],
+    "latest_file_id": null
+  },
+  {
+    "source_file_id": "SOP-A4",
+    "location": "§8 참고 문서",
+    "written_as": "WI-QC-052",
+    "kind": "doc_number",
+    "expected_state": "linked",
+    "expected_target_file_ids": [
+      "SOP-C2"
+    ],
+    "latest_file_id": null
+  },
+  {
+    "source_file_id": "SOP-A4",
+    "location": "§8 참고 문서",
+    "written_as": "SOP-EQ-0101",
+    "kind": "doc_number",
+    "expected_state": "missing",
+    "expected_target_file_ids": [],
+    "latest_file_id": null
+  },
+  {
+    "source_file_id": "SOP-A4",
+    "location": "§8 시험기기 교정 파일",
+    "written_as": "\\\\fabrikam-fs01\\qa\\SOP\\SOP-QC-0012_Rev2.docx",
+    "kind": "shared_path",
+    "expected_state": "ambiguous",
+    "expected_target_file_ids": [
+      "SOP-B1",
+      "SOP-B2"
+    ],
+    "latest_file_id": null
+  },
+  {
+    "source_file_id": "SOP-A4",
+    "location": "§8 인트라넷",
+    "written_as": "https://intranet.fabrikam.example/sop/SOP-QC-0040",
+    "kind": "url",
+    "expected_state": "external",
+    "expected_target_file_ids": [],
+    "latest_file_id": null
+  },
+  {
+    "source_file_id": "RPT-2",
+    "location": "p.4 §5 시정 및 예방 조치",
+    "written_as": "CAPA-2026-0042",
+    "kind": "doc_number",
+    "expected_state": "linked",
+    "expected_target_file_ids": [
+      "RPT-3"
+    ],
+    "latest_file_id": null
+  },
+  {
+    "source_file_id": "RPT-2P",
+    "location": "p.4 §5 시정 및 예방 조치",
+    "written_as": "CAPA-2026-0042",
+    "kind": "doc_number",
+    "expected_state": "linked",
+    "expected_target_file_ids": [
+      "RPT-3"
+    ],
+    "latest_file_id": null
+  },
+  {
+    "source_file_id": "RPT-1",
+    "location": "p.7 §8 참고 문서",
+    "written_as": "SOP-QC-0040 Rev.4",
+    "kind": "doc_number",
+    "expected_state": "outdated",
+    "expected_target_file_ids": [
+      "SOP-A2",
+      "SOP-A4"
+    ],
+    "latest_file_id": "SOP-A3"
+  },
+  {
+    "source_file_id": "RPT-1",
+    "location": "p.7 §8 참고 문서",
+    "written_as": "SOP-EQ-0101",
+    "kind": "doc_number",
+    "expected_state": "missing",
+    "expected_target_file_ids": [],
+    "latest_file_id": null
+  },
+  {
+    "source_file_id": "RPT-1",
+    "location": "p.7 §8 참고 문서",
+    "written_as": "SOP-QC-014",
+    "kind": "doc_number",
+    "expected_state": "linked",
+    "expected_target_file_ids": [
+      "SOP-C1"
+    ],
+    "latest_file_id": null
+  },
+  {
+    "source_file_id": "RPT-1",
+    "location": "p.7 §8 참고 문서",
+    "written_as": "\\\\fabrikam-fs01\\eng\\equipment\\EQ-COOL-02\\점검이력.xlsx",
+    "kind": "shared_path",
+    "expected_state": "missing",
+    "expected_target_file_ids": [],
+    "latest_file_id": null
+  },
+  {
+    "source_file_id": "RPT-1P",
+    "location": "p.7 §8 참고 문서",
+    "written_as": "SOP-QC-0040 Rev.4",
+    "kind": "doc_number",
+    "expected_state": "outdated",
+    "expected_target_file_ids": [
+      "SOP-A2",
+      "SOP-A4"
+    ],
+    "latest_file_id": "SOP-A3"
+  },
+  {
+    "source_file_id": "RPT-1P",
+    "location": "p.7 §8 참고 문서",
+    "written_as": "SOP-EQ-0101",
+    "kind": "doc_number",
+    "expected_state": "missing",
+    "expected_target_file_ids": [],
+    "latest_file_id": null
+  },
+  {
+    "source_file_id": "RPT-1P",
+    "location": "p.7 §8 참고 문서",
+    "written_as": "SOP-QC-014",
+    "kind": "doc_number",
+    "expected_state": "linked",
+    "expected_target_file_ids": [
+      "SOP-C1"
+    ],
+    "latest_file_id": null
+  },
+  {
+    "source_file_id": "RPT-1P",
+    "location": "p.7 §8 참고 문서",
+    "written_as": "\\\\fabrikam-fs01\\eng\\equipment\\EQ-COOL-02\\점검이력.xlsx",
+    "kind": "shared_path",
+    "expected_state": "missing",
+    "expected_target_file_ids": [],
+    "latest_file_id": null
+  },
+  {
+    "source_file_id": "COA-1",
+    "location": "p.1 §1 제품 정보",
+    "written_as": "SPEC-FBX101 Rev.2",
+    "kind": "doc_number",
+    "expected_state": "missing",
+    "expected_target_file_ids": [],
+    "latest_file_id": null
+  },
+  {
+    "source_file_id": "COA-1S",
+    "location": "p.1 §1 제품 정보",
+    "written_as": "SPEC-FBX101 Rev.2",
+    "kind": "doc_number",
+    "expected_state": "missing",
+    "expected_target_file_ids": [],
+    "latest_file_id": null
+  },
+  {
+    "source_file_id": "XLS-1",
+    "location": "장비!D4",
+    "written_as": "SOP-QC-0012",
+    "kind": "doc_number",
+    "expected_state": "ambiguous",
+    "expected_target_file_ids": [
+      "SOP-B1",
+      "SOP-B2"
+    ],
+    "latest_file_id": null
+  },
+  {
+    "source_file_id": "XLS-1",
+    "location": "장비!D5",
+    "written_as": "SOP-QC-014",
+    "kind": "doc_number",
+    "expected_state": "linked",
+    "expected_target_file_ids": [
+      "SOP-C1"
+    ],
+    "latest_file_id": null
+  },
+  {
+    "source_file_id": "XLS-1",
+    "location": "장비!D6",
+    "written_as": "SOP-EQ-0101",
+    "kind": "doc_number",
+    "expected_state": "missing",
+    "expected_target_file_ids": [],
+    "latest_file_id": null
+  },
+  {
+    "source_file_id": "XLS-1",
+    "location": "장비!D7",
+    "written_as": "SOP-QC-0040 Rev.3",
+    "kind": "doc_number",
+    "expected_state": "outdated",
+    "expected_target_file_ids": [
+      "SOP-A1"
+    ],
+    "latest_file_id": "SOP-A3"
+  },
+  {
+    "source_file_id": "XLS-1",
+    "location": "장비!D8",
+    "written_as": "SOP-EQ-0102",
+    "kind": "doc_number",
+    "expected_state": "linked",
+    "expected_target_file_ids": [
+      "SOP-C3"
+    ],
+    "latest_file_id": null
+  },
+  {
+    "source_file_id": "XLS-1",
+    "location": "장비!D9",
+    "written_as": "SOP-QC-0040 Rev.5",
+    "kind": "doc_number",
+    "expected_state": "linked",
+    "expected_target_file_ids": [
+      "SOP-A3",
+      "SOP-A3P"
+    ],
+    "latest_file_id": "SOP-A3"
+  },
+  {
+    "source_file_id": "XLS-1",
+    "location": "장비!D10",
+    "written_as": "SOP-QC-0012",
+    "kind": "doc_number",
+    "expected_state": "ambiguous",
+    "expected_target_file_ids": [
+      "SOP-B1",
+      "SOP-B2"
+    ],
+    "latest_file_id": null
+  },
+  {
+    "source_file_id": "XLS-1",
+    "location": "장비!D11",
+    "written_as": "SOP-QC-014",
+    "kind": "doc_number",
+    "expected_state": "linked",
+    "expected_target_file_ids": [
+      "SOP-C1"
+    ],
+    "latest_file_id": null
+  },
+  {
+    "source_file_id": "XLS-1",
+    "location": "장비!D12",
+    "written_as": "SOP-EQ-0101",
+    "kind": "doc_number",
+    "expected_state": "missing",
+    "expected_target_file_ids": [],
+    "latest_file_id": null
+  },
+  {
+    "source_file_id": "XLS-1",
+    "location": "장비!D13",
+    "written_as": "SOP-QC-0040 Rev.3",
+    "kind": "doc_number",
+    "expected_state": "outdated",
+    "expected_target_file_ids": [
+      "SOP-A1"
+    ],
+    "latest_file_id": "SOP-A3"
+  },
+  {
+    "source_file_id": "XLS-1",
+    "location": "장비!D14",
+    "written_as": "SOP-EQ-0102",
+    "kind": "doc_number",
+    "expected_state": "linked",
+    "expected_target_file_ids": [
+      "SOP-C3"
+    ],
+    "latest_file_id": null
+  },
+  {
+    "source_file_id": "XLS-1",
+    "location": "장비!D15",
+    "written_as": "SOP-QC-0040 Rev.5",
+    "kind": "doc_number",
+    "expected_state": "linked",
+    "expected_target_file_ids": [
+      "SOP-A3",
+      "SOP-A3P"
+    ],
+    "latest_file_id": "SOP-A3"
+  },
+  {
+    "source_file_id": "XLS-1",
+    "location": "장비!D16",
+    "written_as": "SOP-QC-0012",
+    "kind": "doc_number",
+    "expected_state": "ambiguous",
+    "expected_target_file_ids": [
+      "SOP-B1",
+      "SOP-B2"
+    ],
+    "latest_file_id": null
+  },
+  {
+    "source_file_id": "XLS-1",
+    "location": "장비!D17",
+    "written_as": "SOP-QC-014",
+    "kind": "doc_number",
+    "expected_state": "linked",
+    "expected_target_file_ids": [
+      "SOP-C1"
+    ],
+    "latest_file_id": null
+  },
+  {
+    "source_file_id": "XLS-1",
+    "location": "장비!D18",
+    "written_as": "SOP-EQ-0101",
+    "kind": "doc_number",
+    "expected_state": "missing",
+    "expected_target_file_ids": [],
+    "latest_file_id": null
+  },
+  {
+    "source_file_id": "XLS-1",
+    "location": "장비!D19",
+    "written_as": "SOP-QC-0040 Rev.3",
+    "kind": "doc_number",
+    "expected_state": "outdated",
+    "expected_target_file_ids": [
+      "SOP-A1"
+    ],
+    "latest_file_id": "SOP-A3"
+  },
+  {
+    "source_file_id": "XLS-1",
+    "location": "장비!D20",
+    "written_as": "SOP-EQ-0102",
+    "kind": "doc_number",
+    "expected_state": "linked",
+    "expected_target_file_ids": [
+      "SOP-C3"
+    ],
+    "latest_file_id": null
+  },
+  {
+    "source_file_id": "XLS-1",
+    "location": "장비!D21",
+    "written_as": "SOP-QC-0040 Rev.5",
+    "kind": "doc_number",
+    "expected_state": "linked",
+    "expected_target_file_ids": [
+      "SOP-A3",
+      "SOP-A3P"
+    ],
+    "latest_file_id": "SOP-A3"
+  },
+  {
+    "source_file_id": "XLS-1",
+    "location": "장비!D22",
+    "written_as": "SOP-QC-0012",
+    "kind": "doc_number",
+    "expected_state": "ambiguous",
+    "expected_target_file_ids": [
+      "SOP-B1",
+      "SOP-B2"
+    ],
+    "latest_file_id": null
+  },
+  {
+    "source_file_id": "XLS-1",
+    "location": "장비!D23",
+    "written_as": "SOP-QC-014",
+    "kind": "doc_number",
+    "expected_state": "linked",
+    "expected_target_file_ids": [
+      "SOP-C1"
+    ],
+    "latest_file_id": null
+  },
+  {
+    "source_file_id": "XLS-1",
+    "location": "장비!D24",
+    "written_as": "SOP-EQ-0101",
+    "kind": "doc_number",
+    "expected_state": "missing",
+    "expected_target_file_ids": [],
+    "latest_file_id": null
+  },
+  {
+    "source_file_id": "XLS-1",
+    "location": "장비!D25",
+    "written_as": "SOP-QC-0040 Rev.3",
+    "kind": "doc_number",
+    "expected_state": "outdated",
+    "expected_target_file_ids": [
+      "SOP-A1"
+    ],
+    "latest_file_id": "SOP-A3"
+  },
+  {
+    "source_file_id": "XLS-1",
+    "location": "장비!D26",
+    "written_as": "SOP-EQ-0102",
+    "kind": "doc_number",
+    "expected_state": "linked",
+    "expected_target_file_ids": [
+      "SOP-C3"
+    ],
+    "latest_file_id": null
+  },
+  {
+    "source_file_id": "XLS-1",
+    "location": "장비!D27",
+    "written_as": "SOP-QC-0040 Rev.5",
+    "kind": "doc_number",
+    "expected_state": "linked",
+    "expected_target_file_ids": [
+      "SOP-A3",
+      "SOP-A3P"
+    ],
+    "latest_file_id": "SOP-A3"
+  },
+  {
+    "source_file_id": "XLS-1",
+    "location": "장비!D28",
+    "written_as": "SOP-QC-0012",
+    "kind": "doc_number",
+    "expected_state": "ambiguous",
+    "expected_target_file_ids": [
+      "SOP-B1",
+      "SOP-B2"
+    ],
+    "latest_file_id": null
+  },
+  {
+    "source_file_id": "XLS-1",
+    "location": "장비!D29",
+    "written_as": "SOP-QC-014",
+    "kind": "doc_number",
+    "expected_state": "linked",
+    "expected_target_file_ids": [
+      "SOP-C1"
+    ],
+    "latest_file_id": null
+  },
+  {
+    "source_file_id": "XLS-1",
+    "location": "장비!D30",
+    "written_as": "SOP-EQ-0101",
+    "kind": "doc_number",
+    "expected_state": "missing",
+    "expected_target_file_ids": [],
+    "latest_file_id": null
+  },
+  {
+    "source_file_id": "XLS-1",
+    "location": "장비!D31",
+    "written_as": "SOP-QC-0040 Rev.3",
+    "kind": "doc_number",
+    "expected_state": "outdated",
+    "expected_target_file_ids": [
+      "SOP-A1"
+    ],
+    "latest_file_id": "SOP-A3"
+  },
+  {
+    "source_file_id": "XLS-1",
+    "location": "장비!D32",
+    "written_as": "SOP-EQ-0102",
+    "kind": "doc_number",
+    "expected_state": "linked",
+    "expected_target_file_ids": [
+      "SOP-C3"
+    ],
+    "latest_file_id": null
+  },
+  {
+    "source_file_id": "XLS-1",
+    "location": "장비!D33",
+    "written_as": "SOP-QC-0040 Rev.5",
+    "kind": "doc_number",
+    "expected_state": "linked",
+    "expected_target_file_ids": [
+      "SOP-A3",
+      "SOP-A3P"
+    ],
+    "latest_file_id": "SOP-A3"
+  },
+  {
+    "source_file_id": "XLS-1",
+    "location": "장비!D34",
+    "written_as": "SOP-QC-0012",
+    "kind": "doc_number",
+    "expected_state": "ambiguous",
+    "expected_target_file_ids": [
+      "SOP-B1",
+      "SOP-B2"
+    ],
+    "latest_file_id": null
+  },
+  {
+    "source_file_id": "XLS-1",
+    "location": "장비!D35",
+    "written_as": "SOP-QC-014",
+    "kind": "doc_number",
+    "expected_state": "linked",
+    "expected_target_file_ids": [
+      "SOP-C1"
+    ],
+    "latest_file_id": null
+  },
+  {
+    "source_file_id": "XLS-1",
+    "location": "장비!D36",
+    "written_as": "SOP-EQ-0101",
+    "kind": "doc_number",
+    "expected_state": "missing",
+    "expected_target_file_ids": [],
+    "latest_file_id": null
+  },
+  {
+    "source_file_id": "XLS-1",
+    "location": "장비!D37",
+    "written_as": "SOP-QC-0040 Rev.3",
+    "kind": "doc_number",
+    "expected_state": "outdated",
+    "expected_target_file_ids": [
+      "SOP-A1"
+    ],
+    "latest_file_id": "SOP-A3"
+  },
+  {
+    "source_file_id": "XLS-1",
+    "location": "장비!D38",
+    "written_as": "SOP-EQ-0102",
+    "kind": "doc_number",
+    "expected_state": "linked",
+    "expected_target_file_ids": [
+      "SOP-C3"
+    ],
+    "latest_file_id": null
+  },
+  {
+    "source_file_id": "XLS-1",
+    "location": "장비!D39",
+    "written_as": "SOP-QC-0040 Rev.5",
+    "kind": "doc_number",
+    "expected_state": "linked",
+    "expected_target_file_ids": [
+      "SOP-A3",
+      "SOP-A3P"
+    ],
+    "latest_file_id": "SOP-A3"
+  },
+  {
+    "source_file_id": "XLS-1",
+    "location": "장비!D40",
+    "written_as": "SOP-QC-0012",
+    "kind": "doc_number",
+    "expected_state": "ambiguous",
+    "expected_target_file_ids": [
+      "SOP-B1",
+      "SOP-B2"
+    ],
+    "latest_file_id": null
+  },
+  {
+    "source_file_id": "XLS-1",
+    "location": "장비!D41",
+    "written_as": "SOP-QC-014",
+    "kind": "doc_number",
+    "expected_state": "linked",
+    "expected_target_file_ids": [
+      "SOP-C1"
+    ],
+    "latest_file_id": null
+  },
+  {
+    "source_file_id": "XLS-1",
+    "location": "장비!D42",
+    "written_as": "SOP-EQ-0101",
+    "kind": "doc_number",
+    "expected_state": "missing",
+    "expected_target_file_ids": [],
+    "latest_file_id": null
+  },
+  {
+    "source_file_id": "XLS-1",
+    "location": "장비!D43",
+    "written_as": "SOP-QC-0040 Rev.3",
+    "kind": "doc_number",
+    "expected_state": "outdated",
+    "expected_target_file_ids": [
+      "SOP-A1"
+    ],
+    "latest_file_id": "SOP-A3"
+  },
+  {
+    "source_file_id": "XLS-1",
+    "location": "장비!D44",
+    "written_as": "SOP-EQ-0102",
+    "kind": "doc_number",
+    "expected_state": "linked",
+    "expected_target_file_ids": [
+      "SOP-C3"
+    ],
+    "latest_file_id": null
+  },
+  {
+    "source_file_id": "XLS-1",
+    "location": "장비!D45",
+    "written_as": "SOP-QC-0040 Rev.5",
+    "kind": "doc_number",
+    "expected_state": "linked",
+    "expected_target_file_ids": [
+      "SOP-A3",
+      "SOP-A3P"
+    ],
+    "latest_file_id": "SOP-A3"
+  },
+  {
+    "source_file_id": "XLS-1",
+    "location": "장비!D46",
+    "written_as": "SOP-QC-0012",
+    "kind": "doc_number",
+    "expected_state": "ambiguous",
+    "expected_target_file_ids": [
+      "SOP-B1",
+      "SOP-B2"
+    ],
+    "latest_file_id": null
+  },
+  {
+    "source_file_id": "XLS-1",
+    "location": "장비!D47",
+    "written_as": "SOP-QC-014",
+    "kind": "doc_number",
+    "expected_state": "linked",
+    "expected_target_file_ids": [
+      "SOP-C1"
+    ],
+    "latest_file_id": null
+  },
+  {
+    "source_file_id": "XLS-1",
+    "location": "장비!D48",
+    "written_as": "SOP-EQ-0101",
+    "kind": "doc_number",
+    "expected_state": "missing",
+    "expected_target_file_ids": [],
+    "latest_file_id": null
+  },
+  {
+    "source_file_id": "XLS-1",
+    "location": "장비!D49",
+    "written_as": "SOP-QC-0040 Rev.3",
+    "kind": "doc_number",
+    "expected_state": "outdated",
+    "expected_target_file_ids": [
+      "SOP-A1"
+    ],
+    "latest_file_id": "SOP-A3"
+  },
+  {
+    "source_file_id": "XLS-1",
+    "location": "장비!D50",
+    "written_as": "SOP-EQ-0102",
+    "kind": "doc_number",
+    "expected_state": "linked",
+    "expected_target_file_ids": [
+      "SOP-C3"
+    ],
+    "latest_file_id": null
+  },
+  {
+    "source_file_id": "XLS-1",
+    "location": "장비!D51",
+    "written_as": "SOP-QC-0040 Rev.5",
+    "kind": "doc_number",
+    "expected_state": "linked",
+    "expected_target_file_ids": [
+      "SOP-A3",
+      "SOP-A3P"
+    ],
+    "latest_file_id": "SOP-A3"
+  },
+  {
+    "source_file_id": "XLS-1",
+    "location": "장비!D52",
+    "written_as": "SOP-QC-0012",
+    "kind": "doc_number",
+    "expected_state": "ambiguous",
+    "expected_target_file_ids": [
+      "SOP-B1",
+      "SOP-B2"
+    ],
+    "latest_file_id": null
+  },
+  {
+    "source_file_id": "XLS-1",
+    "location": "장비!D53",
+    "written_as": "SOP-QC-014",
+    "kind": "doc_number",
+    "expected_state": "linked",
+    "expected_target_file_ids": [
+      "SOP-C1"
+    ],
+    "latest_file_id": null
+  },
+  {
+    "source_file_id": "XLS-1",
+    "location": "장비!D54",
+    "written_as": "SOP-EQ-0101",
+    "kind": "doc_number",
+    "expected_state": "missing",
+    "expected_target_file_ids": [],
+    "latest_file_id": null
+  },
+  {
+    "source_file_id": "XLS-1",
+    "location": "장비!D55",
+    "written_as": "SOP-QC-0040 Rev.3",
+    "kind": "doc_number",
+    "expected_state": "outdated",
+    "expected_target_file_ids": [
+      "SOP-A1"
+    ],
+    "latest_file_id": "SOP-A3"
+  },
+  {
+    "source_file_id": "XLS-1",
+    "location": "장비!D56",
+    "written_as": "SOP-EQ-0102",
+    "kind": "doc_number",
+    "expected_state": "linked",
+    "expected_target_file_ids": [
+      "SOP-C3"
+    ],
+    "latest_file_id": null
+  },
+  {
+    "source_file_id": "XLS-1",
+    "location": "장비!D57",
+    "written_as": "SOP-QC-0040 Rev.5",
+    "kind": "doc_number",
+    "expected_state": "linked",
+    "expected_target_file_ids": [
+      "SOP-A3",
+      "SOP-A3P"
+    ],
+    "latest_file_id": "SOP-A3"
+  },
+  {
+    "source_file_id": "XLS-1",
+    "location": "장비!D58",
+    "written_as": "SOP-QC-0012",
+    "kind": "doc_number",
+    "expected_state": "ambiguous",
+    "expected_target_file_ids": [
+      "SOP-B1",
+      "SOP-B2"
+    ],
+    "latest_file_id": null
+  },
+  {
+    "source_file_id": "XLS-1",
+    "location": "장비!D59",
+    "written_as": "SOP-QC-014",
+    "kind": "doc_number",
+    "expected_state": "linked",
+    "expected_target_file_ids": [
+      "SOP-C1"
+    ],
+    "latest_file_id": null
+  },
+  {
+    "source_file_id": "XLS-1",
+    "location": "장비!D60",
+    "written_as": "SOP-EQ-0101",
+    "kind": "doc_number",
+    "expected_state": "missing",
+    "expected_target_file_ids": [],
+    "latest_file_id": null
+  },
+  {
+    "source_file_id": "XLS-1",
+    "location": "장비!D61",
+    "written_as": "SOP-QC-0040 Rev.3",
+    "kind": "doc_number",
+    "expected_state": "outdated",
+    "expected_target_file_ids": [
+      "SOP-A1"
+    ],
+    "latest_file_id": "SOP-A3"
+  },
+  {
+    "source_file_id": "XLS-1",
+    "location": "장비!D62",
+    "written_as": "SOP-EQ-0102",
+    "kind": "doc_number",
+    "expected_state": "linked",
+    "expected_target_file_ids": [
+      "SOP-C3"
+    ],
+    "latest_file_id": null
+  },
+  {
+    "source_file_id": "XLS-1",
+    "location": "장비!D63",
+    "written_as": "SOP-QC-0040 Rev.5",
+    "kind": "doc_number",
+    "expected_state": "linked",
+    "expected_target_file_ids": [
+      "SOP-A3",
+      "SOP-A3P"
+    ],
+    "latest_file_id": "SOP-A3"
+  },
+  {
+    "source_file_id": "XLS-1",
+    "location": "장비!H6",
+    "written_as": "../01_sop/SOP-QC-014_HPLC_시스템적합성_v3.docx",
+    "kind": "hyperlink",
+    "expected_state": "linked",
+    "expected_target_file_ids": [
+      "SOP-C1"
+    ],
+    "latest_file_id": null
+  },
+  {
+    "source_file_id": "XLS-1",
+    "location": "장비!H7",
+    "written_as": "\\\\fabrikam-fs01\\qa\\교정\\원본성적서.pdf",
+    "kind": "shared_path",
+    "expected_state": "missing",
+    "expected_target_file_ids": [],
+    "latest_file_id": null
+  },
+  {
+    "source_file_id": "XLS-1",
+    "location": "장비!H8",
+    "written_as": "https://intranet.fabrikam.example/calibration/calendar",
+    "kind": "url",
+    "expected_state": "external",
+    "expected_target_file_ids": [],
+    "latest_file_id": null
+  },
+  {
+    "source_file_id": "XLS-1",
+    "location": "교정!B4",
+    "written_as": "[교정일정_2026.xlsx]",
+    "kind": "external_workbook",
+    "expected_state": "linked",
+    "expected_target_file_ids": [
+      "XLS-2"
+    ],
+    "latest_file_id": null
+  },
+  {
+    "source_file_id": "XLS-1",
+    "location": "교정!B5",
+    "written_as": "[구매요청_집계.xlsx]",
+    "kind": "external_workbook",
+    "expected_state": "missing",
+    "expected_target_file_ids": [],
+    "latest_file_id": null
+  },
+  {
+    "source_file_id": "PPT-1",
+    "location": "슬라이드 9 후속 조사",
+    "written_as": "DEV-2026-0117",
+    "kind": "doc_number",
+    "expected_state": "linked",
+    "expected_target_file_ids": [
+      "RPT-2",
+      "RPT-2P"
+    ],
+    "latest_file_id": null
+  },
+  {
+    "source_file_id": "PPT-1",
+    "location": "슬라이드 9 후속 조사",
+    "written_as": "CAPA-2026-0042",
+    "kind": "doc_number",
+    "expected_state": "linked",
+    "expected_target_file_ids": [
+      "RPT-3"
+    ],
+    "latest_file_id": null
+  },
+  {
+    "source_file_id": "PPT-1",
+    "location": "슬라이드 9 인트라넷",
+    "written_as": "https://intranet.fabrikam.example/quality/review/2026-q3",
+    "kind": "url",
+    "expected_state": "external",
+    "expected_target_file_ids": [],
+    "latest_file_id": null
+  },
+  {
+    "source_file_id": "EML-1",
+    "location": "본문 및 HTML 대체 본문",
+    "written_as": "RPT-EQ-2026-031",
+    "kind": "doc_number",
+    "expected_state": "linked",
+    "expected_target_file_ids": [
+      "RPT-1",
+      "RPT-1P"
+    ],
+    "latest_file_id": null
+  },
+  {
+    "source_file_id": "EML-2",
+    "location": "본문 및 인용문",
+    "written_as": "DEV-2026-0117",
+    "kind": "doc_number",
+    "expected_state": "linked",
+    "expected_target_file_ids": [
+      "RPT-2",
+      "RPT-2P"
+    ],
+    "latest_file_id": null
+  },
+  {
+    "source_file_id": "EML-2",
+    "location": "원인조사_요청_원본.eml 본문",
+    "written_as": "DEV-2026-0117",
+    "kind": "doc_number",
+    "expected_state": "linked",
+    "expected_target_file_ids": [
+      "RPT-2",
+      "RPT-2P"
+    ],
+    "latest_file_id": null
+  },
+  {
+    "source_file_id": "EDGE-2",
+    "location": "p.7 §8 참고 문서",
+    "written_as": "SOP-QC-0040 Rev.4",
+    "kind": "doc_number",
+    "expected_state": "outdated",
+    "expected_target_file_ids": [
+      "SOP-A2",
+      "SOP-A4"
+    ],
+    "latest_file_id": "SOP-A3"
+  },
+  {
+    "source_file_id": "EDGE-2",
+    "location": "p.7 §8 참고 문서",
+    "written_as": "SOP-EQ-0101",
+    "kind": "doc_number",
+    "expected_state": "missing",
+    "expected_target_file_ids": [],
+    "latest_file_id": null
+  },
+  {
+    "source_file_id": "EDGE-2",
+    "location": "p.7 §8 참고 문서",
+    "written_as": "SOP-QC-014",
+    "kind": "doc_number",
+    "expected_state": "linked",
+    "expected_target_file_ids": [
+      "SOP-C1"
+    ],
+    "latest_file_id": null
+  },
+  {
+    "source_file_id": "EDGE-2",
+    "location": "p.7 §8 참고 문서",
+    "written_as": "\\\\fabrikam-fs01\\eng\\equipment\\EQ-COOL-02\\점검이력.xlsx",
+    "kind": "shared_path",
+    "expected_state": "missing",
+    "expected_target_file_ids": [],
+    "latest_file_id": null
+  },
+  {
+    "source_file_id": "SOP-C3",
+    "location": "§4 관련 기록",
+    "written_as": "DEV-2026-0117",
+    "kind": "doc_number",
+    "expected_state": "linked",
+    "expected_target_file_ids": [
+      "RPT-2",
+      "RPT-2P"
+    ],
+    "latest_file_id": null
+  },
+  {
+    "source_file_id": "SOP-B0",
+    "location": "§6.1 교정 일정 확인표",
+    "written_as": "FRM-QC-0012-A",
+    "kind": "doc_number",
+    "expected_state": "missing",
+    "expected_target_file_ids": [],
+    "latest_file_id": null
+  },
+  {
+    "source_file_id": "SOP-B0",
+    "location": "§6.1 허용 오차 이탈 조사표",
+    "written_as": "FRM-QC-0012-B",
+    "kind": "doc_number",
+    "expected_state": "missing",
+    "expected_target_file_ids": [],
+    "latest_file_id": null
+  },
+  {
+    "source_file_id": "SOP-B0",
+    "location": "§6.1 교정 결과 인계서",
+    "written_as": "FRM-QC-0012-C",
+    "kind": "doc_number",
+    "expected_state": "missing",
+    "expected_target_file_ids": [],
+    "latest_file_id": null
+  },
+  {
+    "source_file_id": "SOP-C2",
+    "location": "p.3 §4 참고",
+    "written_as": "SOP-QC-0012",
+    "kind": "doc_number",
+    "expected_state": "ambiguous",
+    "expected_target_file_ids": [
+      "SOP-B1",
+      "SOP-B2"
+    ],
+    "latest_file_id": null
+  },
+  {
+    "source_file_id": "RPT-3",
+    "location": "p.1 §1 계획 범위",
+    "written_as": "DEV-2026-0117",
+    "kind": "doc_number",
+    "expected_state": "linked",
+    "expected_target_file_ids": [
+      "RPT-2",
+      "RPT-2P"
+    ],
+    "latest_file_id": null
+  },
+  {
+    "source_file_id": "RPT-3",
+    "location": "p.4 §5 참고 문서",
+    "written_as": "SOP-EQ-0102",
+    "kind": "doc_number",
+    "expected_state": "linked",
+    "expected_target_file_ids": [
+      "SOP-C3"
+    ],
+    "latest_file_id": null
+  },
+  {
+    "source_file_id": "COA-3",
+    "location": "p.1 §1 제품 정보",
+    "written_as": "SPEC-FBX101 Rev.2",
+    "kind": "doc_number",
+    "expected_state": "missing",
+    "expected_target_file_ids": [],
+    "latest_file_id": null
+  },
+  {
+    "source_file_id": "PPT-2",
+    "location": "슬라이드 8 원본 근거",
+    "written_as": "RPT-EQ-2026-031",
+    "kind": "doc_number",
+    "expected_state": "linked",
+    "expected_target_file_ids": [
+      "RPT-1",
+      "RPT-1P"
+    ],
+    "latest_file_id": null
+  },
+  {
+    "source_file_id": "PPT-3",
+    "location": "슬라이드 8 원본 근거",
+    "written_as": "RPT-EQ-2026-031",
+    "kind": "doc_number",
+    "expected_state": "linked",
+    "expected_target_file_ids": [
+      "RPT-1",
+      "RPT-1P"
+    ],
+    "latest_file_id": null
+  },
+  {
+    "source_file_id": "PPT-3",
+    "location": "슬라이드 8 교정 일정 첨부",
+    "written_as": "../04_spreadsheets/교정일정_2026.xlsx",
+    "kind": "hyperlink",
+    "expected_state": "linked",
+    "expected_target_file_ids": [
+      "XLS-2"
+    ],
+    "latest_file_id": null
+  },
+  {
+    "source_file_id": "EML-3",
+    "location": "본문 조치 1",
+    "written_as": "CAPA-2026-0042",
+    "kind": "doc_number",
+    "expected_state": "linked",
+    "expected_target_file_ids": [
+      "RPT-3"
+    ],
+    "latest_file_id": null
+  },
+  {
+    "source_file_id": "EML-3",
+    "location": "본문 조치 2",
+    "written_as": "SOP-EQ-0102",
+    "kind": "doc_number",
+    "expected_state": "linked",
+    "expected_target_file_ids": [
+      "SOP-C3"
+    ],
+    "latest_file_id": null
+  },
+  {
+    "source_file_id": "EML-3",
+    "location": "본문 조치 3",
+    "written_as": "RPT-EQ-2026-031",
+    "kind": "doc_number",
+    "expected_state": "linked",
+    "expected_target_file_ids": [
+      "RPT-1",
+      "RPT-1P"
+    ],
+    "latest_file_id": null
+  },
+  {
+    "source_file_id": "SOP-C4",
+    "location": "p.1 표지",
+    "written_as": "SOP-QC-0040 Rev.2",
+    "kind": "doc_number",
+    "expected_state": "outdated",
+    "expected_target_file_ids": [
+      "SOP-C4"
+    ],
+    "latest_file_id": "SOP-A3"
+  },
+  {
+    "source_file_id": "EDGE-8",
+    "location": "파일 목록 Markdown 링크",
+    "written_as": "../01_sop/SOP-QC-014_HPLC_시스템적합성_v3.docx",
+    "kind": "hyperlink",
+    "expected_state": "linked",
+    "expected_target_file_ids": [
+      "SOP-C1"
+    ],
+    "latest_file_id": null
+  },
+  {
+    "source_file_id": "EDGE-8",
+    "location": "파일 목록 Markdown 링크",
+    "written_as": "../04_spreadsheets/교정일정_2026.xlsx",
+    "kind": "hyperlink",
+    "expected_state": "linked",
+    "expected_target_file_ids": [
+      "XLS-2"
+    ],
+    "latest_file_id": null
+  },
+  {
+    "source_file_id": "EDGE-8",
+    "location": "파일 목록 Markdown 링크",
+    "written_as": "../05_presentations/2026_Q3_품질지표_리뷰.pptx",
+    "kind": "hyperlink",
+    "expected_state": "linked",
+    "expected_target_file_ids": [
+      "PPT-1"
+    ],
+    "latest_file_id": null
+  }
+]

@@ -1,0 +1,30 @@
+{
+  "file_id": "IMG-6",
+  "title": "FBX-101 공정 흐름도",
+  "key_values": [],
+  "tables": [],
+  "captions": [],
+  "numbers_with_units": [],
+  "headings": [],
+  "text_snippets": [],
+  "visible_image_text": [
+    "세포배양",
+    "수확",
+    "정제 1·2",
+    "바이러스 불활화",
+    "여과",
+    "충전"
+  ],
+  "visual_evidence": [
+    {
+      "question_id": "q-121",
+      "text": "세포배양",
+      "location": "공정 흐름도 좌측 상단"
+    },
+    {
+      "question_id": "q-122",
+      "text": "충전",
+      "location": "공정 흐름도 좌측 하단"
+    }
+  ]
+}

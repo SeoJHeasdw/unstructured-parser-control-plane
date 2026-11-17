@@ -1,3 +1,4 @@
+from contextlib import closing
 from email import policy
 from email.message import EmailMessage
 from io import BytesIO
@@ -171,7 +172,7 @@ def build_pkgs(assets, temp):
         literal='../'+MANIFEST[doc_id]['path']
         txt_lines.append(f'| [{file_path(doc_id).name}](<{literal}>) | {owner} | {use} |')
         link(fid,literal,'파일 목록 Markdown 링크','linked',[doc_id],kind='hyperlink')
-    txt_lines.extend(['','## 처리 상태','','\`\`\`text','status=검토 완료','plant=제1공장','\`\`\`',''])
+    txt_lines.extend(['','## 처리 상태','',chr(96)*3+'text','status=검토 완료','plant=제1공장',chr(96)*3,''])
     target.write_text('\n'.join(txt_lines),encoding='utf-8')
     evidence(fid,headings=['현장 공유 자료 안내','파일 목록','처리 상태'],text_snippets=['status=검토 완료','plant=제1공장'])
     gold_table(fid,'파일 목록',['파일','담당','용도'],[[file_path(k).name,o,u] for k,o,u in links])
@@ -179,7 +180,7 @@ def build_pkgs(assets, temp):
 
 def pdf_raster(path,index):
     with pdfium.PdfDocument(path) as doc:
-        with doc[index] as page, page.render(scale=200/72) as bitmap:
+        with closing(doc[index]) as page, closing(page.render(scale=200/72)) as bitmap:
             return bitmap.to_pil().copy().convert('RGB')
 
 
@@ -224,8 +225,8 @@ def build_pdf_variants(out, assets):
         image=noisy(pdf_raster(file_path('COA-1'),i),seed=10+i,angle=.95 if i==1 else .5)
         if i==1:
             d=ImageDraw.Draw(image)
-            text(d,(1080,1150),'재확인 완료 10/14',35,'#304961')
-            d.line((1065,1197,1388,1191),fill='#304961',width=3)
+            text(d,(1080,1195),'재확인 완료 10/14',35,'#304961')
+            d.line((1065,1239,1388,1233),fill='#304961',width=3)
         images.append(image)
     make_image_pdf(file_path('COA-1S'),images)
     evidence('COA-1S',text_snippets=['재확인 완료 10/14'],captions=[dict(kind='annotation',text='재확인 완료 10/14',page=2)])

@@ -1,0 +1,70 @@
+{
+  "file_id": "SCN-4",
+  "title": "초저온 냉동고 명판",
+  "key_values": [
+    {
+      "label": "관리번호",
+      "value": "EQ-UF-03",
+      "page": 1
+    },
+    {
+      "label": "모델",
+      "value": "UF-700 (가상)",
+      "page": 1
+    },
+    {
+      "label": "일련번호",
+      "value": "SN-2023-0417",
+      "page": 1
+    },
+    {
+      "label": "정격온도",
+      "value": "-86 °C",
+      "page": 1
+    },
+    {
+      "label": "전원",
+      "value": "220 V 60 Hz",
+      "page": 1
+    },
+    {
+      "label": "제조사",
+      "value": "가상냉동(주)",
+      "page": 1
+    }
+  ],
+  "tables": [],
+  "captions": [],
+  "numbers_with_units": [
+    "-86 °C",
+    "220 V",
+    "60 Hz"
+  ],
+  "headings": [],
+  "text_snippets": [],
+  "visible_image_text": [
+    "EQ-UF-03",
+    "UF-700 (가상)",
+    "SN-2023-0417",
+    "-86 °C",
+    "220 V 60 Hz",
+    "가상냉동(주)"
+  ],
+  "visual_evidence": [
+    {
+      "question_id": "q-118",
+      "text": "SN-2023-0417",
+      "location": "명판 일련번호"
+    },
+    {
+      "question_id": "q-119",
+      "text": "220 V 60 Hz",
+      "location": "명판 전원"
+    },
+    {
+      "question_id": "q-120",
+      "text": "UF-700 (가상)",
+      "location": "명판 모델"
+    }
+  ]
+}

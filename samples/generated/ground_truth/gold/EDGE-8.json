@@ -1,0 +1,44 @@
+{
+  "file_id": "EDGE-8",
+  "title": "현장 공유 자료 안내",
+  "key_values": [],
+  "tables": [
+    {
+      "id": "t1",
+      "caption": "파일 목록",
+      "header": [
+        "파일",
+        "담당",
+        "용도"
+      ],
+      "rows": [
+        [
+          "SOP-QC-014_HPLC_시스템적합성_v3.docx",
+          "QC",
+          "시스템 적합성"
+        ],
+        [
+          "교정일정_2026.xlsx",
+          "설비팀",
+          "교정 일정"
+        ],
+        [
+          "2026_Q3_품질지표_리뷰.pptx",
+          "QA",
+          "분기 검토"
+        ]
+      ]
+    }
+  ],
+  "captions": [],
+  "numbers_with_units": [],
+  "headings": [
+    "현장 공유 자료 안내",
+    "파일 목록",
+    "처리 상태"
+  ],
+  "text_snippets": [
+    "status=검토 완료",
+    "plant=제1공장"
+  ]
+}

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from contextlib import closing
+
 import hashlib
 import io
 import json
@@ -38,7 +40,7 @@ MANIFEST = {}
 GOLD = {}
 QUESTIONS = []
 PDF_JOBS = {}
-SPAN_FIRST_ROWS = {'SOP-A1': 10, 'SOP-A2': 10, 'SOP-A3': 10, 'COA-1': 13, 'COA-3': 13}
+SPAN_FIRST_ROWS = {'SOP-A1': 10, 'SOP-A2': 10, 'SOP-A3': 10, 'COA-1': 12, 'COA-3': 12}
 DOCX_FILES = {}
 FOLDERS = dict(enumerate([
     '01_sop', '02_reports', '03_certificates', '04_spreadsheets',
@@ -285,6 +287,13 @@ def t(title, headers, rows, *, row_pt=0, span=False, widths=None, merge=False):
 
 
 def build_word(file_id, pages, *, running=None, pdf=False, hidden=False):
+    from supplement import enrich
+
+    pages = enrich(file_id, pages)
+    is_main_document = file_id.startswith(('SOP-', 'RPT-', 'COA-')) and file_id != 'SOP-C4'
+    if is_main_document:
+        body = ' '.join(block[1] for page in pages for block in page if block[0] in ('paragraph', 'list'))
+        assert len(re.findall(r'[가-힣]', body)) >= 1500, file_id
     meta = MANIFEST[file_id]
     title = GOLD[file_id]['title']
     running = running or ' | '.join(filter(None, [COMPANY, meta['doc_number'], meta['revision'], title]))
@@ -365,7 +374,7 @@ def clone(old, new):
 
 
 def pdf_text(page):
-    with page.get_textpage() as reader:
+    with closing(page.get_textpage()) as reader:
         return reader.get_text_bounded().replace('\r\n', '\n')
 
 
@@ -415,6 +424,8 @@ def pdf_pages(file_id, logical_pages):
                     blocks.append(dict(block, rows=block['rows'][:split]))
                     output.append(dict(blocks=blocks, columns=page_cols))
                     blocks = [dict(block, text='', rows=block['rows'][split:])]
+                    if file_id == 'COA-1':
+                        blocks.append(dict(type='spacer', width=26))
                     continue
             blocks.append(block)
         output.append(dict(blocks=blocks, columns=page_cols))
@@ -455,7 +466,7 @@ def make_image_pdf(destination, images, sizes=None, rotations=None):
             blob = io.BytesIO()
             image.convert('RGB').save(blob, 'JPEG', quality=85, optimize=True)
             width, height = sizes[index] if sizes else (595.28, 841.89)
-            with doc.new_page(width, height) as page:
+            with closing(doc.new_page(width, height)) as page:
                 obj = pdfium.PdfImage.new(doc)
                 obj.load_jpeg(blob)
                 obj.set_matrix(pdfium.PdfMatrix().scale(width, height))

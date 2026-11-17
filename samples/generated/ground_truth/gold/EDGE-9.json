@@ -1,0 +1,15 @@
+{
+  "file_id": "EDGE-9",
+  "title": "점검 기록 파일명 이관 메모",
+  "key_values": [],
+  "tables": [],
+  "captions": [],
+  "numbers_with_units": [],
+  "headings": [
+    "1. 이관 점검"
+  ],
+  "text_snippets": [
+    "대괄호, 괄호, 숫자 표기와 생략 부호가 포함된 파일명을 이관 목록에 적는다.",
+    "문서 개정 상태는 표지의 식별 정보와 배포 기록을 확인한 후 입력한다."
+  ]
+}

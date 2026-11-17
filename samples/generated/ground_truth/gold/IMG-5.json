@@ -1,0 +1,41 @@
+{
+  "file_id": "IMG-5",
+  "title": "냉각수 순환계통",
+  "key_values": [],
+  "tables": [],
+  "captions": [],
+  "numbers_with_units": [],
+  "headings": [],
+  "text_snippets": [],
+  "visible_image_text": [
+    "냉각수 순환계통",
+    "EQ-COOL-02",
+    "TK-01",
+    "완충 탱크",
+    "EQ-PUMP-P1",
+    "주 펌프",
+    "EQ-PUMP-P2",
+    "예비 펌프",
+    "HX-01",
+    "열교환기",
+    "복귀 헤더",
+    "공급 방향"
+  ],
+  "visual_evidence": [
+    {
+      "question_id": "q-081",
+      "text": "HX-01",
+      "location": "그림 오른쪽 열교환기"
+    },
+    {
+      "question_id": "q-082",
+      "text": "TK-01",
+      "location": "그림 왼쪽 탱크"
+    },
+    {
+      "question_id": "q-083",
+      "text": "EQ-PUMP-P2",
+      "location": "그림 아래 펌프"
+    }
+  ]
+}
