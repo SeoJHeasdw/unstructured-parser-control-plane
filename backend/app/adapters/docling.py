@@ -1,5 +1,6 @@
 """Optional local Docling adapter. It never configures remote services or downloads models."""
 import importlib.metadata
+import logging
 import os
 import re
 from pathlib import Path, PurePosixPath
@@ -7,12 +8,15 @@ import zipfile
 
 from app.adapters.base import ParsedDocument, ParserError
 from app.config import Settings
+from app.adapters.docling_locations import markdown_locations
+
+logger = logging.getLogger(__name__)
 
 class DoclingAdapter:
     def __init__(self, settings: Settings):
         self.settings = settings
 
-    def _check_office_archive(self, path: Path) -> None:
+    def check_office_archive(self, path: Path) -> None:
         # Modern Office documents are ZIP containers. Avoid feeding obviously unsafe
         # or oversized archives to a parser. This is not an antivirus scanner.
         try:
@@ -45,7 +49,7 @@ class DoclingAdapter:
         except importlib.metadata.PackageNotFoundError:
             version = "unknown"
         if extension in {"DOCX", "PPTX", "XLSX"}:
-            self._check_office_archive(path)
+            self.check_office_archive(path)
         if extension == "PDF":
             if not self.settings.docling_artifacts or not self.settings.docling_artifacts.is_dir():
                 raise ParserError("오프라인 Docling 모델 경로가 없습니다. 미리 준비된 모델 경로를 설정해 주세요.")
@@ -65,7 +69,15 @@ class DoclingAdapter:
             visible_text = re.sub(r"<!--.*?-->|!\[[^\]]*\]\([^)]*\)", "", markdown, flags=re.DOTALL)
             if not visible_text.strip(" \t\r\n#*-|>"):
                 raise ParserError("추출된 텍스트가 없습니다. 스캔 파일은 OCR 연결 후 처리할 수 있습니다.")
-            return ParsedDocument(markdown=markdown, parser="docling", parser_version=version)
+            locations = []
+            if extension in {"PDF", "XLSX"}:
+                try:
+                    locations = markdown_locations(result.document, markdown, extension)
+                except Exception as exc:
+                    logger.warning("Source locations could not be exported (%s)", type(exc).__name__)
+            return ParsedDocument(markdown=markdown, parser="docling", parser_version=version,
+                                  ocr_enabled=options.do_ocr if extension == "PDF" else None,
+                                  locations=locations)
         except ParserError:
             raise
         except Exception as exc:

@@ -1,6 +1,6 @@
 @echo off
 setlocal EnableExtensions
-rem Unstructured Review - Windows launcher. First run creates backend\.venv and installs packages.
+rem Unstructured Data Console - Windows launcher. First run creates backend\.venv and installs packages.
 rem Usage: start.cmd [port]   (default port 8000)
 cd /d "%~dp0"
 set "VPY=%~dp0backend\.venv\Scripts\python.exe"
@@ -21,7 +21,7 @@ if exist "offline\docling-models" set "DOCOPS_DOCLING_ARTIFACTS=%~dp0offline\doc
 if not exist "frontend\dist\index.html" echo [warn] frontend\dist is missing. Use the offline bundle or run: cd frontend ^&^& npm ci ^&^& npm run build
 
 echo.
-echo   Unstructured Review  -  http://127.0.0.1:%PORT%/
+echo   Unstructured Data Console  -  http://127.0.0.1:%PORT%/
 echo   Model settings: .env  (restart after editing)   Stop: Ctrl+C
 echo.
 start "" "http://127.0.0.1:%PORT%/"

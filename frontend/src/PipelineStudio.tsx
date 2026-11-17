@@ -1,14 +1,14 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState, useSyncExternalStore } from 'react';
 import { applyEdgeChanges, applyNodeChanges, Background, BackgroundVariant, ConnectionLineType, ConnectionMode, MiniMap, Panel, ReactFlow, ReactFlowProvider, SelectionMode, useReactFlow, useViewport } from '@xyflow/react';
 import type { Connection, EdgeChange, FinalConnectionState, FitViewOptions, NodeChange, NodeMouseHandler, XYPosition } from '@xyflow/react';
-import { Activity, ChevronRight, CirclePause, CirclePlay, LayoutGrid, ListTree, Maximize, Minus, PanelBottomClose, PanelBottomOpen, PanelRightClose, PanelRightOpen, PenTool, Plus, Redo2, RotateCcw, Rows3, TriangleAlert, Undo2, X } from 'lucide-react';
+import { Activity, ArrowLeft, CirclePause, CirclePlay, LayoutGrid, ListTree, Maximize, Minus, PanelBottomClose, PanelBottomOpen, PanelRightClose, PanelRightOpen, PenTool, Plus, Redo2, RotateCcw, Rows3, TriangleAlert, Undo2, X } from 'lucide-react';
 import '@xyflow/react/dist/style.css';
 import './flow/flow.css';
 import { listLiveDocuments } from './api/live';
 import { ArrowDefs, edgeRoute, distanceToPath, FlowEdgeView, FlowNodeView, FlowUIContext, KIND_META } from './flow/FlowCanvasParts';
 import type { FlowUI } from './flow/FlowCanvasParts';
 import FlowDock from './flow/FlowDock';
-import { DesignInspector, MonitorInspector, validateFlow } from './flow/FlowInspector';
+import { DesignInspector, getAttentionStages, MonitorInspector, validateFlow } from './flow/FlowInspector';
 import { autoLayout, NODE_SIZE, sizeOf, snap } from './flow/flowLayout';
 import { aggregate, FlowSimulator, rid } from './flow/flowSim';
 import type { NodeMetric } from './flow/flowSim';
@@ -25,7 +25,7 @@ const MANUAL_KEY = 'document-ops:manual-formats:v1';
 const PALETTE: NodeKind[] = ['task', 'gateway', 'review', 'exception', 'store', 'subflow', 'start', 'end', 'note'];
 const INSERTABLE: NodeKind[] = ['task', 'review', 'gateway', 'exception', 'store', 'subflow'];
 type Padding = NonNullable<FitViewOptions['padding']>;
-const fitOptions = (design: boolean) => ({ padding: { top: design ? '32px' : '60px', bottom: '52px', left: '40px', right: '40px' } as Padding, maxZoom: 1 });
+const fitOptions = { padding: { top: '32px', bottom: '52px', left: '40px', right: '40px' } as Padding, maxZoom: 1 };
 const DEFAULT_LABEL: Record<NodeKind, string> = { task: '새 작업', gateway: '조건', review: '사람 검토', exception: '예외 대기열', store: '데이터 저장', subflow: '하위 흐름', start: '시작', end: '종료', note: '메모를 입력하세요' };
 
 function readManualFormats(): string[] {
@@ -72,6 +72,7 @@ function Studio({ formats, onOpenDocuments, onOpenLiveDocuments, initialFormat, 
   const snapshot = useSyncExternalStore(sim.subscribe, sim.getSnapshot);
 
   const flow: FlowDoc = library.flows[flowId] ?? library.flows[OVERVIEW_ID] ?? Object.values(library.flows)[0];
+  const canGoBack = flow.id !== OVERVIEW_ID && !!library.flows[OVERVIEW_ID];
   const design = mode === 'design';
   const routes = useMemo(() => formatRoutes(library), [library]);
 
@@ -100,7 +101,7 @@ function Studio({ formats, onOpenDocuments, onOpenLiveDocuments, initialFormat, 
       if (view.nodeId && !node && tries++ < 10) { timer = window.setTimeout(run, 80); return; }
       autoFit.current = !node;
       if (node) rf.setCenter(node.position.x + (node.width ?? 0) / 2, node.position.y + (node.height ?? 0) / 2, { zoom: Math.max(rf.getZoom(), 0.95), duration: 300 });
-      else rf.fitView({ ...fitOptions(modeRef.current === 'design'), duration: 200 });
+      else rf.fitView({ ...fitOptions, duration: 200 });
     };
     timer = window.setTimeout(run, 60);
     return () => window.clearTimeout(timer);
@@ -108,7 +109,7 @@ function Studio({ formats, onOpenDocuments, onOpenLiveDocuments, initialFormat, 
   useEffect(() => {
     const element = canvasRef.current;
     if (!element || typeof ResizeObserver === 'undefined') return;
-    const observer = new ResizeObserver(() => { if (autoFit.current && element.clientWidth > 0) rf.fitView(fitOptions(modeRef.current === 'design')); });
+    const observer = new ResizeObserver(() => { if (autoFit.current && element.clientWidth > 0) rf.fitView(fitOptions); });
     observer.observe(element);
     return () => observer.disconnect();
   }, [rf]);
@@ -303,9 +304,20 @@ function Studio({ formats, onOpenDocuments, onOpenLiveDocuments, initialFormat, 
   useEffect(() => {
     if (!active) return;
     const handler = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') { setInsertMenu(null); setFormatsOpen(false); }
-      const target = event.target as HTMLElement | null;
-      if (target?.closest('input, textarea, select, [contenteditable="true"]') || modeRef.current !== 'design') return;
+      const target = event.target instanceof Element ? event.target : null;
+      const inField = !!target?.closest('input, textarea, select, [contenteditable="true"]');
+      if (event.key === 'Escape') {
+        if (event.defaultPrevented || event.repeat || event.isComposing || target?.closest('[aria-modal="true"], dialog[open]')) return;
+        if (insertMenu || formatsOpen) {
+          setInsertMenu(null);
+          setFormatsOpen(false);
+        } else if (canGoBack && !inField && editingId === null) {
+          event.preventDefault();
+          openFlow(OVERVIEW_ID);
+        }
+        return;
+      }
+      if (inField || modeRef.current !== 'design') return;
       const mod = event.metaKey || event.ctrlKey; const key = event.key.toLowerCase();
       if (mod && key === 'z') { event.preventDefault(); event.shiftKey ? redo() : undo(); }
       else if (mod && key === 'y') { event.preventDefault(); redo(); }
@@ -314,7 +326,7 @@ function Studio({ formats, onOpenDocuments, onOpenLiveDocuments, initialFormat, 
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [active, undo, redo, duplicate, removeSelection]);
+  }, [active, canGoBack, duplicate, editingId, formatsOpen, insertMenu, openFlow, redo, removeSelection, undo]);
 
   /* ----- 드래그 앤 드롭 ----- */
   const nearestEdge = useCallback((point: XYPosition) => {
@@ -374,17 +386,13 @@ function Studio({ formats, onOpenDocuments, onOpenLiveDocuments, initialFormat, 
   const selectionKey = selectedNode?.id ?? selectedEdge?.id;
   useEffect(() => { if (selectionKey) setInspectorOpen(true); }, [selectionKey]);
   const flowFormats = flow.id === OVERVIEW_ID ? [] : formatsOfFlow(library, flow.id);
-  const t = snapshot.totals;
-  const jumpTo = (predicate: (metric: NodeMetric) => boolean) => {
-    const found = Object.entries(snapshot.metrics).find(([id, metric]) => id.startsWith(`${flow.id}::`) && predicate(metric)) ?? Object.entries(snapshot.metrics).find(([, metric]) => predicate(metric));
-    if (found) { const [flowPart, ...rest] = found[0].split('::'); openFlow(flowPart, rest.join('::')); }
-  };
+  const attention = useMemo(() => getAttentionStages(library, snapshot.metrics, flow.id), [library, snapshot.metrics, flow.id]);
 
   return <FlowUIContext.Provider value={ui}>
     <section className={`ps-root ${design ? 'ps-design' : 'ps-monitor'}`} aria-label="파이프라인 작업 공간">
       <header className="ps-toolbar">
         <div className="ps-title">
-          {flow.id !== OVERVIEW_ID && <><button className="ps-crumb" onClick={() => openFlow(OVERVIEW_ID)}>{library.flows[OVERVIEW_ID]?.title ?? '전체 흐름'}</button><ChevronRight size={14} className="ps-crumb-sep" /></>}
+          {canGoBack && <button type="button" className="ps-btn ps-back" onClick={() => openFlow(OVERVIEW_ID)} aria-keyshortcuts="Escape" title="전체 처리 흐름으로 돌아가기 (Esc)"><ArrowLeft size={15} aria-hidden="true" /> 뒤로가기 <kbd aria-hidden="true">Esc</kbd></button>}
           <h2>{flow.title}</h2>
           {flowFormats.length > 0 && <div className="ps-formats">{flowFormats.slice(0, 6).map(format => <span key={format}>{format}</span>)}{flowFormats.length > 6 && <span>+{flowFormats.length - 6}</span>}</div>}
         </div>
@@ -402,11 +410,10 @@ function Studio({ formats, onOpenDocuments, onOpenLiveDocuments, initialFormat, 
             <span className="ps-sep" />
             <button className={`ps-pill ${issues.length ? 'is-warn' : 'is-ok'}`} onClick={() => { selectInFlow(); setInspectorOpen(true); }} title="검증 결과 보기">{issues.length ? <><TriangleAlert size={13} /> 검증 {issues.length}</> : '검증 통과'}</button>
           </> : <>
+            {attention.length > 0 && <button className="ps-pill is-warn" onClick={() => { selectInFlow(); setInspectorOpen(true); }}>
+              <TriangleAlert size={14} aria-hidden="true" /> 주의 단계 {attention.length}개
+            </button>}
             <button className={`ps-btn ${snapshot.running ? '' : 'is-primary'}`} onClick={() => sim.setRunning(!snapshot.running)}>{snapshot.running ? <><CirclePause size={14} /> 전체 일시정지</> : <><CirclePlay size={14} /> 전체 재개</>}</button>
-            <div className="ps-seg" role="group" aria-label="모의 속도">{[1, 2, 4].map(speed => <button key={speed} className={snapshot.speed === speed ? 'is-on' : ''} aria-pressed={snapshot.speed === speed} onClick={() => sim.setSpeed(speed)}>{speed}×</button>)}</div>
-            <div className="ps-rate" role="group" aria-label="유입량"><span>유입</span><button aria-label="유입 줄이기" onClick={() => sim.setRate(snapshot.rate - 6)}><Minus size={12} /></button><b>{snapshot.rate}<small>/분</small></b><button aria-label="유입 늘리기" onClick={() => sim.setRate(snapshot.rate + 6)}><Plus size={12} /></button></div>
-            <span className="ps-sep" />
-            <span className="ps-clock" title="모의 시각">{snapshot.clock}</span>
             <button className="ps-icon" onClick={() => sim.reset()} aria-label="모의 운영 초기화" title="모의 운영 초기화"><RotateCcw size={15} /></button>
           </>}
           <span className="ps-sep" />
@@ -436,21 +443,11 @@ function Studio({ formats, onOpenDocuments, onOpenLiveDocuments, initialFormat, 
               connectionMode={ConnectionMode.Loose} connectionLineType={ConnectionLineType.SmoothStep}
               deleteKeyCode={null} selectionKeyCode="Shift" multiSelectionKeyCode={['Meta', 'Control']} selectionMode={SelectionMode.Partial}
               snapToGrid snapGrid={[8, 8]} minZoom={0.2} maxZoom={2} zoomOnDoubleClick={false}
-              fitView fitViewOptions={fitOptions(design)} proOptions={{ hideAttribution: true }}
+              fitView fitViewOptions={fitOptions} proOptions={{ hideAttribution: true }}
             >
               <Background variant={BackgroundVariant.Dots} gap={16} size={1.3} color="#cdd4df" />
               <MiniMap pannable zoomable className="ps-minimap" ariaLabel="흐름 미니맵" nodeBorderRadius={6} nodeColor={node => minimapColor(node as FlowNode, viewMetrics[node.id], design)} maskColor="rgba(241,244,249,.72)" />
-              <ZoomControls design={design} />
-              {!design && <Panel position="top-left" className="ps-kpi" aria-label="운영 지표">
-                <span><small>유입</small><b>{t.arrivalsPerMin}</b><i>/분</i></span>
-                <span title="압축 항목·첨부·내장 개체에서 나온 하위 문서"><small>파생</small><b>{t.derivedPerMin}</b><i>/분</i></span>
-                <span><small>완료</small><b>{t.completedPerMin}</b><i>/분</i></span>
-                <span><small>처리 중</small><b>{t.processing}</b></span>
-                <span><small>대기</small><b>{t.queued}</b></span>
-                <button className={t.held ? 'is-warn' : ''} onClick={() => jumpTo(metric => metric.held > 0)} disabled={!t.held}><small>보류</small><b>{t.held}</b></button>
-                <button className={t.failed ? 'is-error' : ''} onClick={() => jumpTo(metric => metric.failed > 0)} disabled={!t.failed}><small>실패</small><b>{t.failed}</b></button>
-                <button className="ps-kpi-more" onClick={() => { selectInFlow(); setInspectorOpen(true); }}>운영 요약</button>
-              </Panel>}
+              <ZoomControls />
             </ReactFlow>
             {notice && <div className="ps-toast" role="status">{notice}</div>}
             {design && !flow.nodes.length && <div className="ps-empty"><b>빈 흐름입니다</b><span>왼쪽 도형을 끌어 놓아 시작하세요.</span></div>}
@@ -470,7 +467,7 @@ function Studio({ formats, onOpenDocuments, onOpenLiveDocuments, initialFormat, 
               onDuplicate={duplicate} onRemove={removeSelection} onAppend={appendAfter} onInsert={insertOnEdge} onReverse={reverseEdge} onOpenFlow={id => openFlow(id)}
               onFlowMeta={patch => updateFlow(doc => ({ ...doc, ...patch }))} onLayout={layout} onResetFlow={resetFlow} onDeleteFlow={deleteFlow}
               onExport={exportJson} onImport={() => importRef.current?.click()} onOpenDocuments={onOpenDocuments} />
-            : <MonitorInspector library={library} flow={flow} node={selectedNode} snapshot={snapshot} sim={sim} metrics={viewMetrics} onNavigate={openFlow} onNodeData={setNodeData} />}
+            : <MonitorInspector library={library} flow={flow} node={selectedNode} snapshot={snapshot} sim={sim} metrics={viewMetrics} attention={attention} onNavigate={openFlow} onNodeData={setNodeData} />}
         </aside>}
       </div>
 
@@ -497,14 +494,14 @@ function freeSpot(start: XYPosition, size: { w: number; h: number }, nodes: Flow
   return start;
 }
 
-function ZoomControls({ design }: { design: boolean }) {
+function ZoomControls() {
   const { zoomIn, zoomOut, fitView } = useReactFlow();
   const { zoom } = useViewport();
   return <Panel position="bottom-left" className="ps-zoom">
     <button onClick={() => zoomOut({ duration: 150 })} aria-label="축소" title="축소"><Minus size={14} /></button>
     <span>{Math.round(zoom * 100)}%</span>
     <button onClick={() => zoomIn({ duration: 150 })} aria-label="확대" title="확대"><Plus size={14} /></button>
-    <button onClick={() => fitView({ ...fitOptions(design), duration: 200 })} aria-label="화면에 맞추기" title="화면에 맞추기"><Maximize size={13} /></button>
+    <button onClick={() => fitView({ ...fitOptions, duration: 200 })} aria-label="화면에 맞추기" title="화면에 맞추기"><Maximize size={13} /></button>
   </Panel>;
 }
 

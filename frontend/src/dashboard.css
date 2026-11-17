@@ -21,3 +21,31 @@
 .dash-subhead{display:flex;align-items:baseline;gap:10px;margin:4px 0 12px}
 .dash-subhead h2{font-size:15px;font-weight:700;color:#1e293b}
 .dash-subhead span{font-size:12.5px;color:#5b6678}
+
+/* 2026-11-17 재구성: 예시 문서는 한 섹션으로. 요약은 작은 칩, 탭과 편집은 같은 줄, 보조 위젯은 접힌 한 줄 요약 */
+.dash-docs{margin-top:4px}
+.dash-docs-head{display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding-bottom:10px;margin-bottom:14px;border-bottom:1px solid #e4e8ee}
+.dash-docs-title{display:flex;align-items:baseline;gap:9px;min-width:0}
+.dash-docs-title h2{font-size:15px;font-weight:700;color:#1e293b;letter-spacing:-.2px}
+.dash-docs-title span{font-size:12.5px;color:#5b6678;white-space:nowrap;cursor:help}
+.dash-root .dash-kpis{display:flex;flex-wrap:wrap;gap:6px;margin:0;grid-template-columns:none}
+.dash-root .dash-kpis>button{display:inline-flex;align-items:center;gap:5px;min-height:0;height:28px;padding:0 10px;border:1px solid var(--dash-line);border-radius:999px;background:#fff;box-shadow:none;font-size:12px;color:#535f6f;transform:none}
+.dash-root .dash-kpis>button svg{color:#7a72c9}
+.dash-root .dash-kpis>button b{font-size:13px;color:#222e40;font-variant-numeric:tabular-nums}
+.dash-root .dash-kpis>button:hover{border-color:#bab3e4;background:#faf9ff;transform:none}
+.dash-root .dash-kpis>button.dash-kpi-attention{border-color:#f1dcb5;background:#fffaf0;color:#93651c}
+.dash-root .dash-kpis>button.dash-kpi-attention svg,.dash-root .dash-kpis>button.dash-kpi-attention b{color:#a2641c}
+.dash-docs-tools{display:flex;align-items:center;gap:10px;margin-left:auto}
+.dash-docs-tools .dash-tabs{gap:4px;background:#f3f4f8;border-radius:8px;padding:3px}
+.dash-docs-tools .dash-tabs button{border:0;border-radius:6px;padding:5px 11px;font-size:12.5px}
+.dash-docs-tools .dash-tabs button.dash-tab-active{background:#fff;color:#4f44a8;box-shadow:0 1px 3px #25314814}
+.dash-docs-tools .dash-edit-btn{margin:0;padding:6px 10px}
+.dash-widget-title{cursor:pointer;min-width:0}
+.dash-widget-title>span:last-child{min-width:0}
+.dash-widget-title small{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dash-root .dash-widget-head{padding:14px 16px 12px}.dash-root .dash-widget-collapsed .dash-widget-head{padding:11px 16px;border-bottom:0}.dash-widget-collapsed .dash-widget-icon{width:26px;height:26px}.dash-widget-collapsed .dash-widget-title h3{margin-bottom:3px}
+.dash-widget-collapsed .dash-widget-title small{color:#4f5b6e!important}
+.dash-widget .dash-drag-handle{opacity:0;transition:opacity .15s}
+.dash-widget:hover .dash-drag-handle,.dash-widget:focus-within .dash-drag-handle,.dash-grid.is-editing .dash-drag-handle{opacity:1}
+@media(max-width:900px){.dash-docs-tools{margin-left:0;width:100%;justify-content:space-between}.dash-docs-title span{white-space:normal}}
+

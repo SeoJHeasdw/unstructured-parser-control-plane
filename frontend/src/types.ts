@@ -10,5 +10,5 @@ export type Relation = {
 };
 export type Activity = {time: string; title: string; description: string; type: string; documentId: string};
 export type AppData = {asOf: string; documents: DocumentItem[]; relations: Relation[]; activity: Activity[]};
-export type Page = 'overview' | 'documents' | 'pipeline' | 'compare' | 'relations' | 'models' | 'live';
+export type Page = 'overview' | 'documents' | 'pipeline' | 'compare' | 'relations' | 'search' | 'chunking' | 'embedding' | 'vectordb' | 'models' | 'live';
 export type DocumentFilter = {status?: string; format?: string};

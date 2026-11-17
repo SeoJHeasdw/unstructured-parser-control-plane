@@ -1,0 +1,927 @@
+{
+ "as_of": "2026-11-14T18:00:00+09:00",
+ "documents": [
+  {
+   "id": "ex-01",
+   "name": "SOP-QC-0040_세척 밸리데이션 절차_Rev3.docx",
+   "uploaded_at": "2026-03-10T09:12:00+09:00",
+   "size": 48211,
+   "hash": "b01ba01ef9374662",
+   "structure": {
+    "name": "SOP-QC-0040_세척 밸리데이션 절차_Rev3.docx",
+    "ext": "DOCX",
+    "size": 48211,
+    "kind": "file",
+    "location": "",
+    "detected": "docx",
+    "flags": [],
+    "stats": {
+     "paragraphs": 38
+    },
+    "links": [
+     {
+      "kind": "doc-number",
+      "target": "SOP-QC-0040 Rev.3",
+      "location": "header1 문단 1",
+      "evidence": "SOP-QC-0040 Rev.3 세척 밸리데이션 절차"
+     },
+     {
+      "kind": "doc-number",
+      "target": "SOP-QC-0012 Rev.1",
+      "location": "본문 문단 12",
+      "evidence": "시험기기는 SOP-QC-0012 Rev.1에 따라 교정된 것을 사용한다"
+     }
+    ],
+    "children": [],
+    "hash": "b01ba01ef9374662",
+    "duplicate_of": null
+   }
+  },
+  {
+   "id": "ex-02",
+   "name": "SOP-QC-0040_세척 밸리데이션 절차_Rev4.docx",
+   "uploaded_at": "2026-06-02T14:30:00+09:00",
+   "size": 51877,
+   "hash": "df2d5f57c7f05f48",
+   "structure": {
+    "name": "SOP-QC-0040_세척 밸리데이션 절차_Rev4.docx",
+    "ext": "DOCX",
+    "size": 51877,
+    "kind": "file",
+    "location": "",
+    "detected": "docx",
+    "flags": [],
+    "stats": {
+     "paragraphs": 41
+    },
+    "links": [
+     {
+      "kind": "doc-number",
+      "target": "SOP-QC-0040 Rev.4",
+      "location": "header1 문단 1",
+      "evidence": "SOP-QC-0040 Rev.4 세척 밸리데이션 절차"
+     },
+     {
+      "kind": "doc-number",
+      "target": "SOP-QC-0040 Rev.3",
+      "location": "본문 문단 3",
+      "evidence": "본 개정으로 SOP-QC-0040 Rev.3을 대체한다"
+     },
+     {
+      "kind": "doc-number",
+      "target": "SOP-QC-0012 Rev.1",
+      "location": "본문 문단 12",
+      "evidence": "시험기기는 SOP-QC-0012 Rev.1에 따라 교정된 것을 사용한다"
+     }
+    ],
+    "children": [],
+    "hash": "df2d5f57c7f05f48",
+    "duplicate_of": null
+   }
+  },
+  {
+   "id": "ex-03",
+   "name": "SOP-QC-0040 Rev.5 세척 밸리데이션 절차(서명본).pdf",
+   "uploaded_at": "2026-11-03T16:05:00+09:00",
+   "size": 402114,
+   "hash": "243a876c4e01194e",
+   "structure": {
+    "name": "SOP-QC-0040 Rev.5 세척 밸리데이션 절차(서명본).pdf",
+    "ext": "PDF",
+    "size": 402114,
+    "kind": "file",
+    "location": "",
+    "detected": "pdf",
+    "flags": [
+     "has-images"
+    ],
+    "stats": {
+     "pages": 12,
+     "images": 4
+    },
+    "links": [
+     {
+      "kind": "url",
+      "target": "https://intranet.example.com/qms/sop/SOP-QC-0040",
+      "location": "PDF 링크 주석",
+      "evidence": ""
+     }
+    ],
+    "children": [],
+    "hash": "243a876c4e01194e",
+    "duplicate_of": null
+   }
+  },
+  {
+   "id": "ex-04",
+   "name": "SOP-QC-0040_세척 밸리데이션 절차_Rev5.docx",
+   "uploaded_at": "2026-11-04T09:40:00+09:00",
+   "size": 66310,
+   "hash": "8f429f5a6174f3de",
+   "structure": {
+    "name": "SOP-QC-0040_세척 밸리데이션 절차_Rev5.docx",
+    "ext": "DOCX",
+    "size": 66310,
+    "kind": "file",
+    "location": "",
+    "detected": "docx",
+    "flags": [
+     "has-images"
+    ],
+    "stats": {
+     "paragraphs": 44,
+     "images": 3
+    },
+    "links": [
+     {
+      "kind": "doc-number",
+      "target": "SOP-QC-0040 Rev.5",
+      "location": "header1 문단 1",
+      "evidence": "SOP-QC-0040 Rev.5 세척 밸리데이션 절차"
+     },
+     {
+      "kind": "doc-number",
+      "target": "SOP-QC-0012 Rev.2",
+      "location": "본문 문단 12",
+      "evidence": "시험기기는 SOP-QC-0012 Rev.2에 따라 교정된 것을 사용한다"
+     },
+     {
+      "kind": "hyperlink",
+      "target": "https://intranet.example.com/qms/forms?id=QF-0040-01",
+      "location": "본문 문단 27",
+      "evidence": "기록 양식 QF-0040-01 내려받기"
+     }
+    ],
+    "children": [
+     {
+      "name": "세척 잔류 허용기준 계산.xlsx",
+      "ext": "XLSX",
+      "size": 18320,
+      "kind": "embedded",
+      "location": "word/embeddings/oleObject1.bin",
+      "detected": "xlsx",
+      "flags": [],
+      "stats": {
+       "sheets": 2,
+       "note": "OLE package"
+      },
+      "links": [
+       {
+        "kind": "doc-number",
+        "target": "SOP-QC-0040 Rev.5",
+        "location": "계산!A1",
+        "evidence": "SOP-QC-0040 Rev.5 부록 2 허용기준 계산"
+       }
+      ],
+      "children": [],
+      "hash": "ade4880d8eb363c7",
+      "duplicate_of": null
+     }
+    ],
+    "hash": "8f429f5a6174f3de",
+    "duplicate_of": null
+   }
+  },
+  {
+   "id": "ex-05",
+   "name": "SOP-QC-0012_시험기기 교정 절차_Rev2.docx",
+   "uploaded_at": "2026-09-21T11:00:00+09:00",
+   "size": 39004,
+   "hash": "6ddc9fbc99f7b5a3",
+   "structure": {
+    "name": "SOP-QC-0012_시험기기 교정 절차_Rev2.docx",
+    "ext": "DOCX",
+    "size": 39004,
+    "kind": "file",
+    "location": "",
+    "detected": "docx",
+    "flags": [],
+    "stats": {
+     "paragraphs": 29
+    },
+    "links": [
+     {
+      "kind": "doc-number",
+      "target": "SOP-QC-0012 Rev.2",
+      "location": "header1 문단 1",
+      "evidence": "SOP-QC-0012 Rev.2 시험기기 교정 절차"
+     },
+     {
+      "kind": "doc-number",
+      "target": "SOP-QC-0040 Rev.5",
+      "location": "본문 문단 8",
+      "evidence": "세척 후 기기 상태 확인은 SOP-QC-0040 Rev.5 부록 1을 따른다"
+     }
+    ],
+    "children": [],
+    "hash": "6ddc9fbc99f7b5a3",
+    "duplicate_of": null
+   }
+  },
+  {
+   "id": "ex-06",
+   "name": "주간 품질회의_v1.pptx",
+   "uploaded_at": "2026-11-02T08:50:00+09:00",
+   "size": 1820331,
+   "hash": "28ebaf6057806b30",
+   "structure": {
+    "name": "주간 품질회의_v1.pptx",
+    "ext": "PPTX",
+    "size": 1820331,
+    "kind": "file",
+    "location": "",
+    "detected": "pptx",
+    "flags": [
+     "has-images"
+    ],
+    "stats": {
+     "slides": 14,
+     "images": 6
+    },
+    "links": [],
+    "children": [],
+    "hash": "28ebaf6057806b30",
+    "duplicate_of": null
+   }
+  },
+  {
+   "id": "ex-07",
+   "name": "주간 품질회의_v2_최종.pptx",
+   "uploaded_at": "2026-11-05T17:20:00+09:00",
+   "size": 2104998,
+   "hash": "e145b8638204ee4f",
+   "structure": {
+    "name": "주간 품질회의_v2_최종.pptx",
+    "ext": "PPTX",
+    "size": 2104998,
+    "kind": "file",
+    "location": "",
+    "detected": "pptx",
+    "flags": [
+     "has-images"
+    ],
+    "stats": {
+     "slides": 16,
+     "images": 7
+    },
+    "links": [
+     {
+      "kind": "unc-path",
+      "target": "\\\\fs01\\qa\\점검\\설비점검_관리대장_20261105.xlsx",
+      "location": "슬라이드 4",
+      "evidence": "상세 이력: \\\\fs01\\qa\\점검\\설비점검_관리대장_20261105.xlsx"
+     },
+     {
+      "kind": "doc-number",
+      "target": "SOP-QC-0040 Rev.5",
+      "location": "슬라이드 7",
+      "evidence": "SOP-QC-0040 Rev.5 시행 일정 공유"
+     }
+    ],
+    "children": [],
+    "hash": "e145b8638204ee4f",
+    "duplicate_of": null
+   }
+  },
+  {
+   "id": "ex-08",
+   "name": "주간 품질회의_v2.pptx",
+   "uploaded_at": "2026-11-07T10:15:00+09:00",
+   "size": 2117450,
+   "hash": "29124457f2ba2565",
+   "structure": {
+    "name": "주간 품질회의_v2.pptx",
+    "ext": "PPTX",
+    "size": 2117450,
+    "kind": "file",
+    "location": "",
+    "detected": "pptx",
+    "flags": [
+     "has-images"
+    ],
+    "stats": {
+     "slides": 16,
+     "images": 7
+    },
+    "links": [
+     {
+      "kind": "unc-path",
+      "target": "\\\\fs01\\qa\\점검\\설비점검_관리대장_20261112.xlsx",
+      "location": "슬라이드 4",
+      "evidence": "상세 이력: \\\\fs01\\qa\\점검\\설비점검_관리대장_20261112.xlsx"
+     },
+     {
+      "kind": "doc-number",
+      "target": "SOP-QC-0040 Rev.5",
+      "location": "슬라이드 7",
+      "evidence": "SOP-QC-0040 Rev.5 시행 일정 공유"
+     }
+    ],
+    "children": [],
+    "hash": "29124457f2ba2565",
+    "duplicate_of": null
+   }
+  },
+  {
+   "id": "ex-09",
+   "name": "품질문서_송부본.zip",
+   "uploaded_at": "2026-11-10T13:02:00+09:00",
+   "size": 1203550,
+   "hash": "23a84f29e729d0d8",
+   "structure": {
+    "name": "품질문서_송부본.zip",
+    "ext": "ZIP",
+    "size": 1203550,
+    "kind": "file",
+    "location": "",
+    "detected": "zip",
+    "flags": [],
+    "stats": {
+     "entries": 4
+    },
+    "links": [],
+    "children": [
+     {
+      "name": "SOP-QC-0040_세척 밸리데이션 절차_Rev4.docx",
+      "ext": "DOCX",
+      "size": 51877,
+      "kind": "archive-entry",
+      "location": "SOP/SOP-QC-0040_세척 밸리데이션 절차_Rev4.docx",
+      "detected": "docx",
+      "flags": [],
+      "stats": {
+       "paragraphs": 41
+      },
+      "links": [
+       {
+        "kind": "doc-number",
+        "target": "SOP-QC-0040 Rev.4",
+        "location": "header1 문단 1",
+        "evidence": "SOP-QC-0040 Rev.4 세척 밸리데이션 절차"
+       },
+       {
+        "kind": "doc-number",
+        "target": "SOP-QC-0040 Rev.3",
+        "location": "본문 문단 3",
+        "evidence": "본 개정으로 SOP-QC-0040 Rev.3을 대체한다"
+       },
+       {
+        "kind": "doc-number",
+        "target": "SOP-QC-0012 Rev.1",
+        "location": "본문 문단 12",
+        "evidence": "시험기기는 SOP-QC-0012 Rev.1에 따라 교정된 것을 사용한다"
+       }
+      ],
+      "children": [],
+      "hash": "df2d5f57c7f05f48",
+      "duplicate_of": null
+     },
+     {
+      "name": "시험성적서_LOT-A2611.pdf",
+      "ext": "PDF",
+      "size": 233019,
+      "kind": "archive-entry",
+      "location": "시험성적서_LOT-A2611.pdf",
+      "detected": "pdf",
+      "flags": [],
+      "stats": {
+       "pages": 3
+      },
+      "links": [],
+      "children": [],
+      "hash": "d4b9046e64cc42ae",
+      "duplicate_of": null
+     },
+     {
+      "name": "참고자료.zip",
+      "ext": "ZIP",
+      "size": 873400,
+      "kind": "archive-entry",
+      "location": "참고자료.zip",
+      "detected": "zip",
+      "flags": [],
+      "stats": {
+       "entries": 2
+      },
+      "links": [],
+      "children": [
+       {
+        "name": "점검기준표_v3.xlsx",
+        "ext": "XLSX",
+        "size": 29115,
+        "kind": "archive-entry",
+        "location": "참고자료/점검기준표_v3.xlsx",
+        "detected": "xlsx",
+        "flags": [],
+        "stats": {
+         "sheets": 3
+        },
+        "links": [
+         {
+          "kind": "doc-number",
+          "target": "SOP-QC-0040 Rev.5",
+          "location": "기준!A2",
+          "evidence": "근거 문서 SOP-QC-0040 Rev.5"
+         }
+        ],
+        "children": [],
+        "hash": "04dcd91757852266",
+        "duplicate_of": null
+       },
+       {
+        "name": "세척 잔류물 사진.jpg",
+        "ext": "JPG",
+        "size": 845112,
+        "kind": "archive-entry",
+        "location": "참고자료/세척 잔류물 사진.jpg",
+        "detected": "image",
+        "flags": [
+         "image-only"
+        ],
+        "stats": {
+         "images": 1
+        },
+        "links": [],
+        "children": [],
+        "hash": "d27e96ae0daecec4",
+        "duplicate_of": null
+       }
+      ],
+      "hash": "8d553a0b479907e4",
+      "duplicate_of": null
+     }
+    ],
+    "hash": "23a84f29e729d0d8",
+    "duplicate_of": null
+   }
+  },
+  {
+   "id": "ex-10",
+   "name": "RE_ 세척 밸리데이션 개정 검토 요청.eml",
+   "uploaded_at": "2026-11-06T15:44:00+09:00",
+   "size": 131022,
+   "hash": "180052750bc437a0",
+   "structure": {
+    "name": "RE_ 세척 밸리데이션 개정 검토 요청.eml",
+    "ext": "EML",
+    "size": 131022,
+    "kind": "file",
+    "location": "",
+    "detected": "mime",
+    "flags": [],
+    "stats": {
+     "subject": "RE: 세척 밸리데이션 개정 검토 요청"
+    },
+    "links": [
+     {
+      "kind": "doc-number",
+      "target": "SOP-QC-0040 Rev.4",
+      "location": "본문",
+      "evidence": "개정 전 SOP-QC-0040 Rev.4 대비 변경 사항을 검토 바랍니다"
+     },
+     {
+      "kind": "unc-path",
+      "target": "\\\\fs01\\qa\\SOP\\SOP-QC-0040_세척 밸리데이션 절차_Rev5.docx",
+      "location": "본문",
+      "evidence": "원본 위치: \\\\fs01\\qa\\SOP\\SOP-QC-0040_세척 밸리데이션 절차_Rev5.docx"
+     }
+    ],
+    "children": [
+     {
+      "name": "SOP-QC-0040_세척 밸리데이션 절차_Rev5.docx",
+      "ext": "DOCX",
+      "size": 66310,
+      "kind": "attachment",
+      "location": "첨부: SOP-QC-0040_세척 밸리데이션 절차_Rev5.docx",
+      "detected": "docx",
+      "flags": [
+       "has-images"
+      ],
+      "stats": {
+       "paragraphs": 44,
+       "images": 3
+      },
+      "links": [
+       {
+        "kind": "doc-number",
+        "target": "SOP-QC-0040 Rev.5",
+        "location": "header1 문단 1",
+        "evidence": "SOP-QC-0040 Rev.5 세척 밸리데이션 절차"
+       },
+       {
+        "kind": "doc-number",
+        "target": "SOP-QC-0012 Rev.2",
+        "location": "본문 문단 12",
+        "evidence": "시험기기는 SOP-QC-0012 Rev.2에 따라 교정된 것을 사용한다"
+       },
+       {
+        "kind": "hyperlink",
+        "target": "https://intranet.example.com/qms/forms?id=QF-0040-01",
+        "location": "본문 문단 27",
+        "evidence": "기록 양식 QF-0040-01 내려받기"
+       }
+      ],
+      "children": [
+       {
+        "name": "세척 잔류 허용기준 계산.xlsx",
+        "ext": "XLSX",
+        "size": 18320,
+        "kind": "embedded",
+        "location": "word/embeddings/oleObject1.bin",
+        "detected": "xlsx",
+        "flags": [],
+        "stats": {
+         "sheets": 2,
+         "note": "OLE package"
+        },
+        "links": [
+         {
+          "kind": "doc-number",
+          "target": "SOP-QC-0040 Rev.5",
+          "location": "계산!A1",
+          "evidence": "SOP-QC-0040 Rev.5 부록 2 허용기준 계산"
+         }
+        ],
+        "children": [],
+        "hash": "ade4880d8eb363c7",
+        "duplicate_of": null
+       }
+      ],
+      "hash": "8f429f5a6174f3de",
+      "duplicate_of": null
+     },
+     {
+      "name": "세척 밸리데이션 개정 대비표.xlsx",
+      "ext": "XLSX",
+      "size": 22488,
+      "kind": "attachment",
+      "location": "첨부: 세척 밸리데이션 개정 대비표.xlsx",
+      "detected": "xlsx",
+      "flags": [],
+      "stats": {
+       "sheets": 1
+      },
+      "links": [
+       {
+        "kind": "doc-number",
+        "target": "SOP-QC-0040 Rev.4",
+        "location": "대비표!B3",
+        "evidence": "현행 SOP-QC-0040 Rev.4 조항"
+       },
+       {
+        "kind": "doc-number",
+        "target": "SOP-QC-0040 Rev.5",
+        "location": "대비표!C3",
+        "evidence": "개정 SOP-QC-0040 Rev.5 조항"
+       }
+      ],
+      "children": [],
+      "hash": "307b62d757bdc2d8",
+      "duplicate_of": null
+     }
+    ],
+    "hash": "180052750bc437a0",
+    "duplicate_of": null
+   }
+  },
+  {
+   "id": "ex-11",
+   "name": "설비점검_관리대장_20261105.xlsx",
+   "uploaded_at": "2026-11-05T18:01:00+09:00",
+   "size": 88412,
+   "hash": "cc5873360e3142fc",
+   "structure": {
+    "name": "설비점검_관리대장_20261105.xlsx",
+    "ext": "XLSX",
+    "size": 88412,
+    "kind": "file",
+    "location": "",
+    "detected": "xlsx",
+    "flags": [],
+    "stats": {
+     "sheets": 4
+    },
+    "links": [
+     {
+      "kind": "external-workbook",
+      "target": "file:///\\\\fs01\\qa\\기준\\점검기준표_v2.xlsx",
+      "location": "점검 이력!F8",
+      "evidence": "='file:///\\\\fs01\\qa\\기준\\[점검기준표_v2.xlsx]기준'!C4"
+     },
+     {
+      "kind": "doc-number",
+      "target": "SOP-QC-0040 Rev.4",
+      "location": "점검 이력!B12",
+      "evidence": "SOP-QC-0040 Rev.4 참조"
+     }
+    ],
+    "children": [],
+    "hash": "cc5873360e3142fc",
+    "duplicate_of": null
+   }
+  },
+  {
+   "id": "ex-12",
+   "name": "설비점검_관리대장_20261112.xlsx",
+   "uploaded_at": "2026-11-12T18:03:00+09:00",
+   "size": 91207,
+   "hash": "6f493599f100912d",
+   "structure": {
+    "name": "설비점검_관리대장_20261112.xlsx",
+    "ext": "XLSX",
+    "size": 91207,
+    "kind": "file",
+    "location": "",
+    "detected": "xlsx",
+    "flags": [],
+    "stats": {
+     "sheets": 4
+    },
+    "links": [
+     {
+      "kind": "external-workbook",
+      "target": "file:///\\\\fs01\\qa\\기준\\점검기준표_v2.xlsx",
+      "location": "점검 이력!F8",
+      "evidence": "='file:///\\\\fs01\\qa\\기준\\[점검기준표_v2.xlsx]기준'!C4"
+     },
+     {
+      "kind": "doc-number",
+      "target": "SOP-QC-0040 Rev.5",
+      "location": "점검 이력!B12",
+      "evidence": "SOP-QC-0040 Rev.5 참조"
+     },
+     {
+      "kind": "doc-number",
+      "target": "SOP-PD-0076 Rev.3",
+      "location": "점검 이력!B20",
+      "evidence": "필터 교체는 SOP-PD-0076 Rev.3 기준"
+     },
+     {
+      "kind": "hyperlink",
+      "target": "\\\\fs01\\qa\\양식\\설비 점검표.xlsx",
+      "location": "양식!A2",
+      "evidence": "점검표 양식 열기"
+     }
+    ],
+    "children": [],
+    "hash": "6f493599f100912d",
+    "duplicate_of": null
+   }
+  },
+  {
+   "id": "ex-13",
+   "name": "BMR-2026-0842_제조기록서.docx",
+   "uploaded_at": "2026-11-11T09:25:00+09:00",
+   "size": 73560,
+   "hash": "96097db5d53688f2",
+   "structure": {
+    "name": "BMR-2026-0842_제조기록서.docx",
+    "ext": "DOCX",
+    "size": 73560,
+    "kind": "file",
+    "location": "",
+    "detected": "docx",
+    "flags": [
+     "macro"
+    ],
+    "stats": {
+     "paragraphs": 63
+    },
+    "links": [
+     {
+      "kind": "doc-number",
+      "target": "BMR-2026-0842",
+      "location": "header1 문단 1",
+      "evidence": "제조기록서 BMR-2026-0842"
+     },
+     {
+      "kind": "doc-number",
+      "target": "SOP-QC-0040 Rev.3",
+      "location": "본문 문단 18",
+      "evidence": "장비 세척은 SOP-QC-0040 Rev.3에 따라 수행하였다"
+     },
+     {
+      "kind": "doc-number",
+      "target": "SOP-QC-0012 Rev.2",
+      "location": "본문 문단 22",
+      "evidence": "시험기기 교정 상태는 SOP-QC-0012 Rev.2로 확인"
+     }
+    ],
+    "children": [
+     {
+      "name": "공정 파라미터 기록.xlsx",
+      "ext": "XLSX",
+      "size": 20977,
+      "kind": "embedded",
+      "location": "word/embeddings/oleObject1.bin",
+      "detected": "xlsx",
+      "flags": [],
+      "stats": {
+       "sheets": 1,
+       "note": "OLE package"
+      },
+      "links": [
+       {
+        "kind": "external-workbook",
+        "target": "file:///\\\\fs01\\prod\\공정\\공정 파라미터 기준_v4.xlsx",
+        "location": "기록!D6",
+        "evidence": "='file:///\\\\fs01\\prod\\공정\\[공정 파라미터 기준_v4.xlsx]기준'!B2"
+       }
+      ],
+      "children": [],
+      "hash": "2da0d38d15b4a20c",
+      "duplicate_of": null
+     }
+    ],
+    "hash": "96097db5d53688f2",
+    "duplicate_of": null
+   }
+  },
+  {
+   "id": "ex-14",
+   "name": "설비 점검표.xlsx",
+   "uploaded_at": "2026-11-12T10:02:00+09:00",
+   "size": 15530,
+   "hash": "718608619d68aa6e",
+   "structure": {
+    "name": "설비 점검표.xlsx",
+    "ext": "XLSX",
+    "size": 15530,
+    "kind": "file",
+    "location": "",
+    "detected": "xlsx",
+    "flags": [],
+    "stats": {
+     "sheets": 1
+    },
+    "links": [],
+    "children": [],
+    "hash": "718608619d68aa6e",
+    "duplicate_of": null
+   }
+  },
+  {
+   "id": "ex-15",
+   "name": "설비 점검표.xlsx",
+   "uploaded_at": "2026-11-12T10:21:00+09:00",
+   "size": 16104,
+   "hash": "c1515d439404f0a8",
+   "structure": {
+    "name": "설비 점검표.xlsx",
+    "ext": "XLSX",
+    "size": 16104,
+    "kind": "file",
+    "location": "",
+    "detected": "xlsx",
+    "flags": [],
+    "stats": {
+     "sheets": 1
+    },
+    "links": [],
+    "children": [],
+    "hash": "c1515d439404f0a8",
+    "duplicate_of": null
+   }
+  },
+  {
+   "id": "ex-16",
+   "name": "점검기준표_v2.xlsx",
+   "uploaded_at": "2026-10-28T13:10:00+09:00",
+   "size": 27640,
+   "hash": "b48c8193cbef3f7d",
+   "structure": {
+    "name": "점검기준표_v2.xlsx",
+    "ext": "XLSX",
+    "size": 27640,
+    "kind": "file",
+    "location": "",
+    "detected": "xlsx",
+    "flags": [],
+    "stats": {
+     "sheets": 3
+    },
+    "links": [
+     {
+      "kind": "doc-number",
+      "target": "SOP-QC-0040 Rev.4",
+      "location": "기준!A2",
+      "evidence": "근거 문서 SOP-QC-0040 Rev.4"
+     }
+    ],
+    "children": [],
+    "hash": "b48c8193cbef3f7d",
+    "duplicate_of": null
+   }
+  },
+  {
+   "id": "ex-17",
+   "name": "점검기준표_v2 (1).xlsx",
+   "uploaded_at": "2026-11-09T08:33:00+09:00",
+   "size": 27640,
+   "hash": "b48c8193cbef3f7d",
+   "structure": {
+    "name": "점검기준표_v2 (1).xlsx",
+    "ext": "XLSX",
+    "size": 27640,
+    "kind": "file",
+    "location": "",
+    "detected": "xlsx",
+    "flags": [],
+    "stats": {
+     "sheets": 3
+    },
+    "links": [
+     {
+      "kind": "doc-number",
+      "target": "SOP-QC-0040 Rev.4",
+      "location": "기준!A2",
+      "evidence": "근거 문서 SOP-QC-0040 Rev.4"
+     }
+    ],
+    "children": [],
+    "hash": "b48c8193cbef3f7d",
+    "duplicate_of": null
+   }
+  },
+  {
+   "id": "ex-18",
+   "name": "세척 밸리데이션 결과 보고서.hwp",
+   "uploaded_at": "2026-11-13T11:47:00+09:00",
+   "size": 152300,
+   "hash": "ba842698857135f3",
+   "structure": {
+    "name": "세척 밸리데이션 결과 보고서.hwp",
+    "ext": "HWP",
+    "size": 152300,
+    "kind": "file",
+    "location": "",
+    "detected": "hwp",
+    "flags": [
+     "has-images"
+    ],
+    "stats": {
+     "images": 2
+    },
+    "links": [
+     {
+      "kind": "doc-number",
+      "target": "SOP-QC-0040 Rev.5",
+      "location": "Section0 문단 6",
+      "evidence": "SOP-QC-0040 Rev.5에 따른 세척 밸리데이션 결과"
+     },
+     {
+      "kind": "doc-number",
+      "target": "BMR-2026-0842",
+      "location": "Section0 문단 14",
+      "evidence": "대상 배치 BMR-2026-0842"
+     }
+    ],
+    "children": [
+     {
+      "name": "잔류물 분석 데이터.xlsx",
+      "ext": "XLSX",
+      "size": 31750,
+      "kind": "embedded",
+      "location": "BinData/BIN0001.OLE",
+      "detected": "xlsx",
+      "flags": [],
+      "stats": {
+       "sheets": 2,
+       "note": "OLE package"
+      },
+      "links": [],
+      "children": [],
+      "hash": "1fa89583245297f8",
+      "duplicate_of": null
+     }
+    ],
+    "hash": "ba842698857135f3",
+    "duplicate_of": null
+   }
+  },
+  {
+   "id": "ex-19",
+   "name": "세척 밸리데이션 결과 보고서.pdf",
+   "uploaded_at": "2026-11-13T11:52:00+09:00",
+   "size": 508211,
+   "hash": null,
+   "structure": null
+  },
+  {
+   "id": "ex-20",
+   "name": "품질 매뉴얼_개정2.hwp",
+   "uploaded_at": "2026-04-01T09:00:00+09:00",
+   "size": 640120,
+   "hash": null,
+   "structure": null
+  },
+  {
+   "id": "ex-21",
+   "name": "품질 매뉴얼_개정3.hwp",
+   "uploaded_at": "2026-10-15T09:00:00+09:00",
+   "size": 655804,
+   "hash": null,
+   "structure": null
+  }
+ ]
+}

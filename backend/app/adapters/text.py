@@ -11,7 +11,7 @@ class TextAdapter:
     def __init__(self, settings: Settings):
         self.settings = settings
 
-    def parse(self, path: Path, extension: str) -> ParsedDocument:
+    def read_source(self, path: Path) -> str:
         if path.stat().st_size > self.settings.max_text_bytes:
             raise ParserError("텍스트 파일이 이 미리보기의 크기 제한을 초과했습니다.")
         raw = path.read_bytes()
@@ -19,12 +19,14 @@ class TextAdapter:
             raise ParserError("텍스트로 읽을 수 없는 데이터가 포함되어 있습니다.")
         for encoding in ("utf-8-sig", "cp949"):
             try:
-                content = raw.decode(encoding)
-                break
+                return raw.decode(encoding)
             except UnicodeDecodeError:
                 continue
         else:
             raise ParserError("문자 인코딩을 확인할 수 없습니다. UTF-8 또는 CP949 파일이 필요합니다.")
+
+    def parse(self, path: Path, extension: str) -> ParsedDocument:
+        content = self.read_source(path)
         parser = "python-text"
         if extension == "CSV":
             content = self._csv_to_markdown(content)

@@ -2,9 +2,16 @@
 export type LiveStatus = 'uploaded' | 'processing' | 'completed' | 'failed' | 'unsupported';
 export type LiveDoc = { id: string; name: string; format: string; size_bytes: number; status: LiveStatus; created_at: string; updated_at: string; parser: string | null; error: string | null };
 export type LiveResult = { id: string; markdown: string; parser: string; parser_version: string; is_stale: boolean; warnings: string[] };
+export type ResultLocation = { start_line: number; end_line: number; page: number | null; start_offset?: number | null; end_offset?: number | null; sheet: string | null; row: number | null; column: number | null; columns: number | null };
+export type ParseRun = { run_id: string; completed_at: string | null; parser: string | null; parser_version: string | null; ocr_enabled: boolean | null; is_latest: boolean; duration_ms?: number | null };
+export type StoredParseRun = ParseRun & { markdown: string; warnings: string[]; locations: ResultLocation[] };
+export type SourcePreview =
+ | { kind: 'text'; text: string; truncated: boolean }
+ | { kind: 'sheet'; sheets: string[]; sheet: string; first_row: number; cell: string; columns: string[]; rows: string[][] };
 
 const DOCUMENTS_URL = '/api/live/documents';
 const documentUrl = (id:string) => `${DOCUMENTS_URL}/${encodeURIComponent(id)}`;
+export const liveSourceUrl = (id: string) => `${documentUrl(id)}/source`;
 
 async function readResponse<T>(response:Response):Promise<T> {
  if (!response.ok) {
@@ -15,10 +22,26 @@ async function readResponse<T>(response:Response):Promise<T> {
  return await response.json() as T;
 }
 
-export async function listLiveDocuments():Promise<LiveDoc[]> {
- const body = await readResponse<{documents:LiveDoc[]}>(await fetch(DOCUMENTS_URL));
+export async function listLiveDocuments(signal?: AbortSignal):Promise<LiveDoc[]> {
+ const body = await readResponse<{documents:LiveDoc[]}>(await (signal ? fetch(DOCUMENTS_URL, {signal}) : fetch(DOCUMENTS_URL)));
  if(!Array.isArray(body.documents))throw new Error('문서 목록의 응답 형식을 확인할 수 없습니다.');
  return body.documents;
+}
+
+export async function listParseRuns(id: string, signal: AbortSignal): Promise<ParseRun[]> {
+ const body = await readResponse<{runs: ParseRun[]}>(await fetch(`${documentUrl(id)}/runs`, {signal}));
+ return body.runs;
+}
+
+export async function getParseRun(id: string, runId: string, signal: AbortSignal): Promise<StoredParseRun> {
+ return readResponse<StoredParseRun>(await fetch(`${documentUrl(id)}/runs/${encodeURIComponent(runId)}`, {signal}));
+}
+
+export async function getSourcePreview(id: string, signal: AbortSignal, sheet?: string, cell?: string): Promise<SourcePreview> {
+ const params = new URLSearchParams();
+ if (sheet) params.set('sheet', sheet);
+ if (cell) params.set('cell', cell);
+ return readResponse<SourcePreview>(await fetch(`${documentUrl(id)}/source-preview?${params}`, {signal}));
 }
 
 export async function getLiveDocument(id:string, signal:AbortSignal):Promise<LiveDoc> {

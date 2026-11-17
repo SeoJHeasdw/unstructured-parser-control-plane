@@ -143,6 +143,19 @@ def test_previous_success_is_available_during_and_after_failed_retry(client, mon
     replaced = client.get(f'/api/live/documents/{doc_id}/result').json()
     assert replaced['markdown'] == 'new result' and replaced['parser_version'] == 'new-version'
     assert replaced['parser'] == 'test-parser' and replaced['is_stale'] is False
+    runs = client.get(f'/api/live/documents/{doc_id}/runs').json()['runs']
+    assert [run['is_latest'] for run in runs] == [True, False]
+    assert all(isinstance(run['duration_ms'], int) and run['duration_ms'] >= 0 for run in runs)
+    stored = [client.get(f"/api/live/documents/{doc_id}/runs/{run['run_id']}").json() for run in runs]
+    assert [run['markdown'] for run in stored] == ['new result', original['markdown']]
+    assert [run['parser_version'] for run in stored] == ['new-version', original['parser_version']]
+    assert client.get(f'/api/live/documents/{doc_id}/source-preview').json() == {
+        'kind': 'text', 'text': 'last good result', 'truncated': False,
+    }
+    source = client.get(f'/api/live/documents/{doc_id}/source')
+    assert source.content == b'last good result' and 'attachment' in source.headers['content-disposition']
+    other = upload(client, 'other.txt', b'other').json()['id']
+    assert client.get(f"/api/live/documents/{other}/runs/{runs[0]['run_id']}").status_code == 404
 
 
 def test_pdf_warning_contract_without_real_pdf(client, monkeypatch):
@@ -177,6 +190,10 @@ def test_existing_database_migrates_without_losing_result(tmp_path):
         assert result['markdown'] == 'previous result'
         assert result['parser'] == 'docling' and result['parser_version'] == '2.150.0'
         assert result['warnings'] == [PDF_OCR_WARNING] and result['is_stale'] is False
+        runs = client.get(f'/api/live/documents/{doc_id}/runs').json()['runs']
+        assert [run['run_id'] for run in runs] == ['b' * 32]
+        legacy = client.get(f"/api/live/documents/{doc_id}/runs/{runs[0]['run_id']}").json()
+        assert legacy['markdown'] == 'previous result' and legacy['ocr_enabled'] is None and legacy['locations'] == []
         client.app.state.documents.begin(doc_id)
     with TestClient(create_app(settings)) as client:
         result = client.get(f'/api/live/documents/{doc_id}/result').json()

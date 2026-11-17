@@ -164,6 +164,7 @@ function EdgeDesign({ flow, edge, onEdgeData, onInsert, onReverse, onRemove, onS
 /* ---------- 운영 모드 ---------- */
 type MonitorProps = {
   library: FlowLibrary; flow: FlowDoc; node?: FlowNode; snapshot: SimSnapshot; sim: FlowSimulator; metrics: Record<string, NodeMetric | undefined>;
+  attention: ReturnType<typeof getAttentionStages>;
   onNavigate: (flowId: string, nodeId?: string) => void; onNodeData: (id: string, patch: Partial<FlowNodeData>) => void;
 };
 export function MonitorInspector(props: MonitorProps) {
@@ -183,24 +184,27 @@ function reason(metric: NodeMetric) {
   return `대기 ${metric.queued}건`;
 }
 
-function Overview({ library, snapshot, onNavigate }: MonitorProps) {
-  const t = snapshot.totals;
-  const attention = Object.entries(snapshot.metrics).filter(([, metric]) => metric.status === 'error' || metric.status === 'warn' || metric.status === 'paused').map(([id, metric]) => ({ id, metric, ...nodeLabel(library, id) }))
-    .sort((a, b) => ({ error: 0, warn: 1, paused: 2 } as Record<string, number>)[a.metric.status] - ({ error: 0, warn: 1, paused: 2 } as Record<string, number>)[b.metric.status] || (b.metric.failed + b.metric.held + b.metric.queued) - (a.metric.failed + a.metric.held + a.metric.queued));
+const ATTENTION_PRIORITY = { error: 0, warn: 1, paused: 2, idle: 3, busy: 3 };
+
+export function getAttentionStages(library: FlowLibrary, metrics: SimSnapshot['metrics'], flowId: string) {
+  return Object.entries(metrics)
+    .filter(([id, metric]) => ATTENTION_PRIORITY[metric.status] < 3 && (flowId === OVERVIEW_ID || splitRid(id).flowId === flowId))
+    .map(([id, metric]) => ({ id, metric, ...nodeLabel(library, id) }))
+    .sort((a, b) => ATTENTION_PRIORITY[a.metric.status] - ATTENTION_PRIORITY[b.metric.status]
+      || (b.metric.failed + b.metric.held + b.metric.queued) - (a.metric.failed + a.metric.held + a.metric.queued));
+}
+
+function Overview({ library, flow, snapshot, attention, onNavigate }: MonitorProps) {
   const actions = snapshot.events.filter(event => event.level === 'action').slice(0, 5);
   return <div className="fi-body">
-    <div className="fi-head"><span className="fi-kicker">운영 요약 · {snapshot.clock}</span><h3>{snapshot.running ? '흐름 진행 중' : '전체 일시정지됨'}</h3><p>노드를 선택하면 그 단계의 문서와 개입 도구가 열립니다.</p></div>
-    <div className="fi-kpis">
-      <div><span>유입</span><b>{t.arrivalsPerMin}<small>/분</small></b></div>
-      <div><span>완료</span><b>{t.completedPerMin}<small>/분</small></b></div>
-      <div><span>처리 중</span><b>{t.processing}</b></div>
-      <div><span>대기</span><b>{t.queued}</b></div>
-      <div className={t.held ? 'is-warn' : ''}><span>보류</span><b>{t.held}</b></div>
-      <div className={t.failed ? 'is-error' : ''}><span>실패</span><b>{t.failed}</b></div>
-    </div>
-    <Section title="주의가 필요한 단계" aside={<span className={`fi-badge ${attention.length ? 'is-warn' : 'is-ok'}`}>{attention.length}</span>}>
-      {attention.length ? <ul className="fi-attention">{attention.slice(0, 12).map(item => <li key={item.id}><button onClick={() => onNavigate(item.flowId, item.nodeId)}><i className={`fx-dot is-${item.metric.status}`} /><span><b>{item.label}</b><small>{item.flowId === OVERVIEW_ID ? '전체 흐름' : library.flows[item.flowId]?.title}</small></span><em className={`is-${item.metric.status}`}>{reason(item.metric)}</em></button></li>)}</ul> : <p className="fi-muted">지연·실패·보류된 단계가 없습니다.</p>}
-    </Section>
+    <div className="fi-head"><h3>주의가 필요한 단계</h3></div>
+    {attention.length ? <ul className="fi-attention">{attention.map(item => <li key={item.id}>
+      <button onClick={() => onNavigate(item.flowId, item.nodeId)}>
+        <i className={`fx-dot is-${item.metric.status}`} />
+        <span><b>{item.label}</b>{flow.id === OVERVIEW_ID && <small>{library.flows[item.flowId]?.title}</small>}</span>
+        <em className={`is-${item.metric.status}`}>{reason(item.metric)}</em>
+      </button>
+    </li>)}</ul> : <p className="fi-muted">이 흐름에는 확인이 필요한 단계가 없습니다.</p>}
     <Section title="최근 개입">{actions.length ? <ul className="fi-events">{actions.map(event => <li key={event.id}><time>{event.clock}</time><span>{event.text.replace(/^운영자 · /, '')}</span></li>)}</ul> : <p className="fi-muted">아직 개입 기록이 없습니다.</p>}</Section>
   </div>;
 }

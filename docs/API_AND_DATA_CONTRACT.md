@@ -1,6 +1,6 @@
 # API·데이터 계약: 현재 로컬 프로토타입
 
-> **기준: 2026-11-12 현재 코드.** 이 문서는 합의된 고객사 운영 계약이나 향후 시스템 규격이 아니라, 다른 세션에서 현재 코드를 안전하게 이어가기 위한 관찰 기록이다. 구현이 바뀌면 코드·테스트와 이 문서를 함께 갱신한다. 미래에 필요한 계약은 마지막 절에 별도로 둔다.
+> **기준: 2026-11-17 현재 코드.** 이 문서는 합의된 고객사 운영 계약이나 향후 시스템 규격이 아니라, 다른 세션에서 현재 코드를 안전하게 이어가기 위한 관찰 기록이다. 구현이 바뀌면 코드·테스트와 이 문서를 함께 갱신한다. 미래에 필요한 계약은 마지막 절에 별도로 둔다.
 
 ## 1. 경계와 용어
 
@@ -9,6 +9,7 @@
 - **실제 로컬 경로:** `POST /api/live/documents`로 선택한 파일 바이트가 서버로 전송되어 로컬에 저장된다. 파싱은 업로드와 별개인 `POST .../{id}/process` 요청을 받은 후에만 시작된다. 실제 문서 목록·결과는 Mock 목록이나 Mock 대시보드에 자동 반영되지 않는다.
 - 다음 표의 **문서**는 실제 로컬 경로의 `LiveDocument`다. 파일에서 확인한 확장자에 따른 처리 후보일 뿐, 파일 내용·품질·문서 업무 분류가 검증됐다는 뜻은 아니다.
 - 런타임은 단일 로컬 서버·단일 사용자용 실험 구성이다. 접근 제어, 다중 사용자·원천 연동·영속 작업 큐·검색 인덱스·게이트웨이 API는 현재 구현 범위가 아니다.
+- **검색 준비 경로(2026-11-17 추가):** `/api/retrieval`(청킹 벤치·임베딩 평가)과 `/api/vectordb`(Milvus 조회)는 측정·확인용이다. 색인을 만들거나 Milvus에 쓰지 않는다. 임베딩 모델 호출은 사용자가 토큰 측정이나 평가 실행을 누를 때만 나가고, Milvus에는 연결이 설정돼 있을 때 조회 요청만 보낸다. 문서 계보(`/api/lineage`)는 저장된 구조 분석 결과로 계산만 한다.
 
 ## 2. 경로 요약
 
@@ -21,11 +22,28 @@
 | `GET /api/live/documents/{id}` | 해당 문서 상태 | `200`, `LiveDocument` | `404` ID 형식이 틀렸거나 없는 문서 |
 | `POST /api/live/documents/{id}/process` | 기존 원본에 대한 처리 요청. 요청 바디 불필요 | `202`, 접수 시 `status: "processing"` | `404` 문서 없음, `409` 이미 처리/대기 중, `503` 대기열 만석 또는 작업자 사용 불가 |
 | `GET /api/live/documents/{id}/result` | 마지막 성공 결과 | `200`, `ParseResult` | `404` 문서 없음, `409` 성공 결과 없음 **또는 결과 포인터·파일·메타데이터 오류** |
+| `GET /api/live/documents/{id}/runs` | 같은 원본의 성공 실행 이력. 실행마다 파서·버전·OCR 여부와 처리 시간 `duration_ms`(2026-11-17부터 기록, 이전 실행은 `null`) | `200`, `{ "runs": [...] }` | `404` 문서 없음 |
+| `GET /api/live/documents/{id}/runs/{run_id}` | 선택한 성공 실행의 Markdown·경고·위치 | `200`, `StoredParseRun` | `404` 문서 또는 실행 없음, `409` 결과 읽기 오류 |
+| `GET /api/live/documents/{id}/source` | 저장된 원본 | `200`, PDF는 인라인, 나머지는 첨부 다운로드 | `404` 문서 없음, `409` 원본 오류 |
+| `GET /api/live/documents/{id}/source-preview` | 텍스트 첫 60,000자 또는 XLSX의 `sheet`·`cell` 주변 값 | `200`, `kind`가 `text` 또는 `sheet` | `404` 문서 없음, `409` 미지원 또는 원본 오류 |
 | `GET /api/live/documents/{id}/history` | 상태 변경·접수 실패 이벤트 | `200`, `{ "id": ..., "history": [...] }` | `404` 문서 없음 |
 | `POST /api/live/documents/{id}/structure` | 원본 구조 분석(하위 문서·링크·플래그). 원본·처리 상태는 바꾸지 않고 `runtime/structure/{id}.json`에 저장 | `200`, `{id,name,format,inspected_at,root,summary}` | `404` 문서 없음, `409` 저장 경로 확인 불가, `403` 허용되지 않은 Origin |
 | `GET /api/live/documents/{id}/structure` | 마지막 구조 분석 결과 | `200` | `404` 문서 없음, `409` 분석 결과 없음·읽기 실패 |
 | `GET /api/live/structure-summary` | 분석한 문서 전체 합계: 원본 대비 발견 문서 배율, 최대 깊이, 링크·하위 문서·플래그 종류별 수 | `200` | |
 | `GET /api/models`, `POST /api/models/{key}/test`, `POST /api/models/{key}/models` | `.env`의 모델 연결 상태(키 값 제외), 사용자가 누를 때만 짧은 채팅 요청·모델 목록 조회 | `200` | `404` 연결 없음, `409` 미설정, `403` 허용되지 않은 Origin |
+| `GET /api/lineage?source=live\|example` | 문서 계보(판 묶음·최신 판단·포함·참조 연결 상태). `live`는 업로드 목록과 **이미 실행해 둔** 구조 분석 결과만 읽고 분석·파싱을 새로 시작하지 않는다. `example`은 `mock-data/lineage-example.json`으로 계산한다 | `200`, `LineageData` | `400` 출처 값 오류, `503` 예시 파일 읽기 실패 |
+| `GET /api/retrieval/config` | 임베딩 연결(`EMBED_*`와 주소가 있는 `MODEL_*`·`MODEL2_*`, 키 값 제외), 모델 사양, 청킹 전략 설명, 요청 한도, 벡터 캐시 크기 | `200` | `403` 허용되지 않은 Origin(이하 `/api/retrieval`, `/api/vectordb` 공통) |
+| `GET /api/retrieval/documents`, `GET /api/retrieval/samples` | 청킹 원문 후보: 성공 결과가 있는 실제 문서 / 합성 예시 3종(`sop` 절차서, `report` 그림 많은 점검 보고서, `coa` 표 많은 시험 성적서)과 요소 구성 | `200` | |
+| `POST /api/retrieval/chunk` | `{source: {doc_id} · {sample} · {text,name}, strategies(1~6개), limit_tokens}` → 원문 요소 목록(제목·본문·목록·표·그림·캡션·코드·반복 머리말, 쪽)과 전략별 청크·통계·요소별 결과(`outcomes`, `by_kind`). 전략은 기준선 4종(고정·재귀·문장·제목 구조)과 요소 인지·부모-자식·페이지 단위. 외부 호출 없음 | `200` | `400` 원문·전략 오류, `404` 문서 없음, `409` 성공 결과 없음, `413` 원문·청크 수 한도 초과 |
+| `POST /api/retrieval/tokens` | 고른 연결·모델로 표본 텍스트(최대 16개)를 임베딩해 실제 토큰 수·차원을 잰다. **외부 모델 호출** | `200` | `400` 표본 오류, `409` 연결 미설정 |
+| `GET`·`PUT /api/retrieval/questions`, `POST .../questions/parse`, `GET .../questions/export?format=csv\|jsonl` | 평가 질문 세트(질문·정답 문서·정답 구절). `runtime/retrieval/questions.json`에 저장 | `200` | `400` 형식 오류, `409` 저장 파일 읽기 실패 |
+| `POST /api/retrieval/runs` | 문서(실제·`sample:<id>`)·청킹 프리셋·후보 모델·`top_k`로 검색 정확도 평가 시작. 결과는 질문 유형(본문·표·그림)별 지표 포함. 한 번에 하나만 실행. **외부 모델 호출**, 청크 벡터는 `runtime/retrieval/embeddings.sqlite3`에 캐시 | `202`, `Run` | `400` 요청 오류, `409` 다른 평가 실행 중 |
+| `GET /api/retrieval/questions/example` | 합성 예시 문서에 맞춘 예시 질문(본문·표·그림 유형). 저장하지 않음 | `200` | |
+| `POST /api/retrieval/plan` | `{doc_ids, preset, models}` → 고른 청킹으로 나눈 청크 수와 모델별 입력 한도 초과 청크·벡터 용량, 유형별 질문 수. 외부 호출 없음 | `200` | 알 수 없는 문서는 `errors`에 담음 |
+| `GET /api/retrieval/runs/current`, `POST .../runs/current/cancel`, `GET .../runs/current/questions/{index}?combo=` | 진행 상태와 결과, 취소, 질문별 검색 결과. 실행 상태는 메모리에만 있어 서버를 다시 시작하면 사라진다 | `200` | `404` 상세 결과 없음 |
+| `GET /api/vectordb/sources`, `POST /api/vectordb/milvus/check` | 출처(예시 데이터·Milvus)와 연결 설정의 공개 정보(토큰 값 제외), Milvus 연결 확인 | `200` | |
+| `GET /api/vectordb/{source}/tree`, `GET .../collection?db=&name=` | 데이터베이스·컬렉션·파티션 트리, 컬렉션 스키마·인덱스·감지한 필드 역할(텍스트·문서·순서·쪽) | `200` | Milvus 오류의 상태 코드와 메시지를 그대로 전달 |
+| `POST /api/vectordb/{source}/browse`, `/chunk`, `/similar`, `/documents`, `/document` | 청크 조회(필터·파티션·페이지, `offset+limit` 16,384 미만), 청크 상세, 유사 청크, 문서 값 목록, 한 문서의 청크를 순서대로 다시 읽기. **읽기 전용**, 쓰기·삭제 요청 없음 | `200` | `422` 요청 값 오류, Milvus 오류 전달 |
 
 `202`는 요청이 **접수되었다는 뜻**이다. 반환된 스냅샷의 `processing`은 실행 중 **또는 메모리 대기열에서 대기 중**을 뜻하며, 결과가 준비됐음을 의미하지 않는다. 아주 빠른 처리는 응답 후 조회 시 이미 끝나 있을 수 있다. 목록을 다시 조회하거나 상세 문서를 폴링해 최종 상태를 확인한다.
 
@@ -176,7 +194,7 @@ stateDiagram-v2
 |---|---|
 | 원본 파일 | `runtime/uploads/{id}.{소문자 확장자}`. 확장자 없으면 `{id}`. 업로드 중에는 `{id}.part`를 사용 |
 | 문서·이벤트 | `runtime/documents.sqlite3`의 `documents`, `document_events` |
-| 성공 결과 | `runtime/results/{id}-{run_id}.md`. DB의 `result_file`이 현재 공개할 마지막 성공 결과를 가리킴 |
+| 성공 결과 | `runtime/results/{id}-{run_id}.md`. DB의 `result_file`은 마지막 성공 결과를 가리키고, `parse_runs`는 비교할 성공 실행의 메타데이터를 보관 |
 | 서버 잠금 | `runtime/server.lock`. 같은 런타임 디렉터리를 쓰는 중복 서버를 막음 |
 
 `documents`에는 현재 상태·선택 파서 외에 마지막 성공 결과용 `result_file`, `result_parser`, `result_parser_version`, `result_warnings`가 있다. 기존 DB에 없는 결과 메타 컬럼은 시작 시 추가·보완한다. 이미 예전 코드에서 포인터가 사라진 결과를 자동 발견해 복원하는 기능은 없다.

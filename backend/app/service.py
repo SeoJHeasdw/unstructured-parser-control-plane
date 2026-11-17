@@ -2,6 +2,7 @@
 import json
 import logging
 import os
+import time
 from pathlib import Path
 from queue import Empty, Full, Queue
 import re
@@ -10,10 +11,11 @@ from uuid import uuid4
 
 from fastapi import UploadFile
 from app.adapters.base import ParserError, UnsupportedFormat
-from app.adapters.registry import ParserRegistry
+from app.adapters.registry import ParserRegistry, TEXT_FORMATS
 from app.config import Settings
 from app.filelock import try_lock, unlock
 from app.repository import DocumentRepository, now
+from app.source_preview import worksheet_preview
 from app.structure import inspect_file
 
 logger = logging.getLogger(__name__)
@@ -23,6 +25,7 @@ _RESULT_NAME = re.compile(r"^[0-9a-f]{32}-[0-9a-f]{32}\.md$")
 PDF_OCR_WARNING = "OCR 미적용: 스캔·이미지 페이지 내용 누락 가능"
 
 class MissingDocument(Exception): pass
+class MissingRun(Exception): pass
 class Conflict(Exception): pass
 class QueueUnavailable(Exception): pass
 class TooLarge(Exception): pass
@@ -205,7 +208,9 @@ class DocumentService:
             if source_name != Path(source_name).name or not source_name.startswith(doc_id):
                 raise ParserError("저장된 파일 경로를 확인할 수 없습니다.")
             path = self.settings.uploads / source_name
+            started = time.perf_counter()
             parsed = self.parsers.parse(path, doc["format"])
+            duration_ms = round((time.perf_counter() - started) * 1000)
             result_name = f"{doc_id}-{run_id}.md"
             result_path = self.settings.results / result_name
             temp_path = self.settings.results / f"{doc_id}-{run_id}.tmp"
@@ -214,7 +219,8 @@ class DocumentService:
                 output.write(parsed.markdown)
             os.replace(temp_path, result_path)
             warnings = [PDF_OCR_WARNING] if doc["format"] == "PDF" else []
-            if not self.repo.finish(doc_id, run_id, status="completed", parser=parsed.parser, parser_version=parsed.parser_version, result_file=result_name, error=None, warnings=warnings):
+            if not self.repo.finish(doc_id, run_id, status="completed", parser=parsed.parser, parser_version=parsed.parser_version, result_file=result_name, error=None, warnings=warnings,
+                                    ocr_enabled=parsed.ocr_enabled, locations=[location.model_dump() for location in parsed.locations], duration_ms=duration_ms):
                 result_path.unlink(missing_ok=True)
         except UnsupportedFormat as exc:
             self.repo.finish(doc_id, run_id, status="unsupported", parser=None, parser_version=None, result_file=None, error=str(exc))
@@ -235,6 +241,43 @@ class DocumentService:
         if source_name != Path(source_name).name or not source_name.startswith(doc["id"]):
             raise Conflict("저장된 파일 경로를 확인할 수 없습니다.")
         return self.settings.uploads / source_name
+
+    def original(self, doc_id: str) -> tuple[dict, Path]:
+        doc = self.get(doc_id)
+        path = self._source_path(doc)
+        if not path.is_file():
+            raise Conflict("저장된 원본 파일을 찾을 수 없습니다.")
+        return doc, path
+
+    def source_preview(self, doc_id: str, sheet: str | None, cell: str) -> dict:
+        doc, path = self.original(doc_id)
+        try:
+            if doc["format"] == "XLSX":
+                self.parsers.docling.check_office_archive(path)
+                return worksheet_preview(path, sheet, cell)
+            if doc["format"] in TEXT_FORMATS:
+                text = self.parsers.text.read_source(path)
+                return {"kind": "text", "text": text[:60_000], "truncated": len(text) > 60_000}
+        except ImportError as exc:
+            raise Conflict("워크시트 미리보기에 필요한 선택 의존성이 설치되어 있지 않습니다.") from exc
+        except (ParserError, OSError) as exc:
+            raise Conflict(str(exc) if isinstance(exc, ParserError) else "저장된 원본을 읽을 수 없습니다.") from exc
+        raise Conflict("이 형식은 원본 파일로 열어 확인할 수 있습니다.")
+
+    def parse_runs(self, doc_id: str) -> list[dict]:
+        self.get(doc_id)
+        return self.repo.parse_runs(doc_id)
+
+    def parse_run(self, doc_id: str, run_id: str) -> dict:
+        self.get(doc_id)
+        run = self.repo.parse_run(doc_id, run_id) if _ID.fullmatch(run_id) else None
+        if run is None:
+            raise MissingRun()
+        try:
+            markdown = (self.settings.results / f"{doc_id}-{run_id}.md").read_text(encoding="utf-8")
+            return {**run, "markdown": markdown, "warnings": json.loads(run["warnings"]), "locations": json.loads(run["locations"])}
+        except (OSError, ValueError) as exc:
+            raise Conflict("저장된 실행 결과를 읽을 수 없습니다.") from exc
 
     def inspect(self, doc_id: str) -> dict:
         """원본을 바꾸지 않고 구조(하위 문서·링크)를 분석해 결과를 보관한다. 사용자가 요청할 때만 실행한다."""

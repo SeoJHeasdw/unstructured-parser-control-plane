@@ -1,12 +1,18 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { AlertCircle, Blocks, ChevronDown, FileSearch, FlaskConical, GitBranch, Layers3, LayoutDashboard, PanelLeftClose, PanelLeftOpen, Plus, Server, ShieldCheck, Sparkles, X } from 'lucide-react';
+import { AlertCircle, Blocks, ChevronDown, Database, FileSearch, FlaskConical, Gauge, GitBranch, Layers3, LayoutDashboard, Network, PanelLeftClose, PanelLeftOpen, Plus, Scissors, Server, Sparkles, Waypoints, X } from 'lucide-react';
 import Dashboard from './Dashboard';
 import PipelineStudio from './PipelineStudio';
 import LiveWorkspace from './LiveWorkspace';
 import ModelWorkspace from './ModelWorkspace';
+import LineageView from './LineageView';
+import ChunkBench from './ChunkBench';
+import EmbeddingEval from './EmbeddingEval';
+import VectorDbWorkspace from './VectorDbWorkspace';
+import SearchPipeline from './SearchPipeline';
 import { FlowSimulator } from './flow/flowSim';
 import { loadLibrary } from './flow/flowTemplates';
-import { DocumentBrowser, DocumentDrawer, CompareView, RelationsView } from './DocumentViews';
+import { DocumentBrowser, DocumentDrawer, CompareView } from './DocumentViews';
+import type { CompareSource } from './CompareView';
 import type { AppData, DocumentFilter, DocumentItem, Page } from './types';
 
 const pages: Record<Page, {label: string; title: string; description: string; icon: React.ElementType}> = {
@@ -15,15 +21,22 @@ const pages: Record<Page, {label: string; title: string; description: string; ic
   pipeline: {label:'처리 파이프라인',title:'처리 파이프라인',description:'처리 흐름을 운영하고 설계합니다.',icon:GitBranch},
   live: {label:'실제 파일 처리',title:'실제 파일 처리',description:'파일을 로컬에 저장하고 실제 파싱을 실행합니다.',icon:Server},
   compare: {label:'파싱 비교',title:'파싱 비교',description:'원문과 파서 결과의 차이를 나란히 확인합니다.',icon:FlaskConical},
-  relations: {label:'문서 관계',title:'문서 관계',description:'문서 간 참조와 근거 위치를 탐색합니다.',icon:Layers3},
+  relations: {label:'문서 계보',title:'문서 계보',description:'어떤 파일이 최신인지, 무엇을 담고 있고 무엇을 가리키는지 계층으로 봅니다.',icon:Network},
+  search: {label:'검색 파이프라인',title:'검색 파이프라인',description:'search 엔드포인트가 질의를 받아 근거를 돌려주기까지의 구상을 한 장으로 봅니다.',icon:Waypoints},
+  chunking: {label:'청킹 벤치',title:'청킹 벤치',description:'문서가 본문·표·그림으로 어떻게 나뉘고, 전략마다 어떤 청크가 되는지 비교합니다.',icon:Scissors},
+  embedding: {label:'임베딩 평가',title:'임베딩 평가',description:'여러 임베딩 모델을 본문·표·그림 질문별 검색 정확도와 입력 한도로 비교합니다.',icon:Gauge},
+  vectordb: {label:'벡터 DB',title:'벡터 DB',description:'컬렉션·파티션 구성과 저장된 청크를 사람이 읽을 수 있는 형태로 확인합니다.',icon:Database},
   models: {label:'모델 연결',title:'모델 연결',description:'서버에 설정된 모델 주소와 연결 상태를 확인합니다.',icon:Blocks},
 };
-const GROUP_LABEL: Record<string,string> = {MONITOR:'모니터링',WORKSPACE:'작업',SYSTEM:'시스템'};
+const GROUP_LABEL: Record<string,string> = {MONITOR:'모니터링',WORKSPACE:'문서 처리',RETRIEVAL:'검색 준비',SYSTEM:'시스템'};
 const groups: {label:string; ids:Page[]}[] = [
   {label:'MONITOR',ids:['overview','documents']},
   {label:'WORKSPACE',ids:['pipeline','live','compare','relations']},
+  {label:'RETRIEVAL',ids:['search','chunking','embedding','vectordb']},
   {label:'SYSTEM',ids:['models']},
 ];
+/** 예시(Mock) 데이터로 그리는 화면. 나머지 화면은 각자 데이터 출처를 표시한다. */
+const MOCK_PAGES = new Set<Page>(['overview','documents','pipeline']);
 const supportedDemo = new Set(['PDF','XLSX','XLS','XLSM','DOC','DOCX','DOCM','PPT','PPTX','PNG','JPG','JPEG','TIFF','HWP','HWPX','EML','ZIP','TXT','CSV','HTM','HTML','MHT','LOG']);
 const getFormat = (name:string) => { const filename=name.split(/[\\/]/).pop() || ''; const i=filename.lastIndexOf('.'); return i<=0 || i===filename.length-1 ? '확장자 없음' : filename.slice(i+1).toUpperCase(); };
 const fileSize = (size:number) => size >= 1048576 ? `${(size/1048576).toFixed(1)} MB` : `${Math.max(1,Math.ceil(size/1024))} KB`;
@@ -31,8 +44,10 @@ const fileSize = (size:number) => size >= 1048576 ? `${(size/1048576).toFixed(1)
 export default function App() {
   const [data,setData]=useState<AppData|null>(null); const [error,setError]=useState(false); const [mockAttempt,setMockAttempt]=useState(0);
   const [active,setActive]=useState<Page>(()=>new URLSearchParams(window.location.search).get('view')==='pipeline'?'pipeline':'overview'); const [tabs,setTabs]=useState<Page[]>(()=>new URLSearchParams(window.location.search).get('view')==='pipeline'?['overview','pipeline']:['overview']);
-  const [sidebarOpen,setSidebarOpen]=useState(()=>typeof window==='undefined'||window.innerWidth>=1000); const [groupsOpen,setGroupsOpen]=useState<Record<string,boolean>>({MONITOR:true,WORKSPACE:true,SYSTEM:true});
+  const [sidebarOpen,setSidebarOpen]=useState(()=>typeof window==='undefined'||window.innerWidth>=1000); const [groupsOpen,setGroupsOpen]=useState<Record<string,boolean>>({MONITOR:true,WORKSPACE:true,RETRIEVAL:true,SYSTEM:true});
   const [documentFilter,setDocumentFilter]=useState<DocumentFilter>({}); const [pipelineFormat,setPipelineFormat]=useState<string|undefined>(undefined); const [pipelineRequest,setPipelineRequest]=useState(0); const [selected,setSelected]=useState<string|null>(null); const [compareId,setCompareId]=useState<string>('DOC-0842');
+  const [compareSource, setCompareSource] = useState<CompareSource>('sample');
+  const [liveCompareId, setLiveCompareId] = useState('');
   const [simulator]=useState(()=>new FlowSimulator(loadLibrary())); const [pipelineFocus,setPipelineFocus]=useState<{flowId:string;nodeId?:string;n:number}|undefined>(undefined);
   const [fileNotice,setFileNotice]=useState(''); const fileInput=useRef<HTMLInputElement>(null);
   useEffect(()=>{let alive=true; fetch('/api/data').then(r=>{if(!r.ok)throw Error();return r.json()}).then((payload:AppData)=>{if(alive){setData(payload);setError(false)}}).catch(()=>{if(alive)setError(true)});return()=>{alive=false}},[mockAttempt]);
@@ -49,27 +64,33 @@ export default function App() {
   const unknownCount=data?.documents.filter(d=>d.status==='형식 확인 필요').length;
   return <div className={'shell-root '+(!sidebarOpen?'shell-collapsed':'')}>
     <aside className="shell-sidebar" aria-label="주 탐색 메뉴">
-      <div className="shell-brand"><div className="shell-mark"><Layers3 size={18}/></div>{sidebarOpen&&<div className="shell-brand-text"><strong>비정형 리뷰</strong><small>Unstructured Review</small></div>}<button className="shell-sidebar-toggle" onClick={()=>setSidebarOpen(!sidebarOpen)} aria-label={sidebarOpen?'사이드바 접기':'사이드바 펼치기'} title={sidebarOpen?'사이드바 접기':'사이드바 펼치기'}>{sidebarOpen?<PanelLeftClose size={17}/>:<PanelLeftOpen size={17}/>}</button></div>
+      <div className="shell-brand"><div className="shell-mark"><Layers3 size={18}/></div>{sidebarOpen&&<div className="shell-brand-text"><strong>비정형 관리 콘솔</strong><small>Unstructured Console</small></div>}<button className="shell-sidebar-toggle" onClick={()=>setSidebarOpen(!sidebarOpen)} aria-label={sidebarOpen?'사이드바 접기':'사이드바 펼치기'} title={sidebarOpen?'사이드바 접기':'사이드바 펼치기'}>{sidebarOpen?<PanelLeftClose size={17}/>:<PanelLeftOpen size={17}/>}</button></div>
       <nav className="shell-nav">{groups.map(group=><div className="shell-nav-group" key={group.label}>{sidebarOpen&&<button className="shell-group-label" onClick={()=>setGroupsOpen({...groupsOpen,[group.label]:!groupsOpen[group.label]})} aria-expanded={groupsOpen[group.label]}><span>{GROUP_LABEL[group.label]}</span><ChevronDown className={!groupsOpen[group.label]?'shell-chevron-closed':''} size={13}/></button>}{(!sidebarOpen||groupsOpen[group.label])&&group.ids.map(id=>{const I=pages[id].icon;return <button key={id} className={'shell-nav-item '+(active===id?'is-active':'')} onClick={()=>navigate(id)} title={pages[id].label} aria-label={pages[id].label} aria-current={active===id?'page':undefined}><I size={17}/>{sidebarOpen&&<span>{pages[id].label}</span>}{sidebarOpen&&id==='pipeline'&&unknownCount!==undefined&&unknownCount>0&&<em title="경로 확인이 필요한 형식">{unknownCount}</em>}</button>})}</div>)}</nav>
     </aside>
     <main className="shell-main">
       <header className="shell-tabbar" aria-label="열린 작업 탭">{tabs.map((page,index)=>{const I=pages[page].icon;return <div className={'shell-worktab '+(page===active?'is-current':'')} key={page}><button onClick={()=>setActive(page)} aria-current={page===active?'page':undefined}><I size={15}/><span>{pages[page].label}</span></button>{index>0&&<button className="shell-tab-close" aria-label={`${pages[page].label} 탭 닫기`} onClick={()=>closeTab(page)}><X size={13}/></button>}</div>})}<span className="shell-tab-end"/>
-        <div className="shell-top-right">{active!=='models'&&<span className={'shell-live '+(active==='live'?'is-real':'')} title={active==='live'?'로컬 서버에 실제 파일을 저장하고 처리합니다':'예시 데이터로 구성한 화면입니다'}><i/> {active==='live'?'실제 파일 · 로컬 처리':'예시 데이터'}</span>}{active!=='live'&&active!=='models'&&<button className="shell-add" aria-label="문서 추가 시뮬레이션" title="파일 이름·형식·크기만 예시 목록에 추가합니다" disabled={!data} onClick={()=>fileInput.current?.click()}><Plus size={15}/> <span>문서 추가</span></button>}</div>
+        <div className="shell-top-right">{(MOCK_PAGES.has(active)||active==='live')&&<span className={'shell-live '+(active==='live'?'is-real':'')} title={active==='live'?'로컬 서버에 실제 파일을 저장하고 처리합니다':'예시 데이터로 구성한 화면입니다'}><i/> {active==='live'?'실제 파일 · 로컬 처리':'예시 데이터'}</span>}{MOCK_PAGES.has(active)&&active!=='pipeline'&&<button className="shell-add" aria-label="문서 추가 시뮬레이션" title="파일 이름·형식·크기만 예시 목록에 추가합니다" disabled={!data} onClick={()=>fileInput.current?.click()}><Plus size={15}/> <span>문서 추가</span></button>}</div>
       </header>
       <div className={'shell-content'+(active==='pipeline'?' is-fill':'')}>
-        {active!=='pipeline'&&<div className="shell-title-row"><div><h1>{pages[active].title}</h1><p>{pages[active].description}</p></div>{active!=='live'&&active!=='models'&&<div className="shell-title-right">{data?`기준 ${data.asOf}`:error?'예시 데이터 오류':'예시 데이터 불러오는 중'}</div>}</div>}
-        {fileNotice&&active!=='live'&&active!=='pipeline'&&<div className="shell-notice" role="status"><Sparkles size={16}/><span>{fileNotice}</span><button onClick={()=>setFileNotice('')} aria-label="안내 닫기"><X size={15}/></button></div>}
+        {active!=='pipeline'&&<div className="shell-title-row"><div><h1>{pages[active].title}</h1><p>{pages[active].description}</p></div>{MOCK_PAGES.has(active)&&<div className="shell-title-right">{data?`기준 ${data.asOf}`:error?'예시 데이터 오류':'예시 데이터 불러오는 중'}</div>}</div>}
+        {fileNotice&&MOCK_PAGES.has(active)&&active!=='pipeline'&&<div className="shell-notice" role="status"><Sparkles size={16}/><span>{fileNotice}</span><button onClick={()=>setFileNotice('')} aria-label="안내 닫기"><X size={15}/></button></div>}
         {data&&tabs.includes('overview')&&<div hidden={active!=='overview'}><Dashboard docs={data.documents} onOpenDoc={setSelected} onNavigate={navigate} simulator={simulator} active={active==='overview'} onOpenPipeline={openPipeline}/></div>}
         {data&&tabs.includes('documents')&&<div hidden={active!=='documents'}><DocumentBrowser docs={data.documents} filter={documentFilter} onFilterChange={setDocumentFilter} onOpenDoc={setSelected} onFiles={addFiles} onPickFiles={()=>fileInput.current?.click()} onPipeline={(format)=>navigate('pipeline',{format})}/></div>}
         {tabs.includes('pipeline')&&<div className="shell-fill" hidden={active!=='pipeline'}><PipelineStudio key={pipelineRequest} active={active==='pipeline'} simulator={simulator} focus={pipelineFocus} formats={[...new Set((data?.documents||[]).map(d=>d.format))]} initialFormat={pipelineFormat} onOpenDocuments={(format)=>navigate('documents',{format:format || '확장자 없음'})} onOpenLiveDocuments={()=>navigate('live')}/></div>}
-        {!data&&active!=='live'&&active!=='pipeline'&&<div className="panel shell-loading" role={error?'alert':'status'}>{error?<AlertCircle size={24}/>:<span className="shell-spinner"/>}<div><h2>{error?'예시 데이터를 불러오지 못했어요':'예시 데이터를 불러오는 중입니다'}</h2><p>{error?'예시 데이터 연결을 확인한 뒤 다시 시도해 주세요. 실제 파일 처리 화면은 별도로 이용할 수 있습니다.':'잠시만 기다려 주세요. 실제 파일 처리는 별도로 이용할 수 있습니다.'}</p></div>{error&&<button className="button-secondary" onClick={retryMock}>다시 시도</button>}</div>}
-        {active==='live'&&<LiveWorkspace/>}
-        {data&&tabs.includes('compare')&&<div hidden={active!=='compare'}><CompareView docs={data.documents} selectedId={compareId} onChange={setCompareId} onOpenDoc={setSelected}/></div>}
-        {data&&tabs.includes('relations')&&<div hidden={active!=='relations'}><RelationsView relations={data.relations} onOpenDoc={setSelected}/></div>}
+        {!data&&MOCK_PAGES.has(active)&&active!=='pipeline'&&<div className="panel shell-loading" role={error?'alert':'status'}>{error?<AlertCircle size={24}/>:<span className="shell-spinner"/>}<div><h2>{error?'예시 데이터를 불러오지 못했어요':'예시 데이터를 불러오는 중입니다'}</h2><p>{error?'예시 데이터 연결을 확인한 뒤 다시 시도해 주세요. 실제 파일 처리 화면은 별도로 이용할 수 있습니다.':'잠시만 기다려 주세요. 실제 파일 처리는 별도로 이용할 수 있습니다.'}</p></div>{error&&<button className="button-secondary" onClick={retryMock}>다시 시도</button>}</div>}
+        {active==='live'&&<LiveWorkspace onOpenCompare={id => { setLiveCompareId(id); setCompareSource('live'); navigate('compare'); }}/>}
+        {tabs.includes('compare')&&<div hidden={active!=='compare'}><CompareView docs={data?.documents ?? []} selectedId={compareId} onChange={setCompareId} onOpenDoc={setSelected}
+          source={compareSource} onSourceChange={setCompareSource} liveId={liveCompareId} onLiveChange={setLiveCompareId} active={active==='compare'}
+          sampleStatus={data?'ready':error?'error':'loading'} onRetrySample={retryMock}/></div>}
+        {tabs.includes('relations')&&<div hidden={active!=='relations'}><LineageView active={active==='relations'}/></div>}
+        {tabs.includes('search')&&<div hidden={active!=='search'}><SearchPipeline active={active==='search'} onNavigate={page=>navigate(page)}/></div>}
+        {tabs.includes('chunking')&&<div hidden={active!=='chunking'}><ChunkBench active={active==='chunking'}/></div>}
+        {tabs.includes('embedding')&&<div hidden={active!=='embedding'}><EmbeddingEval active={active==='embedding'}/></div>}
+        {tabs.includes('vectordb')&&<div hidden={active!=='vectordb'}><VectorDbWorkspace active={active==='vectordb'}/></div>}
         {tabs.includes('models')&&<div hidden={active!=='models'}><ModelWorkspace/></div>}
       </div>
     </main>
     <input ref={fileInput} type="file" multiple hidden onChange={e=>{if(e.target.files)addFiles(Array.from(e.target.files));e.target.value=''}} aria-label="문서 파일 선택"/>
-    {current&&data&&<DocumentDrawer doc={current} relations={data.relations} onClose={()=>setSelected(null)} onCompare={()=>{setCompareId(current.id);navigate('compare')}} onPipeline={()=>navigate('pipeline',{format:current.format})}/>}
+    {current&&data&&<DocumentDrawer doc={current} relations={data.relations} onClose={()=>setSelected(null)} onCompare={()=>{setCompareId(current.id);setCompareSource('sample');navigate('compare')}} onPipeline={()=>navigate('pipeline',{format:current.format})}/>}
   </div>
 }

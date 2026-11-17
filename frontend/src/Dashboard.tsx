@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
-import { Activity, AlertCircle, ArrowDown, ArrowRight, ArrowUp, BarChart3, ChevronDown, ChevronUp, CircleHelp, FileCheck2, FileText, GripVertical, LayoutGrid, ListFilter, RotateCcw, Settings2, SlidersHorizontal, Sparkles, Workflow, X } from 'lucide-react';
+import { Activity, AlertCircle, ArrowDown, ArrowRight, ArrowUp, BarChart3, ChevronDown, ChevronUp, CircleHelp, FileCheck2, FileText, GripVertical, LayoutGrid, ListFilter, RotateCcw, Settings2, SlidersHorizontal, Workflow, X } from 'lucide-react';
 import './dashboard.css';
 import LiveFlowPanel from './flow/LiveFlowPanel';
 import type { FlowSimulator } from './flow/flowSim';
@@ -26,8 +26,9 @@ const widgets: WidgetDef[] = [
   { id: 'stages', tab: 'quality', title: '단계별 문서', subtitle: '현재 단계 기준', icon: ListFilter },
 ];
 const allIds = widgets.map(w => w.id);
-const storageKey = 'document-ops-dashboard-layout-v1';
-const initialLayout: Layout = { order: allIds, hidden: [], collapsed: [] };
+const storageKey = 'document-ops-dashboard-layout-v2';
+/** 기본 화면은 가볍게: 처리 흐름과 겹치는 위젯은 숨기고, 보조 위젯은 접어서 한 줄 요약만 보인다. */
+const initialLayout: Layout = { order: allIds, hidden: ['flow', 'stages'], collapsed: ['recent', 'routes', 'sources', 'qualityExceptions', 'ocr'] };
 const isWidget = (value: unknown): value is WidgetId => typeof value === 'string' && allIds.includes(value as WidgetId);
 function loadLayout(): Layout {
   try {
@@ -41,7 +42,7 @@ function loadLayout(): Layout {
 const colors = ['#7567d8', '#5a9db8', '#d3a15c', '#72ac90', '#bf829a', '#9e9ab7', '#6883b6', '#c18468'];
 const statusPalette: Record<string, string> = { '처리 완료': '#49a58c', '처리 중': '#6995d7', '검토 필요': '#d4a24d', '형식 확인 필요': '#df8f5b', '처리 실패': '#d56f70', '대기': '#9a9faf' };
 const attentionStatus = ['검토 필요', '형식 확인 필요', '처리 실패'];
-const tabs: { id: Tab; label: string }[] = [{ id: 'overview', label: '운영 현황' }, { id: 'format', label: '형식 분석' }, { id: 'quality', label: '품질 · 예외' }];
+const tabs: { id: Tab; label: string }[] = [{ id: 'overview', label: '현황' }, { id: 'format', label: '형식' }, { id: 'quality', label: '품질 · 예외' }];
 function countBy(docs: DocumentItem[], key: 'format' | 'source' | 'status' | 'stage') {
   const counts = new Map<string, number>();
   docs.forEach(d => { const value = d[key] || '미확인'; counts.set(value, (counts.get(value) || 0) + 1); });
@@ -84,6 +85,18 @@ export default function Dashboard({ docs, onOpenDoc, onNavigate, simulator, acti
   }
   const formatBars = (max = byFormat.length) => <div className="dash-format-bars">{byFormat.slice(0, max).map(([format, count], i) => <button key={format} className="dash-bar-row" onClick={() => onNavigate('documents', { format })} title={`${format} 문서 보기`}><span className="dash-bar-name"><i style={{ background: colors[i % colors.length] }} />{format}</span><span className="dash-bar-track"><i style={{ width: `${docs.length ? count / docs.length * 100 : 0}%`, background: colors[i % colors.length] }} /></span><b>{count}<small>건</small></b><ChevronDown size={14} className="dash-bar-arrow"/></button>)}{!byFormat.length && <p className="dash-empty">표시할 문서가 없습니다.</p>}</div>;
   const exceptionList = (limit = exceptions.length) => <div className="dash-exception-list">{exceptions.slice(0, limit).map(d => <button className="dash-exception-row" onClick={() => onOpenDoc(d.id)} key={d.id}><span className="dash-exception-icon"><AlertCircle size={16} /></span><span className="dash-exception-text"><strong>{d.name}</strong><small>{d.note}</small></span><Status status={d.status}/><ArrowRight size={15} className="dash-chevron"/></button>)}{!exceptions.length && <p className="dash-empty">확인이 필요한 문서가 없습니다.</p>}</div>;
+  function summary(id: WidgetId): string {
+    switch (id) {
+      case 'flow': case 'stages': return `${byStage.length}개 단계 · 가장 많은 단계 ${byStage[0]?.[0] ?? '-'}`;
+      case 'formats': case 'formatBreakdown': return `${byFormat.length}개 형식 · 가장 많은 형식 ${byFormat[0]?.[0] ?? '-'}`;
+      case 'exceptions': case 'qualityExceptions': return exceptions.length ? `${exceptions.length}건 · ${exceptions[0].name}${exceptions.length > 1 ? ' 외' : ''}` : '확인이 필요한 문서 없음';
+      case 'recent': return `최근 ${Math.min(5, docs.length)}건 · ${docs[0]?.name ?? '-'}`;
+      case 'routes': return `${byFormat.length}개 형식의 처리 경로`;
+      case 'sources': return `${bySource.length}개 원천 · ${bySource[0]?.[0] ?? '-'}`;
+      case 'statusBreakdown': return byStatus.map(([name, count]) => `${name} ${count}`).join(' · ');
+      case 'ocr': return `OCR 적용 ${withOcr} / ${docs.length}건`;
+    }
+  }
   function renderBody(id: WidgetId): ReactNode {
     switch (id) {
       case 'flow': return <><div className="dash-flow">{byStage.map(([stage, count], i) => <div className="dash-flow-step" key={stage}><span className="dash-flow-number">{String(i + 1).padStart(2, '0')}</span><strong>{count}<small>건</small></strong><b>{stage}</b><span className="dash-flow-line"/></div>)}</div><div className="dash-card-foot"><span><i className="dash-live-dot"/>단계별 숫자는 누적 처리량이 아닌 현재 상태입니다.</span><button onClick={() => onNavigate('pipeline')}>파이프라인 열기 <ArrowRight size={14}/></button></div></>;
@@ -100,18 +113,24 @@ export default function Dashboard({ docs, onOpenDoc, onNavigate, simulator, acti
     }
   }
   return <div className="dash-root">
-    <div className="dash-tabs-bar"><div className="dash-tabs" role="tablist" aria-label="대시보드 보기">{tabs.map(t => <button key={t.id} role="tab" aria-selected={tab === t.id} className={tab === t.id ? 'dash-tab-active' : ''} onClick={() => setTab(t.id)}>{t.label}</button>)}</div><button className={'dash-edit-btn '+(editing ? 'dash-edit-active':'')} onClick={() => setEditing(!editing)}><SlidersHorizontal size={15}/>{editing ? '편집 완료' : '위젯 편집'}</button></div>
-    {tab === 'overview' && simulator && onOpenPipeline && <LiveFlowPanel simulator={simulator} active={active} onOpen={onOpenPipeline} />}
-    <div className="dash-subhead"><h2>샘플 문서</h2><span>파싱 결과·문서 관계를 열어 볼 수 있는 예시 {docs.length}건</span></div>
-    <div className="dash-kpis">
-      <button onClick={() => onNavigate('documents')}><span>전체 문서 <FileText size={17}/></span><strong>{docs.length}<small>건</small></strong><em>예시 데이터 전체</em></button>
-      <button onClick={() => onNavigate('documents', {status:'처리 완료'})}><span>처리 완료 <FileCheck2 size={17}/></span><strong>{complete}<small>건</small></strong><em>인덱스 반영 완료</em></button>
-      <button onClick={() => onNavigate('documents', {status:'처리 중'})}><span>처리 중 <Activity size={17}/></span><strong>{running}<small>건</small></strong><em>처리 진행 중</em></button>
-      <button className="dash-kpi-attention" onClick={() => onNavigate('documents', {status:'확인 필요 전체'})}><span>확인 필요 <AlertCircle size={17}/></span><strong>{exceptions.length}<small>건</small></strong><em>검토 · 형식 확인 · 실패</em></button>
-    </div>
-    {editing && <div className="dash-editor"><div><strong><Settings2 size={16}/> 위젯 구성</strong><p>드래그하거나 화살표로 순서를 바꾸고, 필요한 항목만 표시해요. 이 브라우저에만 저장됩니다.</p></div><div className="dash-editor-buttons">{widgets.filter(w => w.tab === tab).map(w => <button className={!layout.hidden.includes(w.id) ? 'dash-editor-on' : ''} key={w.id} onClick={() => toggle('hidden', w.id)} aria-pressed={!layout.hidden.includes(w.id)}>{!layout.hidden.includes(w.id) ? '✓' : '+'} {w.title}</button>)}<button onClick={() => setLayout(initialLayout)}><RotateCcw size={12}/> 초기화</button></div></div>}
-    <div className="dash-section-heading"><div><h2>{tabs.find(t => t.id === tab)?.label}</h2><span>예시 문서 {docs.length}건 기준 · 클릭하여 상세 확인</span></div><span className="dash-instruction"><GripVertical size={14}/> 위젯을 잡고 순서 변경</span></div>
-    <div className="dash-grid">{visible.map((id, index) => { const def = widgets.find(w => w.id === id)!; const isCollapsed = layout.collapsed.includes(id); const Icon = def.icon; return <section key={id} className={'dash-widget '+(def.wide ? 'dash-widget-wide ' : '')+(dragId === id ? 'dash-dragging' : '')} onDragOver={e => { if(dragId && dragId!==id){e.preventDefault();e.dataTransfer.dropEffect='move';} }} onDrop={e => {e.preventDefault();if(dragId)move(dragId,id);setDragId(null)}}><div className="dash-widget-head"><div className="dash-widget-title"><span className="dash-widget-icon"><Icon size={16}/></span><span><h3>{def.title}</h3><small>{def.subtitle}</small></span></div><div className="dash-widget-actions"><button className="dash-drag-handle" draggable onDragStart={e => {setDragId(id);e.dataTransfer.effectAllowed='move';e.dataTransfer.setData('text/plain',id)}} onDragEnd={() => setDragId(null)} title="드래그하여 위젯 순서 변경" aria-label={`${def.title} 순서 변경: 드래그 또는 화살표 사용`}><GripVertical size={16}/></button>{editing && <><button onClick={() => step(id,-1)} disabled={index===0} title="앞으로 이동" aria-label={`${def.title} 앞으로 이동`}><ArrowUp size={14}/></button><button onClick={() => step(id,1)} disabled={index===visible.length-1} title="뒤로 이동" aria-label={`${def.title} 뒤로 이동`}><ArrowDown size={14}/></button><button onClick={() => toggle('hidden',id)} title="숨기기" aria-label={`${def.title} 숨기기`}><X size={14}/></button></>}<button onClick={() => toggle('collapsed',id)} aria-expanded={!isCollapsed} aria-label={`${def.title} ${isCollapsed ? '펼치기':'접기'}`}>{isCollapsed?<ChevronDown size={16}/>:<ChevronUp size={16}/>}</button></div></div>{!isCollapsed && <div className="dash-widget-body">{renderBody(id)}</div>}</section>})}</div>
-    {visible.length===0 && <div className="dash-all-hidden"><CircleHelp size={19}/><b>이 보기에 표시되는 위젯이 없습니다.</b><button onClick={() => setEditing(true)}>위젯 다시 표시</button></div>}
+    {simulator && onOpenPipeline && <LiveFlowPanel simulator={simulator} active={active} onOpen={onOpenPipeline} />}
+    <section className="dash-docs" aria-label="예시 문서 현황">
+      <div className="dash-docs-head">
+        <div className="dash-docs-title"><h2>예시 문서</h2><span title="파싱 결과와 문서 관계를 열어 볼 수 있는 예시 문서입니다. 위 처리 흐름의 모의 수치와는 별개입니다.">{docs.length}건 · 파싱 결과와 관계를 열어 볼 수 있는 예시</span></div>
+        <div className="dash-kpis" role="group" aria-label="예시 문서 요약">
+          <button onClick={() => onNavigate('documents')}><FileText size={13}/>전체 <b>{docs.length}</b>건</button>
+          <button onClick={() => onNavigate('documents', {status:'처리 완료'})}><FileCheck2 size={13}/>완료 <b>{complete}</b>건</button>
+          <button onClick={() => onNavigate('documents', {status:'처리 중'})}><Activity size={13}/>처리 중 <b>{running}</b>건</button>
+          <button className={exceptions.length ? 'dash-kpi-attention' : ''} onClick={() => onNavigate('documents', {status:'확인 필요 전체'})}><AlertCircle size={13}/>확인 필요 <b>{exceptions.length}</b>건</button>
+        </div>
+        <div className="dash-docs-tools">
+          <div className="dash-tabs" role="tablist" aria-label="대시보드 보기">{tabs.map(t => <button key={t.id} role="tab" aria-selected={tab === t.id} className={tab === t.id ? 'dash-tab-active' : ''} onClick={() => setTab(t.id)}>{t.label}</button>)}</div>
+          <button className={'dash-edit-btn '+(editing ? 'dash-edit-active':'')} onClick={() => setEditing(!editing)}><SlidersHorizontal size={14}/>{editing ? '편집 완료' : '위젯 편집'}</button>
+        </div>
+      </div>
+      {editing && <div className="dash-editor"><div><strong><Settings2 size={16}/> 위젯 구성</strong><p>손잡이를 드래그하거나 화살표로 순서를 바꾸고, 필요한 항목만 표시해요. 이 브라우저에만 저장됩니다.</p></div><div className="dash-editor-buttons">{widgets.filter(w => w.tab === tab).map(w => <button className={!layout.hidden.includes(w.id) ? 'dash-editor-on' : ''} key={w.id} onClick={() => toggle('hidden', w.id)} aria-pressed={!layout.hidden.includes(w.id)}>{!layout.hidden.includes(w.id) ? '✓' : '+'} {w.title}</button>)}<button onClick={() => setLayout(initialLayout)}><RotateCcw size={12}/> 초기화</button></div></div>}
+      <div className={'dash-grid'+(editing ? ' is-editing' : '')}>{visible.map((id, index) => { const def = widgets.find(w => w.id === id)!; const isCollapsed = layout.collapsed.includes(id); const Icon = def.icon; return <section key={id} className={'dash-widget '+(def.wide ? 'dash-widget-wide ' : '')+(isCollapsed ? 'dash-widget-collapsed ' : '')+(dragId === id ? 'dash-dragging' : '')} onDragOver={e => { if(dragId && dragId!==id){e.preventDefault();e.dataTransfer.dropEffect='move';} }} onDrop={e => {e.preventDefault();if(dragId)move(dragId,id);setDragId(null)}}><div className="dash-widget-head"><div className="dash-widget-title" onClick={() => toggle('collapsed', id)}><span className="dash-widget-icon"><Icon size={15}/></span><span><h3>{def.title}</h3><small title={isCollapsed ? def.subtitle : undefined}>{isCollapsed ? summary(id) : def.subtitle}</small></span></div><div className="dash-widget-actions"><button className="dash-drag-handle" draggable onDragStart={e => {setDragId(id);e.dataTransfer.effectAllowed='move';e.dataTransfer.setData('text/plain',id)}} onDragEnd={() => setDragId(null)} title="드래그하여 위젯 순서 변경" aria-label={`${def.title} 순서 변경: 드래그 또는 화살표 사용`}><GripVertical size={15}/></button>{editing && <><button onClick={() => step(id,-1)} disabled={index===0} title="앞으로 이동" aria-label={`${def.title} 앞으로 이동`}><ArrowUp size={14}/></button><button onClick={() => step(id,1)} disabled={index===visible.length-1} title="뒤로 이동" aria-label={`${def.title} 뒤로 이동`}><ArrowDown size={14}/></button><button onClick={() => toggle('hidden',id)} title="숨기기" aria-label={`${def.title} 숨기기`}><X size={14}/></button></>}<button onClick={() => toggle('collapsed',id)} aria-expanded={!isCollapsed} aria-label={`${def.title} ${isCollapsed ? '펼치기':'접기'}`}>{isCollapsed?<ChevronDown size={16}/>:<ChevronUp size={16}/>}</button></div></div>{!isCollapsed && <div className="dash-widget-body">{renderBody(id)}</div>}</section>})}</div>
+      {visible.length===0 && <div className="dash-all-hidden"><CircleHelp size={19}/><b>이 보기에 표시되는 위젯이 없습니다.</b><button onClick={() => setEditing(true)}>위젯 다시 표시</button></div>}
+    </section>
   </div>;
 }

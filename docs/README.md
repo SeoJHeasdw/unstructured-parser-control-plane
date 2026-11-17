@@ -1,4 +1,4 @@
-# Unstructured Review 문서 안내
+# Unstructured Data Console 문서 안내
 
 이 문서들은 2026-11-12 기준으로 작성한 인수인계 자료다. 현재 코드와 실행 환경이 최종 근거이며, 다른 세션에서 이어갈 때는 [인수인계와 실행 안내](HANDOFF_AND_RUNBOOK.md)의 확인 순서부터 시작한다.
 

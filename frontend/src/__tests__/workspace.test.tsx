@@ -4,6 +4,7 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-li
 import userEvent from '@testing-library/user-event';
 import App from '../App';
 import { installFlowDomMocks } from './flowTestEnv';
+import lineage from './fixtures/lineage.json';
 
 const fixture = {
   asOf:'2026-11-12 09:42',
@@ -15,7 +16,7 @@ const fixture = {
   relations:[{id:'R-1',sourceId:'D-3',source:'대장.xlsx',location:'Sheet1 · B12',target:'SOP-QC-0040',targetId:null,evidence:'SOP-QC-0040 참조',method:'문서번호 패턴',status:'대상 미발견'}],activity:[]
 };
 
-beforeEach(()=>{ installFlowDomMocks(); const store=new Map<string,string>(); vi.stubGlobal('localStorage',{getItem:(key:string)=>store.get(key) ?? null,setItem:(key:string,value:string)=>store.set(key,String(value)),removeItem:(key:string)=>store.delete(key),clear:()=>store.clear(),key:(index:number)=>[...store.keys()][index] ?? null,get length(){return store.size}});vi.stubGlobal('fetch',vi.fn(async (url:RequestInfo | URL)=>({ok:true,json:async()=>String(url).includes('/api/live/documents')?{documents:[]}:JSON.parse(JSON.stringify(fixture))}))); });
+beforeEach(()=>{ installFlowDomMocks(); const store=new Map<string,string>(); vi.stubGlobal('localStorage',{getItem:(key:string)=>store.get(key) ?? null,setItem:(key:string,value:string)=>store.set(key,String(value)),removeItem:(key:string)=>store.delete(key),clear:()=>store.clear(),key:(index:number)=>[...store.keys()][index] ?? null,get length(){return store.size}});vi.stubGlobal('fetch',vi.fn(async (url:RequestInfo | URL)=>({ok:true,json:async()=>String(url).startsWith('/api/lineage')?{...JSON.parse(JSON.stringify(lineage)),source:String(url).includes('source=example')?'example':'live'}:String(url).includes('/api/live/documents')?{documents:[]}:JSON.parse(JSON.stringify(fixture))}))); });
 afterEach(()=>{cleanup();vi.unstubAllGlobals()});
 
 describe('문서 운영 Mock 콘솔',()=>{
@@ -55,9 +56,11 @@ describe('문서 운영 Mock 콘솔',()=>{
     await screen.findByRole('heading',{name:'운영 대시보드'});
     await user.click(screen.getByRole('button',{name:'위젯 편집'}));
     const grid=document.querySelector('.dash-grid')!;
-    expect(grid.querySelector('.dash-widget h3')?.textContent).toBe('처리 단계 현황');
-    await user.click(screen.getByRole('button',{name:'처리 단계 현황 뒤로 이동'}));
+    expect(within(grid as HTMLElement).queryByText('처리 단계 현황')).toBeNull();
     expect(grid.querySelector('.dash-widget h3')?.textContent).toBe('파일 형식 분포');
+    expect(screen.getByRole('button',{name:'최근 문서 펼치기'})).toBeTruthy();
+    await user.click(screen.getByRole('button',{name:'파일 형식 분포 뒤로 이동'}));
+    expect(grid.querySelector('.dash-widget h3')?.textContent).toBe('확인이 필요한 문서');
     await user.click(screen.getByRole('button',{name:'파일 형식 분포 숨기기'}));
     expect(within(grid as HTMLElement).queryByText('파일 형식 분포')).toBeNull();
     await user.click(screen.getByRole('button',{name:/\+ 파일 형식 분포/}));
@@ -79,6 +82,11 @@ describe('문서 운영 Mock 콘솔',()=>{
     await screen.findByRole('heading',{name:'운영 대시보드'});
     const live=screen.getByRole('region',{name:'처리 흐름 현황'});
     expect(within(live).getByRole('heading',{name:'처리 흐름'})).toBeTruthy();
+    expect(within(live).queryAllByRole('button',{name:/개입/})).toHaveLength(0);
+    await user.hover(within(live).getByRole('button',{name:/보류 · 사람 확인/}));
+    expect(live.querySelectorAll('.lf-node.is-dim').length).toBeGreaterThan(0);
+    await user.unhover(within(live).getByRole('button',{name:/보류 · 사람 확인/}));
+    await user.click(within(live).getByRole('button',{name:/^주의/}));
     const first=within(live).getAllByRole('button',{name:/개입/})[0];
     const label=first.querySelector('b')!.textContent!;
     await user.click(first);
@@ -86,13 +94,15 @@ describe('문서 운영 Mock 콘솔',()=>{
     expect(within(panel).getByRole('heading',{name:label})).toBeTruthy();
     expect(vi.mocked(fetch).mock.calls.every(([, options])=>!options?.method || options.method==='GET')).toBe(true);
   });
-  it('문서 관계도에서 근거를 확인하고 상세 창을 Escape로 닫는다',async()=>{
+  it('문서 계보에서 근거를 확인하고 상세 창을 Escape로 닫는다',async()=>{
     const user=userEvent.setup();render(<App/>);await screen.findByRole('heading',{name:'운영 대시보드'});
-    await user.click(screen.getByRole('button',{name:'문서 관계'}));
-    expect(screen.getByText('Sheet1 · B12')).toBeTruthy();
-    await user.click(screen.getByRole('button',{name:/출발 문서 보기/}));
-    expect(screen.getByRole('dialog',{name:'문서 상세'})).toBeTruthy();
+    await user.click(screen.getByRole('button',{name:'문서 계보'}));
+    const families=await screen.findByRole('complementary',{name:'문서군 목록'});
+    await user.click(within(families).getByRole('button',{name:/설비점검 관리대장/}));
+    await user.click(screen.getByRole('button',{name:/대상 미발견.*SOP-PD-0076/}));
+    expect(within(screen.getByRole('complementary',{name:'상세'})).getByText('점검 이력!B20')).toBeTruthy();
     await user.keyboard('{Escape}');
-    await waitFor(()=>expect(screen.queryByRole('dialog',{name:'문서 상세'})).toBeNull());
+    await waitFor(()=>expect(screen.queryByRole('complementary',{name:'상세'})).toBeNull());
+    expect(vi.mocked(fetch).mock.calls.some(([url])=>String(url)==='/api/lineage?source=live')).toBe(true);
   });
 });

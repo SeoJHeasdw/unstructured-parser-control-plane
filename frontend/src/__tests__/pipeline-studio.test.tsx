@@ -22,6 +22,38 @@ afterEach(() => { cleanup(); vi.useRealTimers(); vi.unstubAllGlobals(); });
 const onlyGets = () => fetchMock.mock.calls.every(([, options]) => !options?.method || options.method === 'GET');
 const openFormats = async (user: ReturnType<typeof userEvent.setup>) => { await user.click(screen.getByRole('button', { name: /형식 · 경로/ })); return screen.getByRole('dialog', { name: '형식과 경로' }); };
 
+describe('흐름 이동', () => {
+  it('형식별 흐름에서 Esc 또는 뒤로가기로 전체 처리 흐름으로 돌아간다', async () => {
+    const user = userEvent.setup();
+    render(<PipelineStudio formats={[]} initialFormat="PDF" onOpenDocuments={() => {}} />);
+    expect(screen.getByRole('heading', { name: 'PDF 문서' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: '뒤로가기' }).getAttribute('aria-keyshortcuts')).toBe('Escape');
+    await user.keyboard('{Escape}');
+    expect(screen.getByRole('heading', { name: '전체 처리 흐름' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: '뒤로가기' })).toBeNull();
+
+    const pages = screen.getByRole('navigation', { name: '흐름 페이지' });
+    await user.click(within(pages).getByRole('button', { name: /PDF 문서/ }));
+    await user.click(screen.getByRole('button', { name: '뒤로가기' }));
+    expect(screen.getByRole('heading', { name: '전체 처리 흐름' })).toBeTruthy();
+  });
+
+  it('형식과 경로를 먼저 닫고 비활성 탭에서는 Esc로 흐름을 바꾸지 않는다', async () => {
+    const user = userEvent.setup();
+    const props = { formats: [], initialFormat: 'PDF', onOpenDocuments: () => {} };
+    const { rerender } = render(<PipelineStudio {...props} />);
+    const panel = await openFormats(user);
+    await user.click(within(panel).getByRole('textbox', { name: '확장자 검색' }));
+    await user.keyboard('{Escape}');
+    expect(screen.queryByRole('dialog', { name: '형식과 경로' })).toBeNull();
+    expect(screen.getByRole('heading', { name: 'PDF 문서' })).toBeTruthy();
+
+    rerender(<PipelineStudio {...props} active={false} />);
+    await user.keyboard('{Escape}');
+    expect(screen.getByRole('heading', { name: 'PDF 문서' })).toBeTruthy();
+  });
+});
+
 describe('형식과 경로', () => {
   it('사용자가 제공한 19종을 모두 경로에 연결하고 미제공 HWP를 임의로 끼워 넣지 않는다', async () => {
     const user = userEvent.setup(); render(<PipelineStudio formats={[]} onOpenDocuments={() => {}} />);
@@ -106,6 +138,27 @@ describe('설계 모드', () => {
 });
 
 describe('운영 모드', () => {
+  it('주의 단계에서 해당 노드로 이동하고 하위 흐름에서는 다른 흐름의 주의를 제외한다', async () => {
+    const simulator = new FlowSimulator(defaultLibrary(), 0);
+    simulator.pauseNode('overview::review', true);
+    simulator.pauseNode('pdf::ocr', true);
+    const user = userEvent.setup();
+    render(<PipelineStudio formats={[]} onOpenDocuments={() => {}} simulator={simulator} />);
+
+    await user.click(screen.getByRole('button', { name: '주의 단계 2개' }));
+    const panel = within(screen.getByRole('complementary', { name: '운영 상세' }));
+    expect(panel.getByRole('button', { name: /품질 검토.*일시정지/ })).toBeTruthy();
+    await user.click(panel.getByRole('button', { name: /OCR 인식.*PDF 문서.*일시정지/ }));
+    expect(screen.getByRole('heading', { name: 'PDF 문서' })).toBeTruthy();
+    expect(panel.getByRole('heading', { name: 'OCR 인식' })).toBeTruthy();
+
+    await user.click(screen.getByRole('button', { name: '주의 단계 1개' }));
+    expect(panel.queryByRole('button', { name: /품질 검토/ })).toBeNull();
+    await user.click(panel.getByRole('button', { name: /OCR 인식.*일시정지/ }));
+    await user.click(panel.getByRole('button', { name: '재개' }));
+    expect(screen.queryByRole('button', { name: /주의 단계/ })).toBeNull();
+  });
+
   it('단계를 선택해 일시정지하고 보류 문서를 승인하며 실제 처리 요청을 보내지 않는다', async () => {
     const simulator = new FlowSimulator(defaultLibrary());
     const user = userEvent.setup(); render(<PipelineStudio formats={[]} onOpenDocuments={() => {}} simulator={simulator} />);

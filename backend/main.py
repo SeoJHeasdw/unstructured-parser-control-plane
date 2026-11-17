@@ -10,6 +10,9 @@ from app.config import Settings
 from app.middleware import LocalRequestGuard
 from app.routers.live import router as live_router, summary_router as live_summary_router
 from app.routers.models import router as models_router
+from app.routers.lineage import router as lineage_router
+from app.routers.retrieval import router as retrieval_router
+from app.routers.vectordb import router as vectordb_router
 from app.service import DocumentService
 
 DATA = Path(__file__).resolve().parent.parent / "mock-data" / "data.json"
@@ -25,12 +28,15 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             yield
         finally:
             service.stop()
-    app = FastAPI(title="Unstructured Review Local API", version="0.3.0", lifespan=lifespan)
+    app = FastAPI(title="Unstructured Data Console Local API", version="0.4.0", lifespan=lifespan)
     app.state.settings = settings
     app.add_middleware(LocalRequestGuard, max_upload_bytes=settings.max_upload_bytes)
     app.include_router(live_summary_router)
     app.include_router(live_router)
     app.include_router(models_router)
+    app.include_router(lineage_router)
+    app.include_router(retrieval_router)
+    app.include_router(vectordb_router)
 
     @app.get("/api/health")
     def health():

@@ -24,6 +24,34 @@ class ParseResult(BaseModel):
     is_stale: bool
     warnings: list[str]
 
+class ResultLocation(BaseModel):
+    start_line: int
+    end_line: int
+    page: int | None = None
+    start_offset: int | None = None
+    end_offset: int | None = None
+    sheet: str | None = None
+    row: int | None = None
+    column: int | None = None
+    columns: int | None = None
+
+class ParseRun(BaseModel):
+    run_id: str
+    completed_at: str | None
+    parser: str | None
+    parser_version: str | None
+    ocr_enabled: bool | None
+    is_latest: bool
+    duration_ms: int | None = None
+
+class ParseRunList(BaseModel):
+    runs: list[ParseRun]
+
+class StoredParseRun(ParseRun):
+    markdown: str
+    warnings: list[str]
+    locations: list[ResultLocation]
+
 class HistoryEntry(BaseModel):
     created_at: str
     status: str
