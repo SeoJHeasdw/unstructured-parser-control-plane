@@ -41,8 +41,12 @@ class Settings:
         load_dotenv()
         runtime = Path(os.environ.get("DOCOPS_RUNTIME_DIR", str(_PROJECT / "runtime"))).expanduser().resolve()
         artifacts = os.environ.get("DOCOPS_DOCLING_ARTIFACTS") or os.environ.get("DOCLING_ARTIFACTS_PATH")
+        bundled_models = _PROJECT / "offline" / "docling-models"
         default_cache = Path.home() / ".cache" / "docling" / "models"
-        artifact_path = Path(artifacts).expanduser().resolve() if artifacts else (default_cache if default_cache.is_dir() else None)
+        if artifacts:
+            artifact_path = Path(artifacts).expanduser().resolve()
+        else:
+            artifact_path = next((path for path in (bundled_models, default_cache) if path.is_dir()), None)
         static = Path(os.environ.get("DOCOPS_STATIC_DIR", str(_PROJECT / "frontend" / "dist"))).expanduser().resolve()
         return cls(runtime_dir=runtime, docling_artifacts=artifact_path, models=load_connections(), static_dir=static if (static / "index.html").is_file() else None)
 

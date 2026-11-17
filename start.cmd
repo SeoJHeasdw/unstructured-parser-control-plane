@@ -1,74 +1,55 @@
 @echo off
-setlocal EnableExtensions
-rem Unstructured Data Console - Windows launcher. First run creates backend\.venv and installs packages.
-rem Usage: start.cmd [port]   (default port 8000)
-cd /d "%~dp0"
-set "VPY=%~dp0backend\.venv\Scripts\python.exe"
-set "PORT=8000"
-if not "%~1"=="" set "PORT=%~1"
+setlocal EnableExtensions DisableDelayedExpansion
+rem Unstructured Data Console - Windows x64 launcher.
+pushd "%~dp0" || exit /b 1
 
-if not exist "%VPY%" (
-  call :create_venv
-  if errorlevel 1 goto :fail
+if /i "%~1"=="--help" goto :help
+rem Python installation remains a separate WinGet step.
+set "PYTHON_MANAGER_AUTOMATIC_INSTALL=false"
+set "PYLAUNCHER_ALLOW_INSTALL="
+set "PYLAUNCHER_ALWAYS_INSTALL="
+py -3.12 -c "import sysconfig; raise SystemExit(sysconfig.get_platform() != 'win-amd64')" >nul 2>nul
+if not errorlevel 1 (
+  py -3.12 "%~dp0scripts\windows_launcher.py" %*
+  goto :finished
 )
-"%VPY%" -c "import fastapi, uvicorn, python_multipart" >nul 2>nul
-if errorlevel 1 (
-  call :install
-  if errorlevel 1 goto :fail
-)
-if not exist ".env" if exist ".env.example" copy /y ".env.example" ".env" >nul
-if exist "offline\docling-models" set "DOCOPS_DOCLING_ARTIFACTS=%~dp0offline\docling-models"
-if not exist "frontend\dist\index.html" echo [warn] frontend\dist is missing. Use the offline bundle or run: cd frontend ^&^& npm ci ^&^& npm run build
-
-echo.
-echo   Unstructured Data Console  -  http://127.0.0.1:%PORT%/
-echo   Model settings: .env  (restart after editing)   Stop: Ctrl+C
-echo.
-start "" "http://127.0.0.1:%PORT%/"
-pushd backend
-"%VPY%" -m uvicorn main:app --host 127.0.0.1 --port %PORT%
-popd
-exit /b %errorlevel%
-
-:create_venv
-set "PY="
-for %%V in (3.12 3.13 3.14 3.11) do (
-  if not defined PY (
-    py -%%V -c "import sys" >nul 2>nul && set "PY=py -%%V"
+for %%P in ("%LocalAppData%\Programs\Python\Python312\python.exe" "%ProgramFiles%\Python312\python.exe") do (
+  if exist "%%~P" (
+    "%%~P" -c "import sysconfig; raise SystemExit(sysconfig.get_platform() != 'win-amd64')" >nul 2>nul
+    if not errorlevel 1 (
+      "%%~P" "%~dp0scripts\windows_launcher.py" %*
+      goto :finished
+    )
   )
 )
-if not defined PY (
-  python -c "import sys; sys.exit(0 if (3, 11) <= sys.version_info[:2] <= (3, 14) else 1)" >nul 2>nul && set "PY=python"
+for %%V in (3.13 3.14 3.11) do (
+  py -%%V -c "import sysconfig; raise SystemExit(sysconfig.get_platform() != 'win-amd64')" >nul 2>nul
+  if not errorlevel 1 (
+    py -%%V "%~dp0scripts\windows_launcher.py" %*
+    goto :finished
+  )
 )
-if not defined PY (
-  echo Python 3.11 - 3.14 was not found.
-  echo Install it, then run this file again:
-  echo     winget install -e --id Python.Python.3.12
-  exit /b 1
+python -c "import sys, sysconfig; raise SystemExit(not ((3,11) <= sys.version_info[:2] <= (3,14) and sysconfig.get_platform() == 'win-amd64'))" >nul 2>nul
+if not errorlevel 1 (
+  python "%~dp0scripts\windows_launcher.py" %*
+  goto :finished
 )
-echo [setup] creating backend\.venv with %PY%
-%PY% -m venv "%~dp0backend\.venv"
-if errorlevel 1 exit /b 1
-exit /b 0
 
-:install
-if exist "offline\wheels" (
-  echo [setup] installing packages from offline\wheels
-  "%VPY%" -m pip install --disable-pip-version-check --no-index --find-links offline\wheels -r backend\requirements.lock.txt
-) else (
-  echo [setup] installing packages from the package index
-  "%VPY%" -m pip install --disable-pip-version-check -r backend\requirements.lock.txt
-)
-if errorlevel 1 exit /b 1
-if exist "offline\wheels-docling" (
-  echo [setup] installing optional Docling packages
-  "%VPY%" -m pip install --disable-pip-version-check --no-index --find-links offline\wheels --find-links offline\wheels-docling -r backend\requirements-docling.lock.txt
-  if errorlevel 1 exit /b 1
-)
-exit /b 0
-
-:fail
-echo.
-echo Setup failed. Check the messages above.
-pause
+echo [setup] Windows x64 Python 3.11-3.14 is required. Use 3.12 for Docling.
+echo     winget install --exact --id Python.Python.3.12 --architecture x64
+echo Open a new terminal after installation.
+popd
+if "%~1"=="" pause
 exit /b 1
+
+:help
+echo Usage: start.cmd [port] [--offline] [--docling or --base] [--check] [--no-browser]
+echo Default port: 8000. See README.md for Windows setup.
+popd
+exit /b 0
+
+:finished
+set "RESULT=%errorlevel%"
+popd
+if not "%RESULT%"=="0" if "%~1"=="" pause
+exit /b %RESULT%

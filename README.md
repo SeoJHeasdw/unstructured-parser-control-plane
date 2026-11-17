@@ -5,32 +5,48 @@
 - **Mock 워크스페이스:** 대시보드·문서 탐색·파이프라인·관계도·비교 화면의 문서와 수치는 모두 가상의 예시입니다. 여기서 파일을 놓으면 이름·확장자·크기만 브라우저 메모리에 표시하며, 파일 내용은 읽거나 서버에 보내지 않습니다. 위젯 배치와 파이프라인 흐름 정의는 브라우저에 저장되고, 파이프라인 운영 모드의 수치·개입은 브라우저 안 모의 엔진에서만 동작하며 실제 처리 설정을 바꾸지 않습니다.
 - **실제 파일 처리:** 사용자가 파일을 선택하거나 놓으면 `runtime/`에 실제 파일이 저장됩니다. **파싱 실행**을 눌러야 처리합니다. 결과 및 처리 상태도 로컬에 보관됩니다. Mock 대시보드와 실제 처리 목록은 서로 연결되지 않습니다. Mock 데이터가 로딩 중이거나 오류여도 실제 파일 처리 탭으로 이동할 수 있습니다. 실제 API 자체에 문제가 있으면 해당 화면에서 별도로 오류가 표시됩니다.
 
-## Windows PC로 옮기기 (Python만 필요)
+## Windows PC에서 실행
 
-대상 PC에는 Node가 없어도 됩니다. 빌드된 화면을 백엔드가 같은 주소(`http://127.0.0.1:8000/`)에서 제공합니다.
+Windows x64에서 실행합니다. **Python 3.12 x64**를 설치하면 기본 실행과 Docling 환경에 같은 버전을 사용할 수 있습니다. 기본 실행은 3.11~3.14를 지원합니다. 기존에 설치한 Python 3.15는 그대로 두고 3.12를 추가하세요.
 
-1. **인터넷이 되는 PC**(macOS/Linux, Node·Python 필요)에서 묶음을 만듭니다. 결과는 `offline/unstructured-parser-control-plane-windows.zip`입니다(기본 약 10MB).
+```cmd
+winget install --exact --id Python.Python.3.12 --architecture x64
+py -3.12 --version
+```
 
-   ```bash
-   scripts/prepare-offline.sh
-   ```
+| 받은 파일 | 실행 | 첫 설치에 필요한 것 |
+|---|---|---|
+| 준비된 Windows ZIP | `start.cmd --offline` | Python. 화면과 설치용 휠이 들어 있어 Node, npm 레지스트리, PyPI 접속이 필요 없습니다. |
+| GitHub **Code → Download ZIP** | `start.cmd` | Python, Node.js 20.19 이상(20.x) 또는 22.12 이상, npm 레지스트리와 Python 패키지 인덱스 접근. |
 
-   Docling(PDF·Office 파싱)까지 옮기려면 `--with-docling`(휠 약 1GB 이상), 이 PC의 Docling 모델 폴더까지 넣으려면 `--with-docling-models`를 붙입니다.
-2. **대상 PC**에서 압축을 풀고 `start.cmd`를 실행합니다. 첫 실행에 `backend\.venv`를 만들고 `offline\wheels`에서 패키지를 설치한 뒤 브라우저를 엽니다. 포트를 바꾸려면 `start.cmd 8010`.
-   - Python이 없으면: `winget install -e --id Python.Python.3.12` (3.11~3.14 지원, Docling은 3.12 권장)
-   - `offline\wheels`가 없으면 인터넷으로 설치를 시도합니다. 사내 미러가 있으면 `pip config set global.index-url <미러 주소>`를 먼저 설정합니다.
-   - 내려받은 압축이라 실행이 막히면 zip 파일 속성에서 **차단 해제** 후 다시 풉니다.
-3. 모델 연결은 프로젝트 루트 `.env`(첫 실행 때 `.env.example`에서 복사)에 넣고 다시 시작합니다. 화면의 **모델 연결**에서 연결 확인과 모델 목록 조회를 할 수 있습니다.
+1. ZIP을 로컬 폴더에 풀고 새 터미널에서 해당 폴더의 `start.cmd`를 실행합니다. 소스 ZIP은 처음에 `npm ci`로 화면을 빌드하고 가상환경을 준비합니다. npm 또는 pip가 차단된 경우 준비된 Windows ZIP을 사용하세요.
+2. 시작 주소는 `http://127.0.0.1:8000/`입니다. 포트가 이미 쓰이고 있으면 `start.cmd 8010`을 실행하세요. 브라우저 없이 준비만 확인하려면 `start.cmd --check`를 사용합니다. 앱을 닫으려면 실행 창에서 `Ctrl+C`를 누릅니다.
+3. npm·pip 사내 레지스트리가 있으면 현재 터미널에 `npm_config_registry`와 `PIP_INDEX_URL`을 설정하고 실행합니다. npm·pip의 기존 설정도 사용할 수 있습니다.
 
-   ```ini
-   MODEL_BASE_URL=https://게이트웨이주소/v1
-   MODEL_API_KEY=...
-   MODEL_ID=...
-   ```
+### PDF·Office 실제 파싱
 
-   두 번째 연결은 `MODEL2_*`, 사내 인증서는 `MODEL_CA_BUNDLE`, 프록시는 `HTTPS_PROXY`로 지정합니다. 연결 확인은 OpenAI 호환 `/chat/completions`에 짧은 요청 한 번을 보내며, API 키는 화면·응답에 나오지 않습니다.
+기본 설치로 화면, TXT·CSV·MD·LOG 처리, 구조 분석을 사용할 수 있습니다. **PDF·DOCX·PPTX·XLSX 본문 파싱**에는 Docling이 필요하고, PDF에는 로컬 모델 파일도 필요합니다.
 
-화면을 수정해야 할 때만 Node가 필요합니다(`winget install -e --id OpenJS.NodeJS.LTS`, 20.19 이상). `frontend`에서 `npm ci`로 `package-lock.json`의 고정 버전을 설치하며, Windows용 네이티브 패키지(`@rolldown/binding-win32-x64-msvc`, `lightningcss-win32-x64-msvc`)도 레지스트리에서 받아야 합니다.
+- Docling 포함 ZIP은 `start.cmd --offline`만 실행하면 별도 Python 3.12 가상환경을 준비합니다. 모델까지 포함된 ZIP은 PDF에 필요한 파일도 제공합니다. 기본 화면만 확인하려면 `start.cmd --offline --base`를 실행합니다.
+- 인터넷이 열려 있는 PC에서는 `start.cmd --docling --check`로 패키지를 먼저 설치하세요. PDF 모델은 다음 명령으로 받습니다. 모델은 기본적으로 사용자 홈의 `.cache/docling/models`에 저장됩니다. 다른 위치의 모델을 쓰려면 `DOCOPS_DOCLING_ARTIFACTS`를 설정하세요. 이후 `start.cmd --docling`으로 시작합니다.
+
+```cmd
+backend\.venv-docling\Scripts\docling-tools.exe models download layout tableformer
+```
+
+### Windows용 ZIP 만들기
+
+인터넷이 열리는 PC에서 Node.js와 pip가 있는 Python으로 씁니다. Windows에서는 다음 명령을, macOS/Linux에서는 `scripts/prepare-offline.sh`를 같은 옵션으로 실행합니다.
+
+```cmd
+py -3.12 scripts\prepare-offline.py
+py -3.12 scripts\prepare-offline.py --with-docling-models
+```
+
+- 기본 결과는 `offline/unstructured-parser-control-plane-windows.zip`입니다.
+- `--with-docling`은 Windows x64용 Python 3.12 Docling 휠을 더한 `-docling.zip`을 만듭니다. `--with-docling-models`는 준비해 둔 레이아웃·표 모델까지 더한 `-docling-models.zip`을 만듭니다.
+- `--from-cache`는 설치된 프론트 의존성으로 빌드하고 기존 `offline/wheels` 및 `offline/wheels-docling`을 사용합니다. 준비된 ZIP 자체는 대상 PC의 npm이나 pip 인덱스에 의존하지 않습니다.
+- 외부 모델 게이트웨이는 프로젝트 루트 `.env`의 `MODEL_BASE_URL`, `MODEL_API_KEY`, `MODEL_ID`를 설정한 뒤 다시 시작합니다. 화면의 **모델 연결**에서 확인할 수 있습니다. 두 번째 연결은 `MODEL2_*`, 사내 인증서는 `MODEL_CA_BUNDLE`, 프록시는 `HTTPS_PROXY`를 사용합니다.
 
 ## 개발 실행
 
