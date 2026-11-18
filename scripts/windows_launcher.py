@@ -178,8 +178,11 @@ def start(args):
     docling = not args.base and (args.docling or any((OFFLINE / "wheels-docling").glob("*.whl")))
     if not args.check:
         check_port(args.port)
-    ensure_frontend(args.offline)
+    # 파이썬 환경(venv)을 먼저 만든다. 화면 빌드(npm)가 막혀도 venv와 패키지는 남아 다음 실행에서 이어진다.
+    print("[setup] 1/2 Python venv and packages", flush=True)
     python = ensure_python(args.offline, docling)
+    print("[setup] 2/2 frontend", flush=True)
+    ensure_frontend(args.offline)
     env_file = ROOT / ".env"
     example = ROOT / ".env.example"
     if not env_file.exists() and example.is_file():

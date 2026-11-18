@@ -45,7 +45,7 @@ fi
 say() { printf '[setup] %s\n' "$*"; }
 die() { printf '[error] %s\n' "$*" >&2; exit 1; }
 
-# ---------------------------------------------------------------- Python
+# ---------------------------------------------------------------- Python (1/2)
 pick_python() {
   local versions="3.12 3.13 3.14 3.11"
   [ "$DOCLING" = 1 ] && versions="3.12"
@@ -86,7 +86,7 @@ if [ ! -f "$STAMP" ] || [ "$(cat "$STAMP")" != "$(fingerprint)" ] || ! "$VPY" -c
   fingerprint > "$STAMP"
 fi
 
-# ---------------------------------------------------------------- 화면(frontend)
+# ---------------------------------------------------------------- 화면(frontend) (2/2)
 frontend_ready() { [ -f "$FRONTEND/dist/index.html" ]; }
 if [ "$REBUILD" = 1 ] || ! frontend_ready; then
   command -v npm >/dev/null 2>&1 || die "화면을 빌드하려면 Node.js 20.19+ 또는 22.12+ 가 필요합니다(npm). 또는 빌드된 frontend/dist 를 넣어 주세요."
