@@ -1,6 +1,6 @@
 import React from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
+import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import LiveWorkspace from '../LiveWorkspace';
 import App from '../App';
@@ -25,6 +25,49 @@ afterEach(()=>{cleanup();vi.unstubAllGlobals();vi.restoreAllMocks()});
 beforeEach(()=>{vi.stubGlobal('fetch',vi.fn(async()=>{throw new Error('예상하지 못한 네트워크 호출')}))});
 
 describe('실제 문서 로컬 작업 공간',()=>{
+  it('앞서 시작한 목록 조회가 늦게 끝나도 방금 저장한 파일을 유지한다', async () => {
+    let resolveList!: (response: Response) => void;
+    const pendingList = new Promise<Response>(resolve => { resolveList = resolve; });
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const path = String(input);
+      if (path === url) return init?.method === 'POST' ? jsonResponse(uploaded, 201) : pendingList;
+      if (path === detailUrl) return jsonResponse(uploaded);
+      return jsonResponse({}, 404);
+    }));
+    const user = userEvent.setup();
+    render(<LiveWorkspace />);
+    await user.upload(screen.getByLabelText('로컬에 업로드할 파일 선택'), new File(['테스트'], uploaded.name));
+    await screen.findByText(/1개 파일을 이 컴퓨터의 로컬 저장소에 저장했습니다/);
+    await act(async () => { resolveList(jsonResponse({ documents: [] })); });
+    expect(within(document.querySelector('.live-list') as HTMLElement).getByText(uploaded.name)).toBeTruthy();
+  });
+
+  it('여러 파일을 저장할 때 탭을 왕복해도 저장이 이어지고 진행 중에는 탭 닫기가 비활성화된다', async () => {
+    let resolveUpload!: (response: Response) => void;
+    const firstUpload = new Promise<Response>(resolve => { resolveUpload = resolve; });
+    const second = { ...uploaded, id: 'test-002', name: '다른 문서.txt' };
+    let uploadCount = 0;
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const path = String(input);
+      if (path === '/api/data') return jsonResponse({ asOf: '', documents: [], relations: [], activity: [] });
+      if (path === url) return init?.method === 'POST' ? (++uploadCount === 1 ? firstUpload : jsonResponse(second, 201)) : jsonResponse({ documents: [] });
+      if (path === `${url}/${second.id}`) return jsonResponse(second);
+      return jsonResponse({}, 404);
+    }));
+    const user = userEvent.setup();
+    render(<App />);
+    await user.click(screen.getByRole('button', { name: '파일 처리 시작' }));
+    await screen.findByText('업로드된 문서가 없습니다');
+    await user.upload(screen.getByLabelText('로컬에 업로드할 파일 선택'), [new File(['첫 파일'], uploaded.name), new File(['둘째 파일'], second.name)]);
+    const nav = within(screen.getByRole('navigation'));
+    await user.click(nav.getByRole('button', { name: '운영 대시보드' }));
+    expect(screen.getByRole('button', { name: '실제 파일 처리 탭 닫기' })).toHaveProperty('disabled', true);
+    await act(async () => { resolveUpload(jsonResponse(uploaded, 201)); });
+    await user.click(nav.getByRole('button', { name: '실제 파일 처리' }));
+    expect(await screen.findByText(/2개 파일을 이 컴퓨터의 로컬 저장소에 저장했습니다/)).toBeTruthy();
+    expect(screen.getByRole('button', { name: '실제 파일 처리 탭 닫기' })).toHaveProperty('disabled', false);
+  });
+
   it('목록을 조회하고 선택한 문서의 상세를 불러오며 자동으로 업로드하거나 파싱하지 않는다',async()=>{
     const fetchMock=vi.fn(async(input:RequestInfo|URL,init?:RequestInit)=>{
       const path=String(input);const method=init?.method||'GET';

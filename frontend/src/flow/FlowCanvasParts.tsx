@@ -41,7 +41,7 @@ export type FlowUI = {
   hoveredEdge: string | null;
   setHoveredEdge: (id: string | null) => void;
   dropEdge: string | null;
-  requestInsert: (edgeId: string, rect: DOMRect) => void;
+  requestInsert: (edgeId: string, anchor: HTMLElement) => void;
 };
 export const FlowUIContext = createContext<FlowUI | null>(null);
 const useFlowUI = () => { const value = useContext(FlowUIContext); if (!value) throw new Error('FlowUIContext 누락'); return value; };
@@ -56,7 +56,7 @@ function Label({ id, data }: { id: string; data: FlowNodeData }) {
   const input = useRef<HTMLInputElement>(null);
   const editing = ui.editingId === id;
   useEffect(() => { if (editing) input.current?.select(); }, [editing]);
-  if (!editing) return <b className="fx-label">{data.label}</b>;
+  if (!editing) return <b className="fx-label" title={data.label}>{data.label}</b>;
   const commit = () => { const value = input.current?.value.trim(); if (value) ui.rename(id, value); ui.setEditingId(null); };
   return <input ref={input} className="fx-label-input nodrag" defaultValue={data.label} aria-label="노드 이름" onBlur={commit} onKeyDown={event => { event.stopPropagation(); if (event.key === 'Enter') commit(); if (event.key === 'Escape') ui.setEditingId(null); }} />;
 }
@@ -64,13 +64,14 @@ function Label({ id, data }: { id: string; data: FlowNodeData }) {
 const n = (value: number) => value.toLocaleString('ko-KR');
 function Counters({ metric, kind }: { metric: NodeMetric; kind: NodeKind }) {
   if (kind === 'exception') return <div className="fx-counters"><span className={metric.held ? 'is-warn' : ''}>보류 <b>{n(metric.held)}</b></span>{metric.held > 0 && <span>최장 <b>{wait(metric.oldestWait)}</b></span>}</div>;
+  const crowded = metric.failed > 0 && (metric.held > 0 || kind === 'review');
   return <div className="fx-counters">
     <span className={metric.queued >= Math.max(8, metric.capacity * 4) ? 'is-warn' : ''}>대기 <b>{n(metric.queued)}</b></span>
     <span>처리 <b>{metric.processing}</b>{kind !== 'subflow' && <i>/{metric.capacity}</i>}</span>
     {(metric.held > 0 || kind === 'review') && <span className={metric.held ? 'is-warn' : ''}>보류 <b>{metric.held}</b></span>}
     {metric.failed > 0 && <span className="is-error">실패 <b>{metric.failed}</b></span>}
-    {metric.spawned > 0 && <span className="is-spawn" title="최근 1분 동안 만든 하위 문서">파생 <b>{metric.spawned}</b></span>}
-    <em>{metric.throughput}<small>/분</small></em>
+    {metric.spawned > 0 && !crowded && <span className="is-spawn" title="최근 1분 동안 만든 하위 문서">파생 <b>{metric.spawned}</b></span>}
+    {!crowded && <em title={`분당 처리 ${n(metric.throughput)}건`}>{n(metric.throughput)}<small>/분</small></em>}
   </div>;
 }
 export const wait = (seconds: number) => seconds >= 60 ? `${Math.floor(seconds / 60)}분 ${Math.round(seconds % 60)}초` : `${Math.round(seconds)}초`;
@@ -96,7 +97,7 @@ export const FlowNodeView = memo(function FlowNodeView({ id, data, selected }: N
   const open = () => { if (kind === 'subflow' && data.subflow) ui.openSubflow(data.subflow); };
 
   if (kind === 'note') return <div className={`fx-note${state}`}>
-    <NodeResizer isVisible={!!selected && !monitor} minWidth={140} minHeight={64} color="#7468ce" />
+    <NodeResizer isVisible={!!selected && !monitor} minWidth={140} minHeight={64} color="var(--brand)" />
     {ui.editingId === id ? <textarea className="fx-note-input nodrag" autoFocus defaultValue={data.label} aria-label="메모 내용" onBlur={event => { ui.rename(id, event.target.value.trim() || '메모'); ui.setEditingId(null); }} onKeyDown={event => { event.stopPropagation(); if (event.key === 'Escape') ui.setEditingId(null); }} /> : <p>{data.label}</p>}
   </div>;
 
@@ -119,7 +120,7 @@ export const FlowNodeView = memo(function FlowNodeView({ id, data, selected }: N
   if (kind === 'subflow') {
     const formats = data.subflow ? ui.flowFormats(data.subflow) : [];
     return <div className={`fx-box fx-subflow${state}`}>
-      <div className="fx-sub-head"><span className="fx-icon"><Icon size={15} /></span>{!monitor && <span className="fx-sub-tag">하위 흐름</span>}{metric && metric.spawned > 0 && <span className="fx-sub-spawn" title="최근 1분 동안 만든 하위 문서">파생 {metric.spawned}</span>}<button className="fx-subflow-open nodrag" onClick={open} disabled={!data.subflow} aria-label={`${data.label} 하위 흐름 열기`} title="하위 흐름 열기"><Maximize2 size={12} /></button>{monitor && <span className={`fx-status is-${status}`} title={STATUS_LABEL[status]}>{status === 'paused' ? <CirclePause size={14} /> : <i />}</span>}</div>
+      <div className="fx-sub-head"><span className="fx-icon"><Icon size={15} /></span>{!monitor && <span className="fx-sub-tag">하위 흐름</span>}{metric && metric.spawned > 0 && <span className="fx-sub-spawn" title="최근 1분 동안 만든 하위 문서">파생 {metric.spawned}</span>}<button className="fx-subflow-open nodrag" onClick={open} disabled={!data.subflow} aria-label={`${data.label} 하위 흐름 열기`} title="하위 흐름 열기"><Maximize2 size={14} /></button>{monitor && <span className={`fx-status is-${status}`} title={STATUS_LABEL[status]}>{status === 'paused' ? <CirclePause size={14} /> : <i />}</span>}</div>
       <Label id={id} data={data} />
       {metric ? <div className="fx-sub-grid">
         <span className={metric.queued >= 12 ? 'is-warn' : ''}>대기<b>{n(metric.queued)}</b></span><span>처리<b>{metric.processing}</b></span>
@@ -132,7 +133,7 @@ export const FlowNodeView = memo(function FlowNodeView({ id, data, selected }: N
   return <div className={`fx-box fx-${kind}${state}`}>
     <div className="fx-box-head">
       <span className="fx-icon"><Icon size={16} /></span>
-      <div className="fx-titles"><Label id={id} data={data} /><small>{data.engine || KIND_META[kind].label}</small></div>
+      <div className="fx-titles"><Label id={id} data={data} /><small title={data.engine}>{data.engine || KIND_META[kind].label}</small></div>
       {monitor && <span className={`fx-status is-${status}`} title={STATUS_LABEL[status]}>{status === 'paused' ? <CirclePause size={14} /> : <i />}</span>}
     </div>
     {metric ? <Counters metric={metric} kind={kind} /> : <DesignMeta data={data} flowFormats={ui.flowFormats} />}
@@ -211,7 +212,7 @@ export function FlowEdgeView({ id, source, target, data, selected }: EdgeProps<F
         {label}{traffic > 0 && <b>{label ? ' · ' : ''}{traffic}</b>}
       </div>}
       {showInsert && <button className="fx-edge-insert nodrag nopan" style={{ transform: `translate(-50%, -50%) translate(${route.mid.x}px, ${route.mid.y}px)` }} aria-label="이 연결 사이에 단계 삽입" title="이 연결 사이에 단계 삽입"
-        onMouseEnter={() => ui.setHoveredEdge(id)} onMouseLeave={() => ui.setHoveredEdge(null)} onClick={event => ui.requestInsert(id, event.currentTarget.getBoundingClientRect())}><Plus size={13} /></button>}
+        onMouseEnter={() => ui.setHoveredEdge(id)} onMouseLeave={() => ui.setHoveredEdge(null)} onClick={event => ui.requestInsert(id, event.currentTarget)}><Plus size={13} /></button>}
     </EdgeLabelRenderer>
   </>;
 }
@@ -224,7 +225,7 @@ function labelPosition(point: { x: number; y: number }, side: Position) {
 
 export function ArrowDefs() {
   const marker = (id: string, color: string) => <marker id={id} viewBox="0 0 10 10" refX="9" refY="5" markerWidth="11" markerHeight="11" markerUnits="userSpaceOnUse" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill={color} /></marker>;
-  return <svg className="fx-defs" aria-hidden="true"><defs>{marker('fx-arrow', '#8b97ab')}{marker('fx-arrow-exception', '#d08a2e')}{marker('fx-arrow-selected', '#6c5fd0')}</defs></svg>;
+  return <svg className="fx-defs" aria-hidden="true"><defs>{marker('fx-arrow', '#8b97ab')}{marker('fx-arrow-exception', '#d08a2e')}{marker('fx-arrow-selected', '#5168ea')}</defs></svg>;
 }
 
 export function Kbd({ children }: { children: ReactNode }) { return <kbd className="fx-kbd">{children}</kbd>; }

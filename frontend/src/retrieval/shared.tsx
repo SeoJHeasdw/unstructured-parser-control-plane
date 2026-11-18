@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { FocusEvent, MouseEvent, ReactNode } from 'react';
 import { X } from 'lucide-react';
+import { createPortal } from 'react-dom';
 import type { ChunkKind, ImagePolicy, Preset, StrategyKind, StrategyParams, TablePolicy } from '../api/retrieval';
 
 /* ---------- 브라우저 저장(뷰어별 편의 설정). 저장이 막힌 환경에서도 화면은 그대로 동작한다. ---------- */
@@ -133,7 +134,8 @@ export function useTip() {
     if (!tip) return;
     const hide = () => setTip(null);
     window.addEventListener('scroll', hide, true);
-    return () => window.removeEventListener('scroll', hide, true);
+    window.addEventListener('resize', hide);
+    return () => { window.removeEventListener('scroll', hide, true); window.removeEventListener('resize', hide); };
   }, [tip]);
   const bind = useCallback((content: ReactNode | (() => ReactNode), onEnter?: () => void, onLeave?: () => void) => {
     const show = (event: MouseEvent<HTMLElement> | FocusEvent<HTMLElement>) => {
@@ -149,7 +151,8 @@ export function useTip() {
     return { onMouseEnter: show, onMouseLeave: hide, onFocus: show, onBlur: hide };
   }, []);
   const width = typeof window === 'undefined' ? 1200 : window.innerWidth;
-  const node = tip ? <div className={`rb-tip${tip.below ? ' is-below' : ''}`} role="tooltip" style={{ left: Math.min(width - 166, Math.max(166, tip.x)), top: tip.y }}>{tip.content}</div> : null;
+  const inset = Math.min(width / 2, 172);
+  const node = tip ? createPortal(<div className={`rb-tip${tip.below ? ' is-below' : ''}`} role="tooltip" style={{ left: Math.min(width - inset, Math.max(inset, tip.x)), top: tip.y }}>{tip.content}</div>, document.body) : null;
   return { node, bind, hide: () => setTip(null) };
 }
 

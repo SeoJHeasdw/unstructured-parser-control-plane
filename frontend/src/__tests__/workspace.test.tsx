@@ -20,6 +20,36 @@ beforeEach(()=>{ installFlowDomMocks(); const store=new Map<string,string>(); vi
 afterEach(()=>{cleanup();vi.unstubAllGlobals()});
 
 describe('문서 운영 Mock 콘솔',()=>{
+  it('화면 찾기를 키보드로 열고 이동하며 Escape로 닫으면 실행 버튼에 초점을 돌린다', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    const trigger = screen.getByRole('button', { name: '화면 찾기' });
+    await user.click(trigger);
+    const search = screen.getByRole('combobox', { name: '화면 검색' });
+    expect(document.activeElement).toBe(search);
+    await user.type(search, '없는화면');
+    expect(screen.getByText(/일치하는 화면이 없습니다/)).toBeTruthy();
+    await user.keyboard('{Escape}');
+    expect(document.activeElement).toBe(trigger);
+    await user.keyboard('{Control>}k{/Control}');
+    await user.type(screen.getByRole('combobox', { name: '화면 검색' }), '파일 업로드');
+    await user.keyboard('{Enter}');
+    const heading = screen.getByRole('heading', { level: 1, name: '실제 파일 처리' });
+    expect(document.activeElement).toBe(heading);
+    expect(vi.mocked(fetch).mock.calls.every(([, options]) => options?.method !== 'POST')).toBe(true);
+  });
+
+  it('대시보드에서 예외 필터를 열면 이전 검색어가 예외를 가리지 않는다', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await user.click(screen.getByRole('button', { name: '문서 탐색' }));
+    await user.type(await screen.findByRole('textbox', { name: '문서 검색' }), '보고서');
+    await user.click(within(screen.getByRole('navigation')).getByRole('button', { name: '운영 대시보드' }));
+    await user.click(screen.getByRole('button', { name: '확인 필요 2건' }));
+    expect(screen.getByRole('textbox', { name: '문서 검색' })).toHaveProperty('value', '');
+    expect(within(document.querySelector('.doc-list-panel') as HTMLElement).getByText('기록.heic')).toBeTruthy();
+  });
+
   it('대시보드 집계에서 예외 목록과 문서 상세·파싱 비교로 이동한다',async()=>{
     const user=userEvent.setup();render(<App/>);
     await screen.findByRole('heading',{name:'운영 대시보드'});

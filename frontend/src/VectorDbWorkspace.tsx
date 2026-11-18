@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { BookOpenText, Layers, LoaderCircle, PlugZap, RefreshCw, TriangleAlert } from 'lucide-react';
+import { ArrowRight, BookOpenText, Database, Layers, LayoutGrid, LoaderCircle, LockKeyhole, PlugZap, RefreshCw, TriangleAlert } from 'lucide-react';
 import { checkMilvus, getCollection, getSources, getTree, type CheckResult, type CollectionDetail, type SourceKey, type SourcesInfo, type Tree } from './api/vectordb';
-import { Tabs } from './ui';
+import { Tabs, type TabItem } from './ui';
 import { fmtCount, loadLabel, metricHint, readStored, useFloating, useStored, writeStored } from './vectordb/ui';
 import VdbTree from './vectordb/VdbTree';
 import ChunkBrowser from './vectordb/ChunkBrowser';
@@ -22,8 +22,17 @@ type Selection = { db: string; collection: string };
 type Page = 'overview' | 'collections';
 type Tab = 'chunks' | 'schema';
 type Tip = ReturnType<typeof useFloating>;
-const PAGES: { id: Page; label: string }[] = [{ id: 'overview', label: '개요' }, { id: 'collections', label: '컬렉션' }];
-const TABS: [Tab, string][] = [['chunks', '청크'], ['schema', '스키마·인덱스']];
+const PAGES: TabItem<Page>[] = [
+  { id: 'overview', label: <><LayoutGrid size={16} aria-hidden="true" />개요</> },
+  { id: 'collections', label: <><Layers size={16} aria-hidden="true" />컬렉션</> },
+];
+const TABS: TabItem<Tab>[] = [{ id: 'chunks', label: '청크' }, { id: 'schema', label: '스키마·인덱스' }];
+const SUMMARY: { key: keyof Tree['totals']; label: string; unit: string }[] = [
+  { key: 'databases', label: '데이터베이스', unit: '개' },
+  { key: 'collections', label: '컬렉션', unit: '개' },
+  { key: 'partitions', label: '파티션', unit: '개' },
+  { key: 'rows', label: '청크', unit: '건' },
+];
 
 function firstCollection(tree: Tree, stored: string): Selection | null {
   const all = tree.databases.flatMap(db => db.collections.map(c => ({ db: db.name, collection: c.name, rows: c.row_count ?? 0 })));
@@ -40,6 +49,7 @@ function VectorDbScreen({ active }: { active: boolean }) {
   const autoPicked = useRef(false);
   const [tree, setTree] = useState<Tree | null>(null);
   const [treeError, setTreeError] = useState('');
+  const [treeBusy, setTreeBusy] = useState(false);
   const [reload, setReload] = useState(0);
   const [selection, setSelection] = useState<Selection | null>(null);
   const [partition, setPartition] = useState<string | null>(null);
@@ -70,8 +80,10 @@ function VectorDbScreen({ active }: { active: boolean }) {
     if (!source) return;
     let alive = true;
     setTreeError('');
+    setTreeBusy(true);
     getTree(source).then(result => {
       if (!alive) return;
+      if (source === 'milvus') autoPicked.current = false;
       setTree(result);
       setSelection(current => {
         const keep = current && result.databases.some(db => db.name === current.db && db.collections.some(c => c.name === current.collection));
@@ -82,7 +94,7 @@ function VectorDbScreen({ active }: { active: boolean }) {
       // 사용자가 고르지 않고 자동으로 열린 Milvus가 연결되지 않으면 오류 화면에서 멈추지 않고 예시 데이터로 연다.
       if (source === 'milvus' && autoPicked.current) { autoPicked.current = false; setFallback(err.message); setSource('example'); return; }
       setTreeError(err.message);
-    });
+    }).finally(() => { if (alive) setTreeBusy(false); });
     return () => { alive = false; };
   }, [source, reload]);
 
@@ -105,6 +117,7 @@ function VectorDbScreen({ active }: { active: boolean }) {
       if (source) writeStored(`sel.${source}`, `${db}/${collection}`);
     }
     setPartition(part);
+    if (part) setTab('chunks');
   };
   const switchSource = (next: SourceKey) => {
     if (next === source) return;
@@ -122,59 +135,83 @@ function VectorDbScreen({ active }: { active: boolean }) {
   const top = history[history.length - 1] ?? null;
   const shown = detail && selection && detail.db === selection.db && detail.name === selection.collection ? detail : null;
 
-  if (infoError) return <div className="vdb-root"><Problem message={infoError} onRetry={() => setInfoTry(n => n + 1)} /></div>;
+  if (infoError) return <div className="vdb-root"><Problem title="데이터 출처를 확인할 수 없습니다" message={infoError} onRetry={() => setInfoTry(n => n + 1)} /></div>;
   if (!info || !source) return <div className="vdb-root"><Loading label="벡터 DB 정보를 불러오는 중" /></div>;
-  const milvus = info.milvus;
-
-  const collections = () => <div className="vdb-main">
+  const collections = (loadedTree: Tree) => <div className="vdb-main">
     <nav className="panel vdb-side" aria-label="컬렉션 목록">
-      <VdbTree source={source} tree={tree!} selected={selection} partition={partition} onSelect={select} />
+      <VdbTree key={source} source={source} tree={loadedTree} selected={selection} partition={partition} onSelect={select} />
     </nav>
     <section className="panel vdb-center" aria-label="컬렉션">
-      {!selection ? <p className="vdb-empty is-page">표시할 컬렉션이 없습니다.</p>
-        : detailError ? <Problem message={detailError} onRetry={retry} />
+      {!selection ? <div className="vdb-empty is-page"><Layers size={24} aria-hidden="true" /><b>표시할 컬렉션이 없습니다</b><span>현재 데이터 출처의 데이터베이스 구성을 확인하세요.</span><button type="button" className="button-secondary" onClick={() => setPage('overview')}>개요 보기 <ArrowRight size={15} aria-hidden="true" /></button></div>
+        : detailError ? <Problem title="컬렉션을 읽을 수 없습니다" message={detailError} onRetry={retry} />
           : !shown ? <Loading label="컬렉션 정보를 불러오는 중" />
             : <>
               <CollectionHead detail={shown} tip={tip} onRead={() => navigate({ mode: 'document', field: null, value: null })} />
-              <div className="vdb-tabs" role="tablist" aria-label="컬렉션 보기">
-                {TABS.map(([key, label]) => <button key={key} type="button" role="tab" id={`vdb-tab-${key}`} aria-selected={tab === key} aria-controls="vdb-tabpanel" tabIndex={tab === key ? 0 : -1}
-                  onClick={() => setTab(key)}
-                  onKeyDown={event => { if (event.key === 'ArrowRight' || event.key === 'ArrowLeft') { event.preventDefault(); const next = tab === 'chunks' ? 'schema' : 'chunks'; setTab(next); document.getElementById(`vdb-tab-${next}`)?.focus(); } }}>{label}</button>)}
-              </div>
-              <div role="tabpanel" id="vdb-tabpanel" aria-labelledby={`vdb-tab-${tab}`} className="vdb-tabpanel">
-                {tab === 'chunks'
+              <Tabs<Tab> items={TABS} value={tab} onChange={setTab} label="컬렉션 보기" className="vdb-tabs">
+                {current => current === 'chunks'
                   ? <ChunkBrowser key={`${source}|${shown.db}|${shown.name}`} source={source} detail={shown} textField={textField} onTextField={setTextField}
                     partition={partition} onPartition={setPartition} onOpen={openChunk} activePk={top?.mode === 'chunk' ? top.pk : null} />
                   : <SchemaView detail={shown} />}
-              </div>
+              </Tabs>
             </>}
     </section>
   </div>;
 
   return <div className="vdb-root">
+    <SourcePanel info={info} source={source} fallback={fallback} tree={tree} busy={treeBusy} stale={!!treeError} tip={tip} onSource={switchSource} onRefresh={retry} />
     <div className="vdb-shell">
       <Tabs<Page> items={PAGES} value={page} onChange={setPage} label="벡터 DB 보기" className="vdb-pages">
-        {current => treeError ? <Problem message={treeError} onRetry={retry} />
+        {current => treeError ? <Problem title="컬렉션 목록을 읽을 수 없습니다" message={treeError} onRetry={retry} />
           : !tree ? <Loading label="컬렉션 목록을 불러오는 중" />
-            : current === 'overview' ? <Overview tree={tree} onOpen={setOpenPart} /> : collections()}
+            : current === 'overview' ? <Overview tree={tree} onOpen={setOpenPart} onBrowse={() => setPage('collections')} /> : collections(tree)}
       </Tabs>
-      <div className="vdb-bar">
-        {milvus.configured && <div className="vdb-seg" role="group" aria-label="데이터 출처">
-          {info.sources.map(s => <button key={s.key} type="button" aria-pressed={source === s.key} disabled={!s.available} onClick={() => switchSource(s.key)}>{s.label}</button>)}
-        </div>}
-        {source === 'example' && <span className="vdb-example" tabIndex={0}
-          {...tip.bind('example', () => <span>{fallback ? `Milvus에 연결하지 못해 합성 예시 컬렉션을 보여 줍니다. ${fallback}` : milvus.configured ? '합성 예시 컬렉션입니다.' : 'Milvus 연결 정보가 없어 합성 예시 컬렉션을 보여 줍니다.'}</span>)}>{fallback ? '예시 데이터 · Milvus 연결 실패' : '예시 데이터'}</span>}
-        {tree && <span className="vdb-totals">컬렉션 <b>{fmtCount(tree.totals.collections)}</b> · 청크 <b>{fmtCount(tree.totals.rows)}</b></span>}
-        {tree && tree.warnings.length > 0 && <span className="vdb-chip is-warn" tabIndex={0}
-          {...tip.bind('tree-warn', () => <><b>읽지 못한 정보</b>{tree.warnings.slice(0, 6).map(w => <span key={w}>{w}</span>)}</>)}><TriangleAlert size={12} aria-hidden /> {tree.warnings.length}건</span>}
-        <MilvusControl info={info} tip={tip} />
-        <button type="button" className="plain-icon" aria-label="다시 불러오기" title="다시 불러오기" onClick={retry}><RefreshCw size={15} /></button>
-      </div>
     </div>
     {openPart && active && <PartitionModal key={`${source}|${openPart.db}|${openPart.collection}|${openPart.partition}`} source={source} part={openPart} onClose={() => setOpenPart(null)} />}
     {shown && active && <ChunkModal stack={history} onBack={back} onClose={close} onNavigate={navigate} source={source} detail={shown} textField={textField} />}
     {tip.layer}
   </div>;
+}
+
+function SourcePanel({ info, source, fallback, tree, busy, stale, tip, onSource, onRefresh }: {
+  info: SourcesInfo; source: SourceKey; fallback: string; tree: Tree | null; busy: boolean; stale: boolean; tip: Tip;
+  onSource: (next: SourceKey) => void; onRefresh: () => void;
+}) {
+  const milvus = info.milvus;
+  const example = source === 'example';
+  return <section className="vdb-source" aria-label="데이터 출처와 현황">
+    <div className="vdb-source-head">
+      <span className="vdb-source-icon"><Database size={23} strokeWidth={1.7} aria-hidden="true" /></span>
+      <div className="vdb-source-copy">
+        <div className="vdb-source-title">
+          <h2>{example ? (fallback ? '예시 데이터 · Milvus 연결 실패' : '예시 데이터') : 'Milvus 데이터'}</h2>
+          <span className="ui-pill vdb-readonly"><LockKeyhole size={12} aria-hidden="true" />읽기 전용</span>
+        </div>
+        <p>{example ? (milvus.configured ? '합성 컬렉션으로 파티션과 청크를 탐색할 수 있습니다.' : 'Milvus 주소를 설정하면 실제 컬렉션을 볼 수 있습니다. 현재는 합성 컬렉션을 표시합니다.')
+          : <>기본 데이터베이스 <code>{milvus.db}</code> · 연결된 컬렉션을 조회합니다.</>}</p>
+      </div>
+      <div className="vdb-source-controls">
+        {milvus.configured && <div className="vdb-seg" role="group" aria-label="데이터 출처">
+          {info.sources.map(item => <button key={item.key} type="button" aria-pressed={source === item.key} disabled={!item.available} onClick={() => onSource(item.key)}>{item.label}</button>)}
+        </div>}
+        <button type="button" className="button-secondary vdb-refresh" aria-label="다시 불러오기" onClick={onRefresh} disabled={busy}>
+          <RefreshCw size={16} className={busy ? 'vdb-spin' : undefined} aria-hidden="true" /> 새로고침
+        </button>
+      </div>
+    </div>
+    <div className="vdb-source-foot">
+      <MilvusControl info={info} tip={tip} />
+      {stale && tree && <span className="ui-pill is-warn" role="status">새로고침 실패 · 이전 집계</span>}
+      {fallback && example && <details className="vdb-source-details"><summary>연결 오류 상세</summary><p>{fallback}</p></details>}
+      {!milvus.configured && <details className="vdb-source-details"><summary>연결 설정</summary><p>서버의 <code>.env</code>에 <code>MILVUS_URI</code>와 필요한 경우 <code>MILVUS_TOKEN</code>, <code>MILVUS_DB</code>를 설정한 뒤 서버를 다시 시작하세요.</p></details>}
+    </div>
+    <dl className="vdb-summary" aria-label="데이터 출처 집계" aria-busy={busy}>
+      {SUMMARY.map(({ key, label, unit }) => <div key={key}><dt>{label}</dt><dd>{tree ? <>{fmtCount(tree.totals[key])}<small>{unit}</small></> : '—'}</dd></div>)}
+    </dl>
+    {!!tree?.warnings.length && <details className="vdb-warnings">
+      <summary><TriangleAlert size={16} aria-hidden="true" /> 일부 정보를 읽지 못했습니다 <b className="ui-pill is-warn">{tree.warnings.length}건</b></summary>
+      <ul>{tree.warnings.map((warning, index) => <li key={index}>{warning}</li>)}</ul>
+    </details>}
+  </section>;
 }
 
 function CollectionHead({ detail, tip, onRead }: { detail: CollectionDetail; tip: Tip; onRead: () => void }) {
@@ -184,9 +221,8 @@ function CollectionHead({ detail, tip, onRead }: { detail: CollectionDetail; tip
   const partitions = detail.partitions_num ?? detail.partitions.length;
   return <header className="vdb-head">
     <div className="vdb-head-title">
-      <Layers size={16} aria-hidden />
-      <h2>{detail.name}</h2>
-      <span className="vdb-head-db">{detail.db}</span>
+      <span className="vdb-head-icon"><Layers size={19} strokeWidth={1.8} aria-hidden="true" /></span>
+      <div><span className="vdb-head-db">{detail.db}</span><h2>{detail.name}</h2></div>
     </div>
     <div className="vdb-chips" aria-label="컬렉션 요약">
       <span className="vdb-chip" tabIndex={0} {...tip.bind('h-rows', () => <><b>청크 {fmtCount(detail.row_count)}개</b><span>파티션 {fmtCount(partitions)}개{detail.shards ? ` · 샤드 ${detail.shards}개` : ''}</span></>)}>
@@ -205,7 +241,7 @@ function CollectionHead({ detail, tip, onRead }: { detail: CollectionDetail; tip
       </span>
     </div>
     <span className="vdb-toolbar-gap" />
-    <button type="button" className="button-quiet vdb-head-read" onClick={onRead}><BookOpenText size={14} aria-hidden /> 문서로 다시 읽기</button>
+    <button type="button" className="button-quiet vdb-head-read" onClick={onRead}><BookOpenText size={16} aria-hidden="true" /> 문서로 다시 읽기</button>
   </header>;
 }
 
@@ -213,31 +249,31 @@ function MilvusControl({ info, tip }: { info: SourcesInfo; tip: Tip }) {
   const [result, setResult] = useState<CheckResult | null>(null);
   const [checking, setChecking] = useState(false);
   const milvus = info.milvus;
-  if (!milvus.configured) return <span className="vdb-conn is-off" tabIndex={0}
-    {...tip.bind('conn', () => <><b>Milvus 미연결</b><span>연결 정보가 설정되지 않았습니다.</span></>)}><i aria-hidden />Milvus 미연결</span>;
+  if (!milvus.configured) return <span className="vdb-conn is-off"><i aria-hidden="true" />Milvus 미연결</span>;
   const run = () => {
     setChecking(true);
     checkMilvus().then(setResult).catch((err: Error) => setResult({ ok: false, status: null, latency_ms: 0, error: err.message })).finally(() => setChecking(false));
   };
-  return <span className={`vdb-conn ${result ? (result.ok ? 'is-ok' : 'is-bad') : ''}`}>
-    <span className="vdb-conn-label" tabIndex={0} {...tip.bind('conn', () => <><b>{milvus.uri}</b><span>데이터베이스 {milvus.db}</span>
+  return <span className={`vdb-conn ${!checking && result ? (result.ok ? 'is-ok' : 'is-bad') : ''}`}>
+    <span className="vdb-conn-label" tabIndex={0} role="status" {...tip.bind('conn', () => <><b>{milvus.uri}</b><span>데이터베이스 {milvus.db}</span>
       {result && (result.ok
         ? <span>연결됨 · {result.latency_ms}ms{result.databases ? ` · 데이터베이스 ${result.databases.length}개` : ''}{result.db_found === false ? ` · ${milvus.db} 없음` : ''}</span>
         : <span className="is-error">{result.error ?? '연결하지 못했습니다.'}</span>)}
       {result?.note && <span>{result.note}</span>}</>)}>
-      <i aria-hidden />{result ? (result.ok ? `연결됨 · ${result.latency_ms}ms` : '연결 실패') : 'Milvus'}
+      <i aria-hidden />{checking ? '연결 확인 중' : result ? (result.ok ? `연결됨 · ${result.latency_ms} ms` : '연결 확인 실패') : 'Milvus 설정됨'}
     </span>
     <button type="button" className="vdb-conn-check" onClick={run} disabled={checking}>
-      {checking ? <LoaderCircle size={13} className="mw-spin" aria-hidden /> : <PlugZap size={13} aria-hidden />} 연결 확인
+      {checking ? <LoaderCircle size={16} className="vdb-spin" aria-hidden="true" /> : <PlugZap size={16} aria-hidden="true" />} 연결 확인
     </button>
+    {!checking && result && (!result.ok || result.db_found === false) && <span className="vdb-conn-result">{result.ok ? `설정한 데이터베이스 ${milvus.db}을(를) 찾을 수 없습니다.` : result.error ?? 'Milvus에 연결하지 못했습니다.'}</span>}
   </span>;
 }
 
-const Loading = ({ label }: { label: string }) => <p className="vdb-loading is-page" role="status"><LoaderCircle size={16} className="mw-spin" aria-hidden /> {label}</p>;
+const Loading = ({ label }: { label: string }) => <p className="vdb-loading is-page" role="status"><LoaderCircle size={16} className="vdb-spin" aria-hidden /> {label}</p>;
 
-function Problem({ message, onRetry }: { message: string; onRetry: () => void }) {
+function Problem({ title, message, onRetry }: { title: string; message: string; onRetry: () => void }) {
   return <div className="vdb-problem" role="alert">
-    <TriangleAlert size={16} aria-hidden /><span>{message}</span>
-    <button type="button" className="button-secondary" onClick={onRetry}><RefreshCw size={13} aria-hidden /> 다시 시도</button>
+    <TriangleAlert size={19} aria-hidden="true" /><div><strong>{title}</strong><p>{message}</p></div>
+    <button type="button" className="button-secondary" onClick={onRetry}><RefreshCw size={15} aria-hidden="true" /> 다시 시도</button>
   </div>;
 }

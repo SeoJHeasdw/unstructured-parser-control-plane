@@ -61,9 +61,9 @@ const INSERTABLE: NodeKind[] = ['task', 'review', 'gateway', 'exception', 'store
 
 export function DesignInspector(props: DesignProps) {
   const { node, edge } = props;
-  if (node) return <NodeDesign {...props} node={node} />;
-  if (edge) return <EdgeDesign {...props} edge={edge} />;
-  return <FlowDesign {...props} />;
+  if (node) return <NodeDesign key={rid(props.flow.id, node.id)} {...props} node={node} />;
+  if (edge) return <EdgeDesign key={rid(props.flow.id, edge.id)} {...props} edge={edge} />;
+  return <FlowDesign key={props.flow.id} {...props} />;
 }
 
 function FlowDesign({ library, flow, issues, onSelectNode, onFlowMeta, onLayout, onResetFlow, onDeleteFlow, onExport, onImport, onOpenDocuments }: DesignProps) {
@@ -90,7 +90,6 @@ function FlowDesign({ library, flow, issues, onSelectNode, onFlowMeta, onLayout,
       {confirmReset ? <div className="fi-confirm"><span>{flow.builtIn ? '기본 구성으로 되돌릴까요?' : '이 흐름을 삭제할까요?'}</span><button className="fi-button is-danger" onClick={() => { setConfirmReset(false); flow.builtIn ? onResetFlow() : onDeleteFlow(); }}>{flow.builtIn ? '되돌리기' : '삭제'}</button><button className="fi-button" onClick={() => setConfirmReset(false)}>취소</button></div>
         : <button className="fi-button is-ghost" onClick={() => setConfirmReset(true)}>{flow.builtIn ? <><RotateCcw size={14} /> 기본 구성으로 되돌리기</> : <><Trash2 size={14} /> 흐름 삭제</>}</button>}
     </Section>
-    <div className="fi-help"><b>조작</b><span>왼쪽 도형을 끌어 놓거나 눌러 추가 · 노드 가장자리 점을 끌어 연결 · 연결선 위 + 로 중간에 삽입 · 더블클릭으로 이름 수정 · Delete 삭제 · ⌘Z 되돌리기 · ⌘D 복제 · 방향키로 이동</span></div>
   </div>;
 }
 
@@ -168,7 +167,7 @@ type MonitorProps = {
   onNavigate: (flowId: string, nodeId?: string) => void; onNodeData: (id: string, patch: Partial<FlowNodeData>) => void;
 };
 export function MonitorInspector(props: MonitorProps) {
-  return props.node ? <NodeMonitor {...props} node={props.node} /> : <Overview {...props} />;
+  return props.node ? <NodeMonitor key={rid(props.flow.id, props.node.id)} {...props} node={props.node} /> : <Overview {...props} />;
 }
 
 function nodeLabel(library: FlowLibrary, runtimeId: string) {
@@ -195,9 +194,10 @@ export function getAttentionStages(library: FlowLibrary, metrics: SimSnapshot['m
 }
 
 function Overview({ library, flow, snapshot, attention, onNavigate }: MonitorProps) {
-  const actions = snapshot.events.filter(event => event.level === 'action').slice(0, 5);
+  const actions = snapshot.events.filter(event => event.level === 'action'
+    && (flow.id === OVERVIEW_ID || event.node?.startsWith(`${flow.id}::`))).slice(0, 5);
   return <div className="fi-body">
-    <div className="fi-head"><h3>주의가 필요한 단계</h3></div>
+    <div className="fi-head"><h3>주의가 필요한 단계</h3>{attention.length > 0 && <p>단계를 선택하면 지표와 개입 도구를 열 수 있습니다.</p>}</div>
     {attention.length ? <ul className="fi-attention">{attention.map(item => <li key={item.id}>
       <button onClick={() => onNavigate(item.flowId, item.nodeId)}>
         <i className={`fx-dot is-${item.metric.status}`} />
@@ -265,7 +265,7 @@ function NodeMonitor({ library, flow, node, snapshot, sim, metrics, onNavigate, 
       </div>
     </Section>}
 
-    {data.kind !== 'gateway' && data.kind !== 'start' && data.kind !== 'end' && <Section title={`문서 ${docs.length}건`} aside={<div className="fi-filter">{(['all', 'held', 'failed', 'queued', 'processing'] as const).map(value => <button key={value} className={filter === value ? 'is-on' : ''} onClick={() => setFilter(value)}>{value === 'all' ? '전체' : STATE_LABEL[value]}</button>)}</div>}>
+    {data.kind !== 'gateway' && data.kind !== 'start' && data.kind !== 'end' && <Section title={`문서 ${docs.length}건`} aside={<div className="fi-filter" role="group" aria-label="단계 문서 상태">{(['all', 'held', 'failed', 'queued', 'processing'] as const).map(value => <button key={value} className={filter === value ? 'is-on' : ''} aria-pressed={filter === value} onClick={() => setFilter(value)}>{value === 'all' ? '전체' : STATE_LABEL[value]}</button>)}</div>}>
       {shown.length ? <ul className="fi-docs">{shown.slice(0, 40).map(doc => <li key={doc.id} className={`is-${doc.state}`}>
         <div className="fi-doc-main"><b title={doc.parentName ? `${doc.name} ← ${doc.parentName}` : doc.name}>{doc.priority && <ChevronsUp size={12} />}{doc.depth > 0 && <i className="fi-depth">{'↳'.repeat(Math.min(doc.depth, 3))}</i>}{doc.name}</b><span><em className={`fi-state is-${doc.state}`}>{STATE_LABEL[doc.state]}</em>{childFlow && <>{nodeLabel(library, doc.node).label} · </>}{doc.state === 'processing' ? `${Math.round(doc.progress * 100)}%` : wait(snapshot.now - doc.enteredAt)}{doc.reason && <> · {doc.reason}</>}</span></div>
         {!childFlow && <div className="fi-doc-actions">

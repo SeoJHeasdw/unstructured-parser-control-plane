@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import type { FocusEvent, MouseEvent as ReactMouseEvent } from 'react';
-import { ArrowRight, ChevronDown, ChevronRight, CirclePause, CirclePlay, TriangleAlert } from 'lucide-react';
+import { ArrowRight, ChevronDown, ChevronRight, CirclePause, CirclePlay, TriangleAlert, Workflow } from 'lucide-react';
 import { STATUS_LABEL } from './FlowCanvasParts';
 import { aggregate, rid, splitRid } from './flowSim';
 import type { FlowSimulator, NodeMetric } from './flowSim';
@@ -28,9 +28,12 @@ export default function LiveFlowPanel({ simulator, active, onOpen }: Props) {
   const snapshot = useSyncExternalStore(simulator.subscribe, simulator.getSnapshot);
   useEffect(() => { if (active) return simulator.acquire(); }, [active, simulator]);
   const [saved, setSaved] = useState<Saved>(loadSaved);
-  const [focusKey, setFocusKey] = useState<MetricKey | null>(null);
+  const [previewKey, setPreviewKey] = useState<MetricKey | null>(null);
+  const [pinnedKey, setPinnedKey] = useState<MetricKey | null>(null);
+  const focusKey = previewKey ?? pinnedKey;
   const [tip, setTip] = useState<Tip | null>(null);
   const railRef = useRef<HTMLOListElement>(null);
+  const [railOverflow, setRailOverflow] = useState(false);
   const update = (next: Saved) => { setSaved(next); try { localStorage.setItem(STORE_KEY, JSON.stringify(next)); } catch { /* 저장 실패는 화면 동작에 영향 없음 */ } };
 
   const library = simulator.getLibrary();
@@ -45,9 +48,19 @@ export default function LiveFlowPanel({ simulator, active, onOpen }: Props) {
     for (const node of nodes) { const last = groups[groups.length - 1]; if (last && Math.abs(center(last[0]) - center(node)) < 24) last.push(node); else groups.push([node]); }
     return groups.map(group => group.sort((a, b) => cross(a) - cross(b)));
   }, [root]);
+  useEffect(() => {
+    const rail = railRef.current;
+    if (!active || !rail) return;
+    const measure = () => setRailOverflow(rail.scrollWidth > rail.clientWidth + 1);
+    measure();
+    if (typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver(measure);
+    observer.observe(rail);
+    return () => observer.disconnect();
+  }, [active, columns]);
   const metricOf = useCallback((node: FlowNode) => node.data.kind === 'subflow' && node.data.subflow ? aggregate(snapshot.metrics, node.data.subflow) : snapshot.metrics[rid(OVERVIEW_ID, node.id)], [snapshot.metrics]);
   const attention = Object.entries(snapshot.metrics).filter(([, metric]) => metric.status === 'error' || metric.status === 'warn' || metric.status === 'paused')
-    .sort(([, a], [, b]) => rank(a) - rank(b) || (b.failed + b.held + b.queued) - (a.failed + a.held + a.queued)).slice(0, 6)
+    .sort(([, a], [, b]) => rank(a) - rank(b) || (b.failed + b.held + b.queued) - (a.failed + a.held + a.queued))
     .map(([id, metric]) => { const { flowId, nodeId } = splitRid(id); const doc = library.flows[flowId]; return { id, flowId, nodeId, metric, label: doc?.nodes.find(node => node.id === nodeId)?.data.label ?? nodeId, flow: flowId === OVERVIEW_ID ? '전체 흐름' : doc?.title ?? flowId }; });
   const t = snapshot.totals;
 
@@ -55,7 +68,9 @@ export default function LiveFlowPanel({ simulator, active, onOpen }: Props) {
   const showTip = (target: Element, content: Omit<Tip, 'x' | 'y'>) => {
     const rect = target.getBoundingClientRect();
     const railBottom = railRef.current?.getBoundingClientRect().bottom ?? rect.bottom;
-    setTip({ ...content, x: Math.min(Math.max(rect.left + rect.width / 2, 160), window.innerWidth - 160), y: Math.max(rect.bottom, railBottom) + 8 });
+    const halfWidth = Math.min(172, window.innerWidth / 2);
+    const x = Math.min(Math.max(rect.left + rect.width / 2, halfWidth), window.innerWidth - halfWidth);
+    setTip({ ...content, x, y: Math.max(rect.bottom, railBottom) + 8 });
   };
   const hideTip = () => setTip(null);
   useEffect(() => {
@@ -72,35 +87,46 @@ export default function LiveFlowPanel({ simulator, active, onOpen }: Props) {
   };
 
   const kpi = (key: MetricKey | null, label: string, value: string, unit = '', hint?: string, tone = '') => {
-    const props = key ? { onMouseEnter: () => setFocusKey(key), onMouseLeave: () => setFocusKey(null), onFocus: () => setFocusKey(key), onBlur: () => setFocusKey(null) } : {};
-    return <button type="button" className={`lf-kpi${tone}${key && focusKey === key ? ' is-focus' : ''}`} title={hint} {...props}
-      onClick={() => { if (key === 'held' || key === 'failed') jump(attention.find(item => item.metric[key] > 0)); }}>
-      <span>{label}</span><b>{value}<small>{unit}</small></b>
-    </button>;
+    const content = <><span>{label}</span><b>{value}{unit && <small>{unit}</small>}</b></>;
+    const className = `lf-kpi${tone}${key && focusKey === key ? ' is-focus' : ''}`;
+    if (!key || Number(value) === 0) return <div className={className} title={key ? undefined : hint}>{content}</div>;
+    const destination = key === 'held' || key === 'failed' ? attention.find(item => item.metric[key] > 0) : undefined;
+    return <button type="button" className={className} title={hint}
+      aria-pressed={destination ? undefined : pinnedKey === key}
+      onMouseEnter={() => setPreviewKey(key)} onMouseLeave={() => setPreviewKey(null)}
+      onFocus={() => setPreviewKey(key)} onBlur={() => setPreviewKey(null)}
+      onClick={() => {
+        if (destination) jump(destination);
+        else {
+          setPreviewKey(null);
+          setPinnedKey(pinnedKey === key ? null : key);
+        }
+      }}>{content}</button>;
   };
   const formatNodes = columns.flatMap(group => group.length > 1 && group.some(node => node.data.kind === 'subflow') ? group : []);
 
   return <section className={`lf-root${focusKey ? ' has-focus' : ''}`} aria-label="처리 흐름 현황">
     <header className="lf-head">
-      <div><h2>처리 흐름</h2><span className={`lf-state ${snapshot.running ? 'is-on' : ''}`}>{snapshot.running ? <><i /> 진행 중</> : <><CirclePause size={13} /> 전체 일시정지</>}</span><time>{snapshot.clock}</time><span className="lf-mock" title="브라우저 안의 모의 운영 수치입니다. 실제 처리 목록과 연결되어 있지 않습니다.">모의 운영</span></div>
+      <div className="lf-head-title"><span className="lf-head-icon"><Workflow size={19} strokeWidth={1.8} aria-hidden="true" /></span><h2>처리 흐름</h2><span className="lf-mock" title="브라우저 안에서 시뮬레이션한 운영 수치입니다.">모의 운영</span><span className={`lf-state ${snapshot.running ? 'is-on' : ''}`}>{snapshot.running ? <><i /> 진행 중</> : <><CirclePause size={13} /> 전체 일시정지</>}</span><time title="시뮬레이션 시각">{snapshot.clock}</time></div>
       <div className="lf-actions">
         <button type="button" className={`lf-attn-toggle${attention.length ? ' has-items' : ''}`} aria-expanded={saved.attention} onClick={() => update({ ...saved, attention: !saved.attention })}>
           <TriangleAlert size={14} /> 주의 <b>{attention.length}</b><ChevronDown size={13} className={saved.attention ? '' : 'lf-rot'} />
         </button>
         <button type="button" onClick={() => simulator.setRunning(!snapshot.running)}>{snapshot.running ? <><CirclePause size={14} /> 일시정지</> : <><CirclePlay size={14} /> 재개</>}</button>
-        <button type="button" className="is-primary" onClick={() => onOpen(OVERVIEW_ID)}>파이프라인에서 보기 <ArrowRight size={14} /></button>
+        <button type="button" className="is-primary" onClick={() => onOpen(OVERVIEW_ID)}>파이프라인 열기 <ArrowRight size={14} /></button>
       </div>
     </header>
     <div className="lf-kpis" role="group" aria-label="처리 지표">
       {kpi(null, '유입', `${t.arrivalsPerMin}`, '/분')}
       {kpi(null, '파생 문서', `${t.derivedPerMin}`, '/분', t.arrivals ? `압축 항목·첨부·내장 개체에서 나온 문서 · 원본 대비 ×${((t.arrivals + t.derived) / t.arrivals).toFixed(2)} · 최대 깊이 ${t.maxDepth}` : '압축 항목·첨부·내장 개체에서 나온 문서')}
-      {kpi('processing', '처리 중', `${t.processing}`, '', '마우스를 올리면 처리 중인 단계를 강조합니다')}
-      {kpi('queued', '대기', `${t.queued}`, '', '마우스를 올리면 대기가 쌓인 단계를 강조합니다')}
+      {kpi('processing', '처리 중', `${t.processing}`, '', '처리 중인 단계 강조')}
+      {kpi('queued', '대기', `${t.queued}`, '', '대기가 쌓인 단계 강조')}
       {kpi('held', '보류 · 사람 확인', `${t.held}`, '', '클릭하면 보류된 단계로 이동합니다', t.held ? ' is-warn' : '')}
       {kpi('failed', '실패', `${t.failed}`, '', '클릭하면 실패한 단계로 이동합니다', t.failed ? ' is-error' : '')}
       {kpi(null, '누적 완료', t.completed.toLocaleString('ko-KR'), '', `분당 완료 ${t.completedPerMin}`)}
     </div>
     <div className="lf-body">
+      {railOverflow && <p className="lf-rail-hint">좌우로 스크롤해 전체 단계를 확인하세요. <ChevronRight size={14} aria-hidden="true" /></p>}
       <ol className="lf-rail" ref={railRef}>{columns.map((group, index) => {
         const table = group.length > 1 && group.some(node => node.data.kind === 'subflow');
         const next = index < columns.length - 1 && <ChevronRight className="lf-arrow" size={14} aria-hidden="true" />;

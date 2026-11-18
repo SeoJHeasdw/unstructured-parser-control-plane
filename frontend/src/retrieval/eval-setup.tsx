@@ -9,7 +9,7 @@ import { SHORT_INPUT, candidateFor, fmtTokens, modelName, nextId, shortLang, spe
 /** 모델 이름 아래 한 줄: 차원 · 입력 한도 · 언어. 입력이 짧은 모델은 한도를 표시로 드러낸다. */
 export function ModelFacts({ spec, dims, limit }: { spec: ModelSpec | null; dims?: number | null; limit?: number | null }) {
   const d = spec?.dims ?? dims ?? null;
-  const max = spec?.max_tokens ?? limit ?? null;
+  const max = limit ?? spec?.max_tokens ?? null;
   if (d === null && max === null) return <span className="ee-facts">사양 정보 없음</span>;
   return <span className="ee-facts">
     {d !== null ? `${d}차원` : '차원 모름'}{' · '}

@@ -1,5 +1,5 @@
 import { useState, type CSSProperties } from 'react';
-import { TriangleAlert } from 'lucide-react';
+import { ArrowRight, ArrowUpRight, Layers, TriangleAlert } from 'lucide-react';
 import type { CollectionNode, PartitionNode, Tree } from '../api/vectordb';
 import { Modal } from '../ui';
 import type { PartRef } from './PartitionModal';
@@ -17,14 +17,18 @@ function sortParts(coll: CollectionNode): Part[] {
 }
 
 /** 개요: 컬렉션마다 파티션 타일. 타일을 누르면 파티션 팝업을 연다. */
-export default function Overview({ tree, onOpen }: { tree: Tree; onOpen: (part: PartRef) => void }) {
+export default function Overview({ tree, onOpen, onBrowse }: { tree: Tree; onOpen: (part: PartRef) => void; onBrowse: () => void }) {
   const tip = useFloating();
   const [more, setMore] = useState<{ db: string; coll: CollectionNode } | null>(null);
   const sections = tree.databases.flatMap(db => db.collections.map(coll => ({ db: db.name, coll })));
   const bare = tree.databases.filter(db => !db.collections.length);
   const open = (db: string, coll: CollectionNode, p: PartitionNode) => onOpen({ db, collection: coll.name, partition: p.name, rows: p.row_count });
 
-  return <div className="panel vdb-ov">
+  return <div className="vdb-ov">
+    <div className="vdb-ov-intro">
+      <div><h2>파티션별 청크 분포</h2><p>파티션을 선택해 저장된 청크와 문서별 본문을 보세요.</p></div>
+      {sections.length > 0 && <button className="button-secondary" type="button" onClick={onBrowse}>컬렉션 탐색 <ArrowRight size={16} aria-hidden="true" /></button>}
+    </div>
     {sections.map(({ db, coll }) => {
       const parts = sortParts(coll);
       const shown = parts.length > SHOW ? parts.slice(0, SHOW - 1) : parts;
@@ -32,8 +36,8 @@ export default function Overview({ tree, onOpen }: { tree: Tree; onOpen: (part: 
       const loaded = coll.load_state === 'LoadStateLoaded';
       return <section key={`${db}/${coll.name}`} className="vdb-ov-sec" aria-labelledby={`vdb-ov-${db}-${coll.name}`}>
         <header className="vdb-ov-head">
-          <h3 id={`vdb-ov-${db}-${coll.name}`}>{coll.name}</h3>
-          <span className="vdb-ov-db">{db}</span>
+          <span className="vdb-head-icon"><Layers size={18} strokeWidth={1.8} aria-hidden="true" /></span>
+          <div className="vdb-ov-identity"><span className="vdb-ov-db">{db}</span><h3 id={`vdb-ov-${db}-${coll.name}`}>{coll.name}</h3></div>
           <span className="vdb-toolbar-gap" />
           <span className="vdb-ov-fact">청크 <b className="ui-num">{fmtCount(coll.row_count)}</b></span>
           {coll.dim && <span className="vdb-ov-fact"><b className="ui-num">{fmtCount(coll.dim)}</b>차원{coll.metric ? ` · ${coll.metric}` : ''}</span>}
@@ -46,7 +50,7 @@ export default function Overview({ tree, onOpen }: { tree: Tree; onOpen: (part: 
         </div> : !coll.error && <p className="vdb-ov-none">파티션 정보가 없습니다.</p>}
       </section>;
     })}
-    {!sections.length && <p className="ui-empty"><b>컬렉션이 없습니다</b></p>}
+    {!sections.length && <div className="panel vdb-empty is-page"><Layers size={24} aria-hidden="true" /><b>컬렉션이 없습니다</b><span>데이터 출처의 데이터베이스를 확인하세요.</span></div>}
     {bare.length > 0 && <p className="vdb-ov-none">{bare.map(db => db.name).join(', ')} · 컬렉션 없음</p>}
     {tip.layer}
     {more && <MoreModal db={more.db} coll={more.coll} onClose={() => setMore(null)} onPick={p => { setMore(null); open(more.db, more.coll, p); }} />}
@@ -57,8 +61,9 @@ function Tile({ part, total, tip, tipKey, onOpen }: { part: Part; total: number;
   const rows = part.row_count;
   const share = total > 0 && rows ? rows / total : 0;
   const style = { '--c': part.color } as CSSProperties;
+  const interactive = rows !== 0 || !!part.error;
   const body = <>
-    <span className="vdb-tile-name"><i className="vdb-swatch" aria-hidden /><span>{part.name}</span>{part.error && <TriangleAlert size={14} className="vdb-tile-warn" aria-label="읽지 못함" />}</span>
+    <span className="vdb-tile-name"><i className="vdb-swatch" aria-hidden /><span>{part.name}</span>{part.error && <TriangleAlert size={14} className="vdb-tile-warn" aria-label="읽지 못함" />}{interactive && <ArrowUpRight size={16} className="vdb-tile-arrow" aria-hidden="true" />}</span>
     <span className="vdb-tile-count ui-num">{fmtCount(rows)}</span>
     <span className="vdb-tile-bar" aria-hidden><i style={{ width: `${Math.max(share * 100, share ? 2 : 0)}%` }} /></span>
   </>;
@@ -74,7 +79,7 @@ function MoreTile({ parts, total, onOpen }: { parts: Part[]; total: number; onOp
   const rows = parts.reduce((sum, p) => sum + (p.row_count ?? 0), 0);
   const share = total > 0 ? rows / total : 0;
   return <button type="button" className="vdb-tile is-more" onClick={onOpen} aria-label={`파티션 ${parts.length}개 더 보기`}>
-    <span className="vdb-tile-name"><span>{parts.length}개 더</span></span>
+    <span className="vdb-tile-name"><span>{parts.length}개 더</span><ArrowUpRight size={16} className="vdb-tile-arrow" aria-hidden="true" /></span>
     <span className="vdb-tile-count ui-num">{fmtCount(rows)}</span>
     <span className="vdb-tile-bar" aria-hidden><i style={{ width: `${Math.max(share * 100, share ? 2 : 0)}%` }} /></span>
   </button>;

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ChevronDown, FileText, RefreshCw, Ruler, SlidersHorizontal } from 'lucide-react';
+import { AlertCircle, ChevronDown, FileText, Info, LoaderCircle, RefreshCw, Ruler, Scissors, SlidersHorizontal } from 'lucide-react';
 import { chunkSource, getConfig, getSamples, listDocuments } from './api/retrieval';
 import type { ChunkResponse, Preset, RetrievalConfig, RetrievalDoc, Sample } from './api/retrieval';
 import { Tabs } from './ui';
@@ -21,6 +21,7 @@ import './retrieval.css';
 type Bench = { source: SourceKey | ''; selected: string[]; conn: string; model: string };
 type View = 'compare' | 'elements';
 type Open = { id: string; tab: StrategyTab; index: number };
+type BenchResult = { key: string; attempt: number; response: ChunkResponse | null; error: string };
 
 export default function ChunkBench({ active }: { active: boolean }) {
   const [bench, setBench] = usePersistent<Bench>(STORE.bench, { source: 'sample:report', selected: DEFAULT_SELECTED, conn: '', model: '' });
@@ -31,22 +32,21 @@ export default function ChunkBench({ active }: { active: boolean }) {
   const [samples, setSamples] = useState<Sample[]>([]);
   const [ready, setReady] = useState(false);
   const [loadError, setLoadError] = useState('');
-  const [response, setResponse] = useState<ChunkResponse | null>(null);
-  const [running, setRunning] = useState(false);
-  const [runError, setRunError] = useState('');
+  const [result, setResult] = useState<BenchResult | null>(null);
+  const [loadAttempt, setLoadAttempt] = useState(0);
   const [nonce, setNonce] = useState(0);
   const [open, setOpen] = useState<Open | null>(null);
   const [sourceOpen, setSourceOpen] = useState(false);
   const [presetOpen, setPresetOpen] = useState<string | null | false>(false);
   const [measureOpen, setMeasureOpen] = useState(false);
-  const abortRef = useRef<AbortController | null>(null);
 
-  /* 처음 열 때 설정·문서·예시 목록을 읽고, 다시 열 때는 문서 목록만 새로 읽는다. */
-  const loadStarted = useRef(false);
+  const lastLoadAttempt = useRef<number | null>(null);
   useEffect(() => {
     if (!active) return;
-    if (loadStarted.current) { listDocuments().then(setDocs).catch(() => undefined); return; }
-    loadStarted.current = true;
+    if (lastLoadAttempt.current === loadAttempt) { listDocuments().then(setDocs).catch(() => undefined); return; }
+    lastLoadAttempt.current = loadAttempt;
+    setReady(false);
+    setLoadError('');
     void Promise.allSettled([getConfig(), listDocuments(), getSamples()]).then(([c, d, s]) => {
       if (c.status === 'fulfilled') setConfig(c.value);
       if (d.status === 'fulfilled') setDocs(d.value);
@@ -54,7 +54,7 @@ export default function ChunkBench({ active }: { active: boolean }) {
       else setLoadError(errorText(s.reason));
       setReady(true);
     });
-  }, [active]);
+  }, [active, loadAttempt]);
 
   /* 고른 원문이 없어졌으면 첫 예시 문서, 그다음 첫 실제 문서로. */
   const sourceKey: SourceKey | null = useMemo(() => {
@@ -70,26 +70,29 @@ export default function ChunkBench({ active }: { active: boolean }) {
   const chosen = useMemo(() => presets.filter(p => bench.selected.includes(p.id)).slice(0, MAX_SELECTED), [bench.selected, presets]);
   /* 한도 초과는 알려진 모델 가운데 가장 작은 입력 한도로 센다. */
   const limit = useMemo(() => { const caps = (config?.specs ?? []).map(s => s.max_tokens).filter(n => n > 0); return caps.length ? Math.min(...caps) : null; }, [config]);
-  const runKey = sourceKey && chosen.length ? JSON.stringify({ sourceKey, chosen, limit }) : '';
+  const runKey = sourceKey && chosen.length ? JSON.stringify({ sourceKey, chosen, limit, updatedAt: doc?.updated_at ?? null }) : '';
+
+  const currentResult = runKey && result?.key === runKey ? result : null;
+  const response = currentResult?.response ?? null;
+  const running = active && ready && !!runKey && currentResult?.attempt !== nonce;
+  const runError = running ? '' : currentResult?.error ?? '';
 
   /* 원문·전략이 바뀌면 잠깐 기다렸다가 다시 나눈다(서버 안에서만 처리, 외부 모델 호출 없음). */
   useEffect(() => {
     if (!active || !ready || !runKey) return;
     const { sourceKey: key, chosen: strategies, limit: cap } = JSON.parse(runKey) as { sourceKey: SourceKey; chosen: Preset[]; limit: number | null };
     const id = key.slice(key.indexOf(':') + 1);
+    const controller = new AbortController();
     const timer = window.setTimeout(() => {
-      abortRef.current?.abort();
-      const controller = new AbortController();
-      abortRef.current = controller;
-      setRunning(true); setRunError('');
-      chunkSource(key.startsWith('sample:') ? { sample: id } : { doc_id: id }, strategies, cap, controller.signal)
-        .then(result => { if (!controller.signal.aborted) setResponse(result); })
-        .catch(error => { if (!controller.signal.aborted) setRunError(errorText(error)); })
-        .finally(() => { if (abortRef.current === controller) setRunning(false); });
+      void chunkSource(key.startsWith('sample:') ? { sample: id } : { doc_id: id }, strategies, cap, controller.signal)
+        .then(response => { if (!controller.signal.aborted) setResult({ key: runKey, attempt: nonce, response, error: '' }); })
+        .catch(error => {
+          if (!controller.signal.aborted) setResult(previous => ({ key: runKey, attempt: nonce,
+            response: previous?.key === runKey ? previous.response : null, error: errorText(error) }));
+        });
     }, 250);
-    return () => window.clearTimeout(timer);
+    return () => { window.clearTimeout(timer); controller.abort(); };
   }, [active, ready, runKey, nonce]);
-  useEffect(() => () => abortRef.current?.abort(), []);
 
   const changePresets = (next: Preset[]) => {
     setPresets(next); savePresets(next);
@@ -109,44 +112,62 @@ export default function ChunkBench({ active }: { active: boolean }) {
 
   const src = response?.source;
   const composition = src?.composition ?? sample?.composition ?? {};
+  const refresh = () => setNonce(n => n + 1);
   const sourceName = src?.name ?? sample?.name ?? doc?.name ?? '원문 없음';
   const connections = (config?.connections ?? []).filter(c => c.configured);
   const emptyImages = (src?.elements ?? []).filter(el => el.kind === 'image' && el.empty);
 
-  const compare = () => {
-    if (!ready) return <div className="ui-empty">불러오는 중…</div>;
-    if (!sourceKey) return <div className="ui-empty" role={loadError ? 'alert' : undefined}><b>나눌 문서가 없습니다</b>{loadError ? `예시 문서를 불러오지 못했습니다. ${loadError}` : '처리가 끝난 문서가 없습니다.'}</div>;
-    if (!chosen.length) return <div className="ui-empty"><b>비교할 전략이 없습니다</b><button type="button" className="button-secondary cb-btn" onClick={() => setPresetOpen(null)}>전략 설정</button></div>;
-    if (!columns.length) return runError ? <div className="ui-empty" role="alert"><b>나누지 못했습니다</b>{runError}</div> : <div className="ui-empty">나누는 중…</div>;
-    return <>
-      {runError && <p className="cb-error" role="alert">{runError}</p>}
-      <CompareTable columns={columns} elements={src?.elements ?? []} limit={limit} busy={running}
-        onOpen={id => setOpen({ id, tab: 'chunks', index: 0 })} />
-      {emptyImages.length > 0 && <p className="cb-foot">
-        {emptyImages.map(el => el.page ? `${el.page}쪽` : el.label).join(', ')} 그림은 글자가 없어 어느 전략에도 담기지 않습니다(시각 모델 필요). 그림 칸에서는 문제로 세지 않았습니다.</p>}
-    </>;
+  const empty = () => {
+    if (!ready) return <div className="cb-empty" role="status"><LoaderCircle className="cb-spin" size={24} aria-hidden="true" /><b>문서를 불러오는 중입니다</b></div>;
+    if (!sourceKey) return <div className="cb-empty" role={loadError ? 'alert' : undefined}>
+      <span className="cb-empty-icon"><FileText size={23} aria-hidden="true" /></span><b>나눌 문서가 없습니다</b>
+      <p>{loadError ? `예시 문서를 불러오지 못했습니다. ${loadError}` : '파싱이 끝난 실제 문서가 여기에 표시됩니다.'}</p>
+      {loadError && <button type="button" className="button-secondary cb-btn" onClick={() => setLoadAttempt(n => n + 1)}>문서 다시 불러오기</button>}
+    </div>;
+    if (!chosen.length) return <div className="cb-empty"><span className="cb-empty-icon"><Scissors size={23} aria-hidden="true" /></span><b>비교할 전략이 없습니다</b>
+      <p>하나 이상의 전략을 골라 같은 문서를 어떻게 나누는지 확인하세요.</p><button type="button" className="button-secondary cb-btn" onClick={() => setPresetOpen(null)}>비교할 전략 고르기</button>
+    </div>;
+    if (runError) return <div className="cb-empty" role="alert"><span className="cb-empty-icon is-error"><AlertCircle size={23} aria-hidden="true" /></span><b>문서를 나누지 못했습니다</b><p>{runError}</p>
+      <button type="button" className="button-secondary cb-btn" onClick={refresh}>다시 나누기</button></div>;
+    return <div className="cb-empty" role="status"><LoaderCircle className="cb-spin" size={24} aria-hidden="true" /><b>선택한 문서를 나누는 중입니다</b><p>{chosen.length}개 전략의 결과를 계산하고 있어요.</p></div>;
   };
 
   return <div className="cb-root">
-    <div className="cb-bar">
-      <span className="cb-bar-label">원문</span>
-      <button type="button" className="cb-srcbtn" aria-haspopup="dialog" aria-label={`원문: ${sourceName}`} disabled={!ready} onClick={() => setSourceOpen(true)}>
-        <FileText size={15} aria-hidden="true" /><b>{sourceName}</b><ChevronDown size={15} aria-hidden="true" />
-      </button>
-      {sourceKey && (isSample ? <span className="ui-pill">예시 데이터</span> : (src?.is_stale ?? doc?.is_stale) ? <span className="ui-pill is-warn">이전 처리 결과</span> : null)}
-      <CompositionBar composition={composition} />
-      <span className="cb-bar-gap" />
-      <button type="button" className="button-secondary cb-btn" onClick={() => setPresetOpen(null)}><SlidersHorizontal size={14} /> 전략 설정</button>
-      <button type="button" className="button-secondary cb-btn" disabled={!runKey || running} onClick={() => setNonce(n => n + 1)}>
-        <RefreshCw size={14} className={running ? 'cb-spin' : ''} /> {running ? '나누는 중' : '나누기'}
-      </button>
-    </div>
+    <section className="cb-bar" aria-label="청킹 원문 및 전략">
+      <div className="cb-source">
+        <span className="cb-source-icon"><FileText size={22} strokeWidth={1.75} aria-hidden="true" /></span>
+        <div className="cb-source-content">
+          <div className="cb-source-meta"><span className="cb-bar-label">원문</span>
+            {sourceKey && (isSample ? <span className="ui-pill is-accent">예시 데이터</span> : (src?.is_stale ?? doc?.is_stale) ? <span className="ui-pill is-warn">이전 처리 결과</span> : <span className="ui-pill is-ok">실제 문서</span>)}
+          </div>
+          <button type="button" className="cb-srcbtn" aria-haspopup="dialog" aria-label={`원문: ${sourceName}`} disabled={!ready} onClick={() => setSourceOpen(true)}>
+            <b>{sourceName}</b><ChevronDown size={17} aria-hidden="true" />
+          </button>
+        </div>
+      </div>
+      <div className="cb-bar-actions">
+        <button type="button" className="button-secondary cb-btn" onClick={() => setPresetOpen(null)}><SlidersHorizontal size={16} aria-hidden="true" /> 전략 설정</button>
+        <button type="button" className="button-primary cb-btn" disabled={!runKey || running} onClick={refresh}>
+          <RefreshCw size={16} className={running ? 'cb-spin' : ''} aria-hidden="true" /> {running ? '나누는 중' : '나누기'}
+        </button>
+      </div>
+      {Object.values(composition).some(count => count > 0) && <div className="cb-composition"><CompositionBar composition={composition} /></div>}
+    </section>
 
     <section className="cb-main" aria-label="청킹 벤치" aria-busy={running || !ready || undefined}>
       <Tabs<View> label="보기" value={ui.view} onChange={view => setUi({ view })} className="cb-tabs"
         items={[{ id: 'compare', label: '전략 비교' }, { id: 'elements', label: '원문 구성' }]}>
-        {view => view === 'compare' ? compare()
-          : src ? <ElementsView source={src} columns={columns} /> : <div className="ui-empty">{ready ? '나눈 결과가 없습니다.' : '불러오는 중…'}</div>}
+        {view => <>
+          {columns.length > 0 && view === 'compare' && <>
+            {runError ? <p className="cb-error" role="alert">이전 청킹 결과를 표시합니다. {runError}</p> : <p className="cb-table-note">전략을 선택하면 청크 내용과 원문에서 나뉜 위치를 볼 수 있습니다.</p>}
+            <CompareTable columns={columns} elements={src?.elements ?? []} limit={limit} busy={running}
+              onOpen={id => setOpen({ id, tab: 'chunks', index: 0 })} />
+            {emptyImages.length > 0 && <p className="cb-foot"><Info size={16} aria-hidden="true" /><span>
+              {emptyImages.map(el => el.page ? `${el.page}쪽` : el.label).join(', ')} 그림은 글자가 없어 어느 전략에도 담기지 않습니다(시각 모델 필요). 그림 칸에서는 문제로 세지 않았습니다.</span></p>}
+          </>}
+          {view === 'elements' && src && <ElementsView source={src} columns={columns} />}
+          {(view === 'compare' ? !columns.length : !src) && empty()}
+        </>}
       </Tabs>
     </section>
 

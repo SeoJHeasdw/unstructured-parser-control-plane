@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { LoaderCircle, TriangleAlert } from 'lucide-react';
+import { LoaderCircle, RefreshCw, TriangleAlert } from 'lucide-react';
 import { browseChunks, getCollection, type ChunkRow, type CollectionDetail, type SourceKey, type Target } from '../api/vectordb';
 import { ListBox, Modal, Tabs } from '../ui';
 import { DetailPane, docFieldChoices, DocumentReader, type PanelState } from './VdbPanel';
@@ -15,6 +15,7 @@ const DOC_SCAN_MAX = 2000;
 export default function PartitionModal({ source, part, onClose }: { source: SourceKey; part: PartRef; onClose: () => void }) {
   const [detail, setDetail] = useState<CollectionDetail | null>(null);
   const [detailError, setDetailError] = useState('');
+  const [retry, setRetry] = useState(0);
   const [tab, setTab] = useState<Tab>('chunks');
   const [stack, setStack] = useState<PanelState[]>([]);
   const [doc, setDoc] = useState<string | null>(null);
@@ -25,9 +26,10 @@ export default function PartitionModal({ source, part, onClose }: { source: Sour
 
   useEffect(() => {
     let alive = true;
+    setDetailError('');
     getCollection(source, part.db, part.collection).then(result => { if (alive) setDetail(result); }).catch((err: Error) => { if (alive) setDetailError(err.message); });
     return () => { alive = false; };
-  }, [source, part.db, part.collection]);
+  }, [source, part.db, part.collection, retry]);
 
   useEffect(() => {
     if (!focusPane.current) return;
@@ -49,9 +51,9 @@ export default function PartitionModal({ source, part, onClose }: { source: Sour
   const tabs = <Tabs<Tab> label="파티션 보기" value={tab} onChange={setTab} items={[{ id: 'chunks', label: '청크' }, { id: 'docs', label: '문서별' }]} />;
   const subtitle = `${part.collection} · 청크 ${fmtCount(part.rows)}개`;
 
-  return <Modal open onClose={onClose} size="xl" flush title={part.partition} subtitle={subtitle} tabs={tabs}>
-    {detailError ? <div className="vdb-pop is-pad"><p className="vdb-error" role="alert"><TriangleAlert size={14} aria-hidden /><span>{detailError}</span></p></div>
-      : !detail ? <div className="vdb-pop is-pad"><p className="vdb-loading"><LoaderCircle size={16} className="mw-spin" aria-hidden /> 컬렉션 정보를 불러오는 중</p></div>
+  return <Modal open onClose={onClose} size="xl" flush title={part.partition} subtitle={subtitle} tabs={tabs} extra={<span className="ui-pill is-accent">{source === 'example' ? '예시 데이터' : 'Milvus 데이터'}</span>}>
+    {detailError ? <div className="vdb-pop is-pad"><div className="vdb-problem" role="alert"><TriangleAlert size={18} aria-hidden="true" /><div><strong>컬렉션을 읽을 수 없습니다</strong><p>{detailError}</p></div><button className="button-secondary" type="button" onClick={() => setRetry(value => value + 1)}><RefreshCw size={15} aria-hidden="true" /> 다시 시도</button></div></div>
+      : !detail ? <div className="vdb-pop is-pad"><p className="vdb-loading"><LoaderCircle size={16} className="vdb-spin" aria-hidden /> 컬렉션 정보를 불러오는 중</p></div>
         : <>
           <div className="vdb-tabbody" hidden={tab !== 'chunks'}>
             <ChunkTab source={source} target={target} part={part} detail={detail} stack={stack} onPick={pickChunk} onNavigate={navigate}
@@ -94,7 +96,7 @@ function ChunkTab({ source, target, part, detail, stack, onPick, onNavigate, onB
   const det = detail.detected;
   const top = stack[stack.length - 1];
   const selected = top?.mode === 'chunk' && rows.some(r => r.pk === top.pk) ? top.pk : stack[0]?.mode === 'chunk' ? stack[0].pk : null;
-  const more = !loading && (total === null ? rows.length === offset + PAGE : rows.length < total) && offset + PAGE * 2 <= maxWindow;
+  const more = !loading && (total === null ? rows.length === offset + PAGE : rows.length < total) && offset + PAGE * 2 < maxWindow;
 
   if (!loading && !error && !rows.length) return <div className="ui-empty"><b>청크가 없습니다</b>이 파티션에 저장된 청크가 없습니다.</div>;
   return <div className="ui-split vdb-pop">
@@ -120,7 +122,7 @@ function ChunkTab({ source, target, part, detail, stack, onPick, onNavigate, onB
     </div>
     <div ref={paneRef} tabIndex={-1} className="vdb-pane" aria-label="청크 상세">
       {top ? <DetailPane source={source} detail={detail} textField={null} stack={stack} onBack={onBack} onNavigate={onNavigate} showPartition={false} />
-        : loading ? <p className="vdb-loading"><LoaderCircle size={16} className="mw-spin" aria-hidden /> 청크를 불러오는 중</p> : null}
+        : loading ? <p className="vdb-loading"><LoaderCircle size={16} className="vdb-spin" aria-hidden /> 청크를 불러오는 중</p> : null}
     </div>
   </div>;
 }
@@ -166,7 +168,7 @@ function DocTab({ source, target, part, detail, doc, onDoc, onOpenChunk, paneRef
   const current = docs?.find(d => d.value === doc) ?? null;
   return <div className="ui-split vdb-pop">
     <div className="vdb-plist">
-      {!docs ? <p className="vdb-loading is-pad"><LoaderCircle size={14} className="mw-spin" aria-hidden /> 문서를 모으는 중</p>
+      {!docs ? <p className="vdb-loading is-pad"><LoaderCircle size={14} className="vdb-spin" aria-hidden /> 문서를 모으는 중</p>
         : <ListBox<DocCount> label="문서 목록" items={docs} getKey={d => d.value} value={doc} onChange={onDoc}
           render={d => <div className="vdb-opt is-doc"><b>{d.value}</b><span className="ui-num">{fmtCount(d.count)}</span></div>} />}
       {docs && <div className="vdb-plist-foot"><span className="ui-num">문서 {fmtCount(docs.length)}개{scanned.truncated ? ` · 앞 ${fmtCount(scanned.rows)}개 청크에서 찾음` : ''}</span></div>}

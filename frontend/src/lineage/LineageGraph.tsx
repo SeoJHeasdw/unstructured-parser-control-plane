@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 import dagre from '@dagrejs/dagre';
+import { ArrowDown, ArrowLeft, ArrowRight } from 'lucide-react';
 import { Controls, Handle, MarkerType, Position, ReactFlow, ReactFlowProvider, useReactFlow } from '@xyflow/react';
 import type { Edge, Node, NodeProps } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
@@ -18,7 +19,7 @@ type GNode = Node<GData, 'ln'>;
 type EdgeKind = 'contain' | RefState;
 type GEdge = Edge<{ kind: EdgeKind; groups: RefGroup[] }>;
 
-const W = 188, H = 44, CW = 224, CH = 54, GAP = 120, ROW = H + 16, MAX_TREE = 60, MAX_SIDE = 14;
+const W = 198, H = 48, CW = 234, CH = 58, GAP = 122, ROW = H + 16, MAX_TREE = 60, MAX_SIDE = 14;
 const EDGE_STYLE: Record<EdgeKind, { stroke: string; dash?: string; label: string }> = {
   contain: { stroke: '#b3bccb', label: '포함' }, linked: { stroke: '#4f7fc2', label: '참조' }, outdated: { stroke: '#c4862a', dash: '6 4', label: '구버전 참조' },
   missing: { stroke: '#c0504a', dash: '2 4', label: '대상 미발견' }, ambiguous: { stroke: '#8a7fd8', dash: '2 4', label: '후보 여러 개' }, external: { stroke: '#9aa4b2', dash: '2 4', label: '외부 주소' },
@@ -49,6 +50,11 @@ export function LineageGraph(props: Props) {
   return <div className="ln-graph-wrap">
     <div className="ln-graph" aria-label="관계 그래프: 가운데가 선택한 판, 아래가 포함된 파일, 왼쪽이 이 문서를 가리키는 문서, 오른쪽이 이 문서가 가리키는 문서">
       <ReactFlowProvider key={`${props.family.id}:${props.entry.id}`}><GraphCanvas {...props} /></ReactFlowProvider>
+    </div>
+    <div className="ln-graph-context" aria-label="그래프 배치">
+      <span><ArrowLeft size={15} aria-hidden="true" />들어오는 참조</span>
+      <span><ArrowDown size={15} aria-hidden="true" />포함된 파일</span>
+      <span><ArrowRight size={15} aria-hidden="true" />나가는 참조</span>
     </div>
     <ul className="ln-legend" aria-label="선 종류">
       {(['contain', 'linked', 'outdated', 'missing', 'ambiguous'] as EdgeKind[]).map(kind => <li key={kind}><svg width="26" height="8" aria-hidden="true"><line x1="1" y1="4" x2="25" y2="4" stroke={EDGE_STYLE[kind].stroke} strokeWidth="2" strokeDasharray={EDGE_STYLE[kind].dash} /></svg>{EDGE_STYLE[kind].label}</li>)}
@@ -87,6 +93,7 @@ function GraphCanvas({ data, family, entry, onPin }: Props) {
     };
   }, [base, hovered, hoverEdge, onPin]);
   return <ReactFlow<GNode, GEdge> nodes={nodes} edges={edges} nodeTypes={nodeTypes} fitView fitViewOptions={{ padding: 0.18, maxZoom: 1.1 }} minZoom={0.2} maxZoom={1.8}
+    ariaLabelConfig={{ 'controls.zoomIn.ariaLabel': '확대', 'controls.zoomOut.ariaLabel': '축소', 'controls.fitView.ariaLabel': '전체 그래프 보기' }}
     nodesDraggable={false} nodesConnectable={false} elementsSelectable={false} nodesFocusable={false} edgesFocusable={false} proOptions={{ hideAttribution: true }}
     onEdgeMouseEnter={(event, edge) => { setHoverEdge(edge.id); const groups = edge.data?.groups ?? []; tip.show(`edge:${edge.id}`, { x: event.clientX, y: event.clientY }, groups.length ? <RefTip data={data} group={groups[0]} /> : <span>{EDGE_STYLE[edge.data?.kind ?? 'contain'].label}</span>); }}
     onEdgeMouseLeave={(_, edge) => { setHoverEdge(null); tip.hide(`edge:${edge.id}`); }}

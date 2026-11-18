@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import EmbeddingEval from '../EmbeddingEval';
 import { STORE } from '../retrieval/shared';
@@ -97,7 +97,9 @@ beforeEach(() => {
   const store = new Map<string, string>([[STORE.presets, JSON.stringify(PRESETS)]]);
   vi.stubGlobal('localStorage', { getItem: (key: string) => store.get(key) ?? null, setItem: (key: string, value: string) => store.set(key, String(value)), removeItem: (key: string) => store.delete(key), clear: () => store.clear(), key: (index: number) => [...store.keys()][index] ?? null, get length() { return store.size; } });
 });
-afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
+afterEach(() => { cleanup(); vi.useRealTimers(); vi.unstubAllGlobals(); });
+
+const advancePoll = () => act(async () => { await vi.advanceTimersByTimeAsync(1700); });
 
 const board = () => screen.getByRole('region', { name: '모델 비교' });
 const rowOf = (name: string) => within(board()).getByRole('rowheader', { name: new RegExp(`^${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`) }).closest('tr')!;
@@ -326,32 +328,37 @@ describe('임베딩 평가', () => {
   });
 
   it('실행 중이면 진행 상태를 다시 물어 끝나면 멈춘다', async () => {
+    vi.useFakeTimers();
     const fetchMock = mockApi({ runs: [run('running', []), run()] });
-    render(<EmbeddingEval active />);
-    expect(await screen.findByText(/BGE-M3 청크 임베딩/)).toBeTruthy();
+    await act(async () => { render(<EmbeddingEval active />); });
+    expect(screen.getByText(/BGE-M3 청크 임베딩/)).toBeTruthy();
     expect(screen.getByRole('status').textContent).toContain('3 / 10');
     expect(screen.getByRole('button', { name: /취소/ })).toBeTruthy();
-    await screen.findByRole('button', { name: /Harrier-OSS-v1 0\.6B · 표 · Hit@5/ }, { timeout: 4000 });
+    await advancePoll();
+    expect(screen.getByRole('button', { name: /Harrier-OSS-v1 0\.6B · 표 · Hit@5/ })).toBeTruthy();
     const count = () => fetchMock.mock.calls.filter(([url]) => String(url).endsWith('/runs/current')).length;
     const polls = count();
-    await new Promise(resolve => setTimeout(resolve, 1700));
+    await advancePoll();
     expect(count()).toBe(polls);
   });
 
   it('화면이 비활성이 되거나 사라지면 폴링을 멈춘다', async () => {
+    vi.useFakeTimers();
     const fetchMock = mockApi({ runs: [run('running', [])] });
     const { rerender, unmount } = render(<EmbeddingEval active />);
-    await screen.findByText(/BGE-M3 청크 임베딩/);
+    await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+    expect(screen.getByText(/BGE-M3 청크 임베딩/)).toBeTruthy();
     rerender(<EmbeddingEval active={false} />);
     const count = () => fetchMock.mock.calls.filter(([url]) => String(url).endsWith('/runs/current')).length;
     const polls = count();
-    await new Promise(resolve => setTimeout(resolve, 1700));
+    await advancePoll();
     expect(count()).toBe(polls);
     rerender(<EmbeddingEval active />);
-    await waitFor(() => expect(count()).toBeGreaterThan(polls), { timeout: 2500 });
+    await advancePoll();
+    expect(count()).toBeGreaterThan(polls);
     unmount();
     const after = count();
-    await new Promise(resolve => setTimeout(resolve, 1700));
+    await advancePoll();
     expect(count()).toBe(after);
   });
 });

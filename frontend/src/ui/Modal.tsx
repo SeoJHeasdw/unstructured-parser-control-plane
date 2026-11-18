@@ -24,6 +24,7 @@ type Props = {
 
 const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 let openCount = 0;
+let bodyOverflow = '';
 
 /** 가운데 팝업. Escape·바깥 클릭·X로 닫고, 닫으면 연 자리로 초점을 돌려준다. */
 export function Modal({ open, onClose, title, subtitle, size = 'md', extra, tabs, footer, flush, initialFocus, children }: Props) {
@@ -35,16 +36,16 @@ export function Modal({ open, onClose, title, subtitle, size = 'md', extra, tabs
   useEffect(() => {
     if (!open) return;
     const opener = document.activeElement as HTMLElement | null;
+    if (openCount === 0) bodyOverflow = document.body.style.overflow;
     openCount += 1;
-    const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
     const body = dialogRef.current?.querySelector('.ui-dialog-body');
     const target = initialFocus?.current ?? body?.querySelector<HTMLElement>(FOCUSABLE) ?? dialogRef.current;
     target?.focus({ preventScroll: true });
     return () => {
       openCount -= 1;
-      if (openCount === 0) document.body.style.overflow = previousOverflow;
-      if (opener && document.contains(opener)) opener.focus({ preventScroll: true });
+      if (openCount === 0) document.body.style.overflow = bodyOverflow;
+      if (opener && opener.isConnected && !opener.closest('[hidden], [inert]')) opener.focus({ preventScroll: true });
     };
     // 열릴 때 한 번만 초점을 옮긴다.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -60,7 +61,7 @@ export function Modal({ open, onClose, title, subtitle, size = 'md', extra, tabs
       return;
     }
     if (event.key !== 'Tab' || !dialogRef.current) return;
-    const items = [...dialogRef.current.querySelectorAll<HTMLElement>(FOCUSABLE)].filter(el => !el.closest('[hidden]'));
+    const items = [...dialogRef.current.querySelectorAll<HTMLElement>(FOCUSABLE)].filter(el => el.tabIndex >= 0 && !el.closest('[hidden], [inert]'));
     if (!items.length) { event.preventDefault(); return; }
     const first = items[0]; const last = items[items.length - 1];
     if (event.shiftKey && (document.activeElement === first || document.activeElement === dialogRef.current)) { event.preventDefault(); last.focus(); }

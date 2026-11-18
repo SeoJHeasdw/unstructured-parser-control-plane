@@ -13,7 +13,7 @@ export function ChunkModal({ stack, onBack, onClose, ...common }: Common & { sta
   const top = stack[stack.length - 1] ?? null;
   const title = !top ? '' : top.mode === 'chunk' ? `청크 ${shortPk(top.pk)}` : top.value ?? '문서로 다시 읽기';
   const subtitle = !top ? '' : top.mode === 'chunk' ? common.detail.name : `${common.detail.name} · 문서로 다시 읽기`;
-  return <Modal open={!!top} onClose={onClose} size="lg" title={title} subtitle={subtitle}>
+  return <Modal open={!!top} onClose={onClose} size="lg" title={title} subtitle={subtitle} extra={<span className="ui-pill is-accent">{common.source === 'example' ? '예시 데이터' : 'Milvus 데이터'}</span>}>
     {top && <div className="vdb-pop is-sheet"><DetailPane stack={stack} onBack={onBack} {...common} /></div>}
   </Modal>;
 }
@@ -56,7 +56,7 @@ export function ChunkView({ source, detail, textField, pk, onNavigate, showParti
     return () => { alive = false; };
   }, [source, detail.db, detail.name, pk, textField]);
   if (error) return <p className="vdb-error" role="alert"><TriangleAlert size={14} aria-hidden /><span>{error}</span></p>;
-  if (!chunk) return <p className="vdb-loading"><LoaderCircle size={16} className="mw-spin" aria-hidden /> 청크를 불러오는 중</p>;
+  if (!chunk) return <p className="vdb-loading"><LoaderCircle size={16} className="vdb-spin" aria-hidden /> 청크를 불러오는 중</p>;
   const det = chunk.detected;
   const docValue = det.doc ? chunk.fields[det.doc] : undefined;
   const has = (field: string | null) => !!field && chunk.fields[field] !== undefined && chunk.fields[field] !== null && chunk.fields[field] !== '';
@@ -108,7 +108,7 @@ export function ChunkView({ source, detail, textField, pk, onNavigate, showParti
     <section className="vdb-sec" aria-label="비슷한 청크">
       <h3>비슷한 청크 <small>{similar ? metricHint(similar.metric, similar.higher_is_closer) : '이 청크의 벡터로 검색'}</small></h3>
       {similarError && <p className="vdb-error" role="alert"><TriangleAlert size={14} aria-hidden /><span>{similarError}</span></p>}
-      {!similar && !similarError && <p className="vdb-loading"><LoaderCircle size={14} className="mw-spin" aria-hidden /> 검색 중</p>}
+      {!similar && !similarError && <p className="vdb-loading"><LoaderCircle size={14} className="vdb-spin" aria-hidden /> 검색 중</p>}
       {similar && <SimilarList result={similar} hoverDoc={hoverDoc} onHoverDoc={setHoverDoc} onOpen={pk2 => onNavigate({ mode: 'chunk', pk: pk2 })} tip={tip} />}
     </section>
     {tip.layer}
@@ -176,7 +176,7 @@ function DocumentView({ source, detail, textField, field, value, onNavigate }: C
     <label className="vdb-tree-search"><Search size={14} aria-hidden /><input value={query} onChange={event => setQuery(event.target.value)} placeholder={`${docField} 값 찾기`} aria-label="문서 값 찾기"
       onKeyDown={event => { if (event.key === 'Enter' && filtered[0]) { event.preventDefault(); open(filtered[0].value); } }} /></label>
     {valuesError && <p className="vdb-error" role="alert"><TriangleAlert size={14} aria-hidden /><span>{valuesError}</span></p>}
-    {!values && !valuesError && <p className="vdb-loading"><LoaderCircle size={14} className="mw-spin" aria-hidden /> 문서 목록을 모으는 중</p>}
+    {!values && !valuesError && <p className="vdb-loading"><LoaderCircle size={14} className="vdb-spin" aria-hidden /> 문서 목록을 모으는 중</p>}
     {values && <>
       <ul className="vdb-doc-list" aria-label="문서 목록">{filtered.map(v => <li key={v.value}><button type="button" className={v.value === value ? 'is-on' : ''} onClick={() => open(v.value)}><span>{v.value}</span><small>{v.count}</small></button></li>)}</ul>
       <p className="vdb-muted">문서 {fmtCount(values.values.length)}개{values.truncated ? ` · 앞 ${fmtCount(values.scanned)}개 청크에서 찾음` : ''}</p>
@@ -222,7 +222,7 @@ export function DocumentReader({ source, detail, textField, docField, value, onO
     </div>
     {below}
     {docError && <p className="vdb-error" role="alert"><TriangleAlert size={14} aria-hidden /><span>{docError}</span></p>}
-    {loading && !doc && <p className="vdb-loading"><LoaderCircle size={14} className="mw-spin" aria-hidden /> 청크를 순서대로 모으는 중</p>}
+    {loading && !doc && <p className="vdb-loading"><LoaderCircle size={14} className="vdb-spin" aria-hidden /> 청크를 순서대로 모으는 중</p>}
     {doc && <div className={loading ? 'is-loading' : ''}>
       <p className="vdb-doc-stats">
         <span>청크 <b>{fmtCount(doc.total)}</b>개</span><span>순서 <code>{doc.ordered_by}</code></span>

@@ -91,6 +91,18 @@ describe('형식과 경로', () => {
     expect(within(panel).getByText('로컬 형식 1종 확인')).toBeTruthy();
   });
 
+  it('경로가 없는 형식만 확인하고 경로 이름으로 찾을 수 있다', async () => {
+    const user = userEvent.setup(); render(<PipelineStudio formats={['HEIC']} onOpenDocuments={() => {}} />);
+    const panel = await openFormats(user);
+    await user.click(within(panel).getByRole('radio', { name: '경로 없음' }));
+    expect(within(panel).getByRole('button', { name: '.heic 경로 만들기' })).toBeTruthy();
+    expect(within(panel).queryByRole('button', { name: '.pdf 경로 열기' })).toBeNull();
+    await user.click(within(panel).getByRole('radio', { name: '경로 있음' }));
+    await user.type(within(panel).getByRole('textbox', { name: '확장자 검색' }), 'PDF 문서');
+    expect(within(panel).getByRole('button', { name: '.pdf 경로 열기' })).toBeTruthy();
+    expect(within(panel).queryByRole('button', { name: '.docx 경로 열기' })).toBeNull();
+  });
+
   it('직접 추가한 형식은 입력을 검증하고 브라우저에만 저장한다', async () => {
     const user = userEvent.setup(); render(<PipelineStudio formats={[]} onOpenDocuments={() => {}} />);
     const panel = await openFormats(user);
@@ -138,6 +150,23 @@ describe('설계 모드', () => {
 });
 
 describe('운영 모드', () => {
+  it('단계 목록에서 상세를 열고 현재 흐름의 상태 집계에서 문서 추적에 접근한다', async () => {
+    const simulator = new FlowSimulator(defaultLibrary(), 300);
+    simulator.setRunning(false);
+    const user = userEvent.setup();
+    render(<PipelineStudio formats={[]} initialFormat="PDF" onOpenDocuments={() => {}} simulator={simulator} />);
+    await user.click(screen.getByRole('button', { name: '단계 목록' }));
+    const stages = within(screen.getByRole('region', { name: '처리 단계 목록' }));
+    await user.click(stages.getByRole('button', { name: 'OCR 인식' }));
+    expect(within(screen.getByRole('complementary', { name: '운영 상세' })).getByRole('heading', { name: 'OCR 인식' })).toBeTruthy();
+    const metrics = within(screen.getByRole('group', { name: 'PDF 문서 상태 요약' }));
+    await user.click(metrics.getByRole('button', { name: /^보류/ }));
+    const dock = within(screen.getByRole('region', { name: '운영 기록' }));
+    expect(dock.getByRole('tab', { name: /^문서 추적/, selected: true })).toBeTruthy();
+    expect(dock.getByRole('button', { name: '보류', pressed: true })).toBeTruthy();
+    expect(dock.getByText('PDF 문서', { exact: true })).toBeTruthy();
+  });
+
   it('주의 단계에서 해당 노드로 이동하고 하위 흐름에서는 다른 흐름의 주의를 제외한다', async () => {
     const simulator = new FlowSimulator(defaultLibrary(), 0);
     simulator.pauseNode('overview::review', true);

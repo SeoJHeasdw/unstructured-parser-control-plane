@@ -1,3 +1,4 @@
+import { ChevronRight } from 'lucide-react';
 import type { DocElement, ElementKind, ElementOutcome, StrategyResult } from '../api/retrieval';
 import { ELEMENT_META, outcomeTone } from './elements';
 import type { Column } from './chunk-board';
@@ -81,7 +82,7 @@ export function CompareTable({ columns, elements, limit, busy, onOpen }: TablePr
     return [k.kind, ratios.length > 1 && ratios.some(r => r !== top) ? top : null] as const;
   }));
   const span = 3 + kinds.length + (limit ? 1 : 0);
-  return <div className={`cb-table-wrap${busy ? ' is-busy' : ''}`}>
+  return <div className={`cb-table-wrap${busy ? ' is-busy' : ''}`} tabIndex={0} role="region" aria-label="청킹 전략 및 지표">
     <table className="cb-cmp" aria-label="전략 비교">
       <thead><tr>
         <th scope="col" className="cb-cmp-name">전략</th>
@@ -95,7 +96,7 @@ export function CompareTable({ columns, elements, limit, busy, onOpen }: TablePr
         const baseline = isBaseline(c.kind);
         return <tr key={c.id} className="cb-cmp-row" onClick={event => { event.currentTarget.querySelector<HTMLElement>('.cb-rowbtn')?.focus(); onOpen(c.id); }}>
           <th scope="row" className="cb-cmp-name">
-            <button type="button" className="cb-rowbtn">{c.name}</button>{baseline && <span className="cb-base">기준선</span>}
+            <button type="button" className="cb-rowbtn"><ChevronRight size={15} aria-hidden="true" />{c.name}</button>{baseline && <span className="cb-base">기준선</span>}
             {c.params && <span className="cb-sub">{describeParams(c.params)}</span>}
           </th>
           {c.result.error ? <td colSpan={span - 1} className="cb-cmp-error" role="alert">{c.result.error}</td> : <>

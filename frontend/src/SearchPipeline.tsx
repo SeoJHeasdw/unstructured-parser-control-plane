@@ -1,6 +1,7 @@
-import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import type { FocusEvent, MouseEvent as ReactMouseEvent } from 'react';
-import { ArrowRight, ChevronDown, ChevronRight, CircleHelp, ListChecks, Ruler, X } from 'lucide-react';
+import { createPortal } from 'react-dom';
+import { ArrowRight, Braces, ChevronDown, ChevronRight, CircleHelp, Database, GitMerge, Layers3, ListChecks, MessagesSquare, Ruler, Search, X } from 'lucide-react';
 import type { Page } from './types';
 import './searchPipeline.css';
 
@@ -40,11 +41,11 @@ const STAGES: Stage[] = [
   { id: 'i7', lane: 'index', title: 'Milvus 적재', short: '컬렉션 · 파티션', status: 'fixed', detail: '벡터와 함께 문서 ID·버전·보안등급·원문 위치를 스칼라 필드로 저장합니다. 벡터 차원은 컬렉션마다 고정이라 모델이나 차원을 바꾸면 새 컬렉션과 전체 재임베딩이 필요합니다.', link: { page: 'vectordb', label: '벡터 DB 열기' } },
 ];
 
-const LANES: { id: Lane; title: string; caption: string }[] = [
-  { id: 'agent', title: '에이전트', caption: '에이전트 개발 측' },
-  { id: 'query', title: '검색 엔드포인트', caption: '질의 시점' },
-  { id: 'index', title: '색인 파이프라인', caption: '사전 처리' },
-];
+const LANES = [
+  { id: 'agent', title: '에이전트', caption: '에이전트 개발 측', icon: MessagesSquare },
+  { id: 'query', title: '검색 엔드포인트', caption: '질의 시점', icon: Search },
+  { id: 'index', title: '색인 파이프라인', caption: '사전 처리', icon: Layers3 },
+] as const;
 
 const RESPONSIBILITY: [string, string, string][] = [
   ['질의 재작성 · 하위 질문 분해', '맡음', '받은 질의를 그대로 처리'],
@@ -111,11 +112,11 @@ const BOUNDARY: Record<'api' | 'store', { title: string; body: string }> = {
 };
 
 type Section = 'roles' | 'contract' | 'measure' | 'open';
-const SECTIONS: { id: Section; title: string; hint: string; count: number }[] = [
-  { id: 'roles', title: '책임 경계', hint: '에이전트 측과 검색 측이 각각 맡는 일', count: RESPONSIBILITY.length },
-  { id: 'contract', title: 'API 계약 (가안)', hint: '요청·응답 형식 예시', count: 2 },
-  { id: 'measure', title: '정확도를 재는 순서', hint: '단계마다 따로 재야 어디서 놓쳤는지 압니다', count: MEASURE_STEPS.length },
-  { id: 'open', title: '정할 것', hint: '에이전트 개발 측·운영 측과 합의할 항목', count: OPEN_QUESTIONS.length },
+const SECTIONS: { id: Section; title: string; hint: string; count: number; icon: typeof GitMerge }[] = [
+  { id: 'roles', icon: GitMerge, title: '책임 경계', hint: '에이전트 측과 검색 측이 각각 맡는 일', count: RESPONSIBILITY.length },
+  { id: 'contract', icon: Braces, title: 'API 계약 (가안)', hint: '요청·응답 형식 예시', count: 2 },
+  { id: 'measure', icon: Ruler, title: '정확도를 재는 순서', hint: '단계마다 따로 재야 어디서 놓쳤는지 압니다', count: MEASURE_STEPS.length },
+  { id: 'open', icon: CircleHelp, title: '정할 것', hint: '에이전트 개발 측·운영 측과 합의할 항목', count: OPEN_QUESTIONS.length },
 ];
 
 const STORE_KEY = 'document-ops:search-pipeline';
@@ -137,18 +138,19 @@ const tipAt = (target: Element, board: Element | null) => {
   const rect = target.getBoundingClientRect();
   const frame = board?.getBoundingClientRect() ?? rect;
   const above = frame.bottom + 200 > window.innerHeight && frame.top > 220;
-  return { x: Math.min(Math.max(rect.left + rect.width / 2, 170), window.innerWidth - 170), y: above ? frame.top - 8 : frame.bottom + 8, above };
+  const inset = Math.min(window.innerWidth / 2, 172);
+  return { x: Math.min(Math.max(rect.left + rect.width / 2, inset), window.innerWidth - inset), y: above ? frame.top - 8 : frame.bottom + 8, above };
 };
 
-function StageNode({ stage, state, onSelect, onHover }: { stage: Stage; state: 'selected' | 'lit' | 'dim' | 'idle'; onSelect: (id: string) => void; onHover: (stage: Stage | null, target?: Element) => void }) {
+function StageNode({ stage, state, selected, onSelect, onHover }: { stage: Stage; selected: boolean; state: 'selected' | 'lit' | 'dim' | 'idle'; onSelect: (id: string) => void; onHover: (stage: Stage | null, target?: Element) => void }) {
   const enter = (event: ReactMouseEvent<HTMLButtonElement> | FocusEvent<HTMLButtonElement>) => onHover(stage, event.currentTarget);
-  return <button type="button" className={`sp-node is-${stage.status} is-${state}`} aria-pressed={state === 'selected'} aria-label={`${stage.title} · ${STATUS[stage.status]}`}
+  return <button type="button" className={`sp-node is-${stage.status} is-${state}`} aria-pressed={selected} aria-label={`${stage.title} · ${STATUS[stage.status]}`}
     onClick={() => onSelect(stage.id)} onMouseEnter={enter} onFocus={enter} onMouseLeave={() => onHover(null)} onBlur={() => onHover(null)}>
     <i aria-hidden="true" /><span>{stage.title}</span>
   </button>;
 }
 
-function LaneTrack({ lane, nodeState, onSelect, onHover }: { lane: Lane; nodeState: (id: string) => 'selected' | 'lit' | 'dim' | 'idle'; onSelect: (id: string) => void; onHover: (stage: Stage | null, target?: Element) => void }) {
+function LaneTrack({ lane, selected, nodeState, onSelect, onHover }: { lane: Lane; selected: string | null; nodeState: (id: string) => 'selected' | 'lit' | 'dim' | 'idle'; onSelect: (id: string) => void; onHover: (stage: Stage | null, target?: Element) => void }) {
   const stages = STAGES.filter(stage => stage.lane === lane);
   const items: (Stage | Stage[])[] = [];
   for (const stage of stages) {
@@ -158,8 +160,8 @@ function LaneTrack({ lane, nodeState, onSelect, onHover }: { lane: Lane; nodeSta
   return <div className="sp-track">{items.map((item, index) => <Fragment key={Array.isArray(item) ? 'parallel' : item.id}>
     {index > 0 && <span className="sp-arrow" aria-hidden="true"><ChevronRight size={13} /></span>}
     {Array.isArray(item)
-      ? <div className="sp-parallel" role="group" aria-label="병렬 검색">{item.map(stage => <StageNode key={stage.id} stage={stage} state={nodeState(stage.id)} onSelect={onSelect} onHover={onHover} />)}</div>
-      : <StageNode stage={item} state={nodeState(item.id)} onSelect={onSelect} onHover={onHover} />}
+      ? <div className="sp-parallel" role="group" aria-label="병렬 검색">{item.map(stage => <StageNode key={stage.id} stage={stage} selected={selected === stage.id} state={nodeState(stage.id)} onSelect={onSelect} onHover={onHover} />)}</div>
+      : <StageNode stage={item} selected={selected === item.id} state={nodeState(item.id)} onSelect={onSelect} onHover={onHover} />}
   </Fragment>)}</div>;
 }
 
@@ -170,7 +172,8 @@ function SectionBody({ id }: { id: Section }) {
   return <ul className="sp-open">{OPEN_QUESTIONS.map(question => <li key={question}>{question}</li>)}</ul>;
 }
 
-export default function SearchPipeline({ onNavigate }: { active: boolean; onNavigate: (page: Page) => void }) {
+export default function SearchPipeline({ active, onNavigate }: { active: boolean; onNavigate: (page: Page) => void }) {
+  const idBase = useId();
   const [saved, setSaved] = useState<Saved>(loadSaved);
   const [selected, setSelected] = useState<string | null>(null);
   const [hovered, setHovered] = useState<string | null>(null);
@@ -178,6 +181,7 @@ export default function SearchPipeline({ onNavigate }: { active: boolean; onNavi
   const [tip, setTip] = useState<Tip | null>(null);
   const sectionRefs = useRef<Partial<Record<Section, HTMLDivElement | null>>>({});
   const boardRef = useRef<HTMLElement>(null);
+  const detailRef = useRef<HTMLElement>(null);
   const update = (next: Saved) => { setSaved(next); save(next); };
   const toggleLane = (lane: Lane) => update({ ...saved, collapsed: saved.collapsed.includes(lane) ? saved.collapsed.filter(item => item !== lane) : [...saved.collapsed, lane] });
   const toggleSection = (id: Section) => update({ ...saved, sections: saved.sections.includes(id) ? saved.sections.filter(item => item !== id) : [...saved.sections, id] });
@@ -191,7 +195,7 @@ export default function SearchPipeline({ onNavigate }: { active: boolean; onNavi
     if (legend) return new Set(STAGES.filter(stage => stage.status === legend).map(stage => stage.id));
     return null;
   }, [hovered, legend]);
-  const nodeState = useCallback((id: string) => id === selected && !focusSet ? 'selected' as const : !focusSet ? 'idle' as const : focusSet.has(id) ? (id === selected ? 'selected' as const : 'lit' as const) : 'dim' as const, [focusSet, selected]);
+  const nodeState = useCallback((id: string) => id === selected ? 'selected' as const : !focusSet ? 'idle' as const : focusSet.has(id) ? 'lit' as const : 'dim' as const, [focusSet, selected]);
   const onHover = useCallback((stage: Stage | null, target?: Element) => {
     setHovered(stage?.id ?? null);
     setTip(stage && target ? { kind: 'stage', stage, ...tipAt(target, boardRef.current) } : null);
@@ -199,51 +203,66 @@ export default function SearchPipeline({ onNavigate }: { active: boolean; onNavi
   const hoverBoundary = (id: 'api' | 'store' | null, target?: Element) => setTip(id && target ? { kind: 'boundary', id, ...tipAt(target, boardRef.current) } : null);
 
   useEffect(() => {
-    if (!selected) return;
-    const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape') setSelected(null); };
+    if (!active || !selected) return;
+    const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape' && !document.querySelector('[aria-modal="true"]')) { setSelected(null); setTip(null); } };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [selected]);
+  }, [active, selected]);
   useEffect(() => {
     if (!tip) return;
-    const hide = () => setTip(null);
+    const hide = () => { setTip(null); setHovered(null); };
     window.addEventListener('scroll', hide, true);
-    return () => window.removeEventListener('scroll', hide, true);
+    window.addEventListener('resize', hide);
+    return () => { window.removeEventListener('scroll', hide, true); window.removeEventListener('resize', hide); };
   }, [tip]);
 
+  const selectStage = (id: string) => {
+    setTip(null);
+    setSelected(selected === id ? null : id);
+    if (selected !== id) requestAnimationFrame(() => {
+      const detail = detailRef.current;
+      if (detail && detail.getBoundingClientRect().top > window.innerHeight - 140) detail.scrollIntoView?.({ block: 'nearest' });
+    });
+  };
   const stage = STAGES.find(item => item.id === selected);
   const counts = (['fixed', 'candidate', 'open', 'agent'] as Status[]).map(status => [status, STAGES.filter(item => item.status === status).length] as const);
 
   return <div className="sp-root">
-    <div className="sp-bar">
-      <span className="sp-draft">구상 · 가안</span>
-      <p title="질의를 다시 쓰거나 나누고, 다시 검색할지 판단하는 일은 에이전트 개발 측이 맡습니다.">우리 범위는 search 엔드포인트가 받은 질의에 <b>가장 정확한 근거</b>를 돌려주는 것까지입니다.</p>
-      <div className="sp-legend" role="group" aria-label="상태별 강조">{counts.map(([status, count]) => <button type="button" key={status} className={`sp-legend-item is-${status}${legend === status ? ' is-on' : ''}`} aria-pressed={legend === status}
-        onMouseEnter={() => setHovered(null)} onClick={() => setLegend(legend === status ? null : status)}><i aria-hidden="true" />{STATUS[status]} <b>{count}</b></button>)}</div>
-    </div>
-
     <section ref={boardRef} className={`panel sp-board${focusSet ? ' has-focus' : ''}`} aria-label="검색 파이프라인 구상도">
+      <header className="sp-bar">
+        <div className="sp-board-title">
+          <span className="sp-board-icon"><GitMerge size={21} strokeWidth={1.75} aria-hidden="true" /></span>
+          <div><h2>검색 흐름 설계 <span className="sp-draft">구상 · 가안</span></h2><p>단계를 선택해 설계 결정, 후보 기술과 연결 화면을 확인하세요.</p></div>
+        </div>
+        <div className="sp-legend" role="group" aria-label="상태별 강조">{counts.map(([status, count]) => <button type="button" key={status} className={`sp-legend-item is-${status}${legend === status ? ' is-on' : ''}`} aria-pressed={legend === status}
+          onMouseEnter={() => setHovered(null)} onClick={() => { setLegend(legend === status ? null : status); setHovered(null); setTip(null); }}><i aria-hidden="true" />{STATUS[status]} <b>{count}</b></button>)}</div>
+      </header>
+      <div className="sp-board-flow">
       {LANES.map((lane, index) => {
+        const Icon = lane.icon;
+        const boundary = index === 1 ? 'api' : 'store';
+        const BoundaryIcon = index === 1 ? Braces : Database;
         const collapsed = saved.collapsed.includes(lane.id);
         const stages = STAGES.filter(item => item.lane === lane.id);
         return <Fragment key={lane.id}>
-          {index > 0 && <button type="button" className={`sp-boundary is-${index === 1 ? 'api' : 'store'}`} onClick={() => index === 1 ? openSection('contract') : onNavigate('vectordb')}
-            onMouseEnter={event => hoverBoundary(index === 1 ? 'api' : 'store', event.currentTarget)} onFocus={event => hoverBoundary(index === 1 ? 'api' : 'store', event.currentTarget)} onMouseLeave={() => hoverBoundary(null)} onBlur={() => hoverBoundary(null)}>
-            <span>{BOUNDARY[index === 1 ? 'api' : 'store'].title}</span>
+          {index > 0 && <button type="button" className={`sp-boundary is-${boundary}`} aria-label={BOUNDARY[boundary].title} onClick={() => index === 1 ? openSection('contract') : onNavigate('vectordb')}
+            onMouseEnter={event => hoverBoundary(boundary, event.currentTarget)} onFocus={event => hoverBoundary(boundary, event.currentTarget)} onMouseLeave={() => hoverBoundary(null)} onBlur={() => hoverBoundary(null)}>
+            <span><BoundaryIcon size={14} strokeWidth={1.75} aria-hidden="true" />{BOUNDARY[boundary].title}<ChevronRight size={14} aria-hidden="true" /></span>
           </button>}
           <div className={`sp-lane is-${lane.id}${collapsed ? ' is-collapsed' : ''}`}>
-            <button type="button" className="sp-lane-head" aria-expanded={!collapsed} aria-label={`${lane.title} 줄 · ${lane.caption}`} onClick={() => toggleLane(lane.id)}>
-              <ChevronDown size={14} className={collapsed ? 'sp-rot' : ''} aria-hidden="true" /><b>{lane.title}</b><small>{lane.caption}</small>
+            <button type="button" className="sp-lane-head" aria-expanded={!collapsed} aria-controls={`${idBase}-${lane.id}`} aria-label={`${lane.title} 줄 · ${lane.caption}`} onClick={() => toggleLane(lane.id)}>
+              <span className="sp-lane-icon"><Icon size={18} strokeWidth={1.75} aria-hidden="true" /></span><span className="sp-lane-text"><b>{lane.title}</b><small>{lane.caption}</small></span><ChevronDown size={15} className={collapsed ? 'sp-rot' : ''} aria-hidden="true" />
             </button>
-            {collapsed
-              ? <button type="button" className="sp-lane-summary" onClick={() => toggleLane(lane.id)} aria-label={`${lane.title} 펼치기`}>{stages.map(item => item.title).join('  ›  ')}</button>
-              : <LaneTrack lane={lane.id} nodeState={nodeState} onSelect={id => setSelected(selected === id ? null : id)} onHover={onHover} />}
+            <div className="sp-lane-content" id={`${idBase}-${lane.id}`}>{collapsed
+              ? <button type="button" className="sp-lane-summary" onClick={() => toggleLane(lane.id)} aria-label={`${lane.title} 펼치기`}><span>{stages.map(item => item.title).join('  ›  ')}</span><ChevronDown size={16} aria-hidden="true" /></button>
+              : <LaneTrack lane={lane.id} selected={selected} nodeState={nodeState} onSelect={selectStage} onHover={onHover} />}</div>
           </div>
         </Fragment>;
       })}
+      </div>
     </section>
 
-    {stage && <section className={`panel sp-detail is-${stage.status}`} aria-label="단계 상세">
+    {stage && <section ref={detailRef} className={`panel sp-detail is-${stage.status}`} aria-label="단계 상세">
       <header><span className={`sp-chip is-${stage.status}`}>{STATUS[stage.status]}</span><small>{LANES.find(lane => lane.id === stage.lane)?.title}</small><button type="button" className="sp-close" onClick={() => setSelected(null)} aria-label="상세 닫기"><X size={15} /></button></header>
       <div className="sp-detail-body">
         <div><h2>{stage.title}</h2><p>{stage.detail}</p>{stage.link && <button type="button" className="button-secondary sp-link" onClick={() => onNavigate(stage.link!.page)}>{stage.link.label} <ArrowRight size={14} /></button>}</div>
@@ -257,18 +276,19 @@ export default function SearchPipeline({ onNavigate }: { active: boolean; onNavi
 
     <div className="sp-sections">{SECTIONS.map(section => {
       const open = saved.sections.includes(section.id);
+      const Icon = section.icon;
       return <div key={section.id} className={`panel sp-section${open ? ' is-open' : ''}`} ref={element => { sectionRefs.current[section.id] = element; }}>
         <button type="button" className="sp-section-head" aria-expanded={open} onClick={() => toggleSection(section.id)}>
-          <ChevronDown size={15} className={open ? '' : 'sp-rot'} aria-hidden="true" /><b>{section.title}</b><small>{section.hint}</small><em>{section.count}</em>
+          <span className="sp-section-icon"><Icon size={18} strokeWidth={1.75} aria-hidden="true" /></span><span className="sp-section-title"><b>{section.title}</b><small>{section.hint}</small></span><em>{section.count}</em><ChevronDown size={17} className={open ? '' : 'sp-rot'} aria-hidden="true" />
         </button>
         {open && <div className="sp-section-body"><SectionBody id={section.id} /></div>}
       </div>;
     })}</div>
 
-    {tip && <div className={`sp-tip${tip.above ? ' is-above' : ''}`} role="tooltip" style={{ left: tip.x, top: tip.y }}>
+    {active && tip && createPortal(<div className={`sp-tip${tip.above ? ' is-above' : ''}`} role="tooltip" style={{ left: tip.x, top: tip.y }}>
       {tip.kind === 'stage'
         ? <><div className="sp-tip-head"><span className={`sp-chip is-${tip.stage.status}`}>{STATUS[tip.stage.status]}</span><b>{tip.stage.title}</b></div><p className="sp-tip-short">{tip.stage.short}</p><p>{tip.stage.detail}</p>{tip.stage.measure && <p className="sp-tip-measure"><Ruler size={12} /> {tip.stage.measure}</p>}<small>클릭하면 상세를 고정합니다</small></>
         : <><div className="sp-tip-head"><b>{BOUNDARY[tip.id].title}</b></div><p>{BOUNDARY[tip.id].body}</p><small>{tip.id === 'api' ? '클릭하면 API 계약 가안을 엽니다' : '클릭하면 벡터 DB 화면으로 이동합니다'}</small></>}
-    </div>}
+    </div>, document.body)}
   </div>;
 }

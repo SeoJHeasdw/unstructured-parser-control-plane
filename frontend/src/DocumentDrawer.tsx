@@ -1,17 +1,210 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { AlertCircle, ArrowRight, ChevronDown, Link2, X } from 'lucide-react';
+import { useEffect, useId, useRef, useState } from 'react';
+import type { KeyboardEvent } from 'react';
+import { createPortal } from 'react-dom';
+import {
+  ArrowLeft, ArrowRight, Clipboard, FileSearch, GitCompareArrows, Info, Link2, TriangleAlert, Workflow, X,
+} from 'lucide-react';
 import type { DocumentItem, Relation } from './types';
-import { FileIcon, Status } from './DocumentCommon';
+import { FileIcon, Status, attention } from './DocumentCommon';
+import { Tabs } from './ui';
+import './documents.css';
 
-export function DocumentDrawer({doc,relations,onClose,onCompare,onPipeline}:{doc:DocumentItem;relations:Relation[];onClose:()=>void;onCompare:()=>void;onPipeline:()=>void}){
- const close=useRef<HTMLButtonElement>(null);const [sections,setSections]=useState({info:true,process:true,relation:true});
- useEffect(()=>{const last=document.activeElement as HTMLElement|null;close.current?.focus();const key=(e:KeyboardEvent)=>{if(e.key==='Escape')onClose();if(e.key==='Tab'){const buttons=close.current?.closest('[role="dialog"]')?.querySelectorAll<HTMLElement>('button:not([disabled]), [href], input, select, [tabindex]:not([tabindex="-1"])');if(!buttons?.length)return;const first=buttons[0],end=buttons[buttons.length-1];if(e.shiftKey&&document.activeElement===first){e.preventDefault();end.focus()}else if(!e.shiftKey&&document.activeElement===end){e.preventDefault();first.focus()}}};document.addEventListener('keydown',key);return()=>{document.removeEventListener('keydown',key);last?.focus()}},[onClose]);
- const rel=relations.filter(r=>r.sourceId===doc.id||r.targetId===doc.id);
- const toggle=(key:keyof typeof sections)=>setSections({...sections,[key]:!sections[key]});
- return <div className="drawer-overlay" onMouseDown={onClose}><aside className="detail-drawer" role="dialog" aria-modal="true" aria-label="문서 상세" onMouseDown={e=>e.stopPropagation()}><header><div><span>DOCUMENT DETAIL</span><b>문서 상세</b></div><button ref={close} className="plain-icon" onClick={onClose} aria-label="문서 상세 닫기"><X size={20}/></button></header><div className="drawer-content"><div className="detail-file"><FileIcon format={doc.format}/><div><span>{doc.id} · {doc.format}</span><h2>{doc.name}</h2></div></div><Status status={doc.status}/><div className="detail-alert"><AlertCircle size={16}/><span>{doc.note}</span></div>
- <div className="detail-accordion"><button onClick={()=>toggle('info')} aria-expanded={sections.info}>문서 정보 <ChevronDown className={!sections.info?'rotate-right':''} size={16}/></button>{sections.info&&<div className="detail-properties">{[['원천',doc.source],['파일 크기',doc.size],['최근 처리',doc.updated],['현재 단계',doc.stage],['처리 경로',doc.parser],['OCR',doc.ocr?'적용 예시':'미적용 예시']].map(([a,b])=><React.Fragment key={a}><span>{a}</span><b>{b}</b></React.Fragment>)}</div>}</div>
- <div className="detail-accordion"><button onClick={()=>toggle('process')} aria-expanded={sections.process}>처리 이력 <span className="mini-tag">MOCK</span><ChevronDown className={!sections.process?'rotate-right':''} size={16}/></button>{sections.process&&<div className="detail-timeline"><div><i/><b>파일 정보 확인</b><small>파일 형식 · {doc.format}</small></div><div><i/><b>{doc.stage}</b><small>{doc.note}</small></div></div>}</div>
- <div className="detail-accordion"><button onClick={()=>toggle('relation')} aria-expanded={sections.relation}>문서 간 참조 <span className="detail-count">{rel.length}</span><ChevronDown className={!sections.relation?'rotate-right':''} size={16}/></button>{sections.relation&&<div className="detail-relations">{rel.length?rel.map(r=><div key={r.id}><Link2 size={15}/><span><b>{r.sourceId===doc.id?r.target:r.source}</b><small>{r.location} · {r.status}</small></span></div>):<p>표시할 참조 관계가 없습니다.</p>}</div>}</div>
- <div className="drawer-actions"><button className="button-primary" onClick={onCompare}>파싱 결과 비교 <ArrowRight size={15}/></button><button className="button-secondary" onClick={onPipeline}>처리 경로 보기</button></div><p className="drawer-disclaimer">화면의 문서와 처리 이력은 모두 가상의 예시입니다.</p></div></aside></div>
+type Props = {
+  doc: DocumentItem;
+  relations: Relation[];
+  onClose: () => void;
+  onCompare: () => void;
+  onPipeline: () => void;
+  onOpenRelated?: (id: string) => boolean;
+};
+
+type View = 'info' | 'process' | 'relation';
+type HistoryEntry = { id: string; name: string };
+const FOCUSABLE = 'button:not([disabled]):not([tabindex="-1"]), [href], input:not([disabled]), select:not([disabled]), [tabindex="0"]';
+
+export function DocumentDrawer({ doc, relations, onClose, onCompare, onPipeline, onOpenRelated }: Props) {
+  const [view, setView] = useState<View>('info');
+  const [history, setHistory] = useState<HistoryEntry[]>([]);
+  const [feedback, setFeedback] = useState('');
+  const dialogRef = useRef<HTMLElement>(null);
+  const closeRef = useRef<HTMLButtonElement>(null);
+  const documentName = useRef<HTMLHeadingElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const moveFocusToName = useRef(false);
+  const dialogTitle = useId();
+  const related = relations.filter(relation => relation.sourceId === doc.id || relation.targetId === doc.id);
+  const previous = history.at(-1);
+  const routeFirst = doc.simulated || doc.status === '형식 확인 필요' || doc.status === '처리 실패';
+  const hasIssue = attention(doc.status);
+  const NoteIcon = hasIssue ? TriangleAlert : Info;
+  const properties = [
+    ['원천', doc.source], ['파일 크기', doc.size], ['최근 처리', doc.updated],
+    ['현재 단계', doc.stage], ['처리 경로', doc.parser],
+    ['OCR', doc.simulated ? '실행 전' : doc.ocr ? '적용 예시' : '미적용 예시'],
+  ];
+
+  useEffect(() => {
+    const opener = document.activeElement as HTMLElement | null;
+    const shell = document.getElementById('root');
+    const wasInert = shell?.inert ?? false;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    if (shell) shell.inert = true;
+    closeRef.current?.focus({ preventScroll: true });
+    return () => {
+      if (shell) shell.inert = wasInert;
+      document.body.style.overflow = previousOverflow;
+      if (opener?.isConnected) opener.focus({ preventScroll: true });
+    };
+  }, []);
+
+  useEffect(() => {
+    if (scrollRef.current) scrollRef.current.scrollTop = 0;
+    if (moveFocusToName.current) {
+      documentName.current?.focus({ preventScroll: true });
+      moveFocusToName.current = false;
+    }
+  }, [doc.id]);
+
+  const onKeyDown = (event: KeyboardEvent<HTMLElement>) => {
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      event.stopPropagation();
+      onClose();
+      return;
+    }
+    if (event.key !== 'Tab') return;
+    const items = dialogRef.current?.querySelectorAll<HTMLElement>(FOCUSABLE);
+    if (!items?.length) return;
+    const first = items[0];
+    const last = items[items.length - 1];
+    if (event.shiftKey && (document.activeElement === first || document.activeElement === documentName.current)) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault();
+      first.focus();
+    }
+  };
+
+  const openRelated = (id: string) => {
+    if (id === doc.id || !onOpenRelated?.(id)) {
+      setFeedback('예시 목록에서 연결 문서를 찾을 수 없습니다.');
+      return;
+    }
+    setHistory(items => [...items, { id: doc.id, name: doc.name }]);
+    setFeedback('');
+    setView('info');
+    moveFocusToName.current = true;
+  };
+
+  const goBack = () => {
+    if (!previous || !onOpenRelated?.(previous.id)) return;
+    setHistory(items => items.slice(0, -1));
+    setFeedback('');
+    setView('relation');
+    moveFocusToName.current = true;
+  };
+
+  const copyId = async () => {
+    try {
+      if (!navigator.clipboard) throw new Error('Clipboard unavailable');
+      await navigator.clipboard.writeText(doc.id);
+      setFeedback('문서 ID가 복사되었습니다.');
+    } catch {
+      setFeedback('복사 기능을 사용할 수 없습니다. 문서 ID를 선택해 복사하세요.');
+    }
+  };
+
+  const comparisonAction = (
+    <button type="button" className={routeFirst ? 'inventory-secondary' : 'inventory-primary'} onClick={onCompare}>
+      <GitCompareArrows size={17} aria-hidden="true" />파싱 결과 비교
+    </button>
+  );
+  const pipelineAction = (
+    <button type="button" className={routeFirst ? 'inventory-primary' : 'inventory-secondary'} onClick={onPipeline}>
+      <Workflow size={17} aria-hidden="true" />처리 경로 보기
+    </button>
+  );
+
+  return createPortal(
+    <div className="inventory-drawer-backdrop" onMouseDown={event => { if (event.target === event.currentTarget) onClose(); }}>
+      <aside className="inventory-drawer" ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby={dialogTitle} onKeyDown={onKeyDown}>
+        <header className="inventory-drawer-header">
+          <div><FileSearch size={19} strokeWidth={1.8} aria-hidden="true" /><h2 id={dialogTitle}>문서 상세</h2></div>
+          <button type="button" ref={closeRef} className="inventory-icon-button" aria-label="문서 상세 닫기" onClick={onClose}>
+            <X size={20} aria-hidden="true" />
+          </button>
+        </header>
+        <div className="inventory-drawer-scroll" ref={scrollRef}>
+          <div className="inventory-drawer-summary">
+            {previous && <button type="button" className="inventory-back inventory-text-button" onClick={goBack}>
+              <ArrowLeft size={16} aria-hidden="true" /><span>{previous.name}</span>
+            </button>}
+            <div className="inventory-drawer-file">
+              <FileIcon format={doc.format} />
+              <div>
+                <div className="inventory-drawer-meta">
+                  <code>{doc.id}</code>
+                  <span className="inventory-format">{doc.format}</span>
+                  <button type="button" className="inventory-icon-button inventory-copy" aria-label="문서 ID 복사" title="문서 ID 복사"
+                    onClick={() => void copyId()}><Clipboard size={16} aria-hidden="true" /></button>
+                </div>
+                <h3 ref={documentName} tabIndex={-1}>{doc.name}</h3>
+                <Status status={doc.status} />
+              </div>
+            </div>
+            {feedback && <p className="inventory-drawer-feedback" role="status">{feedback}</p>}
+            {doc.note && <div className={`inventory-drawer-note${hasIssue ? ' is-warning' : ''}${doc.status === '처리 실패' ? ' is-error' : ''}`}>
+              <NoteIcon size={18} strokeWidth={1.8} aria-hidden="true" /><p>{doc.note}</p>
+            </div>}
+          </div>
+
+          <Tabs<View> className="inventory-drawer-tabs" items={[
+            { id: 'info', label: '문서 정보' },
+            { id: 'process', label: '처리 이력' },
+            { id: 'relation', label: '문서 간 참조', badge: related.length },
+          ]} value={view} onChange={setView} label="문서 세부 정보">
+            {active => (
+              <div className="inventory-detail-body">
+                {active === 'info' && <dl className="inventory-properties">
+                  {properties.map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value || '기록 없음'}</dd></div>)}
+                </dl>}
+                {active === 'process' && <ol className="inventory-timeline" aria-label="예시 처리 이력">
+                  <li><span aria-hidden="true" /><div><b>파일 정보 확인</b><p>파일 형식 · {doc.format}</p></div></li>
+                  <li className="is-current"><span aria-hidden="true" /><div><b>{doc.stage}</b><p>{doc.updated}</p></div><Status status={doc.status} /></li>
+                </ol>}
+                {active === 'relation' && (
+                  related.length ? <ul className="inventory-relations">{related.map(relation => {
+                    const outgoing = relation.sourceId === doc.id;
+                    const anotherId = outgoing ? relation.targetId : relation.sourceId;
+                    const name = outgoing ? relation.target : relation.source;
+                    return <li key={relation.id}>
+                      <div className="inventory-relation-head">
+                        <span className="inventory-relation-icon"><Link2 size={18} strokeWidth={1.8} aria-hidden="true" /></span>
+                        <div><span>{outgoing ? '나가는 참조' : '들어오는 참조'}</span><strong>{name}</strong></div>
+                        <Status status={relation.status} />
+                      </div>
+                      <p className="inventory-relation-meta">{relation.location} · {relation.method}</p>
+                      {relation.evidence && <blockquote>{relation.evidence}</blockquote>}
+                      {anotherId && anotherId !== doc.id && onOpenRelated && (
+                        <button type="button" className="inventory-text-button" aria-label={`${name} 열기`} onClick={() => openRelated(anotherId)}>
+                          연결 문서 열기 <ArrowRight size={15} aria-hidden="true" />
+                        </button>
+                      )}
+                    </li>;
+                  })}</ul> : <div className="inventory-detail-empty"><Link2 size={23} aria-hidden="true" /><p>표시할 참조 관계가 없습니다.</p></div>
+                )}
+              </div>
+            )}
+          </Tabs>
+        </div>
+        <footer className="inventory-drawer-footer">
+          <span>{doc.simulated ? '직접 추가한 파일 정보' : '예시 문서 및 처리 기록'}</span>
+          <div>{routeFirst ? <>{pipelineAction}{comparisonAction}</> : <>{comparisonAction}{pipelineAction}</>}</div>
+        </footer>
+      </aside>
+    </div>,
+    document.body,
+  );
 }
-

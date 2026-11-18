@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react';
 import type { ReactNode } from 'react';
 import { ArrowRight, X } from 'lucide-react';
 import { CHILD_KIND, FLAG, LINK_KIND } from '../StructurePanel';
@@ -11,6 +12,8 @@ const KICKER = { entry: '판', instance: '파일', group: '참조', family: '문
 
 /** 클릭으로 고정한 항목의 상세. X 또는 Escape로 닫는다. */
 export function DetailPanel({ data, pin, current, onClose, onFamily }: Props) {
+  const close = useRef<HTMLButtonElement>(null);
+  useEffect(() => { close.current?.focus({ preventScroll: true }); }, []);
   const familyOf = (id: string | null | undefined) => id ? data.families.find(item => item.id === id) ?? null : null;
   const goFamily = (id: string | null | undefined, entry?: string | null, label = '이 문서군 보기') => {
     if (!id || (current?.id === id && !entry)) return null;
@@ -64,7 +67,7 @@ export function DetailPanel({ data, pin, current, onClose, onFamily }: Props) {
     body = <>
       <p className="ln-panel-sub"><span className={`ln-state is-${LATEST_META[family.latest.status].tone}`}>{LATEST_META[family.latest.status].label}</span> {latest.label} · {data.instances[latest.primary].name}</p>
       <dl className="ln-dl"><dt>판</dt><dd>{family.entries.length}개</dd><dt>파일</dt><dd>{family.files}개</dd><dt>포함 파일</dt><dd>{family.counts.contained}개</dd>
-        <dt>가리키는 곳</dt><dd>{Object.values(family.counts.in).reduce((a, b) => a + b, 0)}건</dd></dl>
+        <dt>이 문서를 참조하는 곳</dt><dd>{Object.values(family.counts.in).reduce((a, b) => a + b, 0)}건</dd></dl>
       {goFamily(family.id)}
     </>;
   } else if (pin.type === 'group') {
@@ -95,7 +98,7 @@ export function DetailPanel({ data, pin, current, onClose, onFamily }: Props) {
     body = <p className="ln-panel-sub">목록을 다시 불러오면서 사라진 항목입니다.</p>;
   }
   return <aside className="ln-panel" aria-label="상세">
-    <header><div><span>{KICKER[pin.type]}</span><h3 title={title}>{title}</h3></div><button className="ln-close" onClick={onClose} aria-label="상세 닫기" title="닫기 (Esc)"><X size={15} /></button></header>
+    <header><div><span>{KICKER[pin.type]}</span><h3 title={title}>{title}</h3></div><button type="button" ref={close} className="ln-close" onClick={onClose} aria-label="상세 닫기" title="닫기 (Esc)"><X size={17} aria-hidden="true" /></button></header>
     <div className="ln-panel-body">{body}</div>
   </aside>;
 }

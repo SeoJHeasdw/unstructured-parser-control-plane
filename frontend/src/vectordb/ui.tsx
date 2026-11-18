@@ -66,8 +66,10 @@ function FloatBox({ id, float }: { id: string; float: Float }) {
   const vw = window.innerWidth || 1280, vh = window.innerHeight || 800;
   let style: CSSProperties;
   if (kind === 'tip') {
-    const below = rect.top < 80;
-    style = { left: Math.min(Math.max(rect.left + rect.width / 2, 130), vw - 130), top: below ? rect.bottom + 8 : rect.top - 8, transform: below ? 'translateX(-50%)' : 'translate(-50%, -100%)' };
+    const below = rect.top < 100;
+    const width = Math.min(280, vw - 24);
+    const edge = width / 2 + 12;
+    style = { maxWidth: width, left: Math.min(Math.max(rect.left + rect.width / 2, edge), vw - edge), top: below ? rect.bottom + 8 : rect.top - 8, transform: below ? 'translateX(-50%)' : 'translate(-50%, -100%)' };
   } else {
     const width = Math.min(460, vw - 24);
     const below = rect.bottom + 280 < vh;
@@ -84,7 +86,7 @@ export const escapeHides = (float: { hide: () => void; shown: string | null }) =
 /* ----- 벡터: 숫자를 늘어놓지 않고 앞부분 값의 부호·크기만 색으로 ----- */
 export function heat(t: number): string {
   const a = Math.min(1, Math.abs(t));
-  return t >= 0 ? `rgba(110, 99, 202, ${(0.12 + 0.88 * a).toFixed(3)})` : `rgba(214, 128, 58, ${(0.12 + 0.88 * a).toFixed(3)})`;
+  return t >= 0 ? `rgba(77, 102, 213, ${(0.12 + 0.88 * a).toFixed(3)})` : `rgba(214, 128, 58, ${(0.12 + 0.88 * a).toFixed(3)})`;
 }
 export function VectorStrip({ values, size = 'sm' }: { values: number[]; size?: 'sm' | 'lg' }) {
   const peak = Math.max(1e-9, ...values.map(v => Math.abs(v)));
@@ -92,7 +94,7 @@ export function VectorStrip({ values, size = 'sm' }: { values: number[]; size?: 
 }
 
 /* ----- 표시 형식 ----- */
-export const PALETTE = ['#7468ce', '#3f9b7f', '#d08a3c', '#4a86c5', '#c2557a', '#8a9a3b', '#5f6680', '#2f9db0'];
+export const PALETTE = ['#5066d5', '#398e79', '#b77a37', '#4586b8', '#ad5f84', '#75873e', '#7d74ae', '#3192a5'];
 export const fmtCount = (n: number | null | undefined) => n === null || n === undefined ? '—' : n.toLocaleString('ko-KR');
 export const fmtPct = (part: number, whole: number) => whole > 0 ? `${(part / whole * 100).toFixed(part / whole < 0.1 ? 1 : 0)}%` : '—';
 export const shortPk = (pk: string) => pk.length > 16 ? `${pk.slice(0, 8)}…${pk.slice(-4)}` : pk;

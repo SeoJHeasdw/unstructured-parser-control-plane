@@ -1,5 +1,5 @@
 import { useEffect, useId, useMemo, useState, type FormEvent } from 'react';
-import { ChevronLeft, ChevronRight, ChevronsLeft, Info, LoaderCircle, SlidersHorizontal, TriangleAlert, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ChevronsLeft, Info, LoaderCircle, RefreshCw, SlidersHorizontal, TriangleAlert, X } from 'lucide-react';
 import { browseChunks, type BrowseResult, type ChunkRow, type CollectionDetail, type SourceKey } from '../api/vectordb';
 import { escapeHides, fmtCount, fmtValue, oneLine, PALETTE, ROLE_LABEL, shortPk, useFloating, useStored, VectorStrip } from './ui';
 
@@ -18,6 +18,7 @@ export default function ChunkBrowser({ source, detail, textField, onTextField, p
   const [data, setData] = useState<BrowseResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [retry, setRetry] = useState(0);
   const [hoverDoc, setHoverDoc] = useState<string | null>(null);
   const peek = useFloating();
   const optionsId = useId();
@@ -37,15 +38,17 @@ export default function ChunkBrowser({ source, detail, textField, onTextField, p
 
   useEffect(() => {
     let alive = true;
-    setLoading(true); setError('');
+    setLoading(true); setError(''); setData(null);
+    setHoverDoc(null);
     browseChunks(source, { db: detail.db, collection: detail.name }, { filter: applied, partition, output_fields: outputFields, text_field: textField, limit: pageSize, offset, include_vector: includeVector })
       .then(result => { if (alive) { setData(result); setLoading(false); } })
       .catch((err: Error) => { if (alive) { setError(err.message); setLoading(false); } });
     return () => { alive = false; };
-  }, [source, detail.db, detail.name, queryKey, offset]);
+  }, [source, detail.db, detail.name, queryKey, offset, retry]);
 
   const submit = (event: FormEvent) => { event.preventDefault(); setApplied(draft.trim()); };
   const clearFilter = () => { setDraft(''); setApplied(''); };
+  const resetQuery = () => { clearFilter(); onPartition(null); };
   const rows = data?.rows ?? [];
   const columns = (data?.output_fields ?? []).filter(name => name !== pk);
   const total = data?.total ?? null;
@@ -80,7 +83,7 @@ export default function ChunkBrowser({ source, detail, textField, onTextField, p
   </>;
 
   return <div className="vdb-browser">
-    <div className="vdb-toolbar">
+    <div className="vdb-toolbar" role="group" aria-label="청크 목록 도구">
       <label className="vdb-select"><span>파티션</span>
         <select value={partition ?? ''} onChange={event => onPartition(event.target.value || null)} aria-label="파티션 선택">
           <option value="">전체 ({fmtCount(detail.row_count)})</option>
@@ -92,7 +95,7 @@ export default function ChunkBrowser({ source, detail, textField, onTextField, p
       </button>
       {applied && !optionsOpen && <span className="vdb-chip is-filter" title={applied}><code>{oneLine(applied, 48)}</code><button type="button" aria-label="조건 지우기" onClick={clearFilter}><X size={12} /></button></span>}
       <span className="vdb-toolbar-gap" />
-      <span className="vdb-range" aria-live="polite">{loading ? <LoaderCircle size={14} className="mw-spin" aria-label="불러오는 중" /> : rows.length ? `${fmtCount(offset + 1)}–${fmtCount(end)}` : '0건'}{total !== null && <> / <b>{fmtCount(total)}</b>건</>}</span>
+      <span className="vdb-range" aria-live="polite">{loading ? <LoaderCircle size={14} className="vdb-spin" aria-label="불러오는 중" /> : rows.length ? `${fmtCount(offset + 1)}–${fmtCount(end)}` : '0건'}{total !== null && <> / <b>{fmtCount(total)}</b>건</>}</span>
       <div className="vdb-pager">
         <button type="button" className="plain-icon" aria-label="첫 페이지" disabled={loading || offset === 0} onClick={() => setOffset(0)}><ChevronsLeft size={16} /></button>
         <button type="button" className="plain-icon" aria-label="이전 페이지" disabled={loading || offset === 0} onClick={() => setOffset(offset - pageSize)}><ChevronLeft size={16} /></button>
@@ -130,9 +133,9 @@ export default function ChunkBrowser({ source, detail, textField, onTextField, p
     {effectiveText
       ? <p className="vdb-truth" title="벡터는 텍스트로 되돌릴 수 없습니다."><Info size={13} aria-hidden /><span>글은 함께 저장된 <code>{effectiveText}</code> 필드 값입니다.</span></p>
       : <p className="vdb-truth is-warn" role="note"><TriangleAlert size={14} aria-hidden /><span>텍스트 필드가 없어 청크 내용을 읽을 수 없습니다. 벡터는 텍스트로 되돌릴 수 없습니다.</span></p>}
-    {error && <p className="vdb-error" role="alert"><TriangleAlert size={14} aria-hidden /><span>{error}</span></p>}
+    {error && <div className="vdb-problem" role="alert"><TriangleAlert size={18} aria-hidden="true" /><div><strong>청크를 불러오지 못했습니다</strong><p>{error}</p></div><button type="button" className="button-secondary" onClick={() => setRetry(value => value + 1)}><RefreshCw size={15} aria-hidden="true" /> 다시 시도</button></div>}
 
-    <div className={`vdb-table-wrap ${loading ? 'is-loading' : ''}`} aria-busy={loading}>
+    <div className={`vdb-table-wrap ${loading ? 'is-loading' : ''}`} aria-busy={loading} tabIndex={0} role="region" aria-label="저장된 청크 표">
       <table className={`vdb-table is-chunks ${hoverDoc !== null ? 'is-dimmed' : ''}`}>
         <thead><tr>
           <th scope="col" className="is-pk">{pk}</th>
@@ -160,7 +163,7 @@ export default function ChunkBrowser({ source, detail, textField, onTextField, p
             {includeVector && <td className="is-vec">{row.vector?.head ? <><span>{row.vector.dim}차원</span><VectorStrip values={row.vector.head} /></> : row.vector ? <span>{row.vector.type}</span> : '—'}</td>}
           </tr>;
           })}
-          {!loading && !rows.length && !error && <tr><td colSpan={columns.length + 4} className="vdb-empty">조건에 맞는 청크가 없습니다.</td></tr>}
+          {!loading && !rows.length && !error && <tr><td colSpan={columns.length + 3 + Number(includeVector)} className="vdb-empty"><div className="vdb-empty-chunks"><strong>{applied || partition ? '조건에 맞는 청크가 없습니다' : '저장된 청크가 없습니다'}</strong>{(applied || partition) && <button type="button" className="button-secondary" onClick={resetQuery}>전체 청크 보기</button>}</div></td></tr>}
         </tbody>
       </table>
     </div>

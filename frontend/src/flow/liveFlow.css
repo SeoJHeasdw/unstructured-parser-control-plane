@@ -1,14 +1,14 @@
 /* 대시보드 상단 처리 흐름: 기본은 지표 한 줄 + 흐름 한 줄. 세부는 hover, 표와 주의 목록은 펼쳐서 본다. */
-.lf-root{--ink:#1e293b;--ink2:#475569;--ink3:#64748b;--line:#e2e8f0;--brand:#6c5fd0;--brand-ink:#5144b5;--err:#dc2626;--warn:#b45309;
-  background:#fff;border:1px solid #e3e7ee;border-radius:12px;margin-bottom:22px;box-shadow:0 1px 3px #0f172a0a;color:var(--ink);position:relative}
+.lf-root{--ink:var(--ink-1);--ink2:var(--ink-2);--ink3:var(--ink-3);--line:var(--rule);--brand:var(--accent);--brand-ink:#2b3c96;--err:var(--bad);
+  background:#fff;border:1px solid var(--rule);border-radius:13px;margin-bottom:22px;box-shadow:var(--shadow-1);color:var(--ink);position:relative}
 .lf-rot{transform:rotate(-90deg)}
 .lf-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 16px;border-bottom:1px solid #eef1f5;flex-wrap:wrap}
 .lf-head>div:first-child{display:flex;align-items:center;gap:10px}
 .lf-head h2{font-size:15px;font-weight:700;letter-spacing:-.2px}
 .lf-head time{font-size:12px;color:var(--ink3);font-variant-numeric:tabular-nums}
 .lf-state{display:inline-flex;align-items:center;gap:6px;font-size:11.5px;font-weight:650;color:var(--ink3);background:#f1f5f9;border-radius:999px;padding:3px 9px}
-.lf-state.is-on{color:#3f3796;background:#f1effd}
-.lf-state i{width:7px;height:7px;border-radius:50%;background:#4f46e5;animation:fx-pulse 1.6s infinite}
+.lf-state.is-on{color:#3f3796;background:var(--accent-soft)}
+.lf-state i{width:7px;height:7px;border-radius:50%;background:#425acb;animation:fx-pulse 1.6s infinite}
 .lf-mock{font-size:11px;font-weight:700;color:#64748b;border:1px dashed #cbd5e1;border-radius:5px;padding:2px 7px;cursor:help}
 .lf-actions{display:flex;gap:6px}
 .lf-actions button{display:inline-flex;align-items:center;gap:6px;height:30px;padding:0 11px;border:1px solid var(--line);background:#fff;border-radius:7px;font-size:12.5px;font-weight:650;color:var(--ink2)}
@@ -26,23 +26,23 @@
 .lf-kpi span{font-size:12px;font-weight:600;color:var(--ink3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .lf-kpi b{font-size:18px;font-weight:700;letter-spacing:-.3px;font-variant-numeric:tabular-nums;white-space:nowrap}
 .lf-kpi b small{font-size:11.5px;font-weight:500;color:var(--ink3);margin-left:2px}
-.lf-kpi:hover,.lf-kpi:focus-visible,.lf-kpi.is-focus{background:#f8f7ff}
+.lf-kpi:hover,.lf-kpi:focus-visible,.lf-kpi.is-focus{background:var(--accent-soft)}
 .lf-kpi.is-warn b{color:var(--warn)}.lf-kpi.is-warn{box-shadow:inset 0 -2px 0 #f59e0b;cursor:pointer}
 .lf-kpi.is-error b{color:var(--err)}.lf-kpi.is-error{box-shadow:inset 0 -2px 0 var(--err);cursor:pointer}
 
 /* 흐름 한 줄 */
-.lf-body{padding:14px 16px 16px;display:flex;flex-direction:column;gap:12px;background:#fbfcfe;border-radius:0 0 12px 12px}
+.lf-body{padding:14px 16px 16px;display:flex;flex-direction:column;gap:12px;background:#f7f9fd;border-radius:0 0 12px 12px}
 .lf-rail{list-style:none;margin:0;padding:0 0 2px;display:flex;align-items:center;overflow-x:auto;scrollbar-width:thin}
 .lf-rail>li{display:flex;align-items:center;flex:1 1 104px;min-width:98px}
 .lf-rail>li.is-group{flex:1.6 1 150px;min-width:140px}
 .lf-stack{flex:1;min-width:0;display:flex;flex-direction:column;gap:6px}
 .lf-arrow{flex:none;color:#a3adbd;margin:0 3px}
 .lf-node{flex:1;min-width:0;width:100%;display:flex;flex-direction:column;gap:5px;padding:8px 10px;border:1px solid #dfe5ee;border-radius:9px;background:#fff;text-align:left;box-shadow:0 1px 2px #0f172a0a;transition:opacity .15s,border-color .15s,box-shadow .15s}
-.lf-node:hover,.lf-node:focus-visible{border-color:#b5aef0;box-shadow:0 3px 10px #4c429b1a}
+.lf-node:hover,.lf-node:focus-visible{border-color:#aabaf4;box-shadow:0 3px 10px #4c429b1a}
 .lf-node.is-start,.lf-node.is-end{border-radius:999px;padding:8px 13px}
 .lf-node.is-warn{border-color:#f5b94a;background:#fffdf7}.lf-node.is-error{border-color:#f19999;background:#fffafa}
 .lf-node.is-paused{background:repeating-linear-gradient(-45deg,#fff,#fff 7px,#f3f5f8 7px,#f3f5f8 14px)}
-.lf-node.is-lit{border-color:#7c70d8;box-shadow:0 0 0 2px #7c70d833}
+.lf-node.is-lit{border-color:#6077e2;box-shadow:0 0 0 2px #6077e233}
 .lf-node.is-dim{opacity:.3}
 .lf-root.has-focus .lf-arrow{opacity:.35}
 .lf-node-name{display:flex;align-items:center;gap:6px;font-size:12.5px;font-weight:650;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--ink)}
@@ -52,7 +52,7 @@
 .lf-primary b{font-size:16px;font-weight:700;color:var(--ink);font-variant-numeric:tabular-nums}
 .lf-primary.is-warn,.lf-primary.is-warn b{color:var(--warn)}.lf-primary.is-error,.lf-primary.is-error b{color:var(--err)}
 .lf-group{border-color:#d6dcf7;background:#fdfdff}
-.lf-group[aria-expanded=true]{border-color:#9d94e6;box-shadow:0 0 0 2px #7c70d81f}
+.lf-group[aria-expanded=true]{border-color:#9d94e6;box-shadow:0 0 0 2px #6077e21f}
 .lf-spark{display:flex;gap:2px;height:5px}.lf-spark i{display:block;min-width:4px;border-radius:2px;background:#cbd5e1}
 .lf-spark i.is-busy{background:#8b83e6}.lf-spark i.is-warn{background:#f59e0b}.lf-spark i.is-error{background:var(--err)}.lf-spark i.is-paused{background:#94a3b8}
 
@@ -68,7 +68,7 @@
 .lf-row:hover{background:#f5f7fb}
 .lf-row>span{display:flex;align-items:center;gap:7px;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:600}
 .lf-row>span::before{content:'';width:8px;height:8px;border-radius:50%;background:#cbd5e1;flex:none}
-.lf-row.is-busy>span::before{background:#4f46e5}.lf-row.is-warn>span::before{background:#f59e0b}.lf-row.is-error>span::before{background:var(--err)}.lf-row.is-paused>span::before{background:#64748b}
+.lf-row.is-busy>span::before{background:#425acb}.lf-row.is-warn>span::before{background:#f59e0b}.lf-row.is-error>span::before{background:var(--err)}.lf-row.is-paused>span::before{background:#64748b}
 .lf-row em{color:var(--ink2)}
 .lf-row em.is-warn{color:var(--warn);font-weight:700}.lf-row em.is-error{color:var(--err);font-weight:700}
 .lf-row.is-exception{grid-template-columns:1fr auto}.lf-row.is-exception>span{color:#92400e}
@@ -88,7 +88,7 @@
 .lf-attention p{font-size:12.5px;color:var(--ink3)}
 
 /* hover 툴팁: 흐름 줄 바로 아래에 띄워 강조된 단계를 가리지 않는다 */
-.lf-tip{position:fixed;z-index:40;transform:translateX(-50%);min-width:220px;max-width:340px;padding:11px 12px;border-radius:9px;background:#1b2234;color:#dfe3ef;box-shadow:0 10px 30px #0f142333;pointer-events:none;font-size:12px}
+.lf-tip{position:fixed;z-index:40;transform:translateX(-50%);width:min(320px,calc(100vw - 24px));padding:11px 12px;border-radius:9px;background:#1b2234;color:#dfe3ef;box-shadow:0 10px 30px #0f142333;pointer-events:none;font-size:12px}
 .lf-tip-head{display:flex;align-items:center;gap:7px;margin-bottom:8px}.lf-tip-head b{font-size:13px;color:#fff}.lf-tip-head small{margin-left:auto;color:#a5adc4;font-size:11px}
 .lf-tip dl{margin:0;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
 .lf-tip dl div{display:flex;flex-direction:column;gap:2px}.lf-tip dt{font-size:10.5px;color:#9aa3b8}.lf-tip dd{margin:0;font-size:15px;font-weight:700;color:#fff;font-variant-numeric:tabular-nums}.lf-tip dd small{font-size:11px;color:#9aa3b8;margin-left:2px}
@@ -100,5 +100,49 @@
 .lf-tip-foot{display:block;margin-top:8px;color:#8590a8;font-size:11px}
 .lf-sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
 
-@media (max-width:1100px){.lf-kpis{grid-template-columns:repeat(4,minmax(0,1fr))}.lf-kpi{border-bottom:1px solid #eef1f5}}
-@media (max-width:640px){.lf-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}.lf-head{padding:11px 13px}.lf-body{padding:12px}}
+
+.lf-head { padding: 13px 16px; }
+.lf-head > .lf-head-title { display: flex; flex-wrap: wrap; gap: 7px; }
+.lf-head h2 { color: var(--ink); font-size: 17px; letter-spacing: -.035em; white-space: nowrap; }
+.lf-head-icon { display: grid; place-items: center; width: 32px; height: 32px; flex: none; border-radius: 8px; background: var(--accent-soft); color: var(--accent); }
+.lf-state { background: #eef2f7; color: var(--ink-3); white-space: nowrap; }
+.lf-state.is-on { color: var(--ok); background: var(--ok-soft); }
+.lf-state i { flex: none; background: #278561; }
+.lf-mock { color: var(--ink-3); background: var(--surface-2); border: 1px solid var(--rule); border-radius: 5px; white-space: nowrap; }
+.lf-actions { flex-wrap: wrap; }
+.lf-actions button { min-height: 34px; white-space: nowrap; }
+.lf-kpi { flex-direction: column; align-items: flex-start; padding: 11px 15px; gap: 4px; }
+.lf-kpi span { overflow: visible; white-space: normal; word-break: keep-all; line-height: 1.35; }
+.lf-kpi b { font-size: 22px; line-height: 1.05; }
+button.lf-kpi { cursor: pointer; }
+button.lf-kpi:focus-visible { outline-offset: -2px; }
+.lf-kpi.is-warn, .lf-kpi.is-error { box-shadow: none; }
+.lf-kpi.is-warn { background: #fffbf1; }
+.lf-kpi.is-error { background: #fff5f4; }
+.lf-kpi.is-warn.is-focus { background: #fff2d6; }
+.lf-kpi.is-error.is-focus { background: #ffe9e8; }
+.lf-node { min-height: 46px; }
+.lf-node:focus-visible { outline-offset: -2px; }
+.lf-node-name { font-size: 12px; min-width: 0; }
+.lf-rail-hint { display: flex; align-items: center; justify-content: flex-end; gap: 4px; margin-bottom: -5px; color: var(--ink-3); font-size: 11.5px; }
+.lf-rail > li { min-width: 109px; }
+.lf-rail > li.is-group { min-width: 137px; }
+.lf-drawer ul, .lf-attention ul { grid-template-columns: repeat(auto-fill, minmax(min(100%, 270px), 1fr)); }
+.lf-attention ul { max-height: 258px; overflow: auto; padding: 2px; }
+.lf-attention button { min-height: 45px; }
+.lf-tip td:first-child { white-space: normal; }
+
+@media (max-width: 640px) {
+  .lf-head { padding: 11px 12px; gap: 9px; }
+  .lf-head time { display: none; }
+  .lf-kpis { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .lf-kpi { justify-content: center; padding: 7px 9px; min-height: 58px; border-bottom: 1px solid var(--rule); }
+  .lf-kpi:last-child { grid-column: span 2; }
+  .lf-kpi b { font-size: 18px; }
+  .lf-kpi span { font-size: 11px; }
+  .lf-body { padding: 10px 11px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .lf-state i { animation: none; }
+  .lf-drawer, .lf-attention { animation: none; }
+}

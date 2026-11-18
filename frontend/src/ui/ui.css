@@ -3,24 +3,24 @@
  * 간격 4·8 배수, 글자 12·13·14·16·20·24, 본문 대비 4.5:1 이상.
  */
 :root {
-  --ink-1: #1f2a3d;
-  --ink-2: #3c475a;
-  --ink-3: #5b6577;
+  --ink-1: #17243a;
+  --ink-2: #394962;
+  --ink-3: #52627a;
   --ink-4: #8a93a3;
-  --canvas: #f6f7fa;
+  --canvas: #f4f6fa;
   --surface: #ffffff;
-  --surface-2: #f8f9fb;
-  --surface-3: #eef0f4;
-  --rule: #e5e8ef;
-  --rule-strong: #d3d8e1;
-  --accent: #6457c9;
-  --accent-soft: #efedfc;
-  --accent-ring: #7769e0;
-  --ok: #1f8a5b;
+  --surface-2: #f8faff;
+  --surface-3: #edf1f7;
+  --rule: #e1e7f0;
+  --rule-strong: #ccd7e6;
+  --accent: #3e50bd;
+  --accent-soft: #eef0ff;
+  --accent-ring: #5168ea;
+  --ok: #1d714f;
   --ok-soft: #e3f4ec;
-  --warn: #a8701a;
+  --warn: #8a5313;
   --warn-soft: #fbf1df;
-  --bad: #c53b3b;
+  --bad: #ab343b;
   --bad-soft: #fbe7e7;
   --r-1: 6px;
   --r-2: 10px;
@@ -73,6 +73,14 @@
 @keyframes ui-rise { from { opacity: 0; transform: translateY(6px) scale(.985); } }
 @media (prefers-reduced-motion: reduce) { .ui-overlay, .ui-dialog { animation: none; } }
 
+@media (max-width: 550px) {
+  .ui-overlay { padding: 12px; }
+  .ui-dialog { max-height: 94dvh; }
+  .ui-dialog-head, .ui-dialog-body:not(.is-flush), .ui-dialog-foot { padding-inline: 16px; }
+  .ui-dialog-close { width: 36px; height: 36px; }
+  .ui-dialog-foot { flex-wrap: wrap; }
+}
+
 /* ---------- 탭 ---------- */
 .ui-tabs { display: flex; align-items: stretch; gap: 24px; overflow-x: auto; scrollbar-width: none; }
 .ui-tabs::-webkit-scrollbar { display: none; }
@@ -81,6 +89,7 @@
   border: 0; background: none; white-space: nowrap;
   font-size: var(--fs-md); font-weight: 500; color: var(--ink-3);
 }
+.ui-tab:focus-visible { outline-offset: -2px; border-radius: 6px; }
 .ui-tab:hover { color: var(--ink-1); }
 .ui-tab[aria-selected="true"] { color: var(--ink-1); font-weight: 650; }
 .ui-tab[aria-selected="true"]::after { content: ""; position: absolute; left: 0; right: 0; bottom: -1px; height: 2px; border-radius: 2px; background: var(--accent); }

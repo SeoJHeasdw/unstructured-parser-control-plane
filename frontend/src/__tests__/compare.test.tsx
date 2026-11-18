@@ -1,11 +1,50 @@
 import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { CompareView } from '../CompareView';
 import { LiveCompare } from '../compare/LiveCompare';
 import { alignResults, highlightParts } from '../compare/diff';
 import { ResultReview } from '../compare/ResultReview';
+import sample from '../../../mock-data/data.json';
 
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
+
+function renderSample(selectedId: string) {
+  return render(<CompareView docs={sample.documents} selectedId={selectedId} onChange={vi.fn()} onOpenDoc={vi.fn()} source="sample"
+    onSourceChange={vi.fn()} liveId="" onLiveChange={vi.fn()} active sampleStatus="ready" onRetrySample={vi.fn()} />);
+}
+
+describe('비교 원본 파일', () => {
+  it('예시 파싱문을 원본에 복제하지 않고 실제 PDF 파일을 열며 변경 근거 페이지를 확대한다', async () => {
+    const user = userEvent.setup();
+    renderSample('DOC-0842');
+    const original = within(screen.getByRole('region', { name: '원본 문서' }));
+    expect(original.getByTitle('PDF 원문').getAttribute('src')).toContain('bmr-2026-0842');
+    expect(original.queryByText(/문서별 기록|공정별 기록/)).toBeNull();
+    await user.click(screen.getByRole('button', { name: '다음 차이' }));
+    await user.click(screen.getByRole('button', { name: '원문 3쪽' }));
+    expect(original.getByTitle('PDF 원문').getAttribute('src')).toContain('#page=3');
+    await user.click(original.getByRole('button', { name: '크게 보기' }));
+    const expanded = within(screen.getByRole('dialog', { name: '원본 문서' }));
+    expect(expanded.getByTitle('PDF 원문').getAttribute('src')).toContain('#page=3');
+    await user.keyboard('{Escape}');
+    expect(original.getByTitle('PDF 원문').getAttribute('src')).toContain('#page=3');
+  });
+
+  it('예시 XLSX의 원본 셀로 이동하고 같은 워크북을 다운로드한다', async () => {
+    const user = userEvent.setup();
+    renderSample('DOC-0841');
+    const original = within(screen.getByRole('region', { name: '원본 문서' }));
+    const address = original.getByRole('textbox', { name: '원본 셀 주소' });
+    await user.clear(address);
+    await user.type(address, 'b12');
+    await user.click(original.getByRole('button', { name: '이동' }));
+    expect(original.getByRole('cell', { name: 'SOP-QC-0040 Rev.5 참조' }).classList.contains('is-cell')).toBe(true);
+    const download = original.getByRole('link', { name: '원본 다운로드' });
+    expect(download.getAttribute('href')).toContain('.xlsx');
+    expect(download.getAttribute('download')).toBe('설비점검_관리대장_2026.xlsx');
+  });
+});
 
 describe('파싱 차이', () => {
   it('순서와 반복을 비교하고 변경된 구절만 표시한다', () => {

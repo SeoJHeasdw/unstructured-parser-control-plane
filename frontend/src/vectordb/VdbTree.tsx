@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent } from 'react';
-import { ChevronRight, Database, Layers, Search, TriangleAlert } from 'lucide-react';
+import { ChevronRight, Database, Layers, Search, TriangleAlert, X } from 'lucide-react';
 import type { CollectionNode, SourceKey, Tree } from '../api/vectordb';
 import { fmtCount, fmtPct, loadLabel, PALETTE, useFloating, useStored } from './ui';
 
@@ -21,7 +21,7 @@ export default function VdbTree({ source, tree, selected, partition, onSelect }:
     const isOpen = (id: string, fallback: boolean) => flipped.has(id) ? !fallback : fallback;
     const out: Item[] = [];
     tree.databases.forEach((db, di) => {
-      const colls = q ? db.collections.filter(c => c.name.toLowerCase().includes(q)) : db.collections;
+      const colls = q && !db.name.toLowerCase().includes(q) ? db.collections.filter(c => c.name.toLowerCase().includes(q)) : db.collections;
       if (q && !colls.length) return;
       const dbId = `db:${db.name}`;
       const dbOpen = q ? true : isOpen(dbId, true);
@@ -74,7 +74,11 @@ export default function VdbTree({ source, tree, selected, partition, onSelect }:
   };
 
   return <div className="vdb-tree-wrap">
-    <label className="vdb-tree-search"><Search size={14} aria-hidden /><input value={query} onChange={event => setQuery(event.target.value)} placeholder="컬렉션 이름으로 찾기" aria-label="컬렉션 이름으로 찾기" /></label>
+    <div className="vdb-tree-head"><Layers size={17} aria-hidden="true" /><h2>컬렉션 탐색</h2></div>
+    <div className="vdb-tree-search"><Search size={16} aria-hidden="true" />
+      <input value={query} onChange={event => setQuery(event.target.value)} placeholder="DB 또는 컬렉션 검색" aria-label="데이터베이스 또는 컬렉션 검색" />
+      {query && <button type="button" className="plain-icon" onClick={() => setQuery('')} aria-label="검색 지우기"><X size={15} aria-hidden="true" /></button>}
+    </div>
     <div className="vdb-tree" role="tree" aria-label="데이터베이스, 컬렉션, 파티션">
       {items.map((item, index) => {
         const isSelected = item.id === selectedId;
@@ -89,16 +93,16 @@ export default function VdbTree({ source, tree, selected, partition, onSelect }:
           onMouseEnter={tipBind?.onMouseEnter} onMouseLeave={tipBind?.onMouseLeave} onBlur={tipBind?.onBlur} aria-describedby={tipBind?.['aria-describedby']}
           onFocus={event => { setFocusId(item.id); tipBind?.onFocus(event); }}>
           <span className="vdb-ti-chev" aria-hidden onClick={event => { if (item.expandable && item.kind !== 'db') { event.stopPropagation(); toggle(item); } }}>{item.expandable && <ChevronRight size={13} className={item.expanded ? 'is-open' : ''} />}</span>
-          {item.kind === 'db' && <><Database size={14} className="vdb-ti-icon" aria-hidden /><span className="vdb-ti-name">{item.db}</span><span className="vdb-ti-meta">{item.rows ? `컬렉션 ${item.rows}` : '컬렉션 없음'}</span></>}
-          {item.kind === 'coll' && item.coll && <><Layers size={14} className="vdb-ti-icon" aria-hidden /><span className="vdb-ti-name">{item.coll.name}</span>
+          {item.kind === 'db' && <><Database size={14} className="vdb-ti-icon" aria-hidden /><span className="vdb-ti-name" title={item.db}>{item.db}</span><span className="vdb-ti-meta">{item.rows ? `컬렉션 ${item.rows}` : '컬렉션 없음'}</span></>}
+          {item.kind === 'coll' && item.coll && <><Layers size={14} className="vdb-ti-icon" aria-hidden /><span className="vdb-ti-name" title={item.coll.name}>{item.coll.name}</span>
             {item.coll.dim && <span className="vdb-dim">{item.coll.dim}d</span>}<span className="vdb-ti-meta">{fmtCount(item.rows)}</span>
             <i className={`vdb-load ${item.coll.load_state === 'LoadStateLoaded' ? 'is-on' : ''}`} aria-label={loadLabel(item.coll.load_state)} /></>}
-          {item.kind === 'part' && <><i className="vdb-swatch" style={{ background: item.color }} aria-hidden /><span className="vdb-ti-name">{item.part}</span>
+          {item.kind === 'part' && <><i className="vdb-swatch" style={{ background: item.color }} aria-hidden /><span className="vdb-ti-name" title={item.part}>{item.part}</span>
             <span className="vdb-ti-bar" aria-hidden><i style={{ width: `${Math.max(share * 100, item.rows ? 3 : 0)}%`, background: item.color }} /></span><span className="vdb-ti-meta">{fmtCount(item.rows)}</span></>}
           {item.error && <TriangleAlert size={13} className="vdb-ti-warn" aria-label="일부 정보를 읽지 못함" />}
         </div>;
       })}
-      {!items.length && <p className="vdb-empty">{q ? '이름이 맞는 컬렉션이 없습니다.' : '컬렉션이 없습니다.'}</p>}
+      {!items.length && <p className="vdb-empty">{q ? '일치하는 데이터베이스나 컬렉션이 없습니다.' : '컬렉션이 없습니다.'}</p>}
     </div>
     {tip.layer}
   </div>;

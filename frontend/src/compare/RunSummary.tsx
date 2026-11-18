@@ -1,6 +1,6 @@
 import { useMemo, useRef, useState } from 'react';
 import type { ChangeEvent } from 'react';
-import { FileCheck2, ListChecks } from 'lucide-react';
+import { ArrowRight, FileCheck2, ListChecks } from 'lucide-react';
 import { Modal, Tabs } from '../ui';
 import { gained, goldCategories, isGold, lost, measure, scoreGold } from './metrics';
 import type { Gold, RunMetrics } from './metrics';
@@ -21,10 +21,10 @@ function rowsOf(a: RunMetrics, b: RunMetrics, before: RunSide, after: RunSide): 
     { id: 'tables', label: '표', before: a.tables, after: b.tables, better: 'none' },
     { id: 'headings', label: '제목', before: a.headings, after: b.headings, better: 'none' },
     { id: 'images', label: '그림 자리', before: a.images, after: b.images, better: 'none' },
-    { id: 'numbers', label: '숫자·단위', before: a.numbers.size, after: b.numbers.size, better: 'up' },
-    { id: 'docnos', label: '문서번호', before: a.docNumbers.size, after: b.docNumbers.size, better: 'up' },
+    { id: 'numbers', label: '숫자·단위', before: a.numbers.size, after: b.numbers.size, better: 'none' },
+    { id: 'docnos', label: '문서번호', before: a.docNumbers.size, after: b.docNumbers.size, better: 'none' },
     { id: 'broken', label: '깨진 글자', before: a.broken, after: b.broken, better: 'down' },
-    { id: 'pages', label: '위치가 기록된 쪽', before: a.pages, after: b.pages, better: 'up' },
+    { id: 'pages', label: '위치가 기록된 쪽', before: a.pages, after: b.pages, better: 'none' },
     { id: 'warnings', label: '경고', before: before.warnings ?? null, after: after.warnings ?? null, better: 'down' },
   ];
 }
@@ -71,10 +71,12 @@ export function RunSummary({ before, after }: Props) {
 
   return <section className="panel rs-strip" aria-label="두 실행의 변화">
     <div className="rs-head">
-      <p className="rs-runs"><span>이전 실행</span><b>{before.label}</b><span className="rs-arrow">→</span><span>현재 실행</span><b>{after.label}</b></p>
+      <div className="rs-heading"><h2>실행 변화 요약</h2>
+        <p className="rs-runs"><span>이전 실행 <b>{before.label}</b></span><ArrowRight size={14} className="rs-arrow" aria-hidden="true" /><span>현재 실행 <b>{after.label}</b></span></p>
+      </div>
       <div className="rs-actions">
-        <button type="button" className="button-secondary" onClick={() => { setTab('change'); setOpen(true); }}><ListChecks size={14} />변화 자세히</button>
-        <button type="button" className="button-secondary" onClick={() => { setTab('gold'); setOpen(true); }}><FileCheck2 size={14} />정답 대조{scores && <em className="rs-badge">{pct(sum(scores.after))}</em>}</button>
+        <button type="button" className="button-secondary" onClick={() => { setTab('change'); setOpen(true); }}><ListChecks size={16} aria-hidden="true" />변화 자세히</button>
+        <button type="button" className="button-secondary" onClick={() => { setTab('gold'); setOpen(true); }}><FileCheck2 size={16} aria-hidden="true" />정답 대조{scores && <em className="rs-badge">{pct(sum(scores.after))}</em>}</button>
       </div>
     </div>
     <dl className="rs-metrics">
@@ -88,10 +90,10 @@ export function RunSummary({ before, after }: Props) {
     <Modal open={open} onClose={() => setOpen(false)} size="lg" title="두 실행 비교" subtitle={`${before.label} → ${after.label}`}
       tabs={<Tabs label="비교 보기" value={tab} onChange={setTab} items={[{ id: 'change', label: '변화 지표' }, { id: 'gold', label: '정답 대조' }]} />}>
       {tab === 'change' ? <>
-        <table className="rs-table">
+        <div className="rs-table-scroll" tabIndex={0} role="region" aria-label="비교 지표 표"><table className="rs-table">
           <thead><tr><th scope="col">지표</th><th scope="col" className="is-num">이전 실행</th><th scope="col" className="is-num">현재 실행</th><th scope="col" className="is-num">변화</th></tr></thead>
           <tbody>{rows.map(row => <tr key={row.id}><th scope="row">{row.label}</th><td className="is-num">{value(row, 'before')}</td><td className="is-num">{value(row, 'after')}</td><td className="is-num"><Delta row={row} /></td></tr>)}</tbody>
-        </table>
+        </table></div>
         <div className="rs-lists">
           <ItemList title="현재 실행에서 사라진 숫자·단위" items={lostNumbers} tone="bad" />
           <ItemList title="현재 실행에 새로 나온 숫자·단위" items={newNumbers} />
@@ -107,7 +109,7 @@ export function RunSummary({ before, after }: Props) {
         </div>
         {goldError && <p className="rs-error" role="alert">{goldError}</p>}
         {scores && <>
-          <table className="rs-table">
+          <div className="rs-table-scroll" tabIndex={0} role="region" aria-label="정답 대조 지표 표"><table className="rs-table">
             <thead><tr><th scope="col">항목</th><th scope="col" className="is-num">정답 수</th><th scope="col" className="is-num">이전 실행</th><th scope="col" className="is-num">현재 실행</th></tr></thead>
             <tbody>
               {scores.after.map((row, i) => <tr key={row.id}><th scope="row">{row.label}</th><td className="is-num">{nf.format(row.total)}</td>
@@ -115,7 +117,7 @@ export function RunSummary({ before, after }: Props) {
               <tr className="rs-total"><th scope="row">전체</th><td className="is-num">{nf.format(scores.after.reduce((n, row) => n + row.total, 0))}</td>
                 <td className="is-num">{pct(sum(scores.before))}</td><td className="is-num"><b>{pct(sum(scores.after))}</b></td></tr>
             </tbody>
-          </table>
+          </table></div>
           <div className="rs-lists">
             <ItemList title="현재 실행이 못 찾은 정답" items={scores.after.flatMap(row => row.missing.map(item => `${row.label} · ${item}`))} tone="bad" />
             <ItemList title="이전 실행이 못 찾은 정답" items={scores.before.flatMap(row => row.missing.map(item => `${row.label} · ${item}`))} />
