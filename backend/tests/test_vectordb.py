@@ -121,6 +121,13 @@ class FakeMilvus(BaseHTTPRequestHandler):
         return [{**self._project(r, body.get("outputFields") or []), "distance": round(score, 4)} for score, r in scored[:body["limit"]]]
 
 
+@pytest.fixture(autouse=True)
+def _reset_unreachable():
+    vdb.clear_unreachable()
+    yield
+    vdb.clear_unreachable()
+
+
 @pytest.fixture
 def milvus(monkeypatch):
     FakeMilvus.calls = []
@@ -310,3 +317,62 @@ def test_milvus_errors_are_reported_without_the_token(client, milvus, monkeypatc
     monkeypatch.setenv("MILVUS_URI", "http://127.0.0.1:9")
     down = client.post("/api/vectordb/milvus/check").json()
     assert not down["ok"] and "연결 실패" in down["error"]
+
+
+class NotMilvus(BaseHTTPRequestHandler):
+    """Milvus가 아닌 서버(예: 다른 서비스나 게이트웨이)처럼 모든 경로에 404를 돌려준다."""
+    calls: list = []
+
+    def log_message(self, *args):
+        pass
+
+    def do_POST(self):
+        self.rfile.read(int(self.headers.get("Content-Length", 0)))
+        type(self).calls.append(self.path)
+        body = b"404 page not found"
+        self.send_response(404)
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+
+def test_unreachable_milvus_is_probed_once_then_paused_and_example_becomes_default(client, monkeypatch):
+    NotMilvus.calls = []
+    server = ThreadingHTTPServer(("127.0.0.1", 0), NotMilvus)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    try:
+        monkeypatch.setenv("MILVUS_URI", f"http://127.0.0.1:{server.server_port}")
+        assert client.get("/api/vectordb/sources").json()["default"] == "milvus"
+        first = client.get("/api/vectordb/milvus/tree")
+        assert first.status_code == 502 and "404" in first.json()["detail"]
+        reached = len(NotMilvus.calls)
+        assert 0 < reached <= 3  # 목록 조회에서 멈추고 컬렉션별 반복 요청으로 번지지 않는다
+        again = client.get("/api/vectordb/milvus/tree")
+        assert again.status_code == 503 and "멈췄습니다" in again.json()["detail"]
+        assert client.get("/api/vectordb/milvus/collection", params={"db": "default", "name": "chunks"}).status_code == 503
+        assert client.post("/api/vectordb/milvus/browse", json={"db": "default", "collection": "chunks"}).status_code == 503
+        assert len(NotMilvus.calls) == reached  # 쉬는 동안 Milvus로 요청이 나가지 않는다
+        info = client.get("/api/vectordb/sources").json()
+        assert info["default"] == "example" and info["milvus"]["unreachable"]["retry_in"] > 0
+        assert client.get("/api/vectordb/example/tree").status_code == 200  # 예시 데이터는 영향받지 않는다
+        check = client.post("/api/vectordb/milvus/check").json()  # 사용자가 누른 확인은 실제로 요청한다
+        assert check["ok"] is False and check["status"] == 404 and len(NotMilvus.calls) > reached
+    finally:
+        server.shutdown()
+
+
+def test_connection_refused_pauses_requests_and_recovery_clears_the_pause(client, milvus, monkeypatch):
+    good = client.get("/api/vectordb/milvus/tree")
+    assert good.status_code == 200
+    real = f"http://127.0.0.1:{milvus_port(monkeypatch)}"
+    monkeypatch.setenv("MILVUS_URI", "http://127.0.0.1:9")
+    refused = client.get("/api/vectordb/milvus/tree")
+    assert refused.status_code == 502 and "연결 실패" in refused.json()["detail"]
+    assert client.get("/api/vectordb/milvus/tree").status_code == 503
+    monkeypatch.setenv("MILVUS_URI", real)  # 다른 주소는 쉬지 않고 바로 시도한다
+    assert client.get("/api/vectordb/milvus/tree").status_code == 200
+
+
+def milvus_port(monkeypatch) -> int:
+    import os
+    return int(os.environ["MILVUS_URI"].rsplit(":", 1)[1].rstrip("/"))

@@ -23,6 +23,20 @@ py -3.12 --version
 2. 시작 주소는 `http://127.0.0.1:8000/`입니다. 포트가 이미 쓰이고 있으면 `start.cmd 8010`을 실행하세요. 브라우저 없이 준비만 확인하려면 `start.cmd --check`를 사용합니다. 앱을 닫으려면 실행 창에서 `Ctrl+C`를 누릅니다.
 3. npm·pip 사내 레지스트리가 있으면 현재 터미널에 `npm_config_registry`와 `PIP_INDEX_URL`을 설정하고 실행합니다. npm·pip의 기존 설정도 사용할 수 있습니다.
 
+### macOS·Linux·WSL·Git Bash: `run.sh`
+
+루트의 `run.sh`는 `start.cmd`와 같은 일을 bash로 합니다. Python 3.11~3.14(Docling은 3.12)와 소스 ZIP이면 Node.js도 필요합니다. 첫 실행에서 `backend/.venv`를 만들어 `requirements.lock.txt`를 설치하고(잠금 파일이 바뀌면 다시 설치), `frontend/dist`가 없으면 `npm ci`와 빌드를 한 뒤, `.env`가 없으면 `.env.example`에서 만들고 서버를 띄웁니다.
+
+```bash
+./run.sh                 # http://127.0.0.1:8000/ 로 시작하고 브라우저를 엽니다
+./run.sh 8010 --no-browser
+./run.sh --docling       # PDF·Office 파싱(Python 3.12 가상환경 backend/.venv-docling)
+./run.sh --check         # 서버 없이 준비 상태만 확인
+./run.sh --rebuild       # 화면 다시 빌드
+```
+
+사내 인증서 때문에 `UNABLE_TO_VERIFY_LEAF_SIGNATURE`가 나면 `NODE_EXTRA_CA_CERTS=<사내 루트 CA 파일>`(또는 Node 22.15+에서 `NODE_OPTIONS=--use-system-ca`)을, pip는 `PIP_CERT=<같은 파일>`을 설정하고 다시 실행하세요.
+
 ### PDF·Office 실제 파싱
 
 기본 설치로 화면, TXT·CSV·MD·LOG 처리, 구조 분석을 사용할 수 있습니다. **PDF·DOCX·PPTX·XLSX 본문 파싱**에는 Docling이 필요하고, PDF에는 로컬 모델 파일도 필요합니다.

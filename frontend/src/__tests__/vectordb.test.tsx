@@ -279,3 +279,48 @@ describe('벡터 DB 개요와 파티션 팝업', () => {
     expect(screen.queryByRole('dialog', { name: 'demo_chunks 파티션' })).toBeNull();
   });
 });
+
+describe('Milvus가 연결되지 않았을 때', () => {
+  const configured = {
+    default: 'milvus', max_window: 16384,
+    sources: [{ key: 'example', label: '예시 데이터', available: true }, { key: 'milvus', label: 'Milvus 연결', available: true }],
+    milvus: { configured: true, uri: 'http://milvus.local:19530', db: 'default', token_set: false, ca_bundle_set: false, timeout: 10, unreachable: null },
+  };
+  const useMilvusDown = (sources: unknown) => {
+    const base = fetchMock.getMockImplementation() as (input: string, init?: RequestInit) => Promise<unknown>;
+    fetchMock.mockImplementation(async (input: string, init?: RequestInit) => {
+      const path = String(input).split('?')[0];
+      if (path === '/api/vectordb/sources') return { ok: true, status: 200, json: async () => sources };
+      if (path === '/api/vectordb/milvus/tree') return { ok: false, status: 502, json: async () => ({ detail: 'Milvus HTTP 404: 404 page not found' }) };
+      return base(input, init);
+    });
+  };
+
+  it('자동으로 연 Milvus가 실패하면 한 번만 시도하고 예시 데이터로 연다', async () => {
+    useMilvusDown(configured);
+    render(<VectorDbWorkspace active />);
+    expect(await screen.findByRole('heading', { name: 'demo_chunks' })).toBeTruthy();
+    expect(screen.getByText('예시 데이터 · Milvus 연결 실패')).toBeTruthy();
+    expect(screen.queryByRole('alert')).toBeNull();
+    expect(calls('/api/vectordb/milvus/tree')).toBe(1);
+    expect(calls('/api/vectordb/example/tree')).toBe(1);
+  });
+
+  it('최근 연결 실패로 서버가 쉬는 중이면 Milvus를 부르지 않고 예시 데이터로 연다', async () => {
+    useMilvusDown({ ...configured, default: 'example', milvus: { ...configured.milvus, unreachable: { retry_in: 20, error: 'Milvus HTTP 404: 404 page not found' } } });
+    render(<VectorDbWorkspace active />);
+    expect(await screen.findByRole('heading', { name: 'demo_chunks' })).toBeTruthy();
+    expect(screen.getByText('예시 데이터 · Milvus 연결 실패')).toBeTruthy();
+    expect(calls('/api/vectordb/milvus')).toBe(0);
+  });
+
+  it('사용자가 Milvus를 직접 고른 경우에는 예시로 바꾸지 않고 오류와 다시 시도를 보여 준다', async () => {
+    useMilvusDown({ ...configured, default: 'example' });
+    const user = userEvent.setup();
+    render(<VectorDbWorkspace active />);
+    await screen.findByRole('heading', { name: 'demo_chunks' });
+    await user.click(screen.getByRole('button', { name: 'Milvus 연결' }));
+    expect((await screen.findByRole('alert')).textContent).toContain('404');
+    expect(calls('/api/vectordb/milvus/tree')).toBe(1);
+  });
+});

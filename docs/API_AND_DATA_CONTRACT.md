@@ -41,8 +41,8 @@
 | `GET /api/retrieval/questions/example` | 합성 예시 문서에 맞춘 예시 질문(본문·표·그림 유형). 저장하지 않음 | `200` | |
 | `POST /api/retrieval/plan` | `{doc_ids, preset, models}` → 고른 청킹으로 나눈 청크 수와 모델별 입력 한도 초과 청크·벡터 용량, 유형별 질문 수. 외부 호출 없음 | `200` | 알 수 없는 문서는 `errors`에 담음 |
 | `GET /api/retrieval/runs/current`, `POST .../runs/current/cancel`, `GET .../runs/current/questions/{index}?combo=` | 진행 상태와 결과, 취소, 질문별 검색 결과. 실행 상태는 메모리에만 있어 서버를 다시 시작하면 사라진다 | `200` | `404` 상세 결과 없음 |
-| `GET /api/vectordb/sources`, `POST /api/vectordb/milvus/check` | 출처(예시 데이터·Milvus)와 연결 설정의 공개 정보(토큰 값 제외), Milvus 연결 확인 | `200` | |
-| `GET /api/vectordb/{source}/tree`, `GET .../collection?db=&name=` | 데이터베이스·컬렉션·파티션 트리, 컬렉션 스키마·인덱스·감지한 필드 역할(텍스트·문서·순서·쪽) | `200` | Milvus 오류의 상태 코드와 메시지를 그대로 전달 |
+| `GET /api/vectordb/sources`, `POST /api/vectordb/milvus/check` | 출처(예시 데이터·Milvus)와 연결 설정의 공개 정보(토큰 값 제외), Milvus 연결 확인. `sources`는 Milvus에 요청하지 않으며, 최근 연결 실패로 쉬는 중이면 `milvus.unreachable`(`retry_in`초, `error`)을 담고 기본 출처를 `example`로 돌려준다. `check`는 사용자가 누를 때만 실제로 요청하고 쉬는 상태를 풀어 다시 시도한다 | `200` | |
+| `GET /api/vectordb/{source}/tree`, `GET .../collection?db=&name=` | 데이터베이스·컬렉션·파티션 트리, 컬렉션 스키마·인덱스·감지한 필드 역할(텍스트·문서·순서·쪽) | `200` | Milvus 오류의 상태 코드와 메시지를 그대로 전달. 연결 실패(연결 거부·시간 초과·인증서)와 `collections/list`의 HTTP 404(Milvus REST v2 주소가 아님)가 나면 같은 주소로 30초(`UNREACHABLE_COOLDOWN`) 동안 요청을 보내지 않고 `503`으로 바로 답한다. 첫 오류는 원래 메시지(`502`/`504`)를 보여 준다 |
 | `POST /api/vectordb/{source}/browse`, `/chunk`, `/similar`, `/documents`, `/document` | 청크 조회(필터·파티션·페이지, `offset+limit` 16,384 미만), 청크 상세, 유사 청크, 문서 값 목록, 한 문서의 청크를 순서대로 다시 읽기. **읽기 전용**, 쓰기·삭제 요청 없음 | `200` | `422` 요청 값 오류, Milvus 오류 전달 |
 
 `202`는 요청이 **접수되었다는 뜻**이다. 반환된 스냅샷의 `processing`은 실행 중 **또는 메모리 대기열에서 대기 중**을 뜻하며, 결과가 준비됐음을 의미하지 않는다. 아주 빠른 처리는 응답 후 조회 시 이미 끝나 있을 수 있다. 목록을 다시 조회하거나 상세 문서를 폴링해 최종 상태를 확인한다.

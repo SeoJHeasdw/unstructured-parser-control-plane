@@ -27,6 +27,7 @@ from pathlib import Path
 import random
 import re
 import ssl
+import threading
 import time
 from typing import Any, Callable
 from urllib import error, request
@@ -149,6 +150,38 @@ def _not_loaded_hint(message: str) -> str:
     return message
 
 
+UNREACHABLE_COOLDOWN = 30.0    # 연결 실패 뒤 이 시간(초) 동안은 같은 주소로 요청을 다시 보내지 않는다
+_UNREACHABLE: dict[str, tuple[float, str]] = {}
+_UNREACHABLE_LOCK = threading.Lock()
+
+
+def unreachable_state(api_base: str) -> dict | None:
+    """연결 실패로 쉬는 중이면 {retry_in, error}, 아니면 None."""
+    with _UNREACHABLE_LOCK:
+        entry = _UNREACHABLE.get(api_base)
+        if entry is None:
+            return None
+        until, message = entry
+        remaining = until - time.monotonic()
+        if remaining <= 0:
+            del _UNREACHABLE[api_base]
+            return None
+        return {"retry_in": math.ceil(remaining), "error": message}
+
+
+def mark_unreachable(api_base: str, message: str) -> None:
+    with _UNREACHABLE_LOCK:
+        _UNREACHABLE[api_base] = (time.monotonic() + UNREACHABLE_COOLDOWN, message)
+
+
+def clear_unreachable(api_base: str | None = None) -> None:
+    with _UNREACHABLE_LOCK:
+        if api_base is None:
+            _UNREACHABLE.clear()
+        else:
+            _UNREACHABLE.pop(api_base, None)
+
+
 class MilvusSource:
     key = "milvus"
 
@@ -164,6 +197,10 @@ class MilvusSource:
     def call(self, path: str, body: dict) -> Any:
         if path not in READ_ONLY_PATHS:
             raise VectorDbError("읽기 전용 요청만 보낼 수 있습니다.", 500)
+        paused = unreachable_state(self.api_base)
+        if paused:
+            # 연결이 안 되는 주소에 화면이 계속 요청을 보내지 않게 한다. 사용자가 '연결 확인'을 누르면 다시 시도한다.
+            raise VectorDbError(f"Milvus에 연결되지 않아 {paused['retry_in']}초 동안 요청을 멈췄습니다. 마지막 오류: {paused['error']}", 503)
         headers = {"Content-Type": "application/json", "Accept": "application/json", "Request-Timeout": str(int(self.config.timeout))}
         if self.config.token:
             headers["Authorization"] = f"Bearer {self.config.token}"
@@ -183,11 +220,19 @@ class MilvusSource:
                 detail = str(parsed.get("message") or parsed.get("detail") or detail) if isinstance(parsed, dict) else detail
             except ValueError:
                 pass
-            raise VectorDbError(scrub(f"Milvus HTTP {exc.code}: {detail}"), 502, upstream=exc.code) from None
+            failure = VectorDbError(scrub(f"Milvus HTTP {exc.code}: {detail}"), 502, upstream=exc.code)
+            if exc.code == 404 and path == "collections/list":
+                mark_unreachable(self.api_base, failure.message)  # 모든 Milvus REST v2가 갖는 경로가 없으면 Milvus 주소가 아니다
+            raise failure from None
         except error.URLError as exc:
-            raise VectorDbError(scrub(f"Milvus 연결 실패: {exc.reason}"), 502) from None
+            failure = VectorDbError(scrub(f"Milvus 연결 실패: {exc.reason}"), 502)
+            mark_unreachable(self.api_base, failure.message)
+            raise failure from None
         except (TimeoutError, OSError, ssl.SSLError, ValueError) as exc:
-            raise VectorDbError(scrub(f"Milvus 연결 실패: {type(exc).__name__} {exc}"), 504 if isinstance(exc, TimeoutError) else 502) from None
+            failure = VectorDbError(scrub(f"Milvus 연결 실패: {type(exc).__name__} {exc}"), 504 if isinstance(exc, TimeoutError) else 502)
+            mark_unreachable(self.api_base, failure.message)
+            raise failure from None
+        clear_unreachable(self.api_base)
         if len(raw) > MAX_RESPONSE:
             raise VectorDbError("Milvus 응답이 너무 큽니다. 조건을 좁혀 주세요.", 502)
         text = raw.decode("utf-8", "replace")
@@ -824,10 +869,12 @@ def overlap(prev: str, cur: str, minimum: int = 8, cap: int = 4000) -> tuple[int
 # ---------------------------------------------------------------- 화면용 조회
 
 def sources_info(config: MilvusConfig | None = None) -> dict:
+    """화면이 처음 열릴 때 부른다. Milvus에는 요청하지 않고, 최근 연결 실패가 있으면 예시 데이터를 기본으로 권한다."""
     config = config or MilvusConfig.from_env()
-    return {"default": "milvus" if config.configured else "example",
+    paused = unreachable_state(MilvusSource(config).api_base) if config.configured else None
+    return {"default": "milvus" if config.configured and not paused else "example",
             "sources": [{"key": "example", "label": "예시 데이터", "available": True}, {"key": "milvus", "label": "Milvus 연결", "available": config.configured}],
-            "milvus": config.public(), "max_window": MAX_WINDOW}
+            "milvus": {**config.public(), "unreachable": paused}, "max_window": MAX_WINDOW}
 
 
 def get_source(key: str):
@@ -847,12 +894,13 @@ def check_connection(config: MilvusConfig | None = None) -> dict:
     if not config.configured:
         return {"ok": False, "status": None, "latency_ms": 0, "error": "MILVUS_URI가 설정되지 않았습니다."}
     source, started = MilvusSource(config), time.monotonic()
+    clear_unreachable(source.api_base)  # 사용자가 직접 누른 확인은 쉬는 중이어도 실제로 요청해 본다
     try:
         try:
             databases, note = source.databases(), None
         except VectorDbError as exc:
-            if exc.upstream in (401, 403):
-                raise
+            if exc.upstream in (401, 403) or unreachable_state(source.api_base):
+                raise  # 연결 자체가 안 되면 다른 경로로 한 번 더 시도하지 않고 처음 오류를 보여 준다
             source.collections(config.db)
             databases, note = [config.db], f"데이터베이스 목록은 볼 수 없어 {config.db}만 확인했습니다."
     except VectorDbError as exc:
@@ -865,7 +913,7 @@ def _databases(source) -> tuple[list[str], list[str]]:
     try:
         names = source.databases()
     except VectorDbError as exc:
-        if exc.upstream in (401, 403) or not isinstance(source, MilvusSource):
+        if exc.upstream in (401, 403) or not isinstance(source, MilvusSource) or unreachable_state(source.api_base):
             raise
         source.collections(source.default_db)
         return [source.default_db], [f"데이터베이스 목록을 볼 수 없어 {source.default_db}만 표시합니다."]

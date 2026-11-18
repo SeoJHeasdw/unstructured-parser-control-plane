@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { BookOpenText, Layers, LoaderCircle, PlugZap, RefreshCw, TriangleAlert } from 'lucide-react';
 import { checkMilvus, getCollection, getSources, getTree, type CheckResult, type CollectionDetail, type SourceKey, type SourcesInfo, type Tree } from './api/vectordb';
 import { Tabs } from './ui';
@@ -36,6 +36,8 @@ function VectorDbScreen({ active }: { active: boolean }) {
   const [infoError, setInfoError] = useState('');
   const [infoTry, setInfoTry] = useState(0);
   const [source, setSource] = useState<SourceKey | null>(null);
+  const [fallback, setFallback] = useState('');
+  const autoPicked = useRef(false);
   const [tree, setTree] = useState<Tree | null>(null);
   const [treeError, setTreeError] = useState('');
   const [reload, setReload] = useState(0);
@@ -56,7 +58,10 @@ function VectorDbScreen({ active }: { active: boolean }) {
     getSources().then(result => {
       if (!alive) return;
       setInfo(result);
-      setSource(result.sources.some(s => s.key === result.default && s.available) ? result.default : 'example');
+      const pick: SourceKey = result.sources.some(s => s.key === result.default && s.available) ? result.default : 'example';
+      autoPicked.current = pick === 'milvus';
+      setFallback(result.milvus.unreachable ? result.milvus.unreachable.error : '');
+      setSource(pick);
     }).catch((err: Error) => { if (alive) setInfoError(err.message); });
     return () => { alive = false; };
   }, [infoTry]);
@@ -72,7 +77,12 @@ function VectorDbScreen({ active }: { active: boolean }) {
         const keep = current && result.databases.some(db => db.name === current.db && db.collections.some(c => c.name === current.collection));
         return keep ? current : firstCollection(result, readStored<string>(`sel.${source}`, ''));
       });
-    }).catch((err: Error) => { if (alive) setTreeError(err.message); });
+    }).catch((err: Error) => {
+      if (!alive) return;
+      // 사용자가 고르지 않고 자동으로 열린 Milvus가 연결되지 않으면 오류 화면에서 멈추지 않고 예시 데이터로 연다.
+      if (source === 'milvus' && autoPicked.current) { autoPicked.current = false; setFallback(err.message); setSource('example'); return; }
+      setTreeError(err.message);
+    });
     return () => { alive = false; };
   }, [source, reload]);
 
@@ -98,6 +108,7 @@ function VectorDbScreen({ active }: { active: boolean }) {
   };
   const switchSource = (next: SourceKey) => {
     if (next === source) return;
+    autoPicked.current = false; setFallback('');
     setSource(next); setTree(null); setSelection(null); setPartition(null); setDetail(null); setTextField(null); setHistory([]); setOpenPart(null);
   };
   const navigate = useCallback((next: PanelState) => setHistory(current => [...current, next]), []);
@@ -152,7 +163,7 @@ function VectorDbScreen({ active }: { active: boolean }) {
           {info.sources.map(s => <button key={s.key} type="button" aria-pressed={source === s.key} disabled={!s.available} onClick={() => switchSource(s.key)}>{s.label}</button>)}
         </div>}
         {source === 'example' && <span className="vdb-example" tabIndex={0}
-          {...tip.bind('example', () => <span>{milvus.configured ? '합성 예시 컬렉션입니다.' : 'Milvus 연결 정보가 없어 합성 예시 컬렉션을 보여 줍니다.'}</span>)}>예시 데이터</span>}
+          {...tip.bind('example', () => <span>{fallback ? `Milvus에 연결하지 못해 합성 예시 컬렉션을 보여 줍니다. ${fallback}` : milvus.configured ? '합성 예시 컬렉션입니다.' : 'Milvus 연결 정보가 없어 합성 예시 컬렉션을 보여 줍니다.'}</span>)}>{fallback ? '예시 데이터 · Milvus 연결 실패' : '예시 데이터'}</span>}
         {tree && <span className="vdb-totals">컬렉션 <b>{fmtCount(tree.totals.collections)}</b> · 청크 <b>{fmtCount(tree.totals.rows)}</b></span>}
         {tree && tree.warnings.length > 0 && <span className="vdb-chip is-warn" tabIndex={0}
           {...tip.bind('tree-warn', () => <><b>읽지 못한 정보</b>{tree.warnings.slice(0, 6).map(w => <span key={w}>{w}</span>)}</>)}><TriangleAlert size={12} aria-hidden /> {tree.warnings.length}건</span>}

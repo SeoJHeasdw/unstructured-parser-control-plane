@@ -1,6 +1,6 @@
 /** 벡터 DB 읽기 전용 API. 예시 데이터(example)와 Milvus(milvus)가 같은 형태로 응답한다. */
 export type SourceKey = 'example' | 'milvus';
-export type MilvusPublic = { configured: boolean; uri: string; db: string; token_set: boolean; ca_bundle_set: boolean; timeout: number };
+export type MilvusPublic = { configured: boolean; uri: string; db: string; token_set: boolean; ca_bundle_set: boolean; timeout: number; unreachable?: { retry_in: number; error: string } | null };
 export type SourcesInfo = { default: SourceKey; sources: { key: SourceKey; label: string; available: boolean }[]; milvus: MilvusPublic; max_window: number };
 export type CheckResult = { ok: boolean; status: number | null; latency_ms: number; databases?: string[]; db?: string; db_found?: boolean; note?: string | null; error?: string };
 
