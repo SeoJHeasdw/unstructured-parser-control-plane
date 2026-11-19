@@ -12,6 +12,8 @@ class LiveDocument(BaseModel):
     updated_at: str
     parser: str | None = None
     error: str | None = None
+    # 실패 사유 코드(drm_protected, drm_suspected, encrypted, format_mismatch, unsupported_format ...). 성공·대기 중이면 None.
+    error_code: str | None = None
 
 class DocumentList(BaseModel):
     documents: list[LiveDocument]
@@ -23,6 +25,8 @@ class ParseResult(BaseModel):
     parser_version: str
     is_stale: bool
     warnings: list[str]
+    # 원문 충실도 보고서(OOXML만). 없으면 None.
+    fidelity: dict | None = None
 
 class ResultLocation(BaseModel):
     start_line: int
@@ -51,6 +55,7 @@ class StoredParseRun(ParseRun):
     markdown: str
     warnings: list[str]
     locations: list[ResultLocation]
+    fidelity: dict | None = None
 
 class HistoryEntry(BaseModel):
     created_at: str

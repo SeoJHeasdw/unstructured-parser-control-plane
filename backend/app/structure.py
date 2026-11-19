@@ -30,6 +30,7 @@ class Budget:
     max_entry: int = 100 * 1024 * 1024
     max_links: int = 3000
     max_scan: int = 8 * 1024 * 1024
+    signatures: tuple = ()  # format_gate.DrmSignature: 실제 파일에서 확인해 등록한 DRM 머리말
     nodes: int = 0
     bytes: int = 0
     links: int = 0
@@ -181,6 +182,12 @@ def _inspect(data: bytes, name: str, kind: str, location: str, depth: int, budge
         node["detected"] = sniff(data)
         return node
     budget.seen.setdefault(digest, location or name)
+    vendor = _drm_vendor(data, budget.signatures)
+    if vendor:
+        node["detected"] = "drm"
+        _flag(node, "drm-suspect")
+        node["stats"].update(drm_vendor=vendor, header=data[:16].hex(" "))
+        return node
     detected = sniff(data)
     node["detected"] = detected
     family = FAMILY.get(node["ext"])
@@ -202,6 +209,13 @@ def _inspect(data: bytes, name: str, kind: str, location: str, depth: int, budge
     if family and actual and family != actual and not tolerated and not {"encrypted", "drm-suspect", "unreadable"} & set(node["flags"]):
         _flag(node, "format-mismatch")
     return node
+
+
+def _drm_vendor(data: bytes, signatures: tuple) -> str | None:
+    if not signatures:
+        return None
+    from app.format_gate import match_signature  # format_gate가 이 모듈의 sniff를 쓰므로 늦게 가져온다
+    return match_signature(data[:4096], signatures)
 
 
 def _child(parent: dict, data: bytes | None, name: str, kind: str, location: str, depth: int, budget: Budget, size: int | None = None, note: str | None = None) -> dict:

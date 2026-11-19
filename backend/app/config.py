@@ -3,6 +3,7 @@ from dataclasses import dataclass
 import os
 from pathlib import Path
 
+from app.format_gate import DrmSignature, parse_signatures
 from app.llm import ModelConnection, load_connections
 
 _PROJECT = Path(__file__).resolve().parents[2]
@@ -35,6 +36,10 @@ class Settings:
     docling_artifacts: Path | None = None
     models: tuple[ModelConnection, ...] = ()
     static_dir: Path | None = None
+    # 실제 파일에서 확인한 DRM 머리말. 형식: '제품=hex:0A0B; 제품=ascii:TAG' (format_gate 참고)
+    drm_signatures: tuple[DrmSignature, ...] = ()
+    # OOXML 파싱 전 사본에서 기호 글꼴·첨자를 유니코드로 바꾼다. 원본은 바꾸지 않는다.
+    ooxml_prepare: bool = True
 
     @classmethod
     def from_env(cls) -> "Settings":
@@ -48,7 +53,9 @@ class Settings:
         else:
             artifact_path = next((path for path in (bundled_models, default_cache) if path.is_dir()), None)
         static = Path(os.environ.get("DOCOPS_STATIC_DIR", str(_PROJECT / "frontend" / "dist"))).expanduser().resolve()
-        return cls(runtime_dir=runtime, docling_artifacts=artifact_path, models=load_connections(), static_dir=static if (static / "index.html").is_file() else None)
+        prepare = os.environ.get("DOCOPS_OOXML_PREPARE", "1").strip().lower() not in ("0", "false", "no", "off")
+        return cls(runtime_dir=runtime, docling_artifacts=artifact_path, models=load_connections(), static_dir=static if (static / "index.html").is_file() else None,
+                   drm_signatures=parse_signatures(os.environ.get("DOCOPS_DRM_SIGNATURES")), ooxml_prepare=prepare)
 
     @property
     def uploads(self) -> Path:
@@ -61,6 +68,11 @@ class Settings:
     @property
     def structures(self) -> Path:
         return self.runtime_dir / "structure"
+
+    @property
+    def work(self) -> Path:
+        """파싱용 임시 사본. 처리 중에만 존재한다."""
+        return self.runtime_dir / "work"
 
     @property
     def database(self) -> Path:

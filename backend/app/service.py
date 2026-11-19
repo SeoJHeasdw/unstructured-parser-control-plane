@@ -6,6 +6,8 @@ import time
 from pathlib import Path
 from queue import Empty, Full, Queue
 import re
+import shutil
+import tempfile
 import threading
 from uuid import uuid4
 
@@ -13,16 +15,22 @@ from fastapi import UploadFile
 from app.adapters.base import ParserError, UnsupportedFormat
 from app.adapters.registry import ParserRegistry, TEXT_FORMATS
 from app.config import Settings
+from app.fidelity import OOXML_FORMATS, assess, prepare_copy, prepared_copy_path, probe
 from app.filelock import try_lock, unlock
+from app.format_gate import check as check_format
 from app.repository import DocumentRepository, now
 from app.source_preview import worksheet_preview
-from app.structure import inspect_file
+from app.structure import Budget, inspect_file
+from app.textnorm import display_name
 
 logger = logging.getLogger(__name__)
 _ID = re.compile(r"^[0-9a-f]{32}$")
 _EXT = re.compile(r"^[A-Za-z0-9]{1,20}$")
 _RESULT_NAME = re.compile(r"^[0-9a-f]{32}-[0-9a-f]{32}\.md$")
 PDF_OCR_WARNING = "OCR 미적용: 스캔·이미지 페이지 내용 누락 가능"
+FIDELITY_FAILED_WARNING = "원문 충실도 점검을 하지 못했습니다. 파싱 결과는 그대로 저장했습니다."
+PREPARE_FALLBACK_WARNING = "기호·첨자 보정 사본을 파싱하지 못해 원본으로 파싱했습니다. 기호 글꼴·첨자가 빠지거나 붙을 수 있습니다."
+_WORK_PREFIX = "docops-prep-"
 
 class MissingDocument(Exception): pass
 class MissingRun(Exception): pass
@@ -36,7 +44,8 @@ def clean_name(filename: str | None) -> tuple[str, str]:
         raise InvalidName("파일명이 필요합니다.")
     # The supplied name is display metadata only, never a storage path.
     name = filename.replace("\\", "/").split("/")[-1]
-    name = "".join(c for c in name if ord(c) >= 32 and ord(c) != 127).strip()
+    # macOS 분해형 한글(NFD)은 조합형으로, 방향 제어 글자는 제거한다. ℃·±·− 같은 기호는 그대로 둔다.
+    name = display_name("".join(c for c in name if ord(c) >= 32 and ord(c) != 127)).strip()
     if not name or name in {".", ".."}:
         raise InvalidName("유효한 파일명이 필요합니다.")
     suffix = Path(name).suffix[1:]
@@ -62,6 +71,7 @@ class DocumentService:
         self.settings.uploads.mkdir(mode=0o700, exist_ok=True)
         self.settings.results.mkdir(mode=0o700, exist_ok=True)
         self.settings.structures.mkdir(mode=0o700, exist_ok=True)
+        self.settings.work.mkdir(mode=0o700, exist_ok=True)
         self.lock_file = (self.settings.runtime_dir / "server.lock").open("a+")
         try:
             try_lock(self.lock_file)
@@ -70,6 +80,7 @@ class DocumentService:
             self.lock_file = None
             raise RuntimeError("이 데이터 폴더를 사용하는 다른 문서 처리 서버가 이미 실행 중입니다.") from exc
         try:
+            self._clear_work()
             self.repo.initialize()
             self.repo.recover_interrupted()
             self._stopping.clear()
@@ -78,6 +89,11 @@ class DocumentService:
         except BaseException:
             self._release_lock()
             raise
+
+    def _clear_work(self) -> None:
+        # 이전 프로세스가 비정상 종료하며 남긴 파싱용 사본만 지운다(이 서비스가 만든 이름만, 잠금을 얻은 뒤).
+        for leftover in self.settings.work.glob(_WORK_PREFIX + "*"):
+            shutil.rmtree(leftover, ignore_errors=True)
 
     def _release_lock(self) -> None:
         with self._lock_guard:
@@ -112,7 +128,7 @@ class DocumentService:
     def _mark_interrupted(self, doc_id: str, run_id: str) -> None:
         doc = self.repo.get(doc_id)
         if doc:
-            self.repo.finish(doc_id, run_id, status="failed", parser=doc.get("parser"), parser_version=None, result_file=None, error="서버 종료로 대기 중인 처리가 중단되었습니다. 다시 실행해 주세요.")
+            self.repo.finish(doc_id, run_id, status="failed", parser=doc.get("parser"), parser_version=None, result_file=None, error="서버 종료로 대기 중인 처리가 중단되었습니다. 다시 실행해 주세요.", error_code="interrupted")
 
     def _run_worker(self) -> None:
         try:
@@ -194,7 +210,7 @@ class DocumentService:
             try:
                 self._jobs.put_nowait((doc_id, run_id))
             except Full:
-                self.repo.finish(doc_id, run_id, status="failed", parser=processing_doc.get("parser"), parser_version=None, result_file=None, error="처리 대기열이 가득 차 요청을 접수하지 못했습니다.")
+                self.repo.finish(doc_id, run_id, status="failed", parser=processing_doc.get("parser"), parser_version=None, result_file=None, error="처리 대기열이 가득 차 요청을 접수하지 못했습니다.", error_code="queue_full")
                 raise QueueUnavailable("처리 대기열이 가득 찼습니다. 잠시 후 다시 시도해 주세요.")
             return processing_doc
 
@@ -208,33 +224,75 @@ class DocumentService:
             if source_name != Path(source_name).name or not source_name.startswith(doc_id):
                 raise ParserError("저장된 파일 경로를 확인할 수 없습니다.")
             path = self.settings.uploads / source_name
+            extension = doc["format"]
+            if self.parsers.parser_name(extension) is None:
+                raise UnsupportedFormat("이 파일 형식은 아직 처리 경로가 없습니다.")
+            # 확장자가 아니라 내용으로 먼저 확인한다: DRM 래핑·암호·형식 불일치는 파서 오류로 뭉뚱그리지 않는다.
+            gate = check_format(path, extension, self.settings.drm_signatures, self.settings.max_upload_bytes)
+            if not gate.passed:
+                raise ParserError(gate.message or "파일 형식을 확인할 수 없습니다.", code=gate.code)
             started = time.perf_counter()
-            parsed = self.parsers.parse(path, doc["format"])
+            parsed, prepared, warnings = self._parse(path, extension)
+            markdown, locations, fidelity = parsed.markdown, list(parsed.locations), None
+            if extension in OOXML_FORMATS:
+                try:
+                    markdown, extra, notes, fidelity = assess(probe(path, extension), markdown, prepared)
+                    locations += extra
+                    warnings += notes
+                except Exception as exc:
+                    logger.warning("Fidelity check skipped (%s)", type(exc).__name__)
+                    warnings.append(FIDELITY_FAILED_WARNING)
             duration_ms = round((time.perf_counter() - started) * 1000)
             result_name = f"{doc_id}-{run_id}.md"
             result_path = self.settings.results / result_name
             temp_path = self.settings.results / f"{doc_id}-{run_id}.tmp"
             fd = os.open(temp_path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
             with os.fdopen(fd, "w", encoding="utf-8") as output:
-                output.write(parsed.markdown)
+                output.write(markdown)
             os.replace(temp_path, result_path)
-            warnings = [PDF_OCR_WARNING] if doc["format"] == "PDF" else []
+            if extension == "PDF":
+                warnings.insert(0, PDF_OCR_WARNING)
             if not self.repo.finish(doc_id, run_id, status="completed", parser=parsed.parser, parser_version=parsed.parser_version, result_file=result_name, error=None, warnings=warnings,
-                                    ocr_enabled=parsed.ocr_enabled, locations=[location.model_dump() for location in parsed.locations], duration_ms=duration_ms):
+                                    ocr_enabled=parsed.ocr_enabled, locations=[location.model_dump() for location in locations], duration_ms=duration_ms, fidelity=fidelity):
                 result_path.unlink(missing_ok=True)
         except UnsupportedFormat as exc:
-            self.repo.finish(doc_id, run_id, status="unsupported", parser=None, parser_version=None, result_file=None, error=str(exc))
+            self.repo.finish(doc_id, run_id, status="unsupported", parser=None, parser_version=None, result_file=None, error=str(exc), error_code=exc.code)
         except ParserError as exc:
             doc = self.repo.get(doc_id)
-            self.repo.finish(doc_id, run_id, status="failed", parser=doc.get("parser") if doc else None, parser_version=None, result_file=None, error=str(exc))
+            self.repo.finish(doc_id, run_id, status="failed", parser=doc.get("parser") if doc else None, parser_version=None, result_file=None, error=str(exc), error_code=exc.code)
         except Exception as exc:
             # Avoid logging raw document contents, file names, or exception text.
             logger.error("Document processing failed (%s)", type(exc).__name__)
             doc = self.repo.get(doc_id)
-            self.repo.finish(doc_id, run_id, status="failed", parser=doc.get("parser") if doc else None, parser_version=None, result_file=None, error="파일 처리 중 오류가 발생했습니다. 파일 상태와 서버 설정을 확인해 주세요.")
+            self.repo.finish(doc_id, run_id, status="failed", parser=doc.get("parser") if doc else None, parser_version=None, result_file=None, error="파일 처리 중 오류가 발생했습니다. 파일 상태와 서버 설정을 확인해 주세요.", error_code="internal_error")
         finally:
             if temp_path:
                 temp_path.unlink(missing_ok=True)
+
+    def _parse(self, path: Path, extension: str):
+        """(파싱 결과, 사본 보정 통계 | None, 경고). OOXML은 원본 대신 보정 사본을 파서에 넣는다."""
+        if extension not in OOXML_FORMATS:
+            return self.parsers.parse(path, extension), None, []
+        # 사본을 만들기 전에 압축 폭탄·위험 경로를 거른다.
+        self.parsers.docling.check_office_archive(path)
+        if not self.settings.ooxml_prepare:
+            return self.parsers.parse(path, extension), None, []
+        with tempfile.TemporaryDirectory(prefix=_WORK_PREFIX, dir=self.settings.work, ignore_cleanup_errors=True) as workdir:
+            target = prepared_copy_path(Path(workdir), extension)
+            try:
+                stats = prepare_copy(path, target, extension)
+            except Exception as exc:
+                logger.warning("OOXML preparation skipped (%s)", type(exc).__name__)
+                return self.parsers.parse(path, extension), None, [PREPARE_FALLBACK_WARNING]
+            if not stats.changed:
+                return self.parsers.parse(path, extension), stats.as_dict(), []
+            try:
+                return self.parsers.parse(target, extension), stats.as_dict(), []
+            except ParserError as exc:
+                if exc.code == "parser_unavailable":
+                    raise
+                logger.warning("Prepared copy failed to parse; retrying the original (%s)", exc.code)
+        return self.parsers.parse(path, extension), None, [PREPARE_FALLBACK_WARNING]
 
     def _source_path(self, doc: dict) -> Path:
         source_name = doc["source_file"]
@@ -275,14 +333,15 @@ class DocumentService:
             raise MissingRun()
         try:
             markdown = (self.settings.results / f"{doc_id}-{run_id}.md").read_text(encoding="utf-8")
-            return {**run, "markdown": markdown, "warnings": json.loads(run["warnings"]), "locations": json.loads(run["locations"])}
+            return {**run, "markdown": markdown, "warnings": json.loads(run["warnings"]), "locations": json.loads(run["locations"]),
+                    "fidelity": json.loads(run["fidelity"]) if run.get("fidelity") else None}
         except (OSError, ValueError) as exc:
             raise Conflict("저장된 실행 결과를 읽을 수 없습니다.") from exc
 
     def inspect(self, doc_id: str) -> dict:
         """원본을 바꾸지 않고 구조(하위 문서·링크)를 분석해 결과를 보관한다. 사용자가 요청할 때만 실행한다."""
         doc = self.get(doc_id)
-        result = inspect_file(self._source_path(doc), doc["name"])
+        result = inspect_file(self._source_path(doc), doc["name"], Budget(signatures=self.settings.drm_signatures))
         payload = {"id": doc_id, "name": doc["name"], "format": doc["format"], "inspected_at": now(), **result}
         target = self.settings.structures / f"{doc_id}.json"
         temp = self.settings.structures / f"{doc_id}.{uuid4().hex}.tmp"
@@ -344,4 +403,11 @@ class DocumentService:
             warnings = []
         if doc["format"] == "PDF" and PDF_OCR_WARNING not in warnings:
             warnings.append(PDF_OCR_WARNING)
-        return {"id": doc_id, "markdown": markdown, "parser": parser, "parser_version": parser_version, "is_stale": doc["status"] != "completed", "warnings": warnings}
+        fidelity = None
+        run = self.repo.parse_run(doc_id, name[33:65])
+        if run and run.get("fidelity"):
+            try:
+                fidelity = json.loads(run["fidelity"])
+            except ValueError:
+                fidelity = None
+        return {"id": doc_id, "markdown": markdown, "parser": parser, "parser_version": parser_version, "is_stale": doc["status"] != "completed", "warnings": warnings, "fidelity": fidelity}

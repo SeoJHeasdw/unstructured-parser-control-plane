@@ -21,6 +21,7 @@ import unicodedata
 from urllib.parse import unquote, urlsplit
 
 from app.structure import DOCNUM, DOCNUM_STOP
+from app.textnorm import name_key
 
 # 이름에 순서 표시가 없을 때, 업로드 시각 차이가 이보다 작으면 같은 반입으로 보고 순서를 정하지 않는다.
 SAME_BATCH_SECONDS = 3600
@@ -214,10 +215,11 @@ def parse_name(name: str) -> NameInfo:
     title = re.sub(r"\(\s*\)|\[\s*\]|【\s*】", " ", work)
     title = re.sub(r"[\s_]+", " ", title)
     title = re.sub(r"\s+[-.]+(?=\s|$)|(?:^|\s)[-.]+\s+", " ", title).strip(" -_.,")
-    key = re.sub(r"[\W_]+", "", title.casefold())
+    # 기호 보존 키: '-70℃'와 '70℃'는 다른 문서, '−70°C'와 '-70℃'·'m²'와 'm2'는 같은 이름으로 본다.
+    key = name_key(title)
     if not key:  # 이름 전체가 판 표시뿐이면 원래 이름으로 비교한다(서로 다른 문서가 섞이지 않게).
         title = stem
-        key = re.sub(r"[\W_]+", "", stem.casefold()) or stem.casefold() or "-"
+        key = name_key(stem) or stem.casefold() or "-"
     info.title, info.base_key = title, key
     return info
 

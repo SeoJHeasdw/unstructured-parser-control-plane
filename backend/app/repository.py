@@ -29,7 +29,7 @@ class DocumentRepository:
                 created_at TEXT NOT NULL, updated_at TEXT NOT NULL,
                 parser TEXT, parser_version TEXT, error TEXT,
                 source_file TEXT NOT NULL, result_file TEXT, run_id TEXT,
-                result_parser TEXT, result_parser_version TEXT, result_warnings TEXT
+                result_parser TEXT, result_parser_version TEXT, result_warnings TEXT, error_code TEXT
             );
             CREATE TABLE IF NOT EXISTS document_events (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -41,19 +41,21 @@ class DocumentRepository:
                 document_id TEXT NOT NULL REFERENCES documents(id),
                 run_id TEXT NOT NULL,
                 completed_at TEXT, parser TEXT, parser_version TEXT,
-                ocr_enabled INTEGER, warnings TEXT NOT NULL, locations TEXT NOT NULL, duration_ms INTEGER,
+                ocr_enabled INTEGER, warnings TEXT NOT NULL, locations TEXT NOT NULL, duration_ms INTEGER, fidelity TEXT,
                 PRIMARY KEY (document_id, run_id)
             );
             ''')
             # Upgrade existing databases in-place; preserve every existing document and event.
             conn.execute("BEGIN IMMEDIATE")
             columns = {row[1] for row in conn.execute("PRAGMA table_info(documents)")}
-            for column in ("result_parser", "result_parser_version", "result_warnings"):
+            for column in ("result_parser", "result_parser_version", "result_warnings", "error_code"):
                 if column not in columns:
                     conn.execute(f"ALTER TABLE documents ADD COLUMN {column} TEXT")
             run_columns = {row[1] for row in conn.execute("PRAGMA table_info(parse_runs)")}
             if "duration_ms" not in run_columns:
                 conn.execute("ALTER TABLE parse_runs ADD COLUMN duration_ms INTEGER")
+            if "fidelity" not in run_columns:
+                conn.execute("ALTER TABLE parse_runs ADD COLUMN fidelity TEXT")
             conn.execute("UPDATE documents SET result_parser=parser WHERE result_file IS NOT NULL AND result_parser IS NULL")
             conn.execute("UPDATE documents SET result_parser_version=parser_version WHERE result_file IS NOT NULL AND result_parser_version IS NULL")
             # Older results did not record warnings. Default to the same OCR warning for PDFs.
@@ -95,24 +97,25 @@ class DocumentRepository:
 
     def claim(self, doc_id: str, run_id: str, parser: str | None) -> bool:
         with self.connect() as conn:
-            changed = conn.execute("UPDATE documents SET status='processing', updated_at=?, parser=?, error=NULL, run_id=? WHERE id=? AND status != 'processing'", (now(), parser, run_id, doc_id)).rowcount
+            changed = conn.execute("UPDATE documents SET status='processing', updated_at=?, parser=?, error=NULL, error_code=NULL, run_id=? WHERE id=? AND status != 'processing'", (now(), parser, run_id, doc_id)).rowcount
             if changed:
                 self._event(conn, doc_id, "processing", "로컬 처리 요청을 접수했습니다.")
             return bool(changed)
 
-    def finish(self, doc_id: str, run_id: str, *, status: str, parser: str | None, parser_version: str | None, result_file: str | None, error: str | None, warnings: list[str] | None = None, ocr_enabled: bool | None = None, locations: list[dict] | None = None, duration_ms: int | None = None) -> bool:
+    def finish(self, doc_id: str, run_id: str, *, status: str, parser: str | None, parser_version: str | None, result_file: str | None, error: str | None, warnings: list[str] | None = None, ocr_enabled: bool | None = None, locations: list[dict] | None = None, duration_ms: int | None = None, error_code: str | None = None, fidelity: dict | None = None) -> bool:
         assert status in {"completed", "failed", "unsupported"}
         with self.connect() as conn:
             if status == "completed":
                 timestamp = now()
                 warnings_json = json.dumps(warnings or [], ensure_ascii=False)
-                changed = conn.execute("UPDATE documents SET status=?, updated_at=?, parser=?, parser_version=?, result_file=?, result_parser=?, result_parser_version=?, result_warnings=?, error=NULL, run_id=NULL WHERE id=? AND status='processing' AND run_id=?", (status, timestamp, parser, parser_version, result_file, parser, parser_version, warnings_json, doc_id, run_id)).rowcount
+                changed = conn.execute("UPDATE documents SET status=?, updated_at=?, parser=?, parser_version=?, result_file=?, result_parser=?, result_parser_version=?, result_warnings=?, error=NULL, error_code=NULL, run_id=NULL WHERE id=? AND status='processing' AND run_id=?", (status, timestamp, parser, parser_version, result_file, parser, parser_version, warnings_json, doc_id, run_id)).rowcount
                 if changed:
-                    conn.execute("INSERT INTO parse_runs (document_id, run_id, completed_at, parser, parser_version, ocr_enabled, warnings, locations, duration_ms) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                        (doc_id, run_id, timestamp, parser, parser_version, ocr_enabled, warnings_json, json.dumps(locations or [], ensure_ascii=False), duration_ms))
+                    conn.execute("INSERT INTO parse_runs (document_id, run_id, completed_at, parser, parser_version, ocr_enabled, warnings, locations, duration_ms, fidelity) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                        (doc_id, run_id, timestamp, parser, parser_version, ocr_enabled, warnings_json, json.dumps(locations or [], ensure_ascii=False), duration_ms,
+                         json.dumps(fidelity, ensure_ascii=False) if fidelity is not None else None))
             else:
                 # Keep the last successful result and its parser metadata on failure.
-                changed = conn.execute("UPDATE documents SET status=?, updated_at=?, parser=?, error=?, run_id=NULL WHERE id=? AND status='processing' AND run_id=?", (status, now(), parser, error, doc_id, run_id)).rowcount
+                changed = conn.execute("UPDATE documents SET status=?, updated_at=?, parser=?, error=?, error_code=?, run_id=NULL WHERE id=? AND status='processing' AND run_id=?", (status, now(), parser, error, error_code, doc_id, run_id)).rowcount
             if changed:
                 self._event(conn, doc_id, status, "파싱을 완료했습니다." if status == "completed" else (error or "처리하지 못했습니다."))
             return bool(changed)
@@ -129,7 +132,7 @@ class DocumentRepository:
     def parse_run(self, doc_id: str, run_id: str) -> dict[str, Any] | None:
         with self.connect() as conn:
             row = conn.execute("""
-                SELECT r.run_id, r.completed_at, r.parser, r.parser_version, r.ocr_enabled, r.duration_ms, r.warnings, r.locations,
+                SELECT r.run_id, r.completed_at, r.parser, r.parser_version, r.ocr_enabled, r.duration_ms, r.warnings, r.locations, r.fidelity,
                     COALESCE(d.result_file=d.id || '-' || r.run_id || '.md', 0) AS is_latest
                 FROM parse_runs r JOIN documents d ON r.document_id=d.id
                 WHERE r.document_id=? AND r.run_id=?
@@ -145,7 +148,7 @@ class DocumentRepository:
         with self.connect() as conn:
             conn.execute("BEGIN IMMEDIATE")
             ids = [row[0] for row in conn.execute("SELECT id FROM documents WHERE status='processing'")]
-            conn.execute("UPDATE documents SET status='failed', updated_at=?, error=?, run_id=NULL WHERE status='processing'", (now(), message))
+            conn.execute("UPDATE documents SET status='failed', updated_at=?, error=?, error_code='interrupted', run_id=NULL WHERE status='processing'", (now(), message))
             for doc_id in ids:
                 self._event(conn, doc_id, "failed", message)
             return len(ids)

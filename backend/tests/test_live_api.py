@@ -159,7 +159,7 @@ def test_previous_success_is_available_during_and_after_failed_retry(client, mon
 
 
 def test_pdf_warning_contract_without_real_pdf(client, monkeypatch):
-    doc_id = upload(client, 'example.pdf', b'fake-only-for-adapter-test').json()['id']
+    doc_id = upload(client, 'example.pdf', b'%PDF-1.7\nfake-only-for-adapter-test').json()['id']
     service = client.app.state.documents
     monkeypatch.setattr(service.parsers, 'parse', lambda *_: ParsedDocument(markdown='example', parser='docling', parser_version='test'))
     assert client.post(f'/api/live/documents/{doc_id}/process').status_code == 202

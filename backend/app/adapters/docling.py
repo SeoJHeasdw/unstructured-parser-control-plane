@@ -23,16 +23,16 @@ class DoclingAdapter:
             with zipfile.ZipFile(path) as archive:
                 entries = archive.infolist()
                 if len(entries) > 10_000 or sum(e.file_size for e in entries) > 250 * 1024 * 1024:
-                    raise ParserError("문서 내부 항목 또는 압축 해제 크기가 제한을 초과했습니다.")
+                    raise ParserError("문서 내부 항목 또는 압축 해제 크기가 제한을 초과했습니다.", code="limit_exceeded")
                 for entry in entries:
                     name = entry.filename.replace("\\", "/")
                     parts = PurePosixPath(name)
                     if parts.is_absolute() or ".." in parts.parts or entry.flag_bits & 1:
-                        raise ParserError("암호화되었거나 안전하지 않은 내부 경로가 있어 처리할 수 없습니다.")
+                        raise ParserError("암호화되었거나 안전하지 않은 내부 경로가 있어 처리할 수 없습니다.", code="unsafe_archive")
                     if entry.file_size > 5_000_000 and entry.file_size > max(1, entry.compress_size) * 1000:
-                        raise ParserError("문서 내부 압축 비율이 제한을 초과했습니다.")
+                        raise ParserError("문서 내부 압축 비율이 제한을 초과했습니다.", code="limit_exceeded")
         except (zipfile.BadZipFile, OSError) as exc:
-            raise ParserError("Office 문서 형식을 확인할 수 없거나 파일이 손상되었습니다.") from exc
+            raise ParserError("Office 문서 형식을 확인할 수 없거나 파일이 손상되었습니다.", code="format_unrecognized") from exc
 
     def parse(self, path: Path, extension: str) -> ParsedDocument:
         # Set these before importing model libraries so their first initialization is offline.
@@ -43,7 +43,7 @@ class DoclingAdapter:
             from docling.datamodel.pipeline_options import PdfPipelineOptions
             from docling.document_converter import DocumentConverter, PdfFormatOption
         except (ImportError, ModuleNotFoundError) as exc:
-            raise ParserError("Docling이 설치되어 있지 않습니다. 선택 의존성을 설치한 뒤 다시 시도해 주세요.") from exc
+            raise ParserError("Docling이 설치되어 있지 않습니다. 선택 의존성을 설치한 뒤 다시 시도해 주세요.", code="parser_unavailable") from exc
         try:
             version = importlib.metadata.version("docling")
         except importlib.metadata.PackageNotFoundError:
@@ -52,7 +52,7 @@ class DoclingAdapter:
             self.check_office_archive(path)
         if extension == "PDF":
             if not self.settings.docling_artifacts or not self.settings.docling_artifacts.is_dir():
-                raise ParserError("오프라인 Docling 모델 경로가 없습니다. 미리 준비된 모델 경로를 설정해 주세요.")
+                raise ParserError("오프라인 Docling 모델 경로가 없습니다. 미리 준비된 모델 경로를 설정해 주세요.", code="parser_unavailable")
             # Keep OCR off until an explicitly configured, offline OCR engine is added.
             options = PdfPipelineOptions(artifacts_path=self.settings.docling_artifacts, do_ocr=False, enable_remote_services=False, allow_external_plugins=False)
             converter = DocumentConverter(allowed_formats=[InputFormat.PDF], format_options={InputFormat.PDF: PdfFormatOption(pipeline_options=options)})
@@ -68,7 +68,7 @@ class DoclingAdapter:
             # Image-only PDF exports may contain a placeholder comment but no text.
             visible_text = re.sub(r"<!--.*?-->|!\[[^\]]*\]\([^)]*\)", "", markdown, flags=re.DOTALL)
             if not visible_text.strip(" \t\r\n#*-|>"):
-                raise ParserError("추출된 텍스트가 없습니다. 스캔 파일은 OCR 연결 후 처리할 수 있습니다.")
+                raise ParserError("추출된 텍스트가 없습니다. 스캔 파일은 OCR 연결 후 처리할 수 있습니다.", code="no_text")
             locations = []
             if extension in {"PDF", "XLSX"}:
                 try:

@@ -136,6 +136,7 @@ Mock 모델과 로컬 API 상태명은 프로토타입 계약이다. 운영 계�
 | `backend/app/chunking.py`, `embedding.py`, `retrieval_jobs.py`, `routers/retrieval.py` | 청킹 전략, 임베딩 연결(`EMBED_*`)·호출, 질문 세트 저장, 단일 평가 작업·벡터 캐시 | 평가 이력 보존, 실제 색인 파이프라인과 분리 유지 |
 | `backend/app/vectordb.py`, `routers/vectordb.py` | Milvus REST v2 읽기 전용 조회(`MILVUS_*`)와 예시 데이터 | 쓰기·삭제는 범위 밖 |
 | `backend/app/adapters/` | 텍스트/CSV·선택적 Docling 파서와 확장자 기반 선택 | 실제 형식 판별, 위치가 있는 구조화 결과, 추가 파서와 OCR을 별도 어댑터로 확장 |
+| `backend/app/format_gate.py`, `fidelity/`, `textnorm.py` | 파서 전 내용 서명 판별(DRM·암호·불일치 → 실패 코드), OOXML 파싱용 사본 보정(기호 글꼴·첨자→유니코드), 원본 인벤토리와 결과 대조(기호 손실·병합 셀·글상자·흰회색·숨김·그림 종류)와 보충 추출, 기호 보존 파일명 키 | 판별 결과로 파서 자동 선택, 병합 셀 반복 제거, PDF 글자 층 대조, 영역 단위 OCR 연결 |
 | `backend/app/middleware.py` | 로컬 API의 Origin 및 요청 크기 제한 | 인증·인가의 대체가 아님. 배포 경계와 운영 보안은 별도 설계 |
 | `mock-data/data.json` | 가상 문서·참조·활동 예시 | 실제 운영 데이터와 별개로 유지하고 스키마 검증 |
 | `.env.example` | 향후 게이트웨이 설정 이름 예시 | 서버 전용 설정 로딩과 비밀 관리. 실제 값은 저장소에 넣지 않음 |

@@ -37,6 +37,13 @@ export DOCOPS_DOCLING_ARTIFACTS=/path/to/prepared/models
 - `GET /api/live/documents/{id}/result`: 마지막 성공 결과와 파서 정보, `is_stale`, `warnings`를 반환합니다. 재처리 중이거나 실패한 경우에도 이전 성공 결과가 있으면 `is_stale: true`로 반환하고, 성공 이력이 없으면 `409`입니다. PDF 결과에는 OCR 미적용 경고가 항상 포함됩니다.
 - `GET /api/live/documents/{id}/history`: 로컬 처리 이력
 
+### 파싱 전 판별과 원문 충실도 (2026-11-19)
+
+- 처리 요청 시 파서보다 먼저 **내용 서명**을 본다. DRM으로 감싼 파일(`drm_protected`/`drm_suspected`), 암호 문서(`encrypted`), 확장자와 내용이 다른 파일(`format_mismatch`)은 파서를 부르지 않고 `failed`와 `error_code`로 남긴다. DRM은 판별만 하며 복호화하지 않는다. 제품 머리말은 `DOCOPS_DRM_SIGNATURES`로 등록한다(`.env.example` 참고).
+- DOCX·XLSX·PPTX는 `runtime/work/`에 임시 사본을 만들어 Word '기호 삽입'(Symbol 글꼴)·위/아래첨자를 유니코드(`≥`, `m²`, `CO₂`)로 바꾼 뒤 파싱한다. 원본은 바꾸지 않고 사본은 처리 후 지운다. `DOCOPS_OOXML_PREPARE=0`이면 끈다.
+- 파싱 뒤 원본 XML을 직접 읽어 결과와 대조한다: 특수기호 손실 수, 병합 셀, 흰색에 가까운 글자·숨김 글자, OCR 없이 읽지 않은 그림 수. 결과에 없던 글상자·SVG 글자는 결과 끝 `## 보충 추출`에 원문 위치와 함께 덧붙인다. 보고서는 `result`·`runs/{run_id}` 응답의 `fidelity`, 요약은 `warnings`.
+- 엣지 케이스 회귀 테스트는 `tests/test_edge_cases.py`. Docling 실측 테스트 1개는 Docling이 설치된 가상환경에서만 돈다.
+
 원본, SQLite DB, 결과는 프로젝트의 `runtime/`에 남으며 Git 대상에서 제외됩니다. 파일명은 메타데이터로만 사용하고 실제 경로는 서버가 생성한 ID를 사용합니다. 기본 업로드 한도는 100 MiB이며 표준 텍스트 파서는 10 MiB, CSV는 최대 10,000행입니다. 단일 서버와 전용 단일 파싱 워커를 전제로 하며, 최대 64건의 요청을 추가로 대기합니다. 서버 종료 시 대기 작업은 실패 상태로 기록되며, 갑작스러운 종료로 남은 진행 중 상태는 다음 시작 시 실패 상태로 복구됩니다. 마지막 성공 결과는 재처리 실패나 중단 이후에도 보존합니다. 이 서비스는 운영용 인증·권한 시스템을 포함하지 않습니다.
 
 ## 테스트

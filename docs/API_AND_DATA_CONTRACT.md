@@ -1,6 +1,6 @@
 # API·데이터 계약: 현재 로컬 프로토타입
 
-> **기준: 2026-11-17 현재 코드.** 이 문서는 합의된 고객사 운영 계약이나 향후 시스템 규격이 아니라, 다른 세션에서 현재 코드를 안전하게 이어가기 위한 관찰 기록이다. 구현이 바뀌면 코드·테스트와 이 문서를 함께 갱신한다. 미래에 필요한 계약은 마지막 절에 별도로 둔다.
+> **기준: 2026-11-19 현재 코드.** 이 문서는 합의된 고객사 운영 계약이나 향후 시스템 규격이 아니라, 다른 세션에서 현재 코드를 안전하게 이어가기 위한 관찰 기록이다. 구현이 바뀌면 코드·테스트와 이 문서를 함께 갱신한다. 미래에 필요한 계약은 마지막 절에 별도로 둔다.
 
 ## 1. 경계와 용어
 
@@ -85,20 +85,22 @@ Content-Type: text/plain
   "created_at": "2026-11-12T05:00:00+00:00",
   "updated_at": "2026-11-12T05:00:00+00:00",
   "parser": null,
-  "error": null
+  "error": null,
+  "error_code": null
 }
 ```
 
 | 필드 | 의미 및 제한 |
 |---|---|
 | `id` | 서버가 생성한 문서 ID. 원천 문서의 ID나 콘텐츠 해시가 아님 |
-| `name` | 정리된 표시용 파일명. 경로 구분자 앞부분과 제어문자 제거. 저장 경로에는 파일명을 사용하지 않음 |
-| `format` | 파일명 마지막 확장자의 대문자. 확장자가 없거나 ASCII 영숫자 1–20자 조건에 맞지 않으면 빈 문자열. MIME/시그니처 기반 판별이 아님 |
+| `name` | 정리된 표시용 파일명. 경로 구분자 앞부분과 제어문자 제거, macOS 분해형 한글(NFD)은 조합형(NFC)으로 바꾸고 방향 제어·폭 없는 글자(U+202E 등)는 뺀다. `℃`·`±`·`−` 같은 기호는 그대로 둔다(2026-11-19). 저장 경로에는 파일명을 사용하지 않음 |
+| `format` | 파일명 마지막 확장자의 대문자. 확장자가 없거나 ASCII 영숫자 1–20자 조건에 맞지 않으면 빈 문자열. 이 값 자체는 확장자다. 처리 때는 내용 서명으로 다시 확인해 맞지 않으면 실패시킨다(§4-1) |
 | `size_bytes` | 업로드한 바이트 수 |
 | `status` | `uploaded` / `processing` / `completed` / `failed` / `unsupported` 중 하나 |
 | `created_at`, `updated_at` | 서버에서 기록한 UTC 시각. 초 단위이므로 같은 초에 여러 변화가 발생할 수 있음 |
 | `parser` | 현재 또는 마지막 처리 요청에 선택된 파서명. `null`일 수 있음. **마지막 성공 결과의 파서와 동일하다고 가정하지 말 것** |
 | `error` | 마지막 처리 실패 등에 대한 표시용 문자열 또는 `null`. 자동 분기용 안정 코드가 아님 |
+| `error_code` | 마지막 실패·미지원의 안정 사유 코드 또는 `null`(2026-11-19 추가). 값은 §4-1. 처리 접수·성공 시 `null`로 비운다. 추가 전에 실패한 문서는 `null` |
 
 목록은 `documents` 배열로 전체를 반환하고 생성 시각 내림차순, 같은 시각에는 내부 등록 순서의 역순으로 정렬한다. 사용자·원천·파일명별 접근권한, 변경분 조회, 페이징은 없다.
 
@@ -111,15 +113,42 @@ Content-Type: text/plain
   "parser": "python-text",
   "parser_version": "stdlib-3.13.12",
   "is_stale": false,
-  "warnings": []
+  "warnings": [],
+  "fidelity": null
 }
 ```
 
-- `markdown`은 마지막으로 **성공해 현재 연결된** 결과 파일의 텍스트다. 구조화 페이지/시트/셀 위치의 완전 보존을 보장하지 않는다.
+- `markdown`은 마지막으로 **성공해 현재 연결된** 결과 파일의 텍스트다. 구조화 페이지/시트/셀 위치의 완전 보존을 보장하지 않는다. DOCX·XLSX·PPTX에서 파서 결과에 없던 글상자·SVG 글자를 찾으면 끝에 `<!-- docops:supplement -->`와 `## 보충 추출: 파서 결과에 없던 원본 글자` 구획을 덧붙인다. 각 줄은 `- [글상자 · 시트!B3:D5 도형] 글자` 형식이며 **원래 위치가 아니다**. XLSX 글상자 줄은 `locations`에 시트·행·열이 남는다.
+- `fidelity`(2026-11-19 추가)는 DOCX·XLSX·PPTX 성공 결과의 원문 충실도 보고서다. 다른 형식이나 이전 결과는 `null`이다. 아래 '원문 충실도 보고서'를 본다.
 - `parser`, `parser_version`은 이 **성공 결과를 만든 파서와 버전**이다. 현재/최신 시도의 파서값인 `LiveDocument.parser`와 별도로 취급한다.
 - `is_stale: false`는 문서의 현재 상태가 `completed`임을 뜻한다. `true`는 현재 상태가 완료가 아닌데도 **과거 성공 결과**가 있어서 반환했다는 뜻이다. 예를 들어 재처리 대기·실행 중이나 재처리 실패 후 이전 결과를 보여준다. `is_stale`은 결과 품질 평가나 원천 최신성 검증이 아니다.
 - `warnings`는 결과 관련 문자열 배열이다. **PDF 모든 성공 결과**에는 `"OCR 미적용: 스캔·이미지 페이지 내용 누락 가능"`이 포함된다. 특정 페이지를 검사해 스캔을 발견했다는 뜻이 아닌 예방 경고다. 텍스트와 스캔이 섞인 PDF는 일부 텍스트만 추출되어도 완료될 수 있다.
+- DOCX·XLSX·PPTX 결과의 `warnings`에는 원문 대조 경고가 붙는다: 특수기호 손실(`특수기호 N건이 결과에서 빠짐(원문 M건): ≥×2…`), 바꿀 수 없는 첨자·기호 글꼴, 흰색에 가까운 글자 포함, 숨김 글자 포함, 병합 셀 값 반복 가능, 보충 추출, OCR 없이 읽지 않은 래스터 그림 수. 사본 보정이나 점검이 실패하면 그 사실도 경고로 남는다.
 - 현재 응답에는 결과 생성 시각, 결과별 실행 ID, 결과 원본 버전, 구조화 위치, 페이지별 품질이나 이전 결과 목록이 없다. 여러 번 성공했을 때 공개 API는 마지막 성공 결과만 가리킨다.
+
+### 원문 충실도 보고서 (`fidelity`)
+
+`ParseResult.fidelity`와 `StoredParseRun.fidelity`(실행별, `parse_runs.fidelity`에 저장)의 형태다. 파서와 무관하게 **원본 OOXML을 직접 읽은 인벤토리**와 최종 Markdown을 대조한다.
+
+```json
+{
+  "version": 1,
+  "symbols": {"expected": 215, "found": 215, "lost": {}, "normalized": {}, "top": {"℃": 15, "±": 15}},
+  "prepared": {"symbol_font_converted": 2, "symbol_font_unmapped": 0, "scripts_converted": 3, "scripts_kept": 0, "parts_changed": ["word/document.xml"]},
+  "findings": [{"code": "merged_cells", "severity": "warning", "count": 2, "message": "병합 셀 2개: …", "examples": []}],
+  "supplemented": 1,
+  "notes": []
+}
+```
+
+| 항목 | 뜻 |
+|---|---|
+| `symbols.expected` | 원문에서 보이는 글자의 특수기호 수(ASCII·한글·한자·공백 제외). 기호 글꼴 문자는 유니코드로, 서식 위·아래첨자는 바꿀 수 있으면 유니코드 첨자(`m²`)로 센다. 숨김 서식 글자·SVG 글자는 넣지 않는다 |
+| `symbols.lost` / `normalized` | 결과에서 모자란 기호 수. `℃→°C`처럼 기호가 남는 호환 변환은 `normalized`, `²→2`처럼 ASCII로 내려앉으면 `lost` |
+| `prepared` | 파서에 넣기 전 사본에서 바꾼 수. 보정을 끄거나 실패하면 `null` |
+| `findings[].code` | `symbol_lost`, `symbol_normalized`, `symbol_font_converted`, `symbol_font_unmapped`, `script_converted`, `script_flattened`, `script_unconvertible`, `low_contrast_text`, `hidden_text`, `hidden_text_included`, `hidden_sheets`, `merged_cells`, `supplemented`, `images_not_read`, `metafiles_not_read`. `severity: warning`이면 `warnings`에도 문구가 들어간다 |
+
+한계: 스타일·테마에서 상속한 글자색은 보지 않는다(직접 서식만), 머리말·꼬리말·각주의 그림은 세지 않는다, PPTX는 배경색을 몰라 저대비를 판정하지 않는다, 병합 셀 값의 반복은 결과 표에서 지우지 않고 보고만 한다, 그림 속 글자는 OCR 없이는 알 수 없다.
 
 ### `DocumentHistory`
 
@@ -164,6 +193,23 @@ Content-Type: text/plain
 
 이 구분은 현재 **표시 문구에 결합된 임시 계약**이다. 다른 언어·클라이언트를 추가하거나 API를 운영용으로 다듬을 때는 안정적인 오류 코드와 별도 사용자 문구를 도입하고 프론트와 테스트를 함께 변경한다. 재처리 요청의 `409`는 `이미 처리 중인 문서입니다.`이며 결과 조회의 `409`와 의미가 다르다.
 
+### 4-1. 처리 실패 사유 코드 (`LiveDocument.error_code`)
+
+2026-11-19부터 처리 실패·미지원에 안정 코드를 남긴다. 결과 조회 `409`의 구분(위 표)은 아직 문구 기반이다.
+
+| 코드 | 상태 | 뜻 |
+|---|---|---|
+| `drm_protected` | `failed` | 등록한 DRM 머리말(`DOCOPS_DRM_SIGNATURES`)과 일치하거나 Microsoft 권한 관리(IRM)로 보호됨. 파서를 호출하지 않는다 |
+| `drm_suspected` | `failed` | Office·PDF·텍스트 확장자인데 문서 서명이 없고 본문 엔트로피가 7.5 bits/byte 이상(암호문처럼 보임). DRM 래핑으로 의심 |
+| `encrypted` | `failed` | 암호가 걸린 Office 문서(CFB `EncryptionInfo`+`EncryptedPackage`, IRM 아님) |
+| `format_mismatch` | `failed` | 확장자와 내용 서명이 다름. 예: `.xlsx`인데 DOCX·구형 XLS(OLE)·일반 ZIP·텍스트 |
+| `format_unrecognized` | `failed` | 알려진 서명이 없거나 ZIP 목차를 읽을 수 없음 |
+| `unsupported_format` | `unsupported` | 처리 경로가 없는 확장자 |
+| `parser_unavailable`, `no_text`, `limit_exceeded`, `unsafe_archive`, `encoding_unknown`, `parse_failed` | `failed` | Docling·모델 미설치, 추출 글자 없음, 크기·행·압축 한도, 위험한 내부 경로, 인코딩 판별 실패, 그 밖의 파서 오류 |
+| `interrupted`, `queue_full`, `internal_error` | `failed` | 서버 종료·재시작으로 중단, 대기열 포화 후 기록, 예상하지 못한 오류 |
+
+DRM 판별은 **판별만** 한다. 복호화·우회는 하지 않으며 해제본은 DRM 제품의 공식 경로로 받는다. 제품 서명은 공개 자료로 확정할 수 없어 내장하지 않는다(NASCA 포함). 실제 파일의 머리말을 구조 분석(`stats.header`)으로 확인한 뒤 `.env`에 `DOCOPS_DRM_SIGNATURES=제품=ascii:문자열; 제품2=hex:0A0B0C`처럼 등록한다. `hex:`는 파일 맨 앞부터, `ascii:`는 앞 4 KiB 안 어디서든 일치하면 된다. 형식이 틀리면 서버 시작이 실패한다. 등록한 서명은 구조 분석에도 쓰여 `drm-suspect` 플래그와 `stats.drm_vendor`로 표시된다.
+
 ## 5. 상태와 처리 생명주기
 
 ```mermaid
@@ -181,10 +227,11 @@ stateDiagram-v2
 
 1. 업로드는 ID별 원본을 저장하고 SQLite에 `uploaded` 이벤트를 남긴다. 미지원 확장자여도 업로드는 가능하며, 실제 처리 요청 뒤 `unsupported`가 될 수 있다.
 2. 처리 접수 시 중복 여부 확인과 `processing` 상태·run ID 기록을 거쳐 작업을 메모리 대기열에 넣는다. 현재 상태 종류에는 별도 `queued`가 없다.
-3. 전용 작업자는 하나이며 기본 대기열은 **추가 64건**이다. 대기열이 가득 차 접수되지 않으면 `503`과 이력을 남기며 일반적인 포화 경로에서는 기존 문서 상태와 결과를 유지한다. 같은 문서의 중복 처리 요청은 `409`다. 목록 조회가 대기 작업 수만큼 워커 스레드를 점유하는 방식은 아니다.
-4. 결과는 임시 파일에 쓴 뒤 파일명을 바꾸고, 같은 문서·run ID가 아직 `processing`인 경우 SQLite에 성공 결과를 연결한다. 실패한 재처리는 마지막 성공 결과의 포인터·파서/버전·경고를 보존한다. 정상 성공한 재처리는 그 연결을 새 결과로 바꾼다.
-5. 정상 종료에서는 대기 중인 작업을 실패로 기록하고, 실행 중인 작업의 종료를 최대 5초 기다린다. 작업이 더 오래 남아 있으면 해당 워커가 끝나기 전까지 프로세스 잠금을 유지한다. 프로세스가 먼저 사라지면 OS가 잠금을 해제하고 다음 시작에서 남은 `processing`을 `failed`로 복구한다. 메모리 큐 자체는 재시작 후 재개되지 않는다.
-6. 잠금과 SQLite 트랜잭션은 **이 로컬 단일 서버 프로토타입**의 중복·상태 일관성을 위한 것이다. 분산 실행, 영속 큐, 자동 재시도, 정확히 한 번 실행, 백업/복구를 약속하지 않는다.
+3. 작업자는 파서를 부르기 전에 내용 서명으로 형식을 확인한다(§4-1). DOCX·XLSX·PPTX는 압축 안전 검사 후 `runtime/work/docops-prep-*/`에 **사본**을 만들어 기호 글꼴(Word `w:sym` 등)·바꿀 수 있는 위·아래첨자를 유니코드로 바꾸고, 그 사본을 파싱한다. 사본은 처리 직후 지우고 원본은 바꾸지 않는다. 사본 파싱이 실패하면 원본으로 한 번 더 파싱하고 경고를 남긴다. `DOCOPS_OOXML_PREPARE=0`이면 사본 보정을 끈다(대조 보고는 유지). 파싱 뒤 원본을 직접 읽어 대조·보충하고(`fidelity`), 처리 시간 `duration_ms`에는 이 단계까지 포함한다.
+4. 전용 작업자는 하나이며 기본 대기열은 **추가 64건**이다. 대기열이 가득 차 접수되지 않으면 `503`과 이력을 남기며 일반적인 포화 경로에서는 기존 문서 상태와 결과를 유지한다. 같은 문서의 중복 처리 요청은 `409`다. 목록 조회가 대기 작업 수만큼 워커 스레드를 점유하는 방식은 아니다.
+5. 결과는 임시 파일에 쓴 뒤 파일명을 바꾸고, 같은 문서·run ID가 아직 `processing`인 경우 SQLite에 성공 결과를 연결한다. 실패한 재처리는 마지막 성공 결과의 포인터·파서/버전·경고를 보존한다. 정상 성공한 재처리는 그 연결을 새 결과로 바꾼다.
+6. 정상 종료에서는 대기 중인 작업을 실패로 기록하고, 실행 중인 작업의 종료를 최대 5초 기다린다. 작업이 더 오래 남아 있으면 해당 워커가 끝나기 전까지 프로세스 잠금을 유지한다. 프로세스가 먼저 사라지면 OS가 잠금을 해제하고 다음 시작에서 남은 `processing`을 `failed`로 복구한다. 메모리 큐 자체는 재시작 후 재개되지 않는다.
+7. 잠금과 SQLite 트랜잭션은 **이 로컬 단일 서버 프로토타입**의 중복·상태 일관성을 위한 것이다. 분산 실행, 영속 큐, 자동 재시도, 정확히 한 번 실행, 백업/복구를 약속하지 않는다.
 
 ## 6. 저장과 데이터 무결성의 현재 범위
 
@@ -196,8 +243,9 @@ stateDiagram-v2
 | 문서·이벤트 | `runtime/documents.sqlite3`의 `documents`, `document_events` |
 | 성공 결과 | `runtime/results/{id}-{run_id}.md`. DB의 `result_file`은 마지막 성공 결과를 가리키고, `parse_runs`는 비교할 성공 실행의 메타데이터를 보관 |
 | 서버 잠금 | `runtime/server.lock`. 같은 런타임 디렉터리를 쓰는 중복 서버를 막음 |
+| 파싱용 사본 | `runtime/work/docops-prep-*/prepared.{확장자}`. 처리 중에만 존재하고, 비정상 종료로 남은 것은 다음 시작 때 잠금을 얻은 뒤 지운다 |
 
-`documents`에는 현재 상태·선택 파서 외에 마지막 성공 결과용 `result_file`, `result_parser`, `result_parser_version`, `result_warnings`가 있다. 기존 DB에 없는 결과 메타 컬럼은 시작 시 추가·보완한다. 이미 예전 코드에서 포인터가 사라진 결과를 자동 발견해 복원하는 기능은 없다.
+`documents`에는 현재 상태·선택 파서 외에 마지막 성공 결과용 `result_file`, `result_parser`, `result_parser_version`, `result_warnings`와 실패 사유 `error_code`가 있다. `parse_runs`에는 실행별 `fidelity`(JSON)가 있다. 기존 DB에 없는 컬럼은 시작 시 추가·보완한다. 이미 예전 코드에서 포인터가 사라진 결과를 자동 발견해 복원하는 기능은 없다.
 
 성공적인 재처리 후 이전 `.md` 파일이 디스크에 남을 수 있지만, 이전 버전 조회·복구 API나 보존 정책은 없다. 파일·DB·결과는 계속 남고 현재 삭제 UI/API도 없다. 직접 데이터를 지우거나 이동하면 DB 포인터가 가리키는 파일이 사라질 수 있다. 고객 문서와 결과는 민감할 수 있으므로 확인된 보관·삭제 정책이 마련되기 전까지 사용자가 선택한 로컬 프로토타입 데이터로 취급한다.
 
@@ -208,9 +256,11 @@ stateDiagram-v2
 | `.txt`, `.md`, `.log` | Python 텍스트 | UTF-8 BOM 포함 또는 CP949 순으로 디코딩. 10 MiB 초과, NUL 포함, 디코딩 실패 시 `failed` |
 | `.csv` | Python `csv` → Markdown 표 | 위 텍스트 제한 외 최대 10,000행·1,000열. 헤더/표 변환은 범용 구조이며 업무 스키마 검증이 아님 |
 | `.pdf` | 선택 설치 Docling | 미리 준비된 로컬 모델 필요, OCR 꺼짐. Docling 2.150.0의 합성 텍스트 PDF 검증 및 텍스트+이미지 혼합 PDF의 누락·경고 확인. 결과마다 예방 경고 |
-| `.docx` | 선택 설치 Docling | Docling 2.150.0의 합성 DOCX 검증. 복잡한 실제 문서 품질은 별도 검증 필요 |
-| `.pptx`, `.xlsx` | 선택 설치 Docling 경로 | 어댑터 연결만 확인. 실제 정확도·표·시트·셀·수식·외부 문서 참조 보존은 미검증이며 참조 추출 구현 아님 |
+| `.docx` | 사본 보정 → 선택 설치 Docling → 원문 대조 | Docling 2.150.0의 합성 DOCX 검증. 엣지 케이스 실측(아래)은 합성 문서 기준이며 복잡한 실제 문서 품질은 별도 검증 필요 |
+| `.xlsx`, `.pptx` | 사본 보정 → 선택 설치 Docling 경로 → 원문 대조 | XLSX는 합성 문서로 첨자·병합 셀·글상자·흰회색 글자를 실측. PPTX는 보정·대조 단위 테스트만. 수식·외부 문서 참조 보존은 미검증이며 참조 추출 구현 아님 |
 | HWP/HWPX, 이미지, ZIP, 메일 및 그 밖의 형식 | 현재 미지원 | 업로드 후 처리 요청 시 `unsupported`. Mock 파이프라인의 예시 구성과 실제 지원은 별개 |
+
+**Docling 2.150.0 엣지 케이스 실측(합성 DOCX·XLSX, `backend/tests/edge_case_files.py`):** 유니코드로 저장된 `℃ ≥ ± ∓ ≤ −`는 보존된다. Word '기호 삽입'(Symbol 글꼴 `w:sym`)은 글자가 빠지고(`압력 ≥ 10`→`압력  10`), 위·아래첨자 서식은 평탄화된다(`m²`→`m2`, `10⁻³`→`10-3`, `CO₂`→`CO2`). 병합 셀 값은 칸마다 반복되고, XLSX 도형 글상자와 SVG 안 글자는 빠지며, 흰색에 가까운 글자는 표시 없이 본문에 들어간다. 사본 보정 후에는 앞의 두 손실이 사라지고(특수기호 215건 문서 208→215건), 글상자·SVG 글자는 보충 추출로, 나머지는 경고로 드러난다.
 
 공통 업로드는 파일당 기본 100 MiB, multipart 본문 제한은 파일 한도 + 1 MiB이다. 각 파일을 스트리밍하면서도 실제 파일 크기를 확인한다. Docling 변환에는 최대 500페이지 제한이 전달되고, Office 컨테이너는 내부 항목 수·크기·경로·암호·일부 압축 비율을 검사한다. 이 검사는 악성코드 검사나 모든 파일 안전성 보장이 아니다.
 
@@ -230,11 +280,13 @@ Docling 실행 시 `HF_HUB_OFFLINE=1`, `TRANSFORMERS_OFFLINE=1`을 설정하며 
 3. **참조·검색:** 명시적 링크·문서번호·추론 관계의 근거와 대상 버전, 미발견·다중 후보, 삭제/권한 변경을 검색·에이전트에 어떻게 전달할지.
 4. **운영:** 내구성 있는 큐·재시도·부분 실패·중복 처리, 분산 작업, 용량·시간 제한, 이력 보존·삭제·백업·감사·접근 제어, 대량 목록 API를 어떻게 구성할지.
 5. **게이트웨이/모델:** endpoint·인증·모델 ID, 텍스트·비전·임베딩·분류 모델별 API와 운영 자원·호환성은 환경 확인 후 별도 서버 어댑터로 정의한다. 키를 프론트나 저장소에 넣지 않는다.
-6. **API 발전:** 한국어 상세 문구가 아닌 버전이 있는 오류 코드, 결과·원본의 버전과 시간, 페이지네이션·필터·정렬, 호환성 정책을 정의한다.
+6. **API 발전:** 처리 실패 사유는 `error_code`로 시작했다(§4-1). 결과 조회 `409`의 구분, 결과·원본의 버전과 시간, 페이지네이션·필터·정렬, 호환성 정책은 아직 정의하지 않았다.
 
 ## 10. 확인할 코드·테스트
 
 - API 조립·Mock: `backend/main.py`, 실제 라우터: `backend/app/routers/live.py`, 공개 모델: `backend/app/models.py`.
 - 처리·오류·결과: `backend/app/service.py`, DB·마이그레이션: `backend/app/repository.py`, 보호: `backend/app/middleware.py`, 설정: `backend/app/config.py`.
 - 형식별 선택·파싱: `backend/app/adapters/registry.py`, `text.py`, `docling.py`, 공통 결과 `base.py`.
+- 파싱 전 형식·DRM 판별: `backend/app/format_gate.py`. 사본 보정·원문 대조: `backend/app/fidelity/`(`prepare.py`, `probe.py`, `report.py`). 문자 도우미(기호 글꼴 표·첨자·대비·파일명 키): `backend/app/textnorm.py`.
+- 엣지 케이스 회귀: `backend/tests/test_edge_cases.py`(Docling 실측 테스트는 Docling이 설치된 환경에서만 실행), 합성 파일 `backend/tests/edge_case_files.py`.
 - 프론트 실제 API 경계: `frontend/src/api/live.ts`. 실제 API와 실패 동작의 회귀: `backend/tests/test_live_api.py`, `frontend/src/__tests__/live.test.tsx`.
