@@ -57,7 +57,9 @@ def sniff(data: bytes) -> str:
         return "cfb"
     if b"%PDF-" in head[:1024]:
         return "pdf"
-    if head.startswith(b"\x89PNG") or head.startswith(b"\xff\xd8\xff") or head.startswith((b"GIF87a", b"GIF89a")) or head.startswith((b"II*\x00", b"MM\x00*")) or head[:2] == b"BM" or head[4:12] in (b"ftypheic", b"ftypheix", b"ftypmif1"):
+    # BMP는 'BM' 두 글자뿐이라 'BMR-2026-…' 같은 텍스트와 겹친다. 정보 머리말 크기까지 맞아야 그림으로 본다.
+    bmp = head[:2] == b"BM" and len(head) >= 18 and int.from_bytes(head[14:18], "little") in (12, 40, 52, 56, 64, 108, 124)
+    if head.startswith(b"\x89PNG") or head.startswith(b"\xff\xd8\xff") or head.startswith((b"GIF87a", b"GIF89a")) or head.startswith((b"II*\x00", b"MM\x00*")) or bmp or head[4:12] in (b"ftypheic", b"ftypheix", b"ftypmif1"):
         return "image"
     lower = head.lower()
     text = _decode(head)

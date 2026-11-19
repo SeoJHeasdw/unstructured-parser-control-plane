@@ -151,11 +151,13 @@ def _a_run(match: re.Match, stats: PrepareStats) -> str:
 def _targets(extension: str, names: list[str]) -> dict[str, tuple[re.Pattern, object]]:
     result = {}
     for name in names:
-        if extension in ("DOCX", "DOCM") and re.fullmatch(r"word/(document|header\d*|footer\d*|footnotes|endnotes)\.xml", name):
+        # 본문 파일 이름이 표준과 달라도(word/document2.xml 등) 같은 폴더의 XML이면 대상으로 삼는다.
+        # 서식·설정 부분에는 w:r 실행이 없으므로 바뀌지 않는다.
+        if extension in ("DOCX", "DOCM") and re.fullmatch(r"word/[^/]+\.xml", name):
             result[name] = (_W_RUN, _w_run)
-        elif extension in ("XLSX", "XLSM") and (name == "xl/sharedStrings.xml" or re.fullmatch(r"xl/worksheets/sheet\d+\.xml", name)):
+        elif extension in ("XLSX", "XLSM") and re.fullmatch(r"xl/(sharedStrings[^/]*|worksheets/[^/]+)\.xml", name, re.I):
             result[name] = (_X_RUN, _x_run)
-        elif extension in ("PPTX", "PPTM") and re.fullmatch(r"ppt/(slides/slide|notesSlides/notesSlide)\d+\.xml", name):
+        elif extension in ("PPTX", "PPTM") and re.fullmatch(r"ppt/(slides|notesSlides)/[^/]+\.xml", name):
             result[name] = (_A_RUN, _a_run)
     return result
 

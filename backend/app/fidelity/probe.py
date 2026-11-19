@@ -12,6 +12,7 @@ import re
 import xml.etree.ElementTree as ET
 import zipfile
 
+from app.format_gate import main_part
 from app.textnorm import (LOW_CONTRAST, contrast_ratio, map_symbol_font_text, parse_hex_color, special_counts,
                           symbol_font_char, to_script)
 
@@ -183,9 +184,9 @@ def _shd(props: ET.Element | None) -> str | None:
 
 
 class _Docx:
-    def __init__(self, archive: zipfile.ZipFile, inv: Inventory):
+    def __init__(self, archive: zipfile.ZipFile, inv: Inventory, part: str):
         self.archive, self.inv = archive, inv
-        self.rels = _rels(archive, "word/document.xml")
+        self.rels = _rels(archive, part)
         self.paragraphs = self.tables = 0
 
     def walk(self, el: ET.Element, st: dict) -> None:
@@ -342,12 +343,13 @@ class _Docx:
 
 
 def _probe_docx(archive: zipfile.ZipFile, inv: Inventory) -> None:
-    root = _part(archive, "word/document.xml", inv)
+    part = main_part(archive, set(archive.namelist())) or "word/document.xml"
+    root = _part(archive, part, inv)
     if root is None:
         return
     body = root.find(q("w", "body"))
     if body is not None:
-        _Docx(archive, inv).walk(body, {})
+        _Docx(archive, inv, part).walk(body, {})
 
 
 # ---------------------------------------------------------------- XLSX
@@ -400,8 +402,8 @@ def _rich(inv: Inventory, node: ET.Element, ns: str) -> tuple[str, list[dict]]:
     return "".join(out), flattened
 
 
-def _styles(archive: zipfile.ZipFile, inv: Inventory) -> list[tuple[str | None, str | None]]:
-    root = _part(archive, "xl/styles.xml", inv)
+def _styles(archive: zipfile.ZipFile, inv: Inventory, part: str) -> list[tuple[str | None, str | None]]:
+    root = _part(archive, part, inv)
     if root is None:
         return []
     fonts = []
@@ -423,15 +425,18 @@ def _styles(archive: zipfile.ZipFile, inv: Inventory) -> list[tuple[str | None, 
 
 
 def _probe_xlsx(archive: zipfile.ZipFile, inv: Inventory) -> None:
-    workbook = _part(archive, "xl/workbook.xml", inv)
+    names = set(archive.namelist())
+    book = main_part(archive, names) or "xl/workbook.xml"
+    workbook = _part(archive, book, inv)
     if workbook is None:
         return
-    wb_rels = _rels(archive, "xl/workbook.xml")
+    wb_rels = _rels(archive, book)
+    shared_part = next((target for target in wb_rels.values() if posixpath.basename(target).lower().startswith("sharedstrings")), "xl/sharedStrings.xml")
     shared: list[tuple[str, list[dict]]] = []
-    sst = _part(archive, "xl/sharedStrings.xml", inv)
+    sst = _part(archive, shared_part, inv)
     if sst is not None:
         shared = [_rich(inv, si, "x") for si in sst.findall(q("x", "si"))]
-    styles = _styles(archive, inv)
+    styles = _styles(archive, inv, next((target for target in wb_rels.values() if posixpath.basename(target).lower() == "styles.xml"), "xl/styles.xml"))
     for sheet in workbook.iter(q("x", "sheet")):
         name = sheet.get("name", "?")
         if sheet.get("state") in ("hidden", "veryHidden"):

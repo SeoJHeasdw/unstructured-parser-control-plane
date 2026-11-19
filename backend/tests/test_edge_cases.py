@@ -360,3 +360,43 @@ def test_real_docling_recovers_symbols_and_scripts(tmp_path):
             assert "CO2" in before and "CO₂" in after and "mg/m³" in after
         final, _, _, report = assess(probe(source, ext), after, None)
         assert report["symbols"]["lost"] == {}
+
+
+# ---------------------------------------------------------------- 이미 설치된 환경에서 정상 파일을 막지 않는지
+
+def test_gate_never_rejects_text_that_the_text_parser_can_read(client, tmp_path):
+    """문서번호 'BMR-…'(BMP 서명 'BM'), 로그 속 '%PDF-' 같은 서명 문자열이 있어도 텍스트로 처리한다."""
+    samples = {
+        "배치기록.txt": "BMR-2026-0842 배치 기록\n보관 −70℃".encode(),
+        "업로드.log": b"2026-11-19 upload ok header=%PDF-1.7 size=10",
+        "점검.md": "BM 점검 결과".encode("cp949"),
+        "목록.csv": "BMR-2026-0842,−70℃\n".encode(),
+    }
+    for name, data in samples.items():
+        path = tmp_path / name
+        path.write_bytes(data)
+        assert check(path, name.rsplit(".", 1)[1].upper(), SIGNATURES).passed, name
+        assert processed(client, name, data)["status"] == "completed", name
+    from app.structure import sniff
+    assert sniff("BMR-2026-0842".encode()) == "text"
+    real_bmp = b"BM" + (70).to_bytes(4, "little") + b"\0" * 4 + (54).to_bytes(4, "little") + (40).to_bytes(4, "little") + b"\0" * 40
+    assert sniff(real_bmp) == "image"
+
+
+def test_office_main_part_is_found_through_package_relationships(tmp_path):
+    """본문 파일 이름이 'word/document2.xml'이어도(일부 생성 도구) 형식 불일치로 막지 않고 점검한다."""
+    with zipfile.ZipFile(io.BytesIO(files.edge_case_docx())) as archive:
+        parts = {info.filename: archive.read(info) for info in archive.infolist()}
+    renamed = {("word/document2.xml" if name == "word/document.xml" else name.replace("word/_rels/document.xml.rels", "word/_rels/document2.xml.rels")): data
+               for name, data in parts.items()}
+    renamed["_rels/.rels"] = parts["_rels/.rels"].replace(b"word/document.xml", b"word/document2.xml")
+    renamed["[Content_Types].xml"] = parts["[Content_Types].xml"].replace(b"/word/document.xml", b"/word/document2.xml")
+    path = tmp_path / "renamed.docx"
+    path.write_bytes(files._package(renamed))
+    gate = check(path, "DOCX", ())
+    assert gate.passed and gate.evidence["main_part"] == "word/document2.xml"
+    assert check(path, "XLSX", ()).code == "format_mismatch"
+    inventory = probe(path, "DOCX")
+    assert inventory["symbol_font"]["converted"] == 2 and inventory["items"][0]["text"] == "표 위 메모: 재측정 필요"
+    stats = prepare_copy(path, tmp_path / "prepared.docx", "DOCX")
+    assert stats.parts_changed == ["word/document2.xml"] and stats.scripts_converted == 3
