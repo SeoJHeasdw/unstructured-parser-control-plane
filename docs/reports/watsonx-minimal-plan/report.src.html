@@ -107,6 +107,7 @@ mark.hl.blue { background-image: linear-gradient(100deg, rgba(var(--hl-prod), 0)
 .hero-fig { display: grid; gap: 14px; }
 .hero-fig .fh { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: baseline; justify-content: space-between; }
 .hero-fig h2 { font-size: 17px; font-weight: 700; color: #ffffff; }
+.hero-fig h2 small { font-size: 13px; font-weight: 500; color: var(--on-navy-2); margin-left: 8px; }
 .hero .chart-key { color: var(--on-navy-2); }
 .hero .ctl > span { color: var(--on-navy-2); }
 .hero .seg { background: rgba(255,255,255,.05); border-color: rgba(255,255,255,.12); }
@@ -170,6 +171,8 @@ h3 { font-size: 18.5px; font-weight: 700; letter-spacing: -.01em; }
 .sw { display: inline-block; width: 12px; height: 12px; border-radius: 3px; vertical-align: -1px; margin-right: 6px; }
 .sw.own { background: var(--own-mark); } .sw.prod { background: var(--prod-mark); } .sw.cond { background: var(--cond-mark); } .sw.ext { background: var(--ext-mark); }
 .sw.hatch { background: repeating-linear-gradient(45deg, #e5e9ef 0 2px, #98a2b3 2px 3.5px); }
+.sw.dot { border-radius: 50%; background: var(--own-mark); width: 11px; height: 11px; }
+.sw.ring { border-radius: 50%; background: #ffffff; box-shadow: inset 0 0 0 2px var(--prod-mark); width: 11px; height: 11px; }
 
 /* controls */
 .seg { display: inline-flex; flex-wrap: wrap; gap: 2px; padding: 3px; border: 1px solid var(--line); border-radius: 10px; background: #ffffff; }
@@ -267,6 +270,15 @@ details.tview .tbl { margin-top: 10px; }
 .today-l { stroke: var(--ink-2); stroke-width: 1; stroke-dasharray: 2 3; }
 .rowlab { fill: var(--ink); font-family: var(--font-sans); font-size: 12.5px; font-weight: 700; }
 .rowlab-s { fill: var(--muted); font-family: var(--font-sans); font-size: 11.5px; }
+.n-si { fill: #eef2f7; stroke: #94a3b8; }
+.n-si2 { fill: #ffffff; stroke: #94a3b8; }
+.dev-l { stroke: var(--ink); stroke-width: 1.6; fill: none; }
+.dev-t { fill: var(--ink); font-family: var(--font-sans); font-size: 11.5px; font-weight: 700; }
+.doc { fill: #ffffff; stroke: var(--prod-mark); stroke-width: 1.4; stroke-linejoin: round; }
+.doc-f { fill: none; stroke: var(--prod-mark); stroke-width: 1.2; }
+.doc-t { fill: var(--ink-2); font-family: var(--font-sans); font-size: 11.5px; font-weight: 500; }
+.pt-reg { fill: #ffffff; stroke: var(--prod-mark); stroke-width: 2; }
+.pt-n { fill: var(--muted); font-family: var(--font-num); font-size: 10.5px; }
 .ln-own { stroke: var(--own-mark); stroke-width: 2; fill: none; stroke-linejoin: round; stroke-linecap: round; }
 .ln-ext { stroke: var(--ext); stroke-width: 2; fill: none; stroke-linejoin: round; stroke-linecap: round; }
 .pt-own { fill: var(--own-mark); stroke: #ffffff; stroke-width: 2; }
@@ -299,15 +311,42 @@ details.tview .tbl { margin-top: 10px; }
 .time [data-row] { transition: opacity .45s var(--ease); }
 .time .dim { opacity: .16; }
 
-/* week grid */
-.weeks { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
-.wk { border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px 14px; display: grid; gap: 4px; align-content: start; background: #ffffff; }
-.wk.own { border-top: 3px solid var(--own-mark); }
-.wk.prod { border-top: 3px solid var(--prod-mark); }
-.wk .no { font-family: var(--font-num); font-size: 12px; color: var(--muted); display: flex; justify-content: space-between; gap: 6px; }
-.wk .no b { color: var(--ink-2); font-weight: 700; }
-.wk p { font-size: 13.5px; line-height: 1.5; font-weight: 500; }
-.wk .g { justify-self: start; margin-top: 2px; font-family: var(--font-num); font-size: 11px; font-weight: 700; padding: 2px 7px; border-radius: 4px; background: var(--cond-soft); color: var(--cond); }
+/* SI phases */
+.fig-h { font-size: 17px; margin-bottom: 12px; }
+.si-scroll { overflow-x: auto; padding-bottom: 6px; }
+.si-bar { position: relative; display: grid; grid-template-columns: 26fr 54fr 16fr 13fr 17fr; gap: 3px; min-width: 720px; padding-bottom: 28px; }
+.sp { position: relative; border-radius: 8px; padding: 10px 12px; display: grid; gap: 2px; align-content: start; background: #eef2f7; border: 1px solid #cbd5e1; min-width: 0; }
+.sp b { font-size: 14.5px; color: var(--ink); white-space: nowrap; }
+.sp span { font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sp.dev { background: var(--own-soft); border-color: var(--own-mark); }
+.sp.dev b { color: var(--own); }
+.sp.reg { background: #ffffff; }
+.sp .mk { position: absolute; right: -2px; bottom: -27px; transform: translateX(50%); font-style: normal; font-size: 12px; font-weight: 700; color: var(--ink); white-space: nowrap; }
+.sp::after { content: none; }
+.sp.dev::after, .sp.last::after { content: ""; position: absolute; right: -3px; top: -5px; bottom: -9px; border-right: 2px solid var(--ink); }
+.sp.last::after { right: -1px; border-color: var(--crit); }
+.sp.last .mk { right: 0; transform: none; color: var(--crit); }
+.si-tbl th, .si-tbl td { vertical-align: top; }
+.si-tbl tbody th { white-space: nowrap; }
+.si-tbl .open-row th, .si-tbl .open-row td { background: var(--panel); }
+.rk { display: inline-block; font-size: 11.5px; font-weight: 700; padding: 2px 8px; border-radius: 4px; margin-bottom: 8px; }
+.rk.c { background: #eef2f7; color: var(--ink-2); }
+.rk.t { background: var(--own-soft); color: var(--own); }
+.rk.r { background: #ffffff; color: var(--prod); border: 1px solid var(--prod-mark); }
+.rds { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.rds li { display: grid; grid-template-columns: 22px 38px minmax(0, 1fr); gap: 8px; align-items: start; font-size: 14px; line-height: 1.55; }
+.rn { width: 22px; height: 22px; border-radius: 50%; display: inline-grid; place-items: center; font-family: var(--font-num); font-size: 11px; font-weight: 700; font-style: normal; background: var(--own-mark); color: #ffffff; }
+.rn.p { background: var(--prod-mark); }
+.rn.reg { background: #ffffff; color: var(--prod); box-shadow: inset 0 0 0 1.5px var(--prod-mark); }
+.rn.s { width: 16px; height: 16px; font-size: 9px; vertical-align: -3px; margin-right: 6px; }
+.rds .dt { font-family: var(--font-num); font-size: 12px; color: var(--muted); padding-top: 2px; }
+.rds .g { display: inline-block; margin-left: 6px; font-family: var(--font-num); font-size: 11px; font-weight: 700; padding: 1px 6px; border-radius: 4px; background: var(--cond-soft); color: var(--cond); vertical-align: 1px; }
+.dl { list-style: none; margin: 0; padding: 0; display: grid; gap: 5px; font-size: 14px; line-height: 1.5; }
+.dl li { padding-left: 14px; position: relative; }
+.dl li::before { content: ""; position: absolute; left: 0; top: .55em; width: 6px; height: 7px; border: 1.3px solid var(--ink-2); border-radius: 1px; }
+.dl .sub { display: block; margin-top: 1px; font-size: 12.5px; line-height: 1.45; }
+.due { display: inline-block; margin: 6px 0 12px; font-size: 12px; font-weight: 700; color: var(--prod); }
+.due:last-child { margin-bottom: 0; }
 
 /* cascade */
 .cascade { border: 1px solid var(--line); border-radius: 14px; padding: 20px; display: grid; gap: 16px; background: #ffffff; }
@@ -331,8 +370,8 @@ details.tview .tbl { margin-top: 10px; }
 /* 3D layer stack */
 .iso-grid { display: grid; grid-template-columns: minmax(0, 1fr) 316px; gap: 16px; align-items: stretch; }
 .iso-scroll { overflow-x: auto; border-radius: 16px; min-width: 0; }
-.iso-stage { position: relative; height: 580px; overflow: hidden; perspective: 2400px; perspective-origin: 50% 30%; border-radius: 16px; border: 1px solid var(--navy-line); background: radial-gradient(ellipse 60% 55% at 55% 58%, rgba(95,212,192,.07), transparent 70%); }
-.iso-fit { position: absolute; left: calc(50% + 58px); top: 50%; width: 860px; height: 230px; margin: -115px 0 0 -430px; transform-style: preserve-3d; transform: scale(var(--fit, 1)); }
+.iso-stage { position: relative; height: 640px; overflow: hidden; perspective: 2400px; perspective-origin: 50% 30%; border-radius: 16px; border: 1px solid var(--navy-line); background: radial-gradient(ellipse 60% 55% at 55% 58%, rgba(95,212,192,.07), transparent 70%); }
+.iso-fit { position: absolute; left: calc(50% + 58px); top: calc(50% - 34px); width: 860px; height: 230px; margin: -115px 0 0 -430px; transform-style: preserve-3d; transform: scale(var(--fit, 1)); }
 .iso-scene { position: absolute; inset: 0; transform-style: preserve-3d; transform: translateY(calc(var(--ty) + var(--fty))) scale(calc(var(--s) * var(--fs))) rotateX(var(--rx)) rotateZ(var(--rz));
   transition: --rx 1s var(--ease), --rz 1s var(--ease), --gap 1s var(--ease), --ty 1s var(--ease), --s 1s var(--ease), --fty 1s var(--ease), --fs 1s var(--ease), --lift-mid 1s var(--ease), --lift-top 1s var(--ease), --sink-base 1s var(--ease); }
 .iso-scene[data-cam="stack"]   { --rx: 62deg; --rz: -22deg; --gap: 14px;  --ty: 30px;  --s: .8; transition-duration: 0s; }
@@ -340,9 +379,6 @@ details.tview .tbl { margin-top: 10px; }
 .iso-scene[data-cam="explode"] { --rx: 58deg; --rz: -18deg; --gap: 220px; --ty: 131px; --s: .7; }
 .iso-scene[data-cam="low"]     { --rx: 72deg; --rz: -14deg; --gap: 150px; --ty: 120px; --s: .84; }
 .iso-scene.assembling { transition-duration: 1.6s; }
-.iso-scene[data-focus="prod"] { --lift-mid: 130px; --lift-top: 240px; --fs: 1.05; --fty: -40px; }
-.iso-scene[data-focus="own"]  { --sink-base: -90px; --lift-top: 170px; --fs: 1.05; --fty: 26px; }
-.iso-scene[data-focus="seam"] { --lift-mid: 80px; --fs: 1.02; --fty: 18px; }
 .plane { position: absolute; inset: 0; transform-style: preserve-3d; border-radius: 18px; }
 .plane.base { transform: translateZ(var(--sink-base)); background-color: rgba(226,233,242,.95); border: 1px solid rgba(255,255,255,.55); background-image: radial-gradient(circle, rgba(15,23,42,.10) 1px, transparent 1.3px); background-size: 20px 20px; }
 .plane.mid  { transform: translateZ(calc(var(--gap) + var(--lift-mid))); background: rgba(26,154,138,.16); border: 1.5px solid rgba(95,212,192,.75); }
@@ -372,42 +408,51 @@ details.tview .tbl { margin-top: 10px; }
 .post .anchor { transform: translateZ(calc((var(--gap) + var(--lift-mid) - var(--sink-base)) / 2)); }
 .link { position: absolute; height: 2px; background: var(--own-mark); transform: translateZ(2px); transition: opacity .5s var(--ease); }
 .link::after { content: ""; position: absolute; right: -1px; top: -4px; border: 5px solid transparent; border-left: 7px solid var(--own-mark); border-right: 0; }
-/* focus: 제품 영역 — 위층을 걷어 내고 기반 층을 드러낸다 */
-.iso-scene[data-focus="prod"] .plane:not(.base) :is(.face, .side, .bb, .link),
-.iso-scene[data-focus="prod"] .post .strip, .iso-scene[data-focus="prod"] .post .bb { opacity: .08; }
-.iso-scene[data-focus="prod"] .plane.base .tile:not(.prod) :is(.face, .side, .bb) { opacity: .4; }
-.iso-scene[data-focus="prod"] .plane.base > .anchor .bb.layer { color: var(--mint); }
-/* focus: 자체 설계 — 아래·위층을 밀어내고 처리 층만 남긴다 */
-.iso-scene[data-focus="own"] .plane:not(.mid) :is(.face, .side, .bb) { opacity: .1; }
-.iso-scene[data-focus="own"] .post .strip, .iso-scene[data-focus="own"] .post .bb { opacity: .18; }
-.iso-scene[data-focus="own"] .plane.mid > .anchor .bb.layer { color: var(--mint); }
-.iso-scene[data-focus="own"] .link { background: repeating-linear-gradient(90deg, var(--mint) 0 5px, transparent 5px 9px); background-size: 18px 2px; animation: slide .7s linear infinite; }
-@keyframes slide { to { background-position: 18px 0; } }
-/* focus: 교체 지점 — 세 기둥만 남긴다 */
-.iso-scene[data-focus="seam"] .tile:not([data-seam]) :is(.face, .side, .bb),
-.iso-scene[data-focus="seam"] .post:not(.seam) .strip,
-.iso-scene[data-focus="seam"] .link,
-.iso-scene[data-focus="seam"] .bb.layer { opacity: .12; }
-.iso-scene[data-focus="seam"] .bb.badge { width: 36px; height: 36px; font-size: 18px; }
-.iso-scene[data-focus="seam"] .post.seam .strip, .iso-scene.flowing .post.seam .strip { animation: rise 1s linear infinite; }
 @keyframes rise { to { background-position: 0 -20px; } }
 .iso-scene[data-phase="after"]  #mv-own  { transform: translateZ(-46px); }
 .iso-scene[data-phase="after"]  #mv-own  :is(.face, .side, .bb) { opacity: 0 !important; }
 .iso-scene[data-phase="before"] #mv-prod { transform: translateZ(150px); }
 .iso-scene[data-phase="before"] #mv-prod :is(.face, .side, .bb) { opacity: 0 !important; }
 .iso-tools { display: flex; flex-wrap: wrap; gap: 10px 22px; align-items: center; }
+/* packet walkthrough */
+.packet { position: absolute; left: 0; top: 0; width: 0; height: 0; transform-style: preserve-3d; transition: transform .43s cubic-bezier(.45,.05,.55,.95); }
+.packet.jump { transition: none; }
+.packet .anchor { transform: none; }
+.bb.pk { background: var(--mint); color: var(--navy); border: 0; font-size: 15px; font-weight: 800; padding: 6px 15px; border-radius: 999px; box-shadow: 0 0 0 6px rgba(95,212,192,.30), 0 8px 20px rgba(0,0,0,.45); transition: opacity .3s, background .3s; }
+.bb.pk.q { background: #ffd27a; box-shadow: 0 0 0 6px rgba(255,210,122,.30), 0 8px 20px rgba(0,0,0,.45); }
+.bb.pk.ans { background: #ffffff; box-shadow: 0 0 0 6px rgba(255,255,255,.24), 0 8px 20px rgba(0,0,0,.45); }
+.packet.off .bb.pk { opacity: 0; }
+.post.lit .strip { width: 5px; left: -2.5px; box-shadow: 0 0 14px rgba(237,161,0,.9); animation: rise .7s linear infinite; }
+.post.lit .bb.badge { width: 36px; height: 36px; font-size: 18px; }
+.iso-scene.flowmode .tile:not(.onpath) :is(.face, .side, .bb) { opacity: .3; }
+.tile.done .face { box-shadow: 0 0 0 2px rgba(95,212,192,.6); }
+.iso-scene.touching .tile.hot:is(.prod, .ext) .face { box-shadow: 0 0 0 3px var(--cond-mark), 0 14px 26px rgba(0,0,0,.35); }
+.iso-scroll { position: relative; }
+.iso-cap { position: absolute; left: 14px; right: 14px; bottom: 14px; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 11px 16px; border-radius: 12px; background: rgba(11,22,38,.86); border: 1px solid var(--navy-line); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); color: #ffffff; z-index: 2; }
+.iso-cap .cap-n { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; background: var(--mint); color: var(--navy); font-family: var(--font-num); font-weight: 700; font-size: 15px; }
+.iso-cap.touch .cap-n { background: var(--cond-mark); }
+.iso-cap.idle .cap-n { background: rgba(255,255,255,.14); color: #ffffff; font-size: 12px; }
+.iso-cap b { display: block; font-size: 15.5px; line-height: 1.4; }
+.iso-cap .d { display: block; font-size: 13px; color: var(--on-navy-2); line-height: 1.5; }
+.cap-chip { font-size: 12px; font-weight: 700; padding: 4px 10px; border-radius: 999px; white-space: nowrap; }
+.cap-chip.own { background: rgba(26,154,138,.30); color: var(--mint); }
+.cap-chip.prod { background: rgba(237,161,0,.24); color: #ffd27a; }
+.cap-chip.ext { background: rgba(255,255,255,.12); color: var(--on-navy); }
+.ie-steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+.ie-steps button { all: unset; box-sizing: border-box; width: 100%; display: grid; grid-template-columns: 22px minmax(0, 1fr); gap: 10px; padding: 8px 10px; border-radius: 10px; cursor: pointer; color: var(--on-navy-2); transition: background .2s; }
+.ie-steps button:hover { background: rgba(255,255,255,.06); }
+.ie-steps button:focus-visible { outline: 2px solid var(--mint); outline-offset: 1px; }
+.ie-steps button[aria-current="step"] { background: rgba(95,212,192,.14); color: #ffffff; }
+.ie-steps .sn { width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; font-family: var(--font-num); font-size: 12px; font-weight: 700; background: rgba(255,255,255,.12); color: #ffffff; margin-top: 1px; }
+.ie-steps li.touch .sn { background: var(--cond-mark); color: var(--navy); }
+.ie-steps b { display: block; font-size: 13.5px; font-weight: 700; line-height: 1.45; color: inherit; }
+.ie-steps small { display: block; font-size: 12px; line-height: 1.5; color: var(--on-navy-2); }
+.btn.icon { padding: 6px 9px; }
 /* explanation panel */
 .iso-explain { border: 1px solid var(--navy-line); border-radius: 16px; padding: 22px 20px; background: rgba(255,255,255,.035); display: grid; gap: 14px; align-content: start; min-width: 0; }
 .ie-k { font-size: 12px; font-weight: 700; color: var(--mint); letter-spacing: .04em; }
 .iso-explain h3 { font-size: 18px; color: #ffffff; line-height: 1.45; }
 .iso-explain p { font-size: 13.5px; color: var(--on-navy-2); line-height: 1.65; }
-.ie-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
-.ie-list li { display: grid; grid-template-columns: 12px minmax(0, 1fr); gap: 10px; padding: 9px 10px; border-radius: 10px; cursor: default; transition: background .2s; }
-.ie-list li:hover, .ie-list li:focus-visible, .ie-list li.on { background: rgba(255,255,255,.07); }
-.ie-list li i { width: 10px; height: 10px; border-radius: 3px; margin-top: 6px; }
-.ie-list li i.prod { background: var(--prod-mark); } .ie-list li i.own { background: var(--own-mark); } .ie-list li i.ext { background: var(--ext-mark); } .ie-list li i.cond { background: var(--cond-mark); }
-.ie-list li b { display: block; font-size: 14px; color: #ffffff; font-weight: 700; line-height: 1.45; }
-.ie-list li span { display: block; font-size: 12.5px; color: var(--on-navy-2); line-height: 1.55; }
 .ie-foot { font-size: 12.5px; color: var(--on-navy-2); border-top: 1px solid var(--navy-line); padding-top: 12px; }
 .iso-explain.swap { animation: fadein .45s var(--ease); }
 
@@ -481,7 +526,7 @@ details.tview .tbl { margin-top: 10px; }
   .opt + .opt { border-left: 0; border-top: 1px solid var(--line); }
   .branch > header .when-t { margin-left: 0; width: 100%; }
   .facts li { grid-template-columns: minmax(0, 1fr); gap: 2px; }
-  .iso-stage { min-width: 760px; height: 480px; }
+  .iso-stage { min-width: 760px; height: 560px; }
   .stages { grid-template-columns: repeat(2, minmax(0,1fr)); }
   .cut { grid-column: 1 / -1; height: 26px; }
   .cut::before { top: 50%; bottom: auto; left: 0; right: 0; border-left: 0; border-top: 2px dashed var(--own-mark); transform: none; }
@@ -528,24 +573,27 @@ details.tview .tbl { margin-top: 10px; }
     <div class="hero-stats" role="list">
       <div class="hs" role="listitem"><span class="k">오픈까지 남은 기간</span><span class="v">18<small>주</small></span><span class="d">11/23 ~ 3/31 운영 오픈 기한</span></div>
       <div class="hs" role="listitem"><span class="k">제품 위 시험 가능 기간</span><span class="v"><span class="pre">약</span>8<small>주</small></span><span class="d">1월 중순 입고 후 약 10주에서 인프라 안정화 2주(가정)를 뺀 기간</span></div>
-      <div class="hs" role="listitem"><span class="k">주간 평가</span><span class="v">17<small>회</small></span><span class="d">11/30 ~ 3/22, 회차마다 한 가지만 변경</span></div>
+      <div class="hs" role="listitem"><span class="k">주간 평가</span><span class="v">17<small>회</small></span><span class="d">11/30 ~ 3/22 · 2/12 개발 완료 전 튜닝 11회, 뒤로 회귀 6회</span></div>
       <div class="hs" role="listitem"><span class="k">판단 대기 분기</span><span class="v">7<small>개</small></span><span class="d">G1(12월 말)·G2(1월 말)에 닫는다</span></div>
     </div>
 
     <figure class="hero-fig">
       <div class="fh">
-        <h2>구조 한눈에 보기</h2>
-        <div class="chart-key"><span><i class="sw prod"></i>제품</span><span><i class="sw own"></i>자체</span><span><i class="sw ext"></i>고객사 기존</span><span><i class="sw cond"></i>교체 지점</span></div>
+        <h2>구조 한눈에 보기 <small>문서와 질문이 어디를 지나가는지 따라간다</small></h2>
+        <div class="chart-key"><span><i class="sw prod"></i>제품</span><span><i class="sw own"></i>자체</span><span><i class="sw ext"></i>고객사 기존</span><span><i class="sw cond"></i>제품과 만나는 단계</span></div>
       </div>
       <div class="iso-tools">
-        <div class="ctl"><span>보기</span>
-          <div class="seg" role="group" aria-label="강조할 영역" id="isoFocus">
-            <button type="button" data-v="all" aria-pressed="true">전체</button>
-            <button type="button" data-v="prod" aria-pressed="false">제품 영역</button>
-            <button type="button" data-v="own" aria-pressed="false">자체 설계</button>
-            <button type="button" data-v="seam" aria-pressed="false">교체 지점</button>
+        <div class="ctl"><span>따라가기</span>
+          <div class="seg" role="group" aria-label="시나리오" id="isoScn">
+            <button type="button" data-v="doc" aria-pressed="true">문서가 들어갈 때</button>
+            <button type="button" data-v="qa" aria-pressed="false">질문이 들어올 때</button>
+            <button type="button" data-v="delay" aria-pressed="false">제품이 늦어지면</button>
           </div>
-          <button type="button" class="btn" id="isoTour" aria-pressed="false"><svg viewBox="0 0 12 12" aria-hidden="true"><path d="M2 1 L11 6 L2 11 Z" fill="currentColor"/></svg>순서대로 보기</button>
+        </div>
+        <div class="ctl">
+          <button type="button" class="btn icon" id="isoPrev" aria-label="이전 단계"><svg viewBox="0 0 12 12" aria-hidden="true"><path d="M10 1 L3 6 L10 11 Z M1.5 1 H3 V11 H1.5 Z" fill="currentColor"/></svg></button>
+          <button type="button" class="btn" id="isoPlay" aria-pressed="false"><svg viewBox="0 0 12 12" aria-hidden="true"><path d="M2 1 L11 6 L2 11 Z" fill="currentColor"/></svg><span>재생</span></button>
+          <button type="button" class="btn icon" id="isoNext" aria-label="다음 단계"><svg viewBox="0 0 12 12" aria-hidden="true"><path d="M2 1 L9 6 L2 11 Z M9 1 H10.5 V11 H9 Z" fill="currentColor"/></svg></button>
         </div>
         <div class="ctl"><span>각도</span>
           <div class="seg" role="group" aria-label="카메라 각도" id="isoCam">
@@ -554,20 +602,16 @@ details.tview .tbl { margin-top: 10px; }
             <button type="button" data-v="low" aria-pressed="false">낮게</button>
           </div>
         </div>
-        <div class="ctl"><span>Milvus</span>
-          <div class="seg" role="group" aria-label="제품 입고 시점" id="isoPhase">
-            <button type="button" data-v="before" aria-pressed="false">입고 전</button>
-            <button type="button" data-v="after" aria-pressed="true">입고 후</button>
-          </div>
-        </div>
       </div>
       <div class="iso-grid">
-        <div class="iso-scroll"><div class="iso-stage" id="isoStage" role="img" aria-label="세 층 구조. 아래 기반 층은 제품(운영 기반, UDI, watsonx.ai, watsonx.data Milvus)과 고객사 인프라(사내 게이트웨이, GPU)로 모두 on-prem이다. 가운데 처리 층은 자체 설계한 수집·형식 판별, 파서 라우터, 청킹, 임베딩 호출, 벡터 적재, 평가 콘솔, MCP 서버, 검색 API다. 위 사용 층은 에이전트 4개와 평가셋을 만드는 업무 담당자다. 기반 층과 처리 층은 교체 지점 1, 2, 3의 기둥으로만 연결된다.">
-          <div class="iso-fit" id="isoFit"><div class="iso-scene" id="isoScene" data-cam="iso" data-focus="all" data-phase="after"></div></div>
-        </div></div>
-        <aside class="iso-explain" id="isoExplain" aria-live="polite"></aside>
+        <div class="iso-scroll">
+          <div class="iso-stage" id="isoStage" role="img" aria-label="세 층 구조와 흐름. 아래 기반 층은 제품(운영 기반, UDI, watsonx.ai, watsonx.data Milvus)과 고객사 인프라(사내 게이트웨이, GPU)로 모두 on-prem이다. 가운데 처리 층은 자체 설계한 수집·형식 판별, 파서 라우터, 청킹, 임베딩 호출, 벡터 적재, 평가 콘솔, MCP 서버, 검색 API다. 위 사용 층은 에이전트 4개와 업무 담당자다. 문서와 질문은 처리 층을 따라 흐르고, 제품과는 기둥 1, 2, 3을 타고 내려갈 때만 만난다.">
+            <div class="iso-fit" id="isoFit"><div class="iso-scene" id="isoScene" data-cam="iso" data-phase="after"></div></div>
+          </div>
+          <div class="iso-cap idle" id="isoCap" aria-live="polite"><span class="cap-n">▶</span><div><b>재생을 누르면 문서 한 건을 따라간다</b><span class="d">주황 번호 단계에서만 제품과 만난다</span></div><span></span></div>
+        </div>
+        <aside class="iso-explain" id="isoExplain"></aside>
       </div>
-      <p class="live" id="isoLive" aria-live="polite">‘Milvus 입고 전/후’를 바꾸면 기반 층의 Milvus만 교체되고 처리 층은 그대로다.</p>
     </figure>
 
     <div class="legend" aria-label="표시 범례">
@@ -911,12 +955,12 @@ details.tview .tbl { margin-top: 10px; }
           </tbody>
         </table>
       </div>
-      <p class="note">콘솔 임베딩 평가는 Hit@1·3·5·10과 MRR을 정답 문서·정답 구절 기준으로 나눠 채점하고, 파싱 비교는 정답 자료와 대조한다. 재구축 단계 수는 위 ‘변경 범위별 재구축 단계’ 기준이다. 정체 구간을 3월 전에 지나가려면 제품을 기다리지 않고 12월부터 시도를 쌓아야 한다.</p>
+      <p class="note">콘솔 임베딩 평가는 Hit@1·3·5·10과 MRR을 정답 문서·정답 구절 기준으로 나눠 채점하고, 파싱 비교는 정답 자료와 대조한다. 재구축 단계 수는 위 ‘변경 범위별 재구축 단계’ 기준이다. 정체 구간을 개발 완료(2/12) 전에 지나가려면 제품을 기다리지 않고 12월부터 시도를 쌓아야 한다. 개발 완료 뒤에는 결함 조치와 회귀 평가만 한다.</p>
     </div>
 
     <div class="callout">
       <b>설계 목표: 재구축 비용 최소화</b>
-      <p>청크 정본이 있으면 임베딩·Milvus·검색 쪽 변경은 재파싱 없이 시작한다. 교체 지점(05)은 제품 전환을 설정 변경으로 만들고, 자동 재평가는 회차마다 같은 기준을 보장한다. <mark class="hl">재구축 시간이 짧아야 18주 안에 17회 평가할 수 있다.</mark></p>
+      <p>청크 정본이 있으면 임베딩·Milvus·검색 쪽 변경은 재파싱 없이 시작한다. 교체 지점(05)은 제품 전환을 설정 변경으로 만들고, 자동 재평가는 회차마다 같은 기준을 보장한다. <mark class="hl">재구축 시간이 짧아야 개발 8주 안에 튜닝 회차를 돌리고, 회차 사이에도 여러 번 시도할 수 있다.</mark></p>
     </div>
   </div></section>
 
@@ -924,11 +968,40 @@ details.tview .tbl { margin-top: 10px; }
   <section class="band" id="s3"><div class="wrap band-in">
     <div class="sec-head">
       <span class="kicker"><b>03</b>평가 계획</span>
-      <h2>평가셋을 고정하고 매주 한 가지씩 바꿔 측정한다</h2>
-      <p>점수가 떨어진 회차도 원인을 기록하면 진행으로 본다. <mark class="hl">측정 도구는 운영 콘솔에 이미 갖춰져 있다.</mark></p>
+      <h2>평가 회차를 SI 단계에 맞추고, 회차 기록을 산출물로 남긴다</h2>
+      <p>설계 단계의 비교 결과는 설계서의 선정 근거가 되고, 개발 단계의 회차 기록은 평가 결과서가 된다. <mark class="hl">2월 12일 개발 완료 뒤에는 기능을 바꾸지 않고 회귀 평가만 한다.</mark> 측정 도구는 운영 콘솔에 이미 갖춰져 있다.</p>
+    </div>
+
+    <div class="block">
+      <h3>SI 단계별 평가 회차와 산출물 <span class="tag assume">가정</span></h3>
+      <div class="si-scroll">
+        <div class="si-bar" role="img" aria-label="SI 단계. 분석·설계 11/23~12/18(1~3회 설계 비교), 개발 12/21~2/12(4~11회 튜닝), 통합·성능 테스트 2/13~2/28(12~13회), 인수 테스트 3/1~3/13(14~15회), 이행 3/14~3/30(16~17회), 3/31 오픈. 2/12 개발 완료 뒤에는 회귀 평가만 한다.">
+          <div class="sp"><b>분석·설계</b><span>11/23~12/18 · 1~3회</span></div>
+          <div class="sp dev"><b>개발</b><span>12/21~2/12 · 4~11회 튜닝</span><i class="mk">개발 완료 2/12</i></div>
+          <div class="sp reg"><b>통합·성능</b><span>~2/28 · 12~13회</span></div>
+          <div class="sp reg"><b>인수</b><span>~3/13 · 14~15회</span></div>
+          <div class="sp reg last"><b>이행</b><span>~3/30 · 16~17회</span><i class="mk">3/31 오픈</i></div>
+        </div>
+      </div>
+      <div class="chart-key"><span><i class="rn s">n</i>설계 비교·튜닝 (자체 Milvus)</span><span><i class="rn s p">n</i>설계 비교·튜닝 (제품 위, A)</span><span><i class="rn s p reg">n</i>회귀 평가: 기능 고정, 결함 조치 후 점수 확인</span></div>
+      <div class="tbl wide">
+        <table class="si-tbl">
+          <thead><tr><th>단계</th><th>기간</th><th>평가 회차</th><th>산출물</th></tr></thead>
+          <tbody>
+          <tr><th>분석·설계</th><td class="nw">11/23 ~ 12/18<span class="sub">4주</span></td><td><span class="rk c">1~3회 · 설계 비교</span><ol class="rds"><li><span class="rn">1</span><span class="dt">11/30</span><span>기준선: 기존 RAG를 평가셋으로 측정</span></li><li><span class="rn">2</span><span class="dt">12/7</span><span>파서 비교: Docling·기존 파서</span></li><li><span class="rn">3</span><span class="dt">12/14</span><span>청킹 전략 비교</span></li></ol></td><td><ul class="dl"><li>현행 분석서 <span class="sub">기존 RAG 기준선 포함</span></li><li>요구사항 정의서 <span class="sub">오픈 기준 점수는 기준선 측정 후 제시</span></li><li>평가 기준서 <span class="sub">평가셋 구성·지표·판정 방식</span></li></ul><span class="due">12/4 제출</span><ul class="dl"><li>아키텍처 정의서</li><li>인터페이스 정의서 <span class="sub">검색 API·MCP 도구·임베딩 호출</span></li><li>컬렉션 정의서 <span class="sub">Milvus 스키마·차원·인덱스</span></li></ul><span class="due">12/18 제출</span></td></tr>
+          <tr><th>개발</th><td class="nw">12/21 ~ 2/12<span class="sub">8주</span></td><td><span class="rk t">4~11회 · 튜닝</span><ol class="rds"><li><span class="rn">4</span><span class="dt">12/21</span><span>임베딩 후보: 기존 4096·Qwen3-4B·MRL 축소</span></li><li><span class="rn">5</span><span class="dt">12/28</span><span>검색 순위 튜닝: 하이브리드 가중치·리랭커<span class="g">G1</span></span></li><li><span class="rn">6</span><span class="dt">1/4</span><span>메타·권한 필터</span></li><li><span class="rn">7</span><span class="dt">1/11</span><span>검색 API·MCP 도구 계약 점검</span></li><li><span class="rn">8</span><span class="dt">1/18</span><span>오답 유형 보정 (입고·안정화 시작)</span></li><li><span class="rn">9</span><span class="dt">1/25</span><span>이관 리허설<span class="g">G2</span></span></li><li><span class="rn p">10</span><span class="dt">2/1</span><span>제품 Milvus 전환 후 재평가</span></li><li><span class="rn p">11</span><span class="dt">2/8</span><span>UDI 형식별 비교, 개발 완료 기준 점수</span></li></ol></td><td><ul class="dl"><li>소스·프로그램 목록</li><li>단위 테스트 결과서</li><li>회차별 평가 결과서 <span class="sub">4~11회 점수·변경·원인</span></li><li>모델·설정 선정 근거서 <span class="sub">G1·G2 판단 기록</span></li></ul><span class="due">2/12 제출</span></td></tr>
+          <tr><th>통합·성능 테스트</th><td class="nw">2/13 ~ 2/28<span class="sub">2주</span></td><td><span class="rk r">12~13회 · 회귀</span><ol class="rds"><li><span class="rn p reg">12</span><span class="dt">2/15</span><span>전체 적재 후 회귀 평가</span></li><li><span class="rn p reg">13</span><span class="dt">2/22</span><span>부하·응답 시간 측정과 회귀 평가</span></li></ol></td><td><ul class="dl"><li>통합 테스트 결과서</li><li>성능 테스트 결과서 <span class="sub">응답 시간 p95·적재 처리량</span></li></ul><span class="due">2/26 제출</span></td></tr>
+          <tr><th>인수 테스트</th><td class="nw">3/1 ~ 3/13<span class="sub">2주</span></td><td><span class="rk r">14~15회 · 회귀</span><ol class="rds"><li><span class="rn p reg">14</span><span class="dt">3/1</span><span>업무 담당자 질문으로 회귀 평가</span></li><li><span class="rn p reg">15</span><span class="dt">3/8</span><span>운영 시나리오(권한·필터) 회귀 평가</span></li></ol></td><td><ul class="dl"><li>인수 테스트 결과서 <span class="sub">업무 담당자 평가셋 기준 점수</span></li><li>결함 조치 내역</li><li>이행 계획서</li></ul><span class="due">3/12 제출</span></td></tr>
+          <tr><th>이행</th><td class="nw">3/14 ~ 3/30<span class="sub">2주</span></td><td><span class="rk r">16~17회 · 회귀</span><ol class="rds"><li><span class="rn p reg">16</span><span class="dt">3/15</span><span>운영 환경 적재 후 회귀 평가</span></li><li><span class="rn p reg">17</span><span class="dt">3/22</span><span>최종 회귀 평가<span class="g">오픈 판정</span></span></li></ol></td><td><ul class="dl"><li>이행 결과서</li><li>최종 평가 결과서</li><li>운영자 매뉴얼 <span class="sub">재적재·모델 교체·평가 실행 절차</span></li></ul><span class="due">3/26 제출</span></td></tr>
+          <tr class="open-row"><th>오픈</th><td class="nw">3/31</td><td>—</td><td><ul class="dl"><li>안정화 계획 · 완료 보고서 <span class="sub">오픈 뒤 제출</span></li></ul></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="note">튜닝은 개발 단계(4~11회)에 모은다. 2월 12일 개발 완료 뒤에는 기능을 바꾸지 않고, 결함을 조치한 뒤 점수가 기준 아래로 떨어지지 않았는지 회귀 평가로만 확인한다. 회차 사이에는 재구축 비용이 낮은 시도(가중치·리랭커·청킹 설정)를 여러 번 돌리고 가장 나은 것 하나를 회차에 올려 기록한다. 회차 주제는 계획이며 앞 회차 결과에 따라 순서를 바꾼다. 입고나 안정화가 늦어지면 10회차 이후도 자체 Milvus에서 진행한다(<a class="did" href="#d3">D3</a> B). 단계 구분과 산출물 이름은 일반적인 SI 기준으로 적었고, 고객사 방법론의 양식에 맞춰 조정한다.</p>
     </div>
 
     <figure>
+      <h3 class="fig-h">한 회차의 진행</h3>
       <div class="panel">
         <svg class="loop" viewBox="0 0 792 150" role="img" aria-label="평가 회차의 순서. 평가셋을 고정하고, 한 가지만 바꾸고, 재구축하고, 점수를 비교하고, 유지하거나 되돌린 뒤 다음 회차로 돌아간다.">
           <defs><marker id="ah0" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#98a2b3"/></marker></defs>
@@ -999,31 +1072,6 @@ details.tview .tbl { margin-top: 10px; }
         <button type="button" class="shot" data-lb aria-label="벡터 DB 크게 보기"><img src="{{IMG:vdb}}" alt="벡터 DB 개요 화면. 예시 데이터로 데이터베이스 2개, 컬렉션 2개, 파티션 6개, 청크 43건, 1024차원과 768차원 컬렉션별 파티션 분포." loading="lazy"></button>
         <figcaption><b>벡터 DB.</b> Milvus의 컬렉션·파티션 구성과 저장된 청크를 읽을 수 있는 형태로 보여 준다. 읽기 전용이다. 접속 주소만 바꾸면 자체 Milvus와 watsonx.data Milvus를 같은 화면으로 확인한다(교체 지점 ③, D6).</figcaption>
       </div>
-    </div>
-
-    <div class="block">
-      <h3>주간 평가 17회차 계획</h3>
-      <div class="chart-key"><span><i class="sw own"></i>자체 Milvus에서 진행</span><span><i class="sw prod"></i>제품 위에서 진행 (1월 중순 입고, 2주 안정화 가정)</span></div>
-      <div class="weeks">
-        <div class="wk own"><span class="no"><b>1회</b>11/30</span><p>기준선: 기존 RAG를 평가셋으로 측정</p></div>
-        <div class="wk own"><span class="no"><b>2회</b>12/7</span><p>파서 비교: Docling·기존 파서</p></div>
-        <div class="wk own"><span class="no"><b>3회</b>12/14</span><p>청킹 전략 비교</p></div>
-        <div class="wk own"><span class="no"><b>4회</b>12/21</span><p>임베딩 후보: 기존 4096·Qwen3-4B·MRL 축소</p></div>
-        <div class="wk own"><span class="no"><b>5회</b>12/28</span><p>하이브리드 가중치</p><span class="g">G1</span></div>
-        <div class="wk own"><span class="no"><b>6회</b>1/4</span><p>리랭커 추가</p></div>
-        <div class="wk own"><span class="no"><b>7회</b>1/11</span><p>검색 API·MCP 도구 계약 점검</p></div>
-        <div class="wk own"><span class="no"><b>8회</b>1/18</span><p>오답 유형 보정 1차 (입고·안정화 시작)</p></div>
-        <div class="wk own"><span class="no"><b>9회</b>1/25</span><p>이관 리허설</p><span class="g">G2</span></div>
-        <div class="wk prod"><span class="no"><b>10회</b>2/1</span><p>제품 Milvus 전환 후 재평가</p></div>
-        <div class="wk prod"><span class="no"><b>11회</b>2/8</span><p>UDI 형식별 비교</p></div>
-        <div class="wk prod"><span class="no"><b>12회</b>2/15</span><p>전체 적재 후 재평가</p></div>
-        <div class="wk prod"><span class="no"><b>13회</b>2/22</span><p>부하·응답 시간</p></div>
-        <div class="wk prod"><span class="no"><b>14회</b>3/1</span><p>오답 유형 보정 2차</p></div>
-        <div class="wk prod"><span class="no"><b>15회</b>3/8</span><p>운영 시나리오 재평가 (권한·필터)</p></div>
-        <div class="wk prod"><span class="no"><b>16회</b>3/15</span><p>오픈 후보 평가</p></div>
-        <div class="wk prod"><span class="no"><b>17회</b>3/22</span><p>최종 회귀 평가</p><span class="g">오픈 판정</span></div>
-      </div>
-      <p class="note">회차별 주제는 계획이다. 앞 회차 결과에 따라 순서를 바꾸거나 같은 주제를 한 번 더 측정한다. 회차 사이에는 재구축 비용이 낮은 시도(가중치·리랭커·청킹 설정)를 여러 번 돌리고, 가장 나은 것 하나를 회차에 올려 기록한다. 입고나 안정화가 늦어지면 10회차 이후도 자체 Milvus에서 진행하고, 제품 전환 재평가는 안정화 직후로 옮긴다.</p>
     </div>
   </div></section>
 
@@ -1300,10 +1348,10 @@ details.tview .tbl { margin-top: 10px; }
           <li><span class="tag calc">계산</span><span>1월 중순 입고면 제품 위 시험은 약 8주, 2월 중순 입고가 최소 4주를 남기는 경계다(01 그림, 안정화 2주 가정).</span></li>
         </ul>
         <div class="ab">
-          <div class="opt a"><h4><span class="ab-k">A</span>1월 말까지 입고·안정화되면</h4><p>2월 첫 주에 제품 Milvus로 전환하고, 2월에 UDI 판정·전체 적재·통합·부하 테스트를 한다. 3월에 운영 시나리오와 최종 회귀 평가를 거쳐 3/31에 오픈한다.</p></div>
+          <div class="opt a"><h4><span class="ab-k">A</span>1월 말까지 입고·안정화되면</h4><p>2월 첫 주에 제품 Milvus로 전환해 재평가하고, UDI 형식별 판정까지 마쳐 2/12에 개발을 완료한다. 2월 후반 통합·성능 테스트, 3월 전반 인수 테스트, 3월 후반 이행을 거쳐 3/31에 오픈한다.</p></div>
           <div class="opt b"><h4><span class="ab-k">B</span>늦어지면</h4>
             <ul>
-              <li><b>기본: 자체 Milvus로 오픈 후 이관.</b> 제품과 같은 버전의 자체 Milvus로 3/31에 오픈하고, 제품이 안정화되면 청크 정본에서 다시 적재해 전환한다. 검색 API 주소는 그대로라 에이전트 쪽 변경은 없다. 상단 구조도의 ‘Milvus 입고 전/후’가 이 전환이다.</li>
+              <li><b>기본: 자체 Milvus로 오픈 후 이관.</b> 개발 완료(2/12)와 통합·인수·이행을 제품과 같은 버전의 자체 Milvus에서 진행해 3/31에 오픈하고, 제품이 안정화되면 청크 정본에서 다시 적재해 전환한다. 검색 API 주소는 그대로라 에이전트 쪽 변경은 없다. 상단 구조도의 ‘제품이 늦어지면’이 이 전환이다.</li>
               <li><b>예외: 오픈 연기.</b> 임시 운영이 허용되지 않는 경우에만 제품 안정화와 통합 테스트 이후로 미룬다.</li>
             </ul>
           </div>
@@ -1313,7 +1361,7 @@ details.tview .tbl { margin-top: 10px; }
       </article>
 
       <article class="branch" id="d4">
-        <header><span class="did">D4</span><h3>파싱 경로</h3><span class="when-t">제품 위 시험 중 형식별 판정</span></header>
+        <header><span class="did">D4</span><h3>파싱 경로</h3><span class="when-t">11회차(2/8) 형식별 판정</span></header>
         <p class="q">UDI가 해당 형식을 자체 기준 이상으로 처리하나?</p>
         <ul class="facts">
           <li><span class="tag ok">확인됨</span><span>IBM 자료는 70종 이상의 형식을 지원한다고 소개한다. 버전별 실제 목록은 해당 버전 문서로 확인해야 한다.</span></li>
@@ -1398,12 +1446,12 @@ details.tview .tbl { margin-top: 10px; }
   <section class="band alt" id="s8"><div class="wrap band-in">
     <div class="sec-head">
       <span class="kicker"><b>08</b>일정과 판단 시점</span>
-      <h2>G1(12월 말)과 G2(1월 말)에 분기를 닫고 3월 31일에 오픈한다</h2>
-      <p>두 판단 시점 사이를 주간 평가가 채운다. 입고 뒤 첫 2주는 <span class="pen">인프라 안정화</span>로 보고, 그동안에도 개발·평가는 자체 Milvus에서 계속한다.</p>
+      <h2>2월 12일 개발을 마치고 테스트·이행을 거쳐 3월 31일에 오픈한다</h2>
+      <p>분기는 G1(12월 말)과 G2(1월 말)에 닫는다. 입고 뒤 첫 2주는 <span class="pen">인프라 안정화</span>로 보고, 그동안에도 개발·평가는 자체 Milvus에서 계속한다. <mark class="hl">개발 완료 뒤 약 7주는 통합·성능, 인수, 이행에 쓴다.</mark></p>
     </div>
     <figure>
       <div class="chart-head">
-        <h4>3월 31일 오픈까지의 경로</h4>
+        <h4>SI 단계 · 환경 · 평가 · 산출물</h4>
         <div class="seg" role="group" aria-label="경로 강조" id="timeSeg">
           <button type="button" data-v="all" aria-pressed="true">전체</button>
           <button type="button" data-v="a" aria-pressed="false">예상대로 (A)</button>
@@ -1411,113 +1459,144 @@ details.tview .tbl { margin-top: 10px; }
         </div>
       </div>
       <div class="panel">
-        <svg class="time" viewBox="0 0 1000 304" role="img" aria-label="11월 말부터 3월 31일까지의 일정. 기본 경로는 11월 말 착수, 1월 17일까지 제품 없이 개발, 1월 중순 입고 후 2주 인프라 안정화, 2월부터 제품 위 통합·부하 시험, 3월 운영 전환과 3월 31일 오픈이다. 11월 30일부터 3월 22일까지 매주 평가한다. 12월 말 G1, 1월 말 G2에서 판단한다. 지연되면 자체 Milvus로 오픈 후 전환한다.">
-          <text class="month" x="168" y="20" text-anchor="middle">11월</text>
-          <text class="month" x="306" y="20" text-anchor="middle">12월</text>
-          <text class="month" x="505" y="20" text-anchor="middle">1월</text>
-          <text class="month" x="695" y="20" text-anchor="middle">2월</text>
-          <text class="month" x="870" y="20" text-anchor="middle">3월</text>
-          <line class="grid-l" x1="207" y1="30" x2="207" y2="272"/>
-          <line class="grid-l" x1="406" y1="30" x2="406" y2="272"/>
-          <line class="grid-l" x1="605" y1="30" x2="605" y2="272"/>
-          <line class="grid-l" x1="785" y1="30" x2="785" y2="272"/>
-          <line class="today-l" x1="130" y1="30" x2="130" y2="272"/>
-          <text class="gate-s" x="133" y="290">오늘 11/19</text>
-          <path class="dead-l" d="M977.6,28 V272"/>
-          <text class="dead-t" x="973" y="290" text-anchor="end">3/31 오픈 기한</text>
+        <svg class="time" viewBox="0 0 1000 312" role="img" aria-label="11월 23일부터 3월 31일까지의 SI 단계와 평가 회차. 분석·설계 11/23~12/18, 개발 12/21~2/12, 통합·성능 테스트 2/13~2/28, 인수 테스트 3/1~3/13, 이행 3/14~3/30, 3/31 오픈. 산출물은 12/4, 12/18, 2/12, 2/26, 3/12, 3/26에 낸다. 환경은 1월 18일 입고까지 자체 Milvus, 2주 안정화 뒤 2월부터 제품 Milvus. 12월 말 G1, 1월 말 G2에서 판단한다. 평가는 11/30부터 3/22까지 매주 17회이고, 개발 완료 전 11회는 설계 비교·튜닝, 뒤 6회는 회귀 평가다. 지연되면 자체 Milvus로 통합·인수·이행을 하고 오픈 뒤 제품으로 이관한다.">
+          <text class="month" x="168.0" y="18" text-anchor="middle">11월</text>
+          <text class="month" x="306.0" y="18" text-anchor="middle">12월</text>
+          <text class="month" x="505.0" y="18" text-anchor="middle">1월</text>
+          <text class="month" x="695.0" y="18" text-anchor="middle">2월</text>
+          <text class="month" x="870.0" y="18" text-anchor="middle">3월</text>
+          <line class="grid-l" x1="207" y1="26" x2="207" y2="284"/>
+          <line class="grid-l" x1="406" y1="26" x2="406" y2="284"/>
+          <line class="grid-l" x1="605" y1="26" x2="605" y2="284"/>
+          <line class="grid-l" x1="785" y1="26" x2="785" y2="284"/>
+          <line class="today-l" x1="130" y1="26" x2="130" y2="284"/>
+          <path class="dev-l" d="M682.1,26 V284"/>
+          <path class="dead-l" d="M977.4,24 V284"/>
+          <text class="gate-s" x="133" y="302">오늘 11/19</text>
+          <text class="dev-t" x="682.1" y="302" text-anchor="middle">개발 완료 2/12</text>
+          <text class="dead-t" x="973.4" y="302" text-anchor="end">3/31 오픈</text>
+          <text class="rowlab" x="16" y="46">SI 단계</text>
+          <text class="rowlab-s" x="16" y="62">개발 완료 뒤 기능 고정</text>
+          <rect class="n n-si" x="156.6" y="32" width="177.8" height="32" rx="5"/>
+          <text class="bt" x="245.5" y="53" text-anchor="middle">분석·설계</text>
+          <rect class="n n-own" x="336.4" y="32" width="344.7" height="32" rx="5"/>
+          <text class="bt-strong" x="508.8" y="53" text-anchor="middle">개발 · 튜닝 8회</text>
+          <rect class="n n-si2" x="683.1" y="32" width="100.7" height="32" rx="5"/>
+          <text class="bt" x="733.5" y="53" text-anchor="middle">통합·성능</text>
+          <rect class="n n-si2" x="785.8" y="32" width="81.5" height="32" rx="5"/>
+          <text class="bt" x="826.5" y="53" text-anchor="middle">인수 테스트</text>
+          <rect class="n n-si2" x="869.3" y="32" width="107.1" height="32" rx="5"/>
+          <text class="bt" x="922.8" y="53" text-anchor="middle">이행</text>
+          <text class="rowlab" x="16" y="90">산출물</text>
+          <text class="rowlab-s" x="16" y="106">6회 제출</text>
+          <path class="doc" d="M220.3,80 h8 l4,4 v12 h-12 z"/>
+          <path class="doc-f" d="M228.3,80 v4 h4"/>
+          <text class="doc-t" x="226.3" y="112" text-anchor="middle">분석</text>
+          <circle class="hit" cx="226.3" cy="88" r="13" data-tip="산출물 12/4 · 현행 분석서(기존 RAG 기준선), 요구사항 정의서, 평가 기준서"/>
+          <path class="doc" d="M310.1,80 h8 l4,4 v12 h-12 z"/>
+          <path class="doc-f" d="M318.1,80 v4 h4"/>
+          <text class="doc-t" x="316.1" y="112" text-anchor="middle">설계</text>
+          <circle class="hit" cx="316.1" cy="88" r="13" data-tip="산출물 12/18 · 아키텍처·인터페이스·컬렉션 정의서"/>
+          <path class="doc" d="M659.1,80 h8 l4,4 v12 h-12 z"/>
+          <path class="doc-f" d="M667.1,80 v4 h4"/>
+          <text class="doc-t" x="665.1" y="112" text-anchor="middle">개발</text>
+          <circle class="hit" cx="665.1" cy="88" r="13" data-tip="산출물 2/12 · 소스·프로그램 목록, 단위 테스트 결과서, 회차별 평가 결과서, 모델·설정 선정 근거서"/>
+          <path class="doc" d="M759.5,80 h8 l4,4 v12 h-12 z"/>
+          <path class="doc-f" d="M767.5,80 v4 h4"/>
+          <text class="doc-t" x="765.5" y="112" text-anchor="middle">통합·성능</text>
+          <circle class="hit" cx="765.5" cy="88" r="13" data-tip="산출물 2/26 · 통합 테스트 결과서, 성능 테스트 결과서"/>
+          <path class="doc" d="M849.4,80 h8 l4,4 v12 h-12 z"/>
+          <path class="doc-f" d="M857.4,80 v4 h4"/>
+          <text class="doc-t" x="855.4" y="112" text-anchor="middle">인수</text>
+          <circle class="hit" cx="855.4" cy="88" r="13" data-tip="산출물 3/12 · 인수 테스트 결과서, 결함 조치 내역, 이행 계획서"/>
+          <path class="doc" d="M939.3,80 h8 l4,4 v12 h-12 z"/>
+          <path class="doc-f" d="M947.3,80 v4 h4"/>
+          <text class="doc-t" x="945.3" y="112" text-anchor="middle">이행</text>
+          <circle class="hit" cx="945.3" cy="88" r="13" data-tip="산출물 3/26 · 이행 결과서, 최종 평가 결과서, 운영자 매뉴얼"/>
           <g data-row="a">
-            <text class="rowlab" x="16" y="58">예상대로 (A)</text>
-            <text class="rowlab-s" x="16" y="74">1월 중순 입고</text>
-            <text class="gate-s" x="517" y="38">입고 1/18</text>
-            <rect class="n n-hatch" x="517" y="44" width="80" height="32" rx="5"/>
-            <text class="bt" x="557" y="65" text-anchor="middle">안정화</text>
-            <rect class="n n-prod" x="601" y="44" width="272" height="32" rx="5"/>
-            <text class="bt" x="737" y="65" text-anchor="middle">제품 위 통합·부하 시험</text>
-            <rect class="n n-prod" x="877" y="44" width="99" height="32" rx="5"/>
-            <text class="bt-strong" x="926.5" y="65" text-anchor="middle">전환·오픈</text>
+          <text class="rowlab" x="16" y="142">환경 (A)</text>
+          <text class="rowlab-s" x="16" y="158">1월 중순 입고</text>
+          <text class="gate-s" x="517.2" y="122">입고 1/18</text>
+          <rect class="n n-hatch" x="516.2" y="128" width="87.8" height="32" rx="5"/>
+          <text class="bt" x="560.1" y="149" text-anchor="middle">안정화</text>
+          <rect class="n n-prod" x="606.0" y="128" width="370.4" height="32" rx="5"/>
+          <text class="bt" x="791.2" y="149" text-anchor="middle">제품 Milvus (watsonx.data)</text>
           </g>
-          <rect class="n n-own" x="131" y="44" width="74" height="32" rx="5"/>
-          <text class="bt" x="168" y="65" text-anchor="middle">착수</text>
-          <rect class="n n-own" x="209" y="44" width="304" height="32" rx="5"/>
-          <text class="bt" x="300" y="65" text-anchor="middle">제품 없이 개발</text>
-          <text class="bt" x="461" y="65" text-anchor="middle">자체 Milvus</text>
-          <path class="gate" d="M399.7,50 L409.7,60 L399.7,70 L389.7,60 Z"/>
-          <path class="gate" d="M598.7,50 L608.7,60 L598.7,70 L588.7,60 Z"/>
-          <text class="gate-t" x="407" y="98">G1</text>
-          <text class="gate-s" x="429" y="98">임베딩·GPU·기존 수요</text>
-          <text class="gate-t" x="606" y="98">G2</text>
-          <text class="gate-s" x="628" y="98">입고·안정화 확인</text>
-          <text class="rowlab" x="16" y="128">주간 평가</text>
-          <text class="rowlab-s" x="16" y="144">17회</text>
-          <line class="grid-l" x1="200.6" y1="132" x2="919.8" y2="132"/>
-          <circle class="pt-own" cx="200.6" cy="132" r="5"/>
-          <circle class="pt-own" cx="245.6" cy="132" r="5"/>
-          <circle class="pt-own" cx="290.5" cy="132" r="5"/>
-          <circle class="pt-own" cx="335.5" cy="132" r="5"/>
-          <circle class="pt-own" cx="380.4" cy="132" r="5"/>
-          <circle class="pt-own" cx="425.4" cy="132" r="5"/>
-          <circle class="pt-own" cx="470.3" cy="132" r="5"/>
-          <circle class="pt-own" cx="515.3" cy="132" r="5"/>
-          <circle class="pt-own" cx="560.2" cy="132" r="5"/>
-          <circle class="pt-prod" cx="605.2" cy="132" r="5"/>
-          <circle class="pt-prod" cx="650.1" cy="132" r="5"/>
-          <circle class="pt-prod" cx="695" cy="132" r="5"/>
-          <circle class="pt-prod" cx="740" cy="132" r="5"/>
-          <circle class="pt-prod" cx="784.9" cy="132" r="5"/>
-          <circle class="pt-prod" cx="829.9" cy="132" r="5"/>
-          <circle class="pt-prod" cx="874.8" cy="132" r="5"/>
-          <circle class="pt-prod" cx="919.8" cy="132" r="5"/>
-          <circle class="hit" cx="200.6" cy="132" r="11" data-tip="1회 · 11/30 · 기준선: 기존 RAG 측정"/>
-          <circle class="hit" cx="245.6" cy="132" r="11" data-tip="2회 · 12/7 · 파서 비교"/>
-          <circle class="hit" cx="290.5" cy="132" r="11" data-tip="3회 · 12/14 · 청킹 전략 비교"/>
-          <circle class="hit" cx="335.5" cy="132" r="11" data-tip="4회 · 12/21 · 임베딩 후보·MRL 축소 비교"/>
-          <circle class="hit" cx="380.4" cy="132" r="11" data-tip="5회 · 12/28 · 하이브리드 가중치 → G1"/>
-          <circle class="hit" cx="425.4" cy="132" r="11" data-tip="6회 · 1/4 · 리랭커 추가"/>
-          <circle class="hit" cx="470.3" cy="132" r="11" data-tip="7회 · 1/11 · 검색 API·MCP 도구 계약 점검"/>
-          <circle class="hit" cx="515.3" cy="132" r="11" data-tip="8회 · 1/18 · 오답 유형 보정 1차 (입고·안정화 시작)"/>
-          <circle class="hit" cx="560.2" cy="132" r="11" data-tip="9회 · 1/25 · 이관 리허설 → G2"/>
-          <circle class="hit" cx="605.2" cy="132" r="11" data-tip="10회 · 2/1 · 제품 Milvus 전환 후 재평가"/>
-          <circle class="hit" cx="650.1" cy="132" r="11" data-tip="11회 · 2/8 · UDI 형식별 비교"/>
-          <circle class="hit" cx="695" cy="132" r="11" data-tip="12회 · 2/15 · 전체 적재 후 재평가"/>
-          <circle class="hit" cx="740" cy="132" r="11" data-tip="13회 · 2/22 · 부하·응답 시간"/>
-          <circle class="hit" cx="784.9" cy="132" r="11" data-tip="14회 · 3/1 · 오답 유형 보정 2차"/>
-          <circle class="hit" cx="829.9" cy="132" r="11" data-tip="15회 · 3/8 · 운영 시나리오 재평가"/>
-          <circle class="hit" cx="874.8" cy="132" r="11" data-tip="16회 · 3/15 · 오픈 후보 평가"/>
-          <circle class="hit" cx="919.8" cy="132" r="11" data-tip="17회 · 3/22 · 최종 회귀 평가 → 오픈 판정"/>
+          <rect class="n n-own" x="156.6" y="128" width="357.6" height="32" rx="5"/>
+          <text class="bt" x="271.6" y="149" text-anchor="middle">자체 Milvus</text>
+          <path class="gate" d="M399.6,134 L409.6,144 L399.6,154 L389.6,144 Z"/>
+          <text class="gate-t" x="407.6" y="180">G1</text>
+          <text class="gate-s" x="427.6" y="180">임베딩·GPU·기존 수요</text>
+          <path class="gate" d="M598.6,134 L608.6,144 L598.6,154 L588.6,144 Z"/>
+          <text class="gate-t" x="606.6" y="180">G2</text>
+          <text class="gate-s" x="626.6" y="180">입고·안정화 확인</text>
+          <text class="rowlab" x="16" y="204">주간 평가</text>
+          <text class="rowlab-s" x="16" y="220">튜닝 11 · 회귀 6</text>
+          <line class="grid-l" x1="200.6" y1="206" x2="919.6" y2="206"/>
+          <circle class="pt-own" cx="200.6" cy="206" r="5.5"/>
+          <text class="pt-n" x="200.6" y="226" text-anchor="middle">1</text>
+          <circle class="pt-own" cx="245.5" cy="206" r="5.5"/>
+          <text class="pt-n" x="245.5" y="226" text-anchor="middle">2</text>
+          <circle class="pt-own" cx="290.5" cy="206" r="5.5"/>
+          <text class="pt-n" x="290.5" y="226" text-anchor="middle">3</text>
+          <circle class="pt-own" cx="335.4" cy="206" r="5.5"/>
+          <text class="pt-n" x="335.4" y="226" text-anchor="middle">4</text>
+          <circle class="pt-own" cx="380.3" cy="206" r="5.5"/>
+          <text class="pt-n" x="380.3" y="226" text-anchor="middle">5</text>
+          <circle class="pt-own" cx="425.3" cy="206" r="5.5"/>
+          <text class="pt-n" x="425.3" y="226" text-anchor="middle">6</text>
+          <circle class="pt-own" cx="470.2" cy="206" r="5.5"/>
+          <text class="pt-n" x="470.2" y="226" text-anchor="middle">7</text>
+          <circle class="pt-own" cx="515.2" cy="206" r="5.5"/>
+          <text class="pt-n" x="515.2" y="226" text-anchor="middle">8</text>
+          <circle class="pt-own" cx="560.1" cy="206" r="5.5"/>
+          <text class="pt-n" x="560.1" y="226" text-anchor="middle">9</text>
+          <circle class="pt-prod" cx="605.0" cy="206" r="5.5"/>
+          <text class="pt-n" x="605.0" y="226" text-anchor="middle">10</text>
+          <circle class="pt-prod" cx="650.0" cy="206" r="5.5"/>
+          <text class="pt-n" x="650.0" y="226" text-anchor="middle">11</text>
+          <circle class="pt-reg" cx="694.9" cy="206" r="5.5"/>
+          <text class="pt-n" x="694.9" y="226" text-anchor="middle">12</text>
+          <circle class="pt-reg" cx="739.9" cy="206" r="5.5"/>
+          <text class="pt-n" x="739.9" y="226" text-anchor="middle">13</text>
+          <circle class="pt-reg" cx="784.8" cy="206" r="5.5"/>
+          <text class="pt-n" x="784.8" y="226" text-anchor="middle">14</text>
+          <circle class="pt-reg" cx="829.7" cy="206" r="5.5"/>
+          <text class="pt-n" x="829.7" y="226" text-anchor="middle">15</text>
+          <circle class="pt-reg" cx="874.7" cy="206" r="5.5"/>
+          <text class="pt-n" x="874.7" y="226" text-anchor="middle">16</text>
+          <circle class="pt-reg" cx="919.6" cy="206" r="5.5"/>
+          <text class="pt-n" x="919.6" y="226" text-anchor="middle">17</text>
+          <circle class="hit" cx="200.6" cy="210" r="12" data-tip="1회 · 11/30 · 설계 비교 · 기준선: 기존 RAG를 평가셋으로 측정"/>
+          <circle class="hit" cx="245.5" cy="210" r="12" data-tip="2회 · 12/7 · 설계 비교 · 파서 비교: Docling·기존 파서"/>
+          <circle class="hit" cx="290.5" cy="210" r="12" data-tip="3회 · 12/14 · 설계 비교 · 청킹 전략 비교"/>
+          <circle class="hit" cx="335.4" cy="210" r="12" data-tip="4회 · 12/21 · 튜닝 · 임베딩 후보: 기존 4096·Qwen3-4B·MRL 축소"/>
+          <circle class="hit" cx="380.3" cy="210" r="12" data-tip="5회 · 12/28 · 튜닝 · 검색 순위 튜닝: 하이브리드 가중치·리랭커 → G1"/>
+          <circle class="hit" cx="425.3" cy="210" r="12" data-tip="6회 · 1/4 · 튜닝 · 메타·권한 필터"/>
+          <circle class="hit" cx="470.2" cy="210" r="12" data-tip="7회 · 1/11 · 튜닝 · 검색 API·MCP 도구 계약 점검"/>
+          <circle class="hit" cx="515.2" cy="210" r="12" data-tip="8회 · 1/18 · 튜닝 · 오답 유형 보정 (입고·안정화 시작)"/>
+          <circle class="hit" cx="560.1" cy="210" r="12" data-tip="9회 · 1/25 · 튜닝 · 이관 리허설 → G2"/>
+          <circle class="hit" cx="605.0" cy="210" r="12" data-tip="10회 · 2/1 · 튜닝 · 제품 Milvus 전환 후 재평가"/>
+          <circle class="hit" cx="650.0" cy="210" r="12" data-tip="11회 · 2/8 · 튜닝 · UDI 형식별 비교, 개발 완료 기준 점수"/>
+          <circle class="hit" cx="694.9" cy="210" r="12" data-tip="12회 · 2/15 · 회귀 · 전체 적재 후 회귀 평가"/>
+          <circle class="hit" cx="739.9" cy="210" r="12" data-tip="13회 · 2/22 · 회귀 · 부하·응답 시간 측정과 회귀 평가"/>
+          <circle class="hit" cx="784.8" cy="210" r="12" data-tip="14회 · 3/1 · 회귀 · 업무 담당자 질문으로 회귀 평가"/>
+          <circle class="hit" cx="829.7" cy="210" r="12" data-tip="15회 · 3/8 · 회귀 · 운영 시나리오(권한·필터) 회귀 평가"/>
+          <circle class="hit" cx="874.7" cy="210" r="12" data-tip="16회 · 3/15 · 회귀 · 운영 환경 적재 후 회귀 평가"/>
+          <circle class="hit" cx="919.6" cy="210" r="12" data-tip="17회 · 3/22 · 회귀 · 최종 회귀 평가 → 오픈 판정"/>
           <g data-row="b">
-            <path class="branch-l" d="M598.7,72 V124"/>
-            <path class="branch-l" d="M598.7,140 V248"/>
-            <path class="branch-l" d="M598.7,184 H601"/>
-            <text class="rowlab" x="16" y="182">지연 (B 기본)</text>
-            <text class="rowlab-s" x="16" y="198">자체 Milvus로 오픈</text>
-            <rect class="n n-cond" x="601" y="168" width="272" height="32" rx="5"/>
-            <text class="bt" x="737" y="189" text-anchor="middle">자체 Milvus에서 통합·부하 시험</text>
-            <rect class="n n-cond" x="877" y="168" width="99" height="32" rx="5"/>
-            <text class="bt-strong" x="926.5" y="189" text-anchor="middle">오픈·이관</text>
-            <text class="rowlab" x="16" y="246">지연 (B 예외)</text>
-            <text class="rowlab-s" x="16" y="262">오픈 연기</text>
-            <rect class="n n-cond" x="601" y="232" width="272" height="32" rx="5"/>
-            <text class="bt" x="737" y="253" text-anchor="middle">자체 Milvus 스테이징</text>
-            <rect class="n n-ext n-dash" x="877" y="232" width="99" height="32" rx="5"/>
-            <text class="bt" x="926.5" y="253" text-anchor="middle">연기</text>
+          <path class="branch-l" d="M598.6,154 V168"/>
+          <path class="branch-l" d="M598.6,232 V262 H606.0"/>
+          <text class="rowlab" x="16" y="260">지연 (B)</text>
+          <text class="rowlab-s" x="16" y="276">G2에 안정화 미확인</text>
+          <rect class="n n-cond" x="606.0" y="246" width="370.4" height="32" rx="5"/>
+          <text class="bt" x="791.2" y="267" text-anchor="middle">자체 Milvus로 통합·인수·이행 → 오픈 뒤 제품으로 이관</text>
           </g>
-        </svg>
+          </svg>
       </div>
-      <div class="chart-key"><span><i class="sw own"></i>자체 Milvus에서 진행</span><span><i class="sw hatch"></i>인프라 안정화 (가정 2주)</span><span><i class="sw prod"></i>제품 위에서 진행</span><span><i class="sw cond"></i>지연 시</span></div>
-      <figcaption>1월 말(G2)까지 입고·안정화가 확인되지 않으면 아래 경로로 간다. 기본은 자체 Milvus로 3/31에 오픈하고, 제품이 안정화되면 같은 청크 정본에서 다시 적재해 전환하는 것이다. 에이전트가 호출하는 검색 API 주소는 바뀌지 않는다. 주간 평가 점에 마우스를 올리면 회차 주제가 보인다.</figcaption>
+      <div class="chart-key"><span><i class="sw own"></i>자체 Milvus에서 진행</span><span><i class="sw hatch"></i>인프라 안정화 (가정 2주)</span><span><i class="sw prod"></i>제품 위에서 진행</span><span><i class="sw cond"></i>지연 시</span><span><i class="sw dot"></i>튜닝 평가</span><span><i class="sw ring"></i>회귀 평가</span></div>
+      <figcaption>1월 말(G2)까지 입고·안정화가 확인되지 않으면 B로 간다. 자체 Milvus로 통합·인수·이행을 진행해 3/31에 오픈하고, 제품이 안정화되면 청크 정본에서 다시 적재해 이관한다. 에이전트가 호출하는 검색 API 주소는 바뀌지 않는다. 평가 점과 산출물 표시에 마우스를 올리면 내용이 보인다. 단계별 회차와 산출물 목록은 <a href="#s3">03</a>에 있다.</figcaption>
     </figure>
-    <div class="tbl wide">
-      <table>
-        <thead><tr><th>기간</th><th>주요 작업</th><th>평가 회차</th><th>산출물</th></tr></thead>
-        <tbody>
-          <tr><th>11월 말</th><td>확인 질문 발송(10), 첫 평가셋 작성, 자체 Milvus 개발 환경 구성</td><td>—</td><td>평가셋 v1, 회신 기한</td></tr>
-          <tr><th>12월</th><td>제품 없이 개발: 수집·파서·청킹, 임베딩 후보·MRL 축소 비교, 자체 Milvus 위 검색 API·MCP 서버</td><td class="nw">1~5회</td><td><span class="did">G1</span> 임베딩 경로(D1), GPU(D5), 기존 수요 수용 범위(D7)</td></tr>
-          <tr><th>1월</th><td>1월 중순 입고 예상. on-prem 인프라 안정화 점검(OCP·watsonx.ai·watsonx.data·LLM 서빙·벡터 DB), 접속·권한 확인(D6), 이관 리허설. 개발·평가는 자체 Milvus에서 계속</td><td class="nw">6~9회</td><td><span class="did">G2</span> 입고·안정화 확인(D3)</td></tr>
-          <tr><th>2월</th><td>제품 Milvus 전환, 하이브리드 검색 실측(D2), UDI 형식별 판정(D4), 전체 적재, 통합·부하 테스트</td><td class="nw">10~13회</td><td>제품 위 기준 점수 확인</td></tr>
-          <tr><th>3월</th><td>운영 시나리오 재평가, 최종 회귀 평가, 운영 전환</td><td class="nw">14~17회</td><td>3/31 오픈: 검색 API, MCP 서버, 수집·파싱 파이프라인</td></tr>
-        </tbody>
-      </table>
-    </div>
   </div></section>
 
   <!-- 09 리스크 -->
@@ -1533,6 +1612,8 @@ details.tview .tbl { margin-top: 10px; }
           <tr><th>on-prem 인프라 안정화 지연</th><td><span class="pen">제품 위 시험 기간이 줄어든다</span></td><td>자체 Milvus 경로를 오픈까지 유지한다. 입고 첫 주에 OCP·watsonx.ai·watsonx.data·LLM 서빙·벡터 DB 안정화 항목을 점검하고 인프라 담당과 일정을 공유한다.</td><td><span class="did">D3</span></td></tr>
           <tr><th>평가셋 부재</th><td>변경 효과를 판단할 수 없다</td><td>11월 말까지 업무 담당자와 첫 평가셋을 만들고 회차마다 보강한다.</td><td>전체</td></tr>
           <tr><th>점수 정체</th><td>무엇을 바꿔야 할지 보이지 않는다</td><td>단계별 분리 측정과 오답 유형 분류로 원인 단계를 좁히고, 재구축 비용이 낮은 시도부터 빨리·많이 돌린다(02).</td><td>전체</td></tr>
+          <tr><th>개발 완료 지연</th><td><span class="pen">테스트·이행 기간이 줄어든다</span></td><td>회차마다 기준선 대비 추이를 보고한다. 11회차(2/8)에도 기준에 못 미치는 형식·문서군은 오픈 범위에서 빼는 안을 함께 올려 2/12 개발 완료를 지킨다.</td><td>전체</td></tr>
+          <tr><th>산출물 작성이 개발을 잠식</th><td>튜닝 회차가 줄어든다</td><td>회차 기록과 선정 근거를 처음부터 산출물 양식으로 남긴다. 설계서는 설계 비교 회차(1~3회) 결과를 근거로 쓴다.</td><td>전체</td></tr>
           <tr><th>점수 하락을 실패로 해석</th><td>재구축이 막히고 부분 수정만 남는다</td><td>주간 보고에 변경 내용·점수·원인을 함께 싣는다. 오픈 판정은 마지막 회차 점수로 한다.</td><td>—</td></tr>
           <tr><th>제품 입고 지연</th><td>제품 위 시험 기간이 줄거나 없어진다</td><td>같은 버전 자체 Milvus로 먼저 개발하고 접속 주소만 바꾸는 구조로 둔다. 지연 시 자체 Milvus로 오픈 후 이관한다.</td><td><span class="did">D3</span></td></tr>
           <tr><th>제품 Milvus 버전이 낮음</th><td>BM25 내장 기능을 쓸 수 없다</td><td>sparse 벡터를 직접 만드는 쪽으로 개발한다.</td><td><span class="did">D2</span></td></tr>
@@ -1670,9 +1751,9 @@ details.tview .tbl { margin-top: 10px; }
     }
   } catch (e) {}
 
-  /* ---------- 3D layer stack ---------- */
+  /* ---------- 3D layer stack + packet walkthrough ---------- */
   try {
-    var scene = $('#isoScene'), stage = $('#isoStage'), fit = $('#isoFit'), panel = $('#isoExplain');
+    var scene = $('#isoScene'), stage = $('#isoStage'), fit = $('#isoFit'), panel = $('#isoExplain'), cap = $('#isoCap');
     var CX = [20, 188, 356, 524, 692], RY = [20, 125], TW = 150, TH = 85;
     var L = {
       base: { label: ['기반', '제품·인프라'], tiles: [
@@ -1724,16 +1805,124 @@ details.tview .tbl { margin-top: 10px; }
     });
     POSTS.forEach(function (d) {
       var p = el('div', 'post' + (d.seam ? ' seam' : '') + (d.up ? ' up' : ''));
+      if (d.seam) p.setAttribute('data-seam', d.seam);
       p.style.left = (CX[d.c] + TW - 10) + 'px'; p.style.top = (RY[d.r] + TH / 2) + 'px';
       p.appendChild(el('div', 'strip')); p.appendChild(el('div', 'strip b'));
       if (d.badge) p.appendChild(bb('badge', String(d.badge)));
       planes[d.on].appendChild(p);
     });
-    var doFit = function () { var w = stage.clientWidth, h = stage.clientHeight; var f = Math.min(1, (w - 24) / 800, h / 580); fit.style.setProperty('--fit', f.toFixed(3)); };
+    var pk = el('div', 'packet off jump'), pkA = el('div', 'anchor'), pkB = el('div', 'bb pk', '문서');
+    pkA.appendChild(pkB); pk.appendChild(pkA); scene.appendChild(pk);
+
+    var doFit = function () { var w = stage.clientWidth, h = stage.clientHeight; var f = Math.min(1, (w - 24) / 800, (h - 60) / 580); fit.style.setProperty('--fit', f.toFixed(3)); };
     doFit();
     if ('ResizeObserver' in window) new ResizeObserver(doFit).observe(stage); else addEventListener('resize', doFit);
-
     var setCam = function (v) { scene.setAttribute('data-cam', v); setPressed($('#isoCam'), v); };
+
+    /* 시나리오. 좌표는 판 위 (x, y), 높이는 b=기반 · m=처리 · t=사용 · T=사용 층 위 */
+    var SC = {
+      doc: { k: '문서가 들어갈 때', h: '문서 한 건이 검색 가능해지기까지', p: '처리는 모두 처리 층(자체)에서 일어난다. 제품은 기둥을 타고 내려가는 주황 번호 단계에서만 만난다.', f: '기둥 ①②③ 아래만 바꿀 수 있게 만든다. 제품이 늦거나 평가 기준에 못 미쳐도 위쪽 코드는 그대로다.', steps: [
+        { t: '문서가 들어온다', d: '실제 형식을 판별하고 문서 속 문서·링크를 펼친다', L: 'own', keys: 'ingest', pk: '문서', cls: '', jump: 1, path: [[-60, 62, 'm'], [95, 62, 'm']] },
+        { t: '파서 라우터가 엔진을 고른다', d: '형식마다 평가 점수가 높은 파서로 보낸다', L: 'own', keys: 'router', path: [[263, 62, 'm']] },
+        { t: '기둥 ①: UDI가 맡는 형식만 내려간다', d: '평가 기준을 넘는 형식만 제품 UDI로 보낸다. 결과는 공통 형식으로 돌아온다', L: 'prod', seam: 1, keys: 'router,udi', path: [[328, 62, 'm'], [328, 62, 'b'], [263, 62, 'b']] },
+        { t: '청킹하고 정본을 남긴다', d: '청크 정본은 모델이나 Milvus가 바뀔 때 다시 적재하는 원천이다', L: 'own', keys: 'chunk', path: [[328, 62, 'b'], [328, 62, 'm'], [431, 62, 'm']] },
+        { t: '기둥 ②: 벡터를 만들 때만 서빙처를 부른다', d: 'watsonx.ai, 사내 게이트웨이, 직접 서빙 중 어디든 주소만 바꾼다', L: 'prod', seam: 2, keys: 'embed,wxai,gw', path: [[599, 62, 'm'], [664, 62, 'm'], [664, 62, 'b'], [599, 62, 'b']] },
+        { t: '기둥 ③: Milvus에 저장한다', d: '이제 이 문서는 검색할 수 있다', L: 'prod', seam: 3, keys: 'load,milvus', path: [[664, 62, 'b'], [664, 62, 'm'], [767, 62, 'm'], [832, 62, 'm'], [832, 62, 'b'], [767, 172, 'b']] } ] },
+      qa: { k: '질문이 들어올 때', h: '질문 하나가 근거로 돌아오기까지', p: 'Milvus에 닿는 순간만 제품이다. 근거를 고르고 만드는 일은 처리 층(자체)이 한다.', f: '질문 흐름에서 제품과 만나는 곳은 기둥 ③ 한 곳이다.', steps: [
+        { t: '에이전트가 질문한다', d: '고객사 에이전트가 MCP 도구를 호출한다', L: 'ext', keys: 'agent', pk: '질문', cls: 'q', jump: 1, path: [[599, 167, 'T'], [599, 167, 't']] },
+        { t: 'MCP 서버가 검색을 요청한다', d: '도구 명세는 자체 설계. 기존 도구와의 호환 범위는 D7', L: 'own', keys: 'mcp', path: [[599, 167, 'm']] },
+        { t: '검색 API가 하이브리드 검색을 시작한다', d: 'dense + BM25, 권한·범위 필터', L: 'own', keys: 'search', path: [[767, 167, 'm']] },
+        { t: '기둥 ③: Milvus에서 후보를 찾는다', d: '질문 흐름에서 제품과 닿는 곳은 이 기둥 하나다', L: 'prod', seam: 3, keys: 'search,milvus', path: [[832, 167, 'm'], [832, 167, 'b'], [767, 172, 'b']] },
+        { t: '순위를 다시 매기고 근거를 만든다', d: '근거 = 청크 + 원문 위치(페이지·시트·셀) + 문서 버전', L: 'own', keys: 'search', pk: '근거', cls: 'ans', path: [[832, 167, 'b'], [832, 167, 'm'], [767, 167, 'm']] },
+        { t: '근거가 에이전트로 돌아간다', d: '에이전트는 이 근거로 답한다', L: 'ext', keys: 'mcp,agent', path: [[599, 167, 'm'], [599, 167, 't']] } ] },
+      delay: { k: '제품이 늦어지면', h: '제품이 늦어도 위층은 그대로다', p: '기둥 ③ 아래만 바뀐다. 에이전트와 처리 층은 아래에 무엇이 있는지 모른다.', f: 'D3의 기본 대응이다. 바뀌는 것은 접속 주소 하나다.', steps: [
+        { t: '기둥 ③ 아래에 자체 Milvus를 둔다', d: '제품과 같은 버전. 처리 층과 사용 층은 그대로다', L: 'own', seam: 3, keys: 'milvus', phase: 'before', pk: null },
+        { t: '질문 흐름은 똑같이 돈다', d: '에이전트 → MCP → 검색 API → 기둥 ③ → 자체 Milvus', L: 'own', seam: 3, keys: 'agent,mcp,search,milvus', phase: 'before', pk: '질문', cls: 'q', jump: 1, path: [[599, 167, 'T'], [599, 167, 't'], [599, 167, 'm'], [767, 167, 'm'], [832, 167, 'm'], [832, 167, 'b'], [767, 172, 'b']] },
+        { t: '입고·안정화 뒤 정본에서 다시 적재한다', d: '청크 정본 → 제품 Milvus. 파싱은 다시 하지 않는다', L: 'prod', seam: 3, keys: 'chunk,load,milvus', phase: 'after', pk: '재적재', cls: '', jump: 1, path: [[431, 62, 'm'], [599, 62, 'm'], [767, 62, 'm'], [832, 62, 'm'], [832, 62, 'b'], [767, 172, 'b']] },
+        { t: '바뀐 것은 접속 주소 하나', d: '에이전트, 검색 API 주소, 처리 층 코드는 그대로다', L: 'prod', seam: 3, keys: 'milvus,search,load', phase: 'after', pk: null } ] }
+    };
+    var LBL = { own: '처리 · 자체', prod: '기반 · 제품', ext: '사용 · 고객사' };
+    var SEAMN = ['', '①', '②', '③'];
+    var IDLE = { doc: '문서 한 건을', qa: '질문 하나를', delay: '제품이 늦을 때의 전환을' };
+    var walk = { sc: 'doc', i: -1 }, token = 0, playT = null, playing = false, touched = false;
+    var playBtn = $('#isoPlay'), PZ = 62;
+    /* z는 --gap을 따라가므로 카메라를 바꿔도 패킷이 층에 붙어 있다 */
+    var zOf = function (k) { return k === 'b' ? PZ + 'px' : k === 'm' ? 'calc(var(--gap) + ' + PZ + 'px)' : k === 't' ? 'calc(var(--gap) * 2 + ' + PZ + 'px)' : 'calc(var(--gap) * 2 + 130px)'; };
+    var place = function (p, instant) { pk.classList.toggle('jump', !!instant); pk.style.transform = 'translate3d(' + p[0] + 'px, ' + p[1] + 'px, ' + zOf(p[2]) + ')'; };
+    var STEP_MS = reduce ? 0 : 440;
+    var runPath = function (path, tk) {
+      var j = 0;
+      (function nxt() { if (tk !== token || j >= path.length) return; place(path[j], false); j++; setTimeout(nxt, STEP_MS); })();
+    };
+    var isTouch = function (st) { return !!(st.seam && st.L === 'prod'); };
+    var marks = function (st, done) {
+      $$('.tile.hot, .tile.done', scene).forEach(function (t) { t.classList.remove('hot'); t.classList.remove('done'); });
+      $$('.post.lit', scene).forEach(function (p) { p.classList.remove('lit'); });
+      scene.classList.toggle('touching', !!(st && isTouch(st)));
+      if (!st) return;
+      (done || []).forEach(function (k) { $$('.tile[data-key="' + k + '"]', scene).forEach(function (t) { t.classList.add('done'); }); });
+      (st.keys || '').split(',').forEach(function (k) { $$('.tile[data-key="' + k + '"]', scene).forEach(function (t) { t.classList.add('hot'); }); });
+      if (st.seam) $$('.post[data-seam="' + st.seam + '"]', scene).forEach(function (p) { p.classList.add('lit'); });
+    };
+    var setCap = function (st, i) {
+      if (!st) { cap.className = 'iso-cap idle'; cap.innerHTML = '<span class="cap-n">▶</span><div><b>재생을 누르면 ' + IDLE[walk.sc] + ' 따라간다</b><span class="d">주황 번호 단계에서만 제품과 만난다</span></div><span></span>'; return; }
+      cap.className = 'iso-cap' + (isTouch(st) ? ' touch' : '');
+      cap.innerHTML = '<span class="cap-n">' + (i + 1) + '</span><div><b>' + st.t + '</b><span class="d">' + st.d + '</span></div><span class="cap-chip ' + st.L + '">' + LBL[st.L] + (st.seam ? ' · 기둥 ' + SEAMN[st.seam] : '') + '</span>';
+    };
+    var renderPanel = function () {
+      var S = SC[walk.sc];
+      var html = '<span class="ie-k">' + S.k + '</span><h3>' + S.h + '</h3><p>' + S.p + '</p><ol class="ie-steps">';
+      S.steps.forEach(function (st, i) { html += '<li' + (isTouch(st) ? ' class="touch"' : '') + '><button type="button" data-i="' + i + '"><span class="sn">' + (i + 1) + '</span><span><b>' + st.t + '</b><small>' + st.d + '</small></span></button></li>'; });
+      html += '</ol><p class="ie-foot">' + S.f + '</p>';
+      panel.innerHTML = html; panel.classList.remove('swap'); void panel.offsetWidth; panel.classList.add('swap');
+      $$('.ie-steps button', panel).forEach(function (b) { b.addEventListener('click', function () { touched = true; stop(); go(+b.getAttribute('data-i')); }); });
+    };
+    var markPanel = function (i) { $$('.ie-steps button', panel).forEach(function (b) { if (+b.getAttribute('data-i') === i) b.setAttribute('aria-current', 'step'); else b.removeAttribute('aria-current'); }); };
+    /* 앞 단계를 건너뛰고 들어와도 패킷 모양·위치가 맞도록, 그 단계까지의 마지막 패킷 상태를 찾는다 */
+    var pkState = function (S, i) { var lab = null, cls = ''; for (var j = 0; j <= i; j++) { var x = S.steps[j]; if (x.pk) { lab = x.pk; cls = x.cls || ''; } else if (x.pk === null) lab = null; } return { lab: lab, cls: cls }; };
+    var go = function (i) {
+      var S = SC[walk.sc]; if (i < 0 || i >= S.steps.length) return;
+      token++; var tk = token, prev = walk.i; walk.i = i; var st = S.steps[i];
+      if (st.phase) scene.setAttribute('data-phase', st.phase);
+      var done = []; for (var j = 0; j < i; j++) done = done.concat((S.steps[j].keys || '').split(','));
+      marks(st, done); setCap(st, i); markPanel(i);
+      var ps = pkState(S, i);
+      if (st.pk === null || !ps.lab || !st.path) { if (st.pk === null || !ps.lab) pk.classList.add('off'); return; }
+      pkB.textContent = ps.lab; pkB.className = 'bb pk' + (ps.cls ? ' ' + ps.cls : '');
+      var path = st.path;
+      /* 순서대로 이어질 때만 미끄러지고, 건너뛰거나 되돌아가면 단계 시작점으로 옮긴다 */
+      if (st.jump || prev !== i - 1 || pk.classList.contains('off')) { place(path[0], true); void pk.offsetWidth; path = path.slice(1); }
+      pk.classList.remove('off');
+      runPath(path, tk);
+    };
+    var setPlayUI = function (on) { playBtn.setAttribute('aria-pressed', on ? 'true' : 'false'); playBtn.querySelector('span').textContent = on ? '일시정지' : '재생'; };
+    var stop = function () { playing = false; clearTimeout(playT); setPlayUI(false); };
+    var play = function () {
+      var S = SC[walk.sc]; playing = true; setPlayUI(true);
+      if (walk.i >= S.steps.length - 1) walk.i = -1;
+      (function tick() {
+        if (!playing) return;
+        var n = walk.i + 1; if (n >= S.steps.length) { stop(); return; }
+        go(n); var st = S.steps[n];
+        playT = setTimeout(tick, reduce ? 3200 : ((st.path ? st.path.length : 0) * STEP_MS + 2300));
+      })();
+    };
+    var setScenario = function (v) {
+      stop(); token++; walk.sc = v; walk.i = -1; marks(null);
+      scene.setAttribute('data-phase', 'after'); pk.classList.add('off');
+      var keys = []; SC[v].steps.forEach(function (st) { keys = keys.concat((st.keys || '').split(',')); });
+      $$('.tile', scene).forEach(function (t) { t.classList.toggle('onpath', keys.indexOf(t.getAttribute('data-key')) > -1); });
+      scene.classList.add('flowmode');
+      setPressed($('#isoScn'), v); renderPanel(); setCap(null);
+    };
+    seg('isoScn', function (v) { touched = true; setScenario(v); play(); });
+    seg('isoCam', function (v) { touched = true; setCam(v); });
+    playBtn.addEventListener('click', function () { touched = true; if (playing) stop(); else play(); });
+    $('#isoPrev').addEventListener('click', function () { touched = true; stop(); go(Math.max(0, walk.i - 1)); });
+    $('#isoNext').addEventListener('click', function () { touched = true; stop(); go(Math.min(SC[walk.sc].steps.length - 1, walk.i + 1)); });
+    setScenario('doc');
+
+    /* 처음 보일 때 층이 쌓이며 조립되고, 이어서 문서 흐름을 한 번 재생한다 */
     if (!reduce && hasIO) {
       scene.setAttribute('data-cam', 'stack');
       var aio = new IntersectionObserver(function (es) {
@@ -1742,88 +1931,11 @@ details.tview .tbl { margin-top: 10px; }
           aio.disconnect();
           scene.classList.add('assembling');
           requestAnimationFrame(function () { requestAnimationFrame(function () { setCam('iso'); }); });
-          setTimeout(function () { scene.classList.remove('assembling'); }, 1800);
+          setTimeout(function () { scene.classList.remove('assembling'); if (!touched) play(); }, 1900);
         });
-      }, { threshold: 0.3 });
+      }, { threshold: 0.35 });
       aio.observe(stage);
     }
-
-    /* explanation panel */
-    var PANEL = {
-      all: { k: '전체', h: '세 층이 세 기둥으로만 연결된다', p: '위로 갈수록 사용자에 가깝다. 제품 입고나 인프라 안정화가 늦어도 처리 층은 자체 Milvus 위에서 계속 개발·평가한다.', items: [
-        ['prod', '기반 · 제품과 고객사 인프라', '운영 기반, Milvus, UDI·watsonx.ai(선택), 사내 게이트웨이, GPU. 모두 on-prem', 'ops,udi,wxai,milvus,gw,gpu'],
-        ['own', '처리 · 자체 설계', '수집부터 검색 API·MCP 서버까지, 품질을 좌우하는 단계', 'ingest,router,chunk,embed,load,eval,mcp,search'],
-        ['ext', '사용 · 고객사', '에이전트 4개와 평가셋을 만드는 업무 담당자', 'agent,biz'],
-        ['cond', '기둥 ①②③ · 교체 지점', '기반과 처리가 만나는 유일한 접점', 'router,udi,embed,wxai,load,search,milvus'] ],
-        f: '항목에 마우스를 올리면 해당 타일이 떠오른다.' },
-      prod: { k: '제품 영역', h: '제품은 저장과 운영을 맡는다', p: '위층을 걷어 내면 제품이 맡는 범위가 드러난다. 확정은 Milvus와 운영 기반이고, 나머지는 평가로 정한다.', items: [
-        ['prod', 'Milvus', '벡터 저장·검색. 확정', 'milvus'],
-        ['prod', '운영 기반', '배포·형상·권한은 제품 체계를 따른다', 'ops'],
-        ['prod', 'UDI', '형식별 평가에서 기준을 넘을 때 사용 (D4)', 'udi'],
-        ['prod', 'watsonx.ai', 'Qwen3-Embedding-4B 서빙이 가능할 때 사용 (D1)', 'wxai'],
-        ['ext', '사내 게이트웨이 · GPU', '고객사 인프라. 임베딩 서빙 대안 (D1·D5)', 'gw,gpu'] ],
-        f: '전 구성이 on-prem이라 입고 뒤 안정화 기간이 필요하다. 이 층이 늦어도 처리 층 개발은 멈추지 않는다.' },
-      own: { k: '자체 설계', h: '품질을 좌우하는 단계는 모두 처리 층에 있다', p: '아래층과 위층을 밀어내면 문서가 근거가 되기까지의 흐름만 남는다.', items: [
-        ['own', '수집·형식 판별', '문서 속 문서·링크까지 펼친다', 'ingest'],
-        ['own', '파서 라우터', '형식별로 엔진을 고른다 ①', 'router'],
-        ['own', '청킹 · 청크 정본', '재구축의 출발점을 보관한다', 'chunk'],
-        ['own', '임베딩 호출', '서빙처와 무관한 하나의 호출 ②', 'embed'],
-        ['own', '벡터 적재 · 검색 API', 'Milvus 위치와 무관 ③. 근거(원문 위치·버전) 반환', 'load,search'],
-        ['own', 'MCP 서버', '에이전트가 쓰는 도구', 'mcp'],
-        ['own', '평가 콘솔', '주간 평가로 품질을 측정한다', 'eval'] ],
-        f: '흐르는 화살표가 색인 경로다. 이 층은 제품 일정과 무관하게 진행한다.' },
-      seam: { k: '교체 지점', h: '제품과 만나는 곳은 세 기둥뿐이다', p: '기둥 위쪽 코드는 그대로 두고, 기둥 아래 연결만 바꾼다.', items: [
-        ['cond', '① 파서 라우터 ↔ UDI', '바뀜: 형식별 파서 엔진 · 그대로: 공통 결과 형식, 청킹 이후 전부', 'router,udi'],
-        ['cond', '② 임베딩 호출 ↔ 서빙처', '바뀜: 서빙 주소(watsonx.ai·게이트웨이·직접) · 그대로: 호출 코드', 'embed,wxai,gw'],
-        ['cond', '③ 적재·검색 ↔ Milvus', '바뀜: 접속 주소(자체 → 제품) · 그대로: 검색 API 주소, 에이전트 코드', 'load,search,milvus'] ],
-        f: '‘Milvus 입고 전/후’를 누르면 ③의 전환을 볼 수 있다.' }
-    };
-    var hot = function (keys, on) {
-      (keys || '').split(',').forEach(function (k) { $$('.tile[data-key="' + k + '"]', scene).forEach(function (t) { t.classList.toggle('hot', on); }); });
-    };
-    var renderPanel = function (v) {
-      var d = PANEL[v];
-      var html = '<span class="ie-k">' + d.k + '</span><h3>' + d.h + '</h3><p>' + d.p + '</p><ul class="ie-list">';
-      d.items.forEach(function (it) { html += '<li tabindex="0" data-keys="' + it[3] + '"><i class="' + it[0] + '"></i><div><b>' + it[1] + '</b><span>' + it[2] + '</span></div></li>'; });
-      html += '</ul><p class="ie-foot">' + d.f + '</p>';
-      panel.innerHTML = html;
-      panel.classList.remove('swap'); void panel.offsetWidth; panel.classList.add('swap');
-      $$('li', panel).forEach(function (li) {
-        var on = function () { $$('.tile.hot', scene).forEach(function (t) { t.classList.remove('hot'); }); hot(li.getAttribute('data-keys'), true); li.classList.add('on'); };
-        var off = function () { hot(li.getAttribute('data-keys'), false); li.classList.remove('on'); };
-        li.addEventListener('mouseenter', on); li.addEventListener('focus', on);
-        li.addEventListener('mouseleave', off); li.addEventListener('blur', off);
-      });
-    };
-    var setFocus = function (v) {
-      $$('.tile.hot', scene).forEach(function (t) { t.classList.remove('hot'); });
-      scene.setAttribute('data-focus', v); setPressed($('#isoFocus'), v); renderPanel(v);
-    };
-    renderPanel('all');
-
-    var tourBtn = $('#isoTour'), tourT = null;
-    var stopTour = function () { clearTimeout(tourT); tourT = null; tourBtn.setAttribute('aria-pressed', 'false'); };
-    seg('isoFocus', function (v) { stopTour(); setFocus(v); });
-    seg('isoCam', function (v) { setCam(v); });
-    tourBtn.addEventListener('click', function () {
-      if (tourT) { stopTour(); return; }
-      var order = ['all', 'prod', 'own', 'seam', 'all'], i = 0;
-      tourBtn.setAttribute('aria-pressed', 'true');
-      var step = function () {
-        setFocus(order[i]); i++;
-        if (i < order.length) tourT = setTimeout(step, reduce ? 2500 : 4200); else stopTour();
-      };
-      step();
-    });
-    var live = $('#isoLive'), flowT = null;
-    seg('isoPhase', function (v) {
-      scene.setAttribute('data-phase', v);
-      scene.classList.add('flowing');
-      live.innerHTML = v === 'before'
-        ? '<b>입고 전.</b> 같은 버전의 자체 Milvus 위에서 개발하고 평가한다. 처리 층은 그대로다.'
-        : '<b>입고 후.</b> 접속 주소만 watsonx.data Milvus로 바꾸고 청크 정본에서 다시 적재한다. 처리 층의 코드는 바뀌지 않는다.';
-      clearTimeout(flowT); flowT = setTimeout(function () { scene.classList.remove('flowing'); }, 2400);
-    });
   } catch (e) { /* 3D 구조도는 부가 기능 */ }
 
   /* ---------- cascade ---------- */

@@ -107,6 +107,7 @@ mark.hl.blue { background-image: linear-gradient(100deg, rgba(var(--hl-prod), 0)
 .hero-fig { display: grid; gap: 14px; }
 .hero-fig .fh { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: baseline; justify-content: space-between; }
 .hero-fig h2 { font-size: 17px; font-weight: 700; color: #ffffff; }
+.hero-fig h2 small { font-size: 13px; font-weight: 500; color: var(--on-navy-2); margin-left: 8px; }
 .hero .chart-key { color: var(--on-navy-2); }
 .hero .ctl > span { color: var(--on-navy-2); }
 .hero .seg { background: rgba(255,255,255,.05); border-color: rgba(255,255,255,.12); }
@@ -170,6 +171,8 @@ h3 { font-size: 18.5px; font-weight: 700; letter-spacing: -.01em; }
 .sw { display: inline-block; width: 12px; height: 12px; border-radius: 3px; vertical-align: -1px; margin-right: 6px; }
 .sw.own { background: var(--own-mark); } .sw.prod { background: var(--prod-mark); } .sw.cond { background: var(--cond-mark); } .sw.ext { background: var(--ext-mark); }
 .sw.hatch { background: repeating-linear-gradient(45deg, #e5e9ef 0 2px, #98a2b3 2px 3.5px); }
+.sw.dot { border-radius: 50%; background: var(--own-mark); width: 11px; height: 11px; }
+.sw.ring { border-radius: 50%; background: #ffffff; box-shadow: inset 0 0 0 2px var(--prod-mark); width: 11px; height: 11px; }
 
 /* controls */
 .seg { display: inline-flex; flex-wrap: wrap; gap: 2px; padding: 3px; border: 1px solid var(--line); border-radius: 10px; background: #ffffff; }
@@ -267,6 +270,15 @@ details.tview .tbl { margin-top: 10px; }
 .today-l { stroke: var(--ink-2); stroke-width: 1; stroke-dasharray: 2 3; }
 .rowlab { fill: var(--ink); font-family: var(--font-sans); font-size: 12.5px; font-weight: 700; }
 .rowlab-s { fill: var(--muted); font-family: var(--font-sans); font-size: 11.5px; }
+.n-si { fill: #eef2f7; stroke: #94a3b8; }
+.n-si2 { fill: #ffffff; stroke: #94a3b8; }
+.dev-l { stroke: var(--ink); stroke-width: 1.6; fill: none; }
+.dev-t { fill: var(--ink); font-family: var(--font-sans); font-size: 11.5px; font-weight: 700; }
+.doc { fill: #ffffff; stroke: var(--prod-mark); stroke-width: 1.4; stroke-linejoin: round; }
+.doc-f { fill: none; stroke: var(--prod-mark); stroke-width: 1.2; }
+.doc-t { fill: var(--ink-2); font-family: var(--font-sans); font-size: 11.5px; font-weight: 500; }
+.pt-reg { fill: #ffffff; stroke: var(--prod-mark); stroke-width: 2; }
+.pt-n { fill: var(--muted); font-family: var(--font-num); font-size: 10.5px; }
 .ln-own { stroke: var(--own-mark); stroke-width: 2; fill: none; stroke-linejoin: round; stroke-linecap: round; }
 .ln-ext { stroke: var(--ext); stroke-width: 2; fill: none; stroke-linejoin: round; stroke-linecap: round; }
 .pt-own { fill: var(--own-mark); stroke: #ffffff; stroke-width: 2; }
@@ -299,15 +311,42 @@ details.tview .tbl { margin-top: 10px; }
 .time [data-row] { transition: opacity .45s var(--ease); }
 .time .dim { opacity: .16; }
 
-/* week grid */
-.weeks { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
-.wk { border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px 14px; display: grid; gap: 4px; align-content: start; background: #ffffff; }
-.wk.own { border-top: 3px solid var(--own-mark); }
-.wk.prod { border-top: 3px solid var(--prod-mark); }
-.wk .no { font-family: var(--font-num); font-size: 12px; color: var(--muted); display: flex; justify-content: space-between; gap: 6px; }
-.wk .no b { color: var(--ink-2); font-weight: 700; }
-.wk p { font-size: 13.5px; line-height: 1.5; font-weight: 500; }
-.wk .g { justify-self: start; margin-top: 2px; font-family: var(--font-num); font-size: 11px; font-weight: 700; padding: 2px 7px; border-radius: 4px; background: var(--cond-soft); color: var(--cond); }
+/* SI phases */
+.fig-h { font-size: 17px; margin-bottom: 12px; }
+.si-scroll { overflow-x: auto; padding-bottom: 6px; }
+.si-bar { position: relative; display: grid; grid-template-columns: 26fr 54fr 16fr 13fr 17fr; gap: 3px; min-width: 720px; padding-bottom: 28px; }
+.sp { position: relative; border-radius: 8px; padding: 10px 12px; display: grid; gap: 2px; align-content: start; background: #eef2f7; border: 1px solid #cbd5e1; min-width: 0; }
+.sp b { font-size: 14.5px; color: var(--ink); white-space: nowrap; }
+.sp span { font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sp.dev { background: var(--own-soft); border-color: var(--own-mark); }
+.sp.dev b { color: var(--own); }
+.sp.reg { background: #ffffff; }
+.sp .mk { position: absolute; right: -2px; bottom: -27px; transform: translateX(50%); font-style: normal; font-size: 12px; font-weight: 700; color: var(--ink); white-space: nowrap; }
+.sp::after { content: none; }
+.sp.dev::after, .sp.last::after { content: ""; position: absolute; right: -3px; top: -5px; bottom: -9px; border-right: 2px solid var(--ink); }
+.sp.last::after { right: -1px; border-color: var(--crit); }
+.sp.last .mk { right: 0; transform: none; color: var(--crit); }
+.si-tbl th, .si-tbl td { vertical-align: top; }
+.si-tbl tbody th { white-space: nowrap; }
+.si-tbl .open-row th, .si-tbl .open-row td { background: var(--panel); }
+.rk { display: inline-block; font-size: 11.5px; font-weight: 700; padding: 2px 8px; border-radius: 4px; margin-bottom: 8px; }
+.rk.c { background: #eef2f7; color: var(--ink-2); }
+.rk.t { background: var(--own-soft); color: var(--own); }
+.rk.r { background: #ffffff; color: var(--prod); border: 1px solid var(--prod-mark); }
+.rds { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.rds li { display: grid; grid-template-columns: 22px 38px minmax(0, 1fr); gap: 8px; align-items: start; font-size: 14px; line-height: 1.55; }
+.rn { width: 22px; height: 22px; border-radius: 50%; display: inline-grid; place-items: center; font-family: var(--font-num); font-size: 11px; font-weight: 700; font-style: normal; background: var(--own-mark); color: #ffffff; }
+.rn.p { background: var(--prod-mark); }
+.rn.reg { background: #ffffff; color: var(--prod); box-shadow: inset 0 0 0 1.5px var(--prod-mark); }
+.rn.s { width: 16px; height: 16px; font-size: 9px; vertical-align: -3px; margin-right: 6px; }
+.rds .dt { font-family: var(--font-num); font-size: 12px; color: var(--muted); padding-top: 2px; }
+.rds .g { display: inline-block; margin-left: 6px; font-family: var(--font-num); font-size: 11px; font-weight: 700; padding: 1px 6px; border-radius: 4px; background: var(--cond-soft); color: var(--cond); vertical-align: 1px; }
+.dl { list-style: none; margin: 0; padding: 0; display: grid; gap: 5px; font-size: 14px; line-height: 1.5; }
+.dl li { padding-left: 14px; position: relative; }
+.dl li::before { content: ""; position: absolute; left: 0; top: .55em; width: 6px; height: 7px; border: 1.3px solid var(--ink-2); border-radius: 1px; }
+.dl .sub { display: block; margin-top: 1px; font-size: 12.5px; line-height: 1.45; }
+.due { display: inline-block; margin: 6px 0 12px; font-size: 12px; font-weight: 700; color: var(--prod); }
+.due:last-child { margin-bottom: 0; }
 
 /* cascade */
 .cascade { border: 1px solid var(--line); border-radius: 14px; padding: 20px; display: grid; gap: 16px; background: #ffffff; }
@@ -331,8 +370,8 @@ details.tview .tbl { margin-top: 10px; }
 /* 3D layer stack */
 .iso-grid { display: grid; grid-template-columns: minmax(0, 1fr) 316px; gap: 16px; align-items: stretch; }
 .iso-scroll { overflow-x: auto; border-radius: 16px; min-width: 0; }
-.iso-stage { position: relative; height: 580px; overflow: hidden; perspective: 2400px; perspective-origin: 50% 30%; border-radius: 16px; border: 1px solid var(--navy-line); background: radial-gradient(ellipse 60% 55% at 55% 58%, rgba(95,212,192,.07), transparent 70%); }
-.iso-fit { position: absolute; left: calc(50% + 58px); top: 50%; width: 860px; height: 230px; margin: -115px 0 0 -430px; transform-style: preserve-3d; transform: scale(var(--fit, 1)); }
+.iso-stage { position: relative; height: 640px; overflow: hidden; perspective: 2400px; perspective-origin: 50% 30%; border-radius: 16px; border: 1px solid var(--navy-line); background: radial-gradient(ellipse 60% 55% at 55% 58%, rgba(95,212,192,.07), transparent 70%); }
+.iso-fit { position: absolute; left: calc(50% + 58px); top: calc(50% - 34px); width: 860px; height: 230px; margin: -115px 0 0 -430px; transform-style: preserve-3d; transform: scale(var(--fit, 1)); }
 .iso-scene { position: absolute; inset: 0; transform-style: preserve-3d; transform: translateY(calc(var(--ty) + var(--fty))) scale(calc(var(--s) * var(--fs))) rotateX(var(--rx)) rotateZ(var(--rz));
   transition: --rx 1s var(--ease), --rz 1s var(--ease), --gap 1s var(--ease), --ty 1s var(--ease), --s 1s var(--ease), --fty 1s var(--ease), --fs 1s var(--ease), --lift-mid 1s var(--ease), --lift-top 1s var(--ease), --sink-base 1s var(--ease); }
 .iso-scene[data-cam="stack"]   { --rx: 62deg; --rz: -22deg; --gap: 14px;  --ty: 30px;  --s: .8; transition-duration: 0s; }
@@ -340,9 +379,6 @@ details.tview .tbl { margin-top: 10px; }
 .iso-scene[data-cam="explode"] { --rx: 58deg; --rz: -18deg; --gap: 220px; --ty: 131px; --s: .7; }
 .iso-scene[data-cam="low"]     { --rx: 72deg; --rz: -14deg; --gap: 150px; --ty: 120px; --s: .84; }
 .iso-scene.assembling { transition-duration: 1.6s; }
-.iso-scene[data-focus="prod"] { --lift-mid: 130px; --lift-top: 240px; --fs: 1.05; --fty: -40px; }
-.iso-scene[data-focus="own"]  { --sink-base: -90px; --lift-top: 170px; --fs: 1.05; --fty: 26px; }
-.iso-scene[data-focus="seam"] { --lift-mid: 80px; --fs: 1.02; --fty: 18px; }
 .plane { position: absolute; inset: 0; transform-style: preserve-3d; border-radius: 18px; }
 .plane.base { transform: translateZ(var(--sink-base)); background-color: rgba(226,233,242,.95); border: 1px solid rgba(255,255,255,.55); background-image: radial-gradient(circle, rgba(15,23,42,.10) 1px, transparent 1.3px); background-size: 20px 20px; }
 .plane.mid  { transform: translateZ(calc(var(--gap) + var(--lift-mid))); background: rgba(26,154,138,.16); border: 1.5px solid rgba(95,212,192,.75); }
@@ -372,42 +408,51 @@ details.tview .tbl { margin-top: 10px; }
 .post .anchor { transform: translateZ(calc((var(--gap) + var(--lift-mid) - var(--sink-base)) / 2)); }
 .link { position: absolute; height: 2px; background: var(--own-mark); transform: translateZ(2px); transition: opacity .5s var(--ease); }
 .link::after { content: ""; position: absolute; right: -1px; top: -4px; border: 5px solid transparent; border-left: 7px solid var(--own-mark); border-right: 0; }
-/* focus: 제품 영역 — 위층을 걷어 내고 기반 층을 드러낸다 */
-.iso-scene[data-focus="prod"] .plane:not(.base) :is(.face, .side, .bb, .link),
-.iso-scene[data-focus="prod"] .post .strip, .iso-scene[data-focus="prod"] .post .bb { opacity: .08; }
-.iso-scene[data-focus="prod"] .plane.base .tile:not(.prod) :is(.face, .side, .bb) { opacity: .4; }
-.iso-scene[data-focus="prod"] .plane.base > .anchor .bb.layer { color: var(--mint); }
-/* focus: 자체 설계 — 아래·위층을 밀어내고 처리 층만 남긴다 */
-.iso-scene[data-focus="own"] .plane:not(.mid) :is(.face, .side, .bb) { opacity: .1; }
-.iso-scene[data-focus="own"] .post .strip, .iso-scene[data-focus="own"] .post .bb { opacity: .18; }
-.iso-scene[data-focus="own"] .plane.mid > .anchor .bb.layer { color: var(--mint); }
-.iso-scene[data-focus="own"] .link { background: repeating-linear-gradient(90deg, var(--mint) 0 5px, transparent 5px 9px); background-size: 18px 2px; animation: slide .7s linear infinite; }
-@keyframes slide { to { background-position: 18px 0; } }
-/* focus: 교체 지점 — 세 기둥만 남긴다 */
-.iso-scene[data-focus="seam"] .tile:not([data-seam]) :is(.face, .side, .bb),
-.iso-scene[data-focus="seam"] .post:not(.seam) .strip,
-.iso-scene[data-focus="seam"] .link,
-.iso-scene[data-focus="seam"] .bb.layer { opacity: .12; }
-.iso-scene[data-focus="seam"] .bb.badge { width: 36px; height: 36px; font-size: 18px; }
-.iso-scene[data-focus="seam"] .post.seam .strip, .iso-scene.flowing .post.seam .strip { animation: rise 1s linear infinite; }
 @keyframes rise { to { background-position: 0 -20px; } }
 .iso-scene[data-phase="after"]  #mv-own  { transform: translateZ(-46px); }
 .iso-scene[data-phase="after"]  #mv-own  :is(.face, .side, .bb) { opacity: 0 !important; }
 .iso-scene[data-phase="before"] #mv-prod { transform: translateZ(150px); }
 .iso-scene[data-phase="before"] #mv-prod :is(.face, .side, .bb) { opacity: 0 !important; }
 .iso-tools { display: flex; flex-wrap: wrap; gap: 10px 22px; align-items: center; }
+/* packet walkthrough */
+.packet { position: absolute; left: 0; top: 0; width: 0; height: 0; transform-style: preserve-3d; transition: transform .43s cubic-bezier(.45,.05,.55,.95); }
+.packet.jump { transition: none; }
+.packet .anchor { transform: none; }
+.bb.pk { background: var(--mint); color: var(--navy); border: 0; font-size: 15px; font-weight: 800; padding: 6px 15px; border-radius: 999px; box-shadow: 0 0 0 6px rgba(95,212,192,.30), 0 8px 20px rgba(0,0,0,.45); transition: opacity .3s, background .3s; }
+.bb.pk.q { background: #ffd27a; box-shadow: 0 0 0 6px rgba(255,210,122,.30), 0 8px 20px rgba(0,0,0,.45); }
+.bb.pk.ans { background: #ffffff; box-shadow: 0 0 0 6px rgba(255,255,255,.24), 0 8px 20px rgba(0,0,0,.45); }
+.packet.off .bb.pk { opacity: 0; }
+.post.lit .strip { width: 5px; left: -2.5px; box-shadow: 0 0 14px rgba(237,161,0,.9); animation: rise .7s linear infinite; }
+.post.lit .bb.badge { width: 36px; height: 36px; font-size: 18px; }
+.iso-scene.flowmode .tile:not(.onpath) :is(.face, .side, .bb) { opacity: .3; }
+.tile.done .face { box-shadow: 0 0 0 2px rgba(95,212,192,.6); }
+.iso-scene.touching .tile.hot:is(.prod, .ext) .face { box-shadow: 0 0 0 3px var(--cond-mark), 0 14px 26px rgba(0,0,0,.35); }
+.iso-scroll { position: relative; }
+.iso-cap { position: absolute; left: 14px; right: 14px; bottom: 14px; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 11px 16px; border-radius: 12px; background: rgba(11,22,38,.86); border: 1px solid var(--navy-line); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); color: #ffffff; z-index: 2; }
+.iso-cap .cap-n { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; background: var(--mint); color: var(--navy); font-family: var(--font-num); font-weight: 700; font-size: 15px; }
+.iso-cap.touch .cap-n { background: var(--cond-mark); }
+.iso-cap.idle .cap-n { background: rgba(255,255,255,.14); color: #ffffff; font-size: 12px; }
+.iso-cap b { display: block; font-size: 15.5px; line-height: 1.4; }
+.iso-cap .d { display: block; font-size: 13px; color: var(--on-navy-2); line-height: 1.5; }
+.cap-chip { font-size: 12px; font-weight: 700; padding: 4px 10px; border-radius: 999px; white-space: nowrap; }
+.cap-chip.own { background: rgba(26,154,138,.30); color: var(--mint); }
+.cap-chip.prod { background: rgba(237,161,0,.24); color: #ffd27a; }
+.cap-chip.ext { background: rgba(255,255,255,.12); color: var(--on-navy); }
+.ie-steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+.ie-steps button { all: unset; box-sizing: border-box; width: 100%; display: grid; grid-template-columns: 22px minmax(0, 1fr); gap: 10px; padding: 8px 10px; border-radius: 10px; cursor: pointer; color: var(--on-navy-2); transition: background .2s; }
+.ie-steps button:hover { background: rgba(255,255,255,.06); }
+.ie-steps button:focus-visible { outline: 2px solid var(--mint); outline-offset: 1px; }
+.ie-steps button[aria-current="step"] { background: rgba(95,212,192,.14); color: #ffffff; }
+.ie-steps .sn { width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; font-family: var(--font-num); font-size: 12px; font-weight: 700; background: rgba(255,255,255,.12); color: #ffffff; margin-top: 1px; }
+.ie-steps li.touch .sn { background: var(--cond-mark); color: var(--navy); }
+.ie-steps b { display: block; font-size: 13.5px; font-weight: 700; line-height: 1.45; color: inherit; }
+.ie-steps small { display: block; font-size: 12px; line-height: 1.5; color: var(--on-navy-2); }
+.btn.icon { padding: 6px 9px; }
 /* explanation panel */
 .iso-explain { border: 1px solid var(--navy-line); border-radius: 16px; padding: 22px 20px; background: rgba(255,255,255,.035); display: grid; gap: 14px; align-content: start; min-width: 0; }
 .ie-k { font-size: 12px; font-weight: 700; color: var(--mint); letter-spacing: .04em; }
 .iso-explain h3 { font-size: 18px; color: #ffffff; line-height: 1.45; }
 .iso-explain p { font-size: 13.5px; color: var(--on-navy-2); line-height: 1.65; }
-.ie-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
-.ie-list li { display: grid; grid-template-columns: 12px minmax(0, 1fr); gap: 10px; padding: 9px 10px; border-radius: 10px; cursor: default; transition: background .2s; }
-.ie-list li:hover, .ie-list li:focus-visible, .ie-list li.on { background: rgba(255,255,255,.07); }
-.ie-list li i { width: 10px; height: 10px; border-radius: 3px; margin-top: 6px; }
-.ie-list li i.prod { background: var(--prod-mark); } .ie-list li i.own { background: var(--own-mark); } .ie-list li i.ext { background: var(--ext-mark); } .ie-list li i.cond { background: var(--cond-mark); }
-.ie-list li b { display: block; font-size: 14px; color: #ffffff; font-weight: 700; line-height: 1.45; }
-.ie-list li span { display: block; font-size: 12.5px; color: var(--on-navy-2); line-height: 1.55; }
 .ie-foot { font-size: 12.5px; color: var(--on-navy-2); border-top: 1px solid var(--navy-line); padding-top: 12px; }
 .iso-explain.swap { animation: fadein .45s var(--ease); }
 
@@ -481,7 +526,7 @@ details.tview .tbl { margin-top: 10px; }
   .opt + .opt { border-left: 0; border-top: 1px solid var(--line); }
   .branch > header .when-t { margin-left: 0; width: 100%; }
   .facts li { grid-template-columns: minmax(0, 1fr); gap: 2px; }
-  .iso-stage { min-width: 760px; height: 480px; }
+  .iso-stage { min-width: 760px; height: 560px; }
   .stages { grid-template-columns: repeat(2, minmax(0,1fr)); }
   .cut { grid-column: 1 / -1; height: 26px; }
   .cut::before { top: 50%; bottom: auto; left: 0; right: 0; border-left: 0; border-top: 2px dashed var(--own-mark); transform: none; }
@@ -528,24 +573,27 @@ details.tview .tbl { margin-top: 10px; }
     <div class="hero-stats" role="list">
       <div class="hs" role="listitem"><span class="k">오픈까지 남은 기간</span><span class="v">18<small>주</small></span><span class="d">11/23 ~ 3/31 운영 오픈 기한</span></div>
       <div class="hs" role="listitem"><span class="k">제품 위 시험 가능 기간</span><span class="v"><span class="pre">약</span>8<small>주</small></span><span class="d">1월 중순 입고 후 약 10주에서 인프라 안정화 2주(가정)를 뺀 기간</span></div>
-      <div class="hs" role="listitem"><span class="k">주간 평가</span><span class="v">17<small>회</small></span><span class="d">11/30 ~ 3/22, 회차마다 한 가지만 변경</span></div>
+      <div class="hs" role="listitem"><span class="k">주간 평가</span><span class="v">17<small>회</small></span><span class="d">11/30 ~ 3/22 · 2/12 개발 완료 전 튜닝 11회, 뒤로 회귀 6회</span></div>
       <div class="hs" role="listitem"><span class="k">판단 대기 분기</span><span class="v">7<small>개</small></span><span class="d">G1(12월 말)·G2(1월 말)에 닫는다</span></div>
     </div>
 
     <figure class="hero-fig">
       <div class="fh">
-        <h2>구조 한눈에 보기</h2>
-        <div class="chart-key"><span><i class="sw prod"></i>제품</span><span><i class="sw own"></i>자체</span><span><i class="sw ext"></i>고객사 기존</span><span><i class="sw cond"></i>교체 지점</span></div>
+        <h2>구조 한눈에 보기 <small>문서와 질문이 어디를 지나가는지 따라간다</small></h2>
+        <div class="chart-key"><span><i class="sw prod"></i>제품</span><span><i class="sw own"></i>자체</span><span><i class="sw ext"></i>고객사 기존</span><span><i class="sw cond"></i>제품과 만나는 단계</span></div>
       </div>
       <div class="iso-tools">
-        <div class="ctl"><span>보기</span>
-          <div class="seg" role="group" aria-label="강조할 영역" id="isoFocus">
-            <button type="button" data-v="all" aria-pressed="true">전체</button>
-            <button type="button" data-v="prod" aria-pressed="false">제품 영역</button>
-            <button type="button" data-v="own" aria-pressed="false">자체 설계</button>
-            <button type="button" data-v="seam" aria-pressed="false">교체 지점</button>
+        <div class="ctl"><span>따라가기</span>
+          <div class="seg" role="group" aria-label="시나리오" id="isoScn">
+            <button type="button" data-v="doc" aria-pressed="true">문서가 들어갈 때</button>
+            <button type="button" data-v="qa" aria-pressed="false">질문이 들어올 때</button>
+            <button type="button" data-v="delay" aria-pressed="false">제품이 늦어지면</button>
           </div>
-          <button type="button" class="btn" id="isoTour" aria-pressed="false"><svg viewBox="0 0 12 12" aria-hidden="true"><path d="M2 1 L11 6 L2 11 Z" fill="currentColor"/></svg>순서대로 보기</button>
+        </div>
+        <div class="ctl">
+          <button type="button" class="btn icon" id="isoPrev" aria-label="이전 단계"><svg viewBox="0 0 12 12" aria-hidden="true"><path d="M10 1 L3 6 L10 11 Z M1.5 1 H3 V11 H1.5 Z" fill="currentColor"/></svg></button>
+          <button type="button" class="btn" id="isoPlay" aria-pressed="false"><svg viewBox="0 0 12 12" aria-hidden="true"><path d="M2 1 L11 6 L2 11 Z" fill="currentColor"/></svg><span>재생</span></button>
+          <button type="button" class="btn icon" id="isoNext" aria-label="다음 단계"><svg viewBox="0 0 12 12" aria-hidden="true"><path d="M2 1 L9 6 L2 11 Z M9 1 H10.5 V11 H9 Z" fill="currentColor"/></svg></button>
         </div>
         <div class="ctl"><span>각도</span>
           <div class="seg" role="group" aria-label="카메라 각도" id="isoCam">
@@ -554,20 +602,16 @@ details.tview .tbl { margin-top: 10px; }
             <button type="button" data-v="low" aria-pressed="false">낮게</button>
           </div>
         </div>
-        <div class="ctl"><span>Milvus</span>
-          <div class="seg" role="group" aria-label="제품 입고 시점" id="isoPhase">
-            <button type="button" data-v="before" aria-pressed="false">입고 전</button>
-            <button type="button" data-v="after" aria-pressed="true">입고 후</button>
-          </div>
-        </div>
       </div>
       <div class="iso-grid">
-        <div class="iso-scroll"><div class="iso-stage" id="isoStage" role="img" aria-label="세 층 구조. 아래 기반 층은 제품(운영 기반, UDI, watsonx.ai, watsonx.data Milvus)과 고객사 인프라(사내 게이트웨이, GPU)로 모두 on-prem이다. 가운데 처리 층은 자체 설계한 수집·형식 판별, 파서 라우터, 청킹, 임베딩 호출, 벡터 적재, 평가 콘솔, MCP 서버, 검색 API다. 위 사용 층은 에이전트 4개와 평가셋을 만드는 업무 담당자다. 기반 층과 처리 층은 교체 지점 1, 2, 3의 기둥으로만 연결된다.">
-          <div class="iso-fit" id="isoFit"><div class="iso-scene" id="isoScene" data-cam="iso" data-focus="all" data-phase="after"></div></div>
-        </div></div>
-        <aside class="iso-explain" id="isoExplain" aria-live="polite"></aside>
+        <div class="iso-scroll">
+          <div class="iso-stage" id="isoStage" role="img" aria-label="세 층 구조와 흐름. 아래 기반 층은 제품(운영 기반, UDI, watsonx.ai, watsonx.data Milvus)과 고객사 인프라(사내 게이트웨이, GPU)로 모두 on-prem이다. 가운데 처리 층은 자체 설계한 수집·형식 판별, 파서 라우터, 청킹, 임베딩 호출, 벡터 적재, 평가 콘솔, MCP 서버, 검색 API다. 위 사용 층은 에이전트 4개와 업무 담당자다. 문서와 질문은 처리 층을 따라 흐르고, 제품과는 기둥 1, 2, 3을 타고 내려갈 때만 만난다.">
+            <div class="iso-fit" id="isoFit"><div class="iso-scene" id="isoScene" data-cam="iso" data-phase="after"></div></div>
+          </div>
+          <div class="iso-cap idle" id="isoCap" aria-live="polite"><span class="cap-n">▶</span><div><b>재생을 누르면 문서 한 건을 따라간다</b><span class="d">주황 번호 단계에서만 제품과 만난다</span></div><span></span></div>
+        </div>
+        <aside class="iso-explain" id="isoExplain"></aside>
       </div>
-      <p class="live" id="isoLive" aria-live="polite">‘Milvus 입고 전/후’를 바꾸면 기반 층의 Milvus만 교체되고 처리 층은 그대로다.</p>
     </figure>
 
     <div class="legend" aria-label="표시 범례">
@@ -911,12 +955,12 @@ details.tview .tbl { margin-top: 10px; }
           </tbody>
         </table>
       </div>
-      <p class="note">콘솔 임베딩 평가는 Hit@1·3·5·10과 MRR을 정답 문서·정답 구절 기준으로 나눠 채점하고, 파싱 비교는 정답 자료와 대조한다. 재구축 단계 수는 위 ‘변경 범위별 재구축 단계’ 기준이다. 정체 구간을 3월 전에 지나가려면 제품을 기다리지 않고 12월부터 시도를 쌓아야 한다.</p>
+      <p class="note">콘솔 임베딩 평가는 Hit@1·3·5·10과 MRR을 정답 문서·정답 구절 기준으로 나눠 채점하고, 파싱 비교는 정답 자료와 대조한다. 재구축 단계 수는 위 ‘변경 범위별 재구축 단계’ 기준이다. 정체 구간을 개발 완료(2/12) 전에 지나가려면 제품을 기다리지 않고 12월부터 시도를 쌓아야 한다. 개발 완료 뒤에는 결함 조치와 회귀 평가만 한다.</p>
     </div>
 
     <div class="callout">
       <b>설계 목표: 재구축 비용 최소화</b>
-      <p>청크 정본이 있으면 임베딩·Milvus·검색 쪽 변경은 재파싱 없이 시작한다. 교체 지점(05)은 제품 전환을 설정 변경으로 만들고, 자동 재평가는 회차마다 같은 기준을 보장한다. <mark class="hl">재구축 시간이 짧아야 18주 안에 17회 평가할 수 있다.</mark></p>
+      <p>청크 정본이 있으면 임베딩·Milvus·검색 쪽 변경은 재파싱 없이 시작한다. 교체 지점(05)은 제품 전환을 설정 변경으로 만들고, 자동 재평가는 회차마다 같은 기준을 보장한다. <mark class="hl">재구축 시간이 짧아야 개발 8주 안에 튜닝 회차를 돌리고, 회차 사이에도 여러 번 시도할 수 있다.</mark></p>
     </div>
   </div></section>
 
@@ -924,11 +968,40 @@ details.tview .tbl { margin-top: 10px; }
   <section class="band" id="s3"><div class="wrap band-in">
     <div class="sec-head">
       <span class="kicker"><b>03</b>평가 계획</span>
-      <h2>평가셋을 고정하고 매주 한 가지씩 바꿔 측정한다</h2>
-      <p>점수가 떨어진 회차도 원인을 기록하면 진행으로 본다. <mark class="hl">측정 도구는 운영 콘솔에 이미 갖춰져 있다.</mark></p>
+      <h2>평가 회차를 SI 단계에 맞추고, 회차 기록을 산출물로 남긴다</h2>
+      <p>설계 단계의 비교 결과는 설계서의 선정 근거가 되고, 개발 단계의 회차 기록은 평가 결과서가 된다. <mark class="hl">2월 12일 개발 완료 뒤에는 기능을 바꾸지 않고 회귀 평가만 한다.</mark> 측정 도구는 운영 콘솔에 이미 갖춰져 있다.</p>
+    </div>
+
+    <div class="block">
+      <h3>SI 단계별 평가 회차와 산출물 <span class="tag assume">가정</span></h3>
+      <div class="si-scroll">
+        <div class="si-bar" role="img" aria-label="SI 단계. 분석·설계 11/23~12/18(1~3회 설계 비교), 개발 12/21~2/12(4~11회 튜닝), 통합·성능 테스트 2/13~2/28(12~13회), 인수 테스트 3/1~3/13(14~15회), 이행 3/14~3/30(16~17회), 3/31 오픈. 2/12 개발 완료 뒤에는 회귀 평가만 한다.">
+          <div class="sp"><b>분석·설계</b><span>11/23~12/18 · 1~3회</span></div>
+          <div class="sp dev"><b>개발</b><span>12/21~2/12 · 4~11회 튜닝</span><i class="mk">개발 완료 2/12</i></div>
+          <div class="sp reg"><b>통합·성능</b><span>~2/28 · 12~13회</span></div>
+          <div class="sp reg"><b>인수</b><span>~3/13 · 14~15회</span></div>
+          <div class="sp reg last"><b>이행</b><span>~3/30 · 16~17회</span><i class="mk">3/31 오픈</i></div>
+        </div>
+      </div>
+      <div class="chart-key"><span><i class="rn s">n</i>설계 비교·튜닝 (자체 Milvus)</span><span><i class="rn s p">n</i>설계 비교·튜닝 (제품 위, A)</span><span><i class="rn s p reg">n</i>회귀 평가: 기능 고정, 결함 조치 후 점수 확인</span></div>
+      <div class="tbl wide">
+        <table class="si-tbl">
+          <thead><tr><th>단계</th><th>기간</th><th>평가 회차</th><th>산출물</th></tr></thead>
+          <tbody>
+          <tr><th>분석·설계</th><td class="nw">11/23 ~ 12/18<span class="sub">4주</span></td><td><span class="rk c">1~3회 · 설계 비교</span><ol class="rds"><li><span class="rn">1</span><span class="dt">11/30</span><span>기준선: 기존 RAG를 평가셋으로 측정</span></li><li><span class="rn">2</span><span class="dt">12/7</span><span>파서 비교: Docling·기존 파서</span></li><li><span class="rn">3</span><span class="dt">12/14</span><span>청킹 전략 비교</span></li></ol></td><td><ul class="dl"><li>현행 분석서 <span class="sub">기존 RAG 기준선 포함</span></li><li>요구사항 정의서 <span class="sub">오픈 기준 점수는 기준선 측정 후 제시</span></li><li>평가 기준서 <span class="sub">평가셋 구성·지표·판정 방식</span></li></ul><span class="due">12/4 제출</span><ul class="dl"><li>아키텍처 정의서</li><li>인터페이스 정의서 <span class="sub">검색 API·MCP 도구·임베딩 호출</span></li><li>컬렉션 정의서 <span class="sub">Milvus 스키마·차원·인덱스</span></li></ul><span class="due">12/18 제출</span></td></tr>
+          <tr><th>개발</th><td class="nw">12/21 ~ 2/12<span class="sub">8주</span></td><td><span class="rk t">4~11회 · 튜닝</span><ol class="rds"><li><span class="rn">4</span><span class="dt">12/21</span><span>임베딩 후보: 기존 4096·Qwen3-4B·MRL 축소</span></li><li><span class="rn">5</span><span class="dt">12/28</span><span>검색 순위 튜닝: 하이브리드 가중치·리랭커<span class="g">G1</span></span></li><li><span class="rn">6</span><span class="dt">1/4</span><span>메타·권한 필터</span></li><li><span class="rn">7</span><span class="dt">1/11</span><span>검색 API·MCP 도구 계약 점검</span></li><li><span class="rn">8</span><span class="dt">1/18</span><span>오답 유형 보정 (입고·안정화 시작)</span></li><li><span class="rn">9</span><span class="dt">1/25</span><span>이관 리허설<span class="g">G2</span></span></li><li><span class="rn p">10</span><span class="dt">2/1</span><span>제품 Milvus 전환 후 재평가</span></li><li><span class="rn p">11</span><span class="dt">2/8</span><span>UDI 형식별 비교, 개발 완료 기준 점수</span></li></ol></td><td><ul class="dl"><li>소스·프로그램 목록</li><li>단위 테스트 결과서</li><li>회차별 평가 결과서 <span class="sub">4~11회 점수·변경·원인</span></li><li>모델·설정 선정 근거서 <span class="sub">G1·G2 판단 기록</span></li></ul><span class="due">2/12 제출</span></td></tr>
+          <tr><th>통합·성능 테스트</th><td class="nw">2/13 ~ 2/28<span class="sub">2주</span></td><td><span class="rk r">12~13회 · 회귀</span><ol class="rds"><li><span class="rn p reg">12</span><span class="dt">2/15</span><span>전체 적재 후 회귀 평가</span></li><li><span class="rn p reg">13</span><span class="dt">2/22</span><span>부하·응답 시간 측정과 회귀 평가</span></li></ol></td><td><ul class="dl"><li>통합 테스트 결과서</li><li>성능 테스트 결과서 <span class="sub">응답 시간 p95·적재 처리량</span></li></ul><span class="due">2/26 제출</span></td></tr>
+          <tr><th>인수 테스트</th><td class="nw">3/1 ~ 3/13<span class="sub">2주</span></td><td><span class="rk r">14~15회 · 회귀</span><ol class="rds"><li><span class="rn p reg">14</span><span class="dt">3/1</span><span>업무 담당자 질문으로 회귀 평가</span></li><li><span class="rn p reg">15</span><span class="dt">3/8</span><span>운영 시나리오(권한·필터) 회귀 평가</span></li></ol></td><td><ul class="dl"><li>인수 테스트 결과서 <span class="sub">업무 담당자 평가셋 기준 점수</span></li><li>결함 조치 내역</li><li>이행 계획서</li></ul><span class="due">3/12 제출</span></td></tr>
+          <tr><th>이행</th><td class="nw">3/14 ~ 3/30<span class="sub">2주</span></td><td><span class="rk r">16~17회 · 회귀</span><ol class="rds"><li><span class="rn p reg">16</span><span class="dt">3/15</span><span>운영 환경 적재 후 회귀 평가</span></li><li><span class="rn p reg">17</span><span class="dt">3/22</span><span>최종 회귀 평가<span class="g">오픈 판정</span></span></li></ol></td><td><ul class="dl"><li>이행 결과서</li><li>최종 평가 결과서</li><li>운영자 매뉴얼 <span class="sub">재적재·모델 교체·평가 실행 절차</span></li></ul><span class="due">3/26 제출</span></td></tr>
+          <tr class="open-row"><th>오픈</th><td class="nw">3/31</td><td>—</td><td><ul class="dl"><li>안정화 계획 · 완료 보고서 <span class="sub">오픈 뒤 제출</span></li></ul></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="note">튜닝은 개발 단계(4~11회)에 모은다. 2월 12일 개발 완료 뒤에는 기능을 바꾸지 않고, 결함을 조치한 뒤 점수가 기준 아래로 떨어지지 않았는지 회귀 평가로만 확인한다. 회차 사이에는 재구축 비용이 낮은 시도(가중치·리랭커·청킹 설정)를 여러 번 돌리고 가장 나은 것 하나를 회차에 올려 기록한다. 회차 주제는 계획이며 앞 회차 결과에 따라 순서를 바꾼다. 입고나 안정화가 늦어지면 10회차 이후도 자체 Milvus에서 진행한다(<a class="did" href="#d3">D3</a> B). 단계 구분과 산출물 이름은 일반적인 SI 기준으로 적었고, 고객사 방법론의 양식에 맞춰 조정한다.</p>
     </div>
 
     <figure>
+      <h3 class="fig-h">한 회차의 진행</h3>
       <div class="panel">
         <svg class="loop" viewBox="0 0 792 150" role="img" aria-label="평가 회차의 순서. 평가셋을 고정하고, 한 가지만 바꾸고, 재구축하고, 점수를 비교하고, 유지하거나 되돌린 뒤 다음 회차로 돌아간다.">
           <defs><marker id="ah0" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#98a2b3"/></marker></defs>
@@ -999,31 +1072,6 @@ details.tview .tbl { margin-top: 10px; }
         <button type="button" class="shot" data-lb aria-label="벡터 DB 크게 보기"><img src="data:image/webp;base64,UklGRmqiAABXRUJQVlA4IF6iAABwmgOdASrgBi8EPm02l0mkIqKkIPMoqIANiWlu++M2bfaRN3a9G/hSX9aG76J4/c81HhN9p5C/v3gB9Of+W/EP4Cv1p9aP/o9gf+F9BX8o/zX7Ze8f6gf7Z6gH9Q/4HrX+s1/cPUg863/4/ut8Tf95/6/7j+2P//9Z68sf2j8gf6P8f/jX69/a/7v+z/9s9Nfxf55+6/3n9ov7p7TX8D46fT/6z/gf5v1P/kf2h/C/2r/N/8D++/vn8af6D+z/uP/ePSP83/av9B/f/2+/u3yC/kv8m/v39t/c//BfvX7oP9r3Dun/7j/Y/5P2BfVz6D/pf7t/mv/P/kfRt/if7r+8P7////6O/Tv7f/m/8t+Q/2Afyj+mf8H/E+4/+v/6vjQfa/91/2P838Af8x/uv/c/xv+y/az6Wv6L/w/5b/X/uT7evzL/Of+L/Pflh9hn8z/sn/W/xf5WfPn///eb6PAQqTLSeH0SFKPOXF5n25n25n25n25n25n25n25n25n25n25n25n25n25n25n25n25n25n25n2wRWLiUa/RvKoljoDIKtks9zD0YxZi4PqjT8lAnre6MMluxeZ9uZ9uZ9uZ9uZ9uZ9uZ9uZ9uZ9uZ9uZ9uZ9uZ9uZ9uZ9hytWuSDZhusJTvUaZDS1Lqf+S3NitAFlgub7i7IxX6LT2H/K9IIaG5lSLl/zsotVFuFi2OQslpu/Yp9MC5PYsx8J/TZjGnZtUY3nwM8gwJH5wJajsyLt+NAjEmEAL6eZVrvSLYLyDlRLDgY7x9XoxakLLb5C4qXNojNsmLzPtzPtzPtzPtzPtzPtzPtzPtzPtzPtzPtzPtzPtzPhqhE5jRiVou9GPXdABeSZSJEsTe68p5Fo1p0nUAXXT0NKEwe+SegyV+LsHT40EpJAS1PdEXOJ0RkIZRneTnUN/W6hMaRnd1jD0qQSRsZpMEulnwgSY8Y6giLGSUvN+vtcd+s8vpeZ9uZ9uZ9uZ9uZ9uZ9uZ9uZ9uZ9uZ9uZ9uZ9uZ9uZ9yn8oOF9HPgPZcTV5NnPTDAuivAbGmX/CntWsunuWrfddNREq9wJvWSodBFcA9nWp9bLeO7A8uUWAehAq529gttb4ZkBLgKB36ImBDzqvIahNbrqbw+W6ePCkQLSilip8qhVScpkN0BVu+do7WhyQ/GJhrVSDg5o1AmNJwkvDK/A3lraqXQVFyO7e3oySdwyoks/oZfjK05MdxypB7VLGl82yYL8oKefIU+3M+3M+3M+3M+3M+3M+3M9fLXhLJgDTx8H8SlwLttDhMT0wS0vZyO4umVvPjQtrlOp54BFG66BDCibnoGj6gQUA36LGwd8rT2mGPfGNHDSunRt4kXICFDvxESDXzNJwhRxYv1Vmn9np0CEoc1Ato1t6jLPzqFwg3hQ5O48UsFIS1uiGwCPDhrR10OWZIGzt0yIa1dhU4BcaHlqgcEiFn5bx0D3pL8b3WVZbxyx+Nf4eHMrBwPXMB4iimJxM+zB5nGmg3v8k3RFlMvqpBeRb/8NsdipFOH0wa70phTZxE0GmvXEMXTYxqpfoswf6m/MtTfJWCWy5u0dAUOFdwq/qfVYLO2csSio4CWRAGdzg1yiorqYg4XYvGRhfIu2QgC0sHmH8YSkY+Cuw/WfaAwb5VrQZ8AOU6oQXXOpoA1wai/E6OUEhPloFpDCoTp4pcHXNMjeTrchsY8uwMXVrp8cdC6/krd0lWcdljKj5V4GLYAWEsOfxhG/4ZXkIcpR5y4vM+3M+3M+3M+3M+3M+RlP1JGPeCZmiRQAaICJ/lWVGD6oxRFsaTBiDeO3ZLz/HbRHskKq8uFXlthc1c5KS/4Gpp9sSMkw2KcGnBl7eMV4Uo85cXmfbmfbmfbmfbmt+dmd3KlUYFPtzPtzPtzPtzPtzPtzPtzPtzPtzPtzPtzPtzPtzPtzPtzPtzPtzPtzPtzPtzPt1pEHPGCrQi1gXVo4WyfI/Mx3+vaeAau8vyIDxwnQTnSaX9HR0nTKU9QUgk9z7mZphewVL44PS3aL+g1DDWp8otR80CcEbLQu93QTwjVGvQnsfVzdjtfcqUQXYPBXzoTEC7xSYGEoVnIpwSXG/a8YrwpR5y4vM+3M+3M+3M+3M+3M+3M+3M+3M+3M+3M+3M+3M+3M+3Wmq1wJvMS6RNYtXt0sv2Irj5B91uJChTDdWmvnlwo4buYCCYYflxeZ9uZ9uZ9uZ9uZ9uZ9uZ9uZ9uZ9uZ9uZ9uZ9uZ9uZ9uZ9uZ9uZ+adBkt2YBu+bvHSxeZ9uZ9uZ9uZ9uZ9uZ9uZ9uZ9uZ9uZ9uZ9uZ9uZ9uZ9uZ9uZ9uZ9ubQUaG1RXejGBJOGWky+JRXejHruxDVGeqflEFHlLQWcq4DNUafkorvRj13Yhqd8jW+oBG81Rp+Siu9GPXdiGqNPyUV3ox67n9BDrph8Oeu7ENUafkorvRj13YhqjT8ft7hmkCCGVbb3B6aGtloCJMqHSEKozTxRZXmU0irJbsXmfbmfccTMNOWYczf5txkZcFRFIDEYrwpR5y4vM/MxwAZiuNXnMNawa4iww85cXmfbmfbm2xjo+sO8flR16WwyW7F5n25n25oXmdAo2K2/dSer9k2ZtRpOKxo+O2oxZNhvu+7/n3hE8cvulJ7c/CUD8vM+3M+3M+44t34vAnV5S4zcSi4qRpimAnRDd4rwpR5y4vM+3WaUProRtmQxQqxDU98Hxsj6/tX6DL7O8KUecuLzPt1eU2Wv/vtQ2ebNbp+YNvP3V5y4vM+3M+3M/M/s3WwFLmUg4kt2LzPtzPuOKFOEirxGK8KUecuLzPt1mvIZ7ctWO4Uo85cXmfbmflzoRMHkzbiyYLlxeZ9uZ9uZ9x9lhKuBNeIvTQjp2LPBpadfQeZnwo85cXmfbmfccXg96KbMtS33Wwiq322a5fcKUecuLzPtzPzMlxR9HQkf+7O5iu3l0c7Gw5WsIvM+3M+3M+3M/LmtB/Ldp/ynJ2DjUUumj4CC1L6yQuFuoD2AZSCXN4xXhSjzlxes0YC8EM41ITrYEBFcCMdaiHJZ3hSjzlxeZ9uaFeESKQOeyT/vDkEkEMLszeMV4Uo85cXm4HPAH/d0SPXBPHwJCEUZocRvbmfbmfbmfbmfl0EY+b/AZc9N9uVzJPXZ1hcz++ZzdWE+U5/5e3jFeFKPOXINRflciC+3M+3M+3M+3M/ME44vM+3M+3M+3M+5AAcz7cz7cz7cz7cz8wHSXLdi8z7cz7cz6+vY+yt7VNuBa846yEFuTemN0m7x1jehiskpkmCH2jCC2Td46xvQxbJu8dY3hZlLBy5Br0xuk3eOsb0MWybvHWN4IXKxEH96Fjehi2Td46xvQxbJNz9cGwecuLzPtzPtzPtzPtzPtzPtzPtzPtzPtzPtzPtzPtzPtzPtzPtzPtzPtzPtzPtzPtyXH+dosaP+mvIVU+ipsuQn2/RrFXuCIakUo85cXmfbmfbmfbmfbmfbmfbmfbmfbmfbmfbmfbmfbmfbmfbmfbmfbmfXZc3FhWCSJ8NTKDKJFF6Xf++dDFIa3KYXPoT9HNpHRkEf/SNlk8jJ7mhr4hlxJcnfXO+8pqxSkZUTbTgQqkr4WWUkT7zPtzPtzPtzPtzPtzPtzPtzPtzPtzPtzPtzPtzPtzPtzPtzPtzPtzPtzK+OUQUXp4uONtclSc25iqcB3GCOVF6J8N4OGiBxD4N0vGK8KUecuLzPtzPtzPtzPtzPtzPtzPtzPtzPtzPtzPtzPtzPtzPtzPrsULs01O8Bcf9FuV5d54VR2kib0MWybvHWN6GLZN3jrG9DFsm7x1jehi2Td46xvQxbJu8dY3oYtk3eOsb0MWybvHWN6GLZN3jpYvM+3M+3M+3M+3M+3M+3M+3M+3M+3M+3M+3M+3M+3M+3M+3M+3M+3M+3M+3M+3M+3JcfxUBaPH4qZdBLgTbFl9wxiQJaUpASEsqEKBaJbeK8TauLWtcKuXF5n25n25n25n25n25n25n25n25n25n25n25n25n25n25n25n2JSrVbhFptPx8NbXLvLEIKfClNS1TOXVYmZI95dTTAypo7qJDupAYx0idKiB4D1envZLq05USx2K1MCD5jC/oQvwvXnEfAWagcezDJKnJv0iR+AjhtxPQnwo85cXmfbmfbmfbmfbmfbmfbmfbmfbmfbmfbmfbmfbmfbmfbmfbK+u08MxpykixCGnbNNM0kSA1VCXTiRKgc8iwTT7NAykwSlOvSZc4qrewplJdOtEC2dkGll3TN8qHnLi8z7cz7cz7cz7cz7cz7cz7cz7cz7cz7cz7cz7cz7cz7cz7c3TPHZeS1BwUTtZsL+2wmS1BT4KAAiGWtVqp6DNY8OlJM+3VEGty6EC2xqvoiTVZPyk7fJblMnPzK80L/bpdsjMtEMy9xa77B5iONlTOcfeFEJSC3zuxXcCYTg2mwpQYWRa/L+fAVUNXWBhKmakhJhdzfAdYpFXw74mCjoUIcPZPy5J7hw69AuGUNPTpxvkjLaZFXxiVOpcM33uhJj7O9z96/znu+FmEGc9EOVQFBYq63DBUl0CiQzchOr129BzMzmrxWTrojke0p5bEjA4lrCst32Bm2ngSNsB/aohMprrJMsB6FP2dOUo85cXmfbmfbmfbmfbmfbmfbmfbmfbmfbmfbmfbme/k9IF0nV0jjFBpsHfDpzupM+6KiGE1IjAEy5kJKTxvgCokBj713wjIjfrFyE6h5EqqqjTCtpZezPjg1LVsHfIwTaBXsHMwlvqbRMkxmJ59AsTEqsPhAFXf+fSypJbsXmfbmfbmfbmfbmfbmfbmfbmfbmfbmfbmfbmfbkqjxphBbJwoYTzdLZaAE5BiXkeB2W9MAqyHJKoLcm9MbpN3jrG9DFsm7x1jehi2Td46xvQxbJu8dY3oYtk3eOsb0MWybsBeN6GLXj4Mhf37JpSafLPFtkmXxKK70Y9d2Iao0/JRXejHruxDVGn5KK70Y9d2Iao0/JRXejHruxDVGn5KK70Y9d2Iao0/JRXejHruxDVGn5KK70Y9d2Iao0/JRXejHrHbdUKSu3UOq7XFV6d4gdBFFVDozylW2i2ddlJg3+H+aN6GLZN3jrG9DFsm7x1jehi2Td46xvQxbJu8dY3oYtk3eOsb0MWybvHWN6GLZN3jrG9DFr1z183uBryaKau5yNY8LU1oyx/qCfohUu3xiW6ZbO7P4u4HWUA1JCDOBNnr8UHuiiBxPbGup54fbmfbmfbmfbmfbmfbmfbmfbmfbmfbmfbmfbmfbmfbmfbkmS4gjN6q6lukBDFPwzxiVsgHlJhQe6Iga1eFPvUpfUqhN6hV+BZUaqynssVA5jGIQxWqYuMi+m5NjlFrz3f0ULIPU9ge8iNjD5ge/kYdDXIc8wyHGtLC4/xQe3lT74rUkxgNhv0v7p/H+rrBbERr1WqNhI2Hr6+Z3VaMK6yHd7rus/Rp7gLGuX8gCd2TOvZNZSj22Cl2Uaie3XvC8V44JAEO0T9fs6gq/QvClHnLi8z7cz7cz7cz7cz7cz7cz7cz7cz7cz7cytOy4Biu65LsGIsq6kM0r/BASTdtl1+dsn/rVft4HxK+Kgk2pM7cMKmjOHLaIE5MrksOfJ8k1iInjN27sUcENrTU8SOPoL+bXLZzYJiyyL3ylIBUO/b4+tpZGJdU+bQMoVq5pyaFNnolnISsOCILdVAVg1dVKZsai0I3MPpws7xcYoFirjN/lQMgNy+TjJb119QHrfKt5tS7mUDELTTcWiRkpd6WPef0GmmMsyeW6Hn4HSCI3mfbmfbmfbmfbmfbmfbmfbmfbmfbmfbmfbmfbmfibDh7ELXeFKIQ3f1yFiSr7CxZhaBIFcC8jbWWaJmDsvM+3M+3M+3M+3M+3M+3M+3M+3M+3M+3M+3M+3M+3M+3M+3M+3M+5AyhN4lNM/aUY9d2Iao0/JQqMWWuK2g0cFxuo+Siu9GPXdiGqM/kQPacZCrZo5dmXOGUkw+HPXdhqq6gFrL4ZLMtt7pyRXehI/JRSz475oXhq7ul4xXhSjzlxeZ9uZ9uZ9uZ9uZ9utLDM0YoDrmaBRYA65RHlP8LnqiugFPP1m+C+nIiNcmjykISNo1rf6zhmDOTwQynEWuUQ0tajSmim8uypcYHk4xsVm8tJHs1I1tOsDfjlLcJojS0Z1adzmMj+DT1fEJDIaCAGRfLHuTkBOplXLlIumQbynwNITYqAU9AdJgpR5y4vM+3M+3M+3M+3M+3M+3M/NPvh5i2lsmp9u4/CY81hnwFPw7+TI9l0RI0Dc3Ym0QjYQIzPP3yZp6wjnL+l0vs3a7v03w6u4QeMhPEdCTlON+NBri6KcoIAFF0yEllRDmi+fJdZZieQSQ9XDRvQrFkSQl3WSQb+aaCXG2EWsIwZLBHPrkB6wgA4fjdTouZlnV4HJVx8j00eoGGjhS0N7HqDV/nrdIg9t6g2SK5Q3O2fKIsHMDKu7JyyUxRkgYxSSAtgyBfZeIZTJ0twDtLwXndh1EF06/iXb8KPNqqQSj0mxoFBUxzMYmJFdDBkt2LzPtzPtzPtzPtzPtzPtzPt1pzn6XNcz7cz9DjEWur88ZsRJi33ery2nnOqgPGc8rSXoe9DT/bmfbmfbmfbmfbmfbmfbmfbmfcgnsEJVSQPg3qjzlxewcVgK2/dcYVzFeFKPeqVI9RcXmfbrTOaGpw+i9vGK8McFHnLi8z7cz7cz7cz7cz7cz7cz7dac1maIZto0KHpNeb5th7L5IfKwvClHvWPdqfrm+Q+jKvPgnyE9Hd4xXhnXvjPJMP1muudBhqvM+3NDCHo/+p5sQLu8qmwpR5y5LJ3YvM+3M+3M+3M+3M+3M+3M+3M+5BPYPax3nsBgxx/SMA+KoVYRzLCjzlyR3jE83iRcieEa0BOsxyUkJt2LzQ7WD1JIx/Jk2m60ogIDwdl5oYQ/zPwu/Pi6cSIlT7cz7dY+SjzlxeZ9uZ9uZ9uZ9uZ9uZ9uZ9yCe1fIa3M+3N5zbOURivClaDiezYUecvN4CjzlxeZ+mTuxeZ9uZ9uZ9uZ9uZ9uZ9uZ9uZ9yCd3AxcSNXwewp5hXuwjhOTMSqcN2IZDYbZfjhw9V57xK2Zo550YvnhUafkoreFGuRNWSwJpxBNWw6WsDsewb9pXhHMZ1YhqjT4til27GITaJKDgPJ6HgCUsky+JQpxfG8NG7M+3M+3M+3M+3M+3M+3M+3M+3M+5BAM/SDpspvJQATHruxDVGbM8jMarXesCOPXfCo/JRXejHruxDFLvPOaTEcDDczjma6zNUafkorvAHrt806bbAyO47mnkX/EN//6//4mhO3JwyxQnLi8z7cz7cz7cz7cz7cz7cz7cz8mozgbHPkb+doJjtBMcirCIGrxA1eIGrmCjCry4VeXCry2qygR1FsH2768KPOXF5n25n25n25n25n25n25n25N+MR2IWsRsnKuAzVGn5KK70Y9d2Iao0/JRXejHruxDVGn5KK70Y9d2Iao0/JRXejHruxDVGn5KK70Y9d2Iao0/JRXejHruxDVGn5KK70Y9d2Iao0/JRXejHruPM2IV2YhM0Po+/53+L/e/1/9L/K/wv7j+t/n/5P9//a/0/83/E/u/6/+j/k/3/9r/T/zf8T+7/r/6P+T/f/2v9P/N/xP7v+v/o/5P9//a/0/83/E/u/6/+j/k/3/9r/T/zf8T9PUTKKVXKjNv4PvXJHMKvLhV5cKvLhV5cKvLhV5cKvLhV5cKvLhV5cKvLhV5cKvLhV5cKvLhV5cKvLhV5cKvLhV5cKvLhV5cKvLhV5cKvLhV2udQ9YxOQiZHeY3/42V4gxX3C6cSSnCAA8vZHPSiilHnLi8z7cz7cz7cz7cz7cz7cz7cz7cz7cz7cz7cz7cz7cz7cz7cz7aw0DvLxZfvUBEnV1VUjIbycln06K90DTuCGUSn2daR+t2ykidNRbUQTNUOd9G+6+ihFMxdwiGdbMobxxrt+XF5n25n25n25n25n25n25n25n25n25n25n25n25n20CgPrQ742ZMluDiH8nyHfdovLeXXduPjXK/5g7Izx35iOrK1hNqH51Xmi1QsYF5fSlo3/zfsujuQneWvRSY9Px6e1H2W2H0stto62zGwVeEtrZEJdOnlgU7IU4OHAZjzu/nNbp7S3CIr00Xm0UvDynLNXZs3nQF49jRvK7tRmcw6T9pjoogLg8obmI4M8NBM9TpqV8X3SFAojYGZBesfJroo+15juRVvFO8flXQg6EeVmnMfJZ+wxXZXheezcKu3hQr6kKKGbuqNdQwGJKjzbxJZgv2ABdbv2QeuJEnAKZfIcCWnBD/ClHnLi8z7cz7cz7cz7cz7cz7cz7cz7cz7cz7cz7Z55HpWkdczqKNJODdMg6A30y2QK0xDBsOiVQLZ6ukVBxEfjdj6EIz2w4e7K+Dd9i1ogmQ3G7j3UYBZ9Ekekwqa66bZqzGTe2znqWjqTuPuGEHIAGAuCMoz6a7X41v8YRglnfGsKSIT9vhTBArk8wgmwo85cXmfbmfbmfbmfbmfbmfbmfbmfbmfbmfbmfbxOk3eOljNHD0Tcsta3lnOtMblQ+twifLxHjg5JeieGN567sQ1RmAiCMxY2vM+3M+3M+3M+3M+3M+3M+3M+3M+3M+3M+3M+3M+3M+3M+5A7f6sjknLi8z7a95EJapIAKLvRIdl5n25e8fl16lHnLi8z7cz7cz7cz7cz7cz7cz7cz7cz7cz7cz7cz7cz7dacsC+Sz327sIXi/lO3D7o8ab9hPe2yRpW6rQbIPPZYGE5MRlX6Gf9O0NoT2jfvIMct7lU6BR/bdpqcCLQNRaCIslzmPOgc77U8bE78aGqVMbLPT9u4KkbpeMV4Uo85cXmfbmfbmfbmfbmfbmfbmfbmfbmfbmfbmfbm4pxgOSE9gd34vpzDnbtvPgoR6EGP7FidWj0wiMsWWvpqASDHeLHYJVefGiJhnJU41JcwN009kDfMsUTNs2IKvJNLwXnXmdcV6vmR0NgqWbwBakgXsTnhBupClDzK8ds+8z7cz7cz7cz7cz7cz7cz7cz7cz7cz7cz7cz7cz7cz7cz7kE9rZKkT5gJ899ig0pC2Dxy5IiE5cXmfbmfbmfbmfbmfbmfbmfbmfbmfbmfbmfbmfbmfbmfmn6ZMHaeYQTCHWbxivClZ/mTFCHQ3A3crT7cz7c3jSjzlxeZ9uZ9uZ9uZ9uZ9uZ9uZ9uZ9uZ9uZ9uZ9uZ9uZ9ubinLnyOWdC775N/N1kpGjrmVNA7LzPuVLFhYqRYqh2PIY180Swo85cYpScuLzPtzPtzPtzPtzPtzPtzPtzPtzPtzPtzPtzPtzPtzPuQT2EhX9U+A1GdFKPOXJGbPJP7QbBWZe3jFeUxn25n25n25n25n25n25n25n25n25n25n25n25n25n25n25uKcVA0UHSbA7mJWzQcStmbg7/sEJtpgSRec12kk5lTt385LJMviUV3apKkzhSjzlxeZ9uZ9uZ9uZ9uZ9uZ9uZ9uZ9uZ9uZ9uZ9uZ9uZ9yB3/p7OGvlY1fkHTArZoOJWzQcSs9HYHWxNGjkEbYsA83hKFOie4aHW3WqsqRJh8Oeu57bBgTL2xMycuLzPtzPtzPtzPtzPtzPtzPtzPtzPtzPtzPtzPtzPtzPuQO6UYGcWrFUeohqjT8kigYLb3j5PP1gtZt8ySiu9GPWxOS9NZMOZe3jFeFKPOXF5n25n25n25n25n25n25n25n25n25n25n3Fx7XxSug0pusG5l9vOh1seylW///nDEy+/tPyUV3ox67sQ1Rp+Siu9GPXdiGqNPyUV3ox67sQ1Rp+Siu9GPXdiGqNPyUV3ox67sQ1Rp+Siu9GPXdiGqNPyUV3ox0t0mJdJgAAD+y5Ql/026gj1gfUDKroC2SxaengJhXOPwAAAAAAAABiICycXK5W7LcAqxBwwu4RGGXkMXOWo09FQV6bKi8pzTnb+qwN5sCXDPcjlwn5Gp76WdPHM9a6s72E9A1A0FjpcRhU4wYxRZeZxCyCCZOi01MPVtg4KS07InNCXx1ocst4lQFyK8QRMubAPcL8//eRKKiOqtKgn5EnJIgAAAAAARMrpCty5zxUii7aCi+LAs/lAXoCLcrSi5rumjHjDHMLVO6Z7pfFbUpWdFfvwCO+tX5ue316i3n0a2uUokCLgtgqgKP12IsHYozp090rZj0HMuV3Su6bFPD/TeDL29eKpknFHIoFDhiSPUVtmH7SnCyo0p/LKfS3EX+DVgATa0lQ3GgjAbWBMn1ixfU4q+yQ3/Fuqnex/lpFnSPfMIViKytdwck61frAivPEWAdHiSvQ2T0MrpIWeUKta0aKV04l4kgoCJe5otAsQXk+Iz1slNecYJzF2ZpCmn6aD6m7ZbxfNVqiHj5deGZZ8+VxJvAuFu0n8qEcHwDlFrM6yMP4MB8xjSWWEXCr1vu6fqHpWCw2RjCnD0qQyd7IEl2XTVtzBRUWD2098oMbpgivX7X/8FB0S5hZjq310R2t4LzoXx5lZAy1/9dUfW/YP2c1kVuvGcJuwZWQKXLjwp3Z4BjjhTMeNl7vCnH0tEO+pVi8NlrhYiKiejARz+X49OVPutGdHz6z/G3lDOFeW4Jj5owBmxTj1hnnRvaZn/EH+MsZhGqnOvvpiLG0fmDKQk0nSl9DDAMmZLLRlcnyC1W+SS8BxX+i1VKLRPPXKL9DRH7lkrVARmbBGMU9rZR618rq4VufSH5290dsO9E3D2tkttUTtbPHmu+FGefIoDLdtuIkbI7fyy92hmfXeGnljtVNSDBln/57kESg0MsfozJNXPu8cIW9d+WQ2ml/t/naCnGi/AP29gytqJfA0Leb771MzXdTRIqJ7EmiqtTtyICE6vmCoSjGOo74owkqvVLE9Efxp+5Jm4ClORwV3rK1hH5O9dQicY61VfgfCR/vRL4MoXGGnLEvzJHc7C4elCcHS1lTL/+IddL3kdmhD+pBb+0jJPsLVj6rdW6Lhg2vCEpV6SwrEPnK8SqyHNJFUnpRmlxFuhTDIZdkjsy/ogLLZ85bfDrHr35e2dN4CBrps7/ZHorfIpnY2gPRvqGg5s2RBMD6Z2mFMbGnpmLyH/p/v4AkWHAvqaZosW1v6aZqslGH64AHo3I/LRD+vWCpAry7Qulu87EtD2HltF9eFYW3NO5lLqRKWRNlz/nUurvyYOal+OFIeaVdLvGfzlvAhz9Xb1jHS460si14/sKltFGB7BVFS6phQykGmynqypcS4W8nBmWXdeKgzOqXmRuqbS+GU6cDTl9R0ST5pCK64L2+pZL4i34Dqh/5lMiLO5yE+OxTzvUr6nDv4A+U5DjVqDTYld99uFfLA62HJKnwVy9SNtsILKkVTNQiMMGfYuHamJpHxKDkdDiAqSWawPdOM/ib3/G0/o34HX2xcR2M4CIUn1WFeu1Tz/3bzlQKH7b3IXj2JCBV4v7/JwVl6BTOPUHo2BHRo8194hw1QAAAAAIw7N8iNo44X/Htc5LKgAsbv3k2qL2AEgW4b5osAd1UJBN858SsZbzLeZbzLeZYbDdLcEhxsQDt7Ce+HpMDPz6CBY4Hbs/gkTukXwy4C/EBHOkK9DoYqE173y6uy1OJJlMlqAh05JfYtoEPb3nALKXNJCW41Pso8PnHpsdB2Au+NsbWAein5kUCp/kVbxqkb+cRP8FWJv/xT73aomecToKUww42iA/iZ9oBC8XcGe/Q+5IDAyHTKoZ9hPRmwbFbhZlBAM/nB0hq3eAevvG4Hfogfk32bNAwzO8NpBX8wZyTja8Dc4Dg8sLY4Qrdj4qtOMV/IO6sBBNYTt1IolSfCwJB4Xd5CcE2MwiJpUHJoh+QMgy8XDK7ae/KZiu2oUtuakzDDvV3YF2AyJRHKAABiOhg+FCtAiUbbZRnwPzkYyhi6VUOCGRaN0gyuWLLj8ual7y8iuB6il9woJJip9rmEYljR+ftb3asw6dSdvjqNvsb7aqdIhnC07p48Zcs2vvQ3+k/iXZRZXeVtoqL86DV/ZwMRdRdCC6Pv2qVz2K1Iq8K+/Pq7+8pBUIWziR9hIqMNNypcl1ptXgNmxjWBvYpimWJdcH7tcYLTgOVSu4Ki0/+kTQ2UDIc4EACzRvkPl4NubKzXoSAWsqUjeVsGZ25vDsMNBsuieD5pd0zN/BKOO8Q1m9iMSSJBNJaaUeSDOb1/lvVZuNUFcn4t+c9oKD6zEAHbjLR/wev1QBauNR/duniGHOoAAAAAHQDrV5N1/z/aazP5kYLndcr/r+hBBdKUuXqfki1pB2oZLA+M57b9FD5gEb/cSOV+W4Rg8z05zzJ1ffqkRMyvUfcLWYeVDjxSnuZJI8bIk0QKRqlGE530MuNaU5tjKpTLrsnMk/DSgI3Ewte2bHW78mwGSmn1blDlrkBjbR2dRlt7xO3+siVa6btf1PQ6wfd+wNZmZ3nP/Pa34zOxKkfNWuPS+V6WjCYQHJTgb5bEPTT3qms2eARtydruGD3ZbHP5wH/7DHhrP16AwVI5gWE3B9xvIB6GCU5bUPFATvtBOTD+Ah/16Xwy2x4KmXpgX8SntIv5+njB8gfBgls9y9K9cb50ybNdWbkWh8/5raNObaDoOcrHDa7IdYV4kIBG/fnAR6DuPSNAT3pngy3NMWIlGNhU8kMNofZgJFPOt/18GxBTsJ3/lnlICsYpNIuhkXGR6+7aKR/sYlhYETLL9su61RUuAUn4tjK3hZtYEvNGfZE/9iGnZlZwcPfGKm3XdfqZq3bdq1jzquaqZE7hSDj+VmnFryhrMkpJanlsb1sTr4uqtVGoAjSf73xkaMoZQyWLL+cc+LOAWy4eG4e8oNXVqnZNBw5YcqQTd+bLDdiAVz59ZGBveEYwtIAbWK5mS99Cu2KB+cQXUR07uO3xQVlAHxR3YJGxIpr++dLXsONbMmIPkbKbBZv7zHNvvepNdSw32mEDsnLNVww0K9iso9rSFACE3BNbcEUil1ebMXyVRGPTh+QuyUSTQIn71AFX/XS+jtBEmt4eXNtoJQ3lSAil1YrYUUiM15SZC123lXpUhR6CVZVkphoGkrrNLrsFe6ezbGFwuMFiMXKPfz1dRmy8ZFB9Sxo/K7gpl1bz4NVi+GXuGHs4Z3gq1Jq++Vh8Wyun+kcDbnPr5ejL/gEXrG+oxuqPs0wvcvvXHjQySQFyiYglzannwdMrBfCtPkoARWSUWUbwgsXhR7JnztXujQ+oxVZC5597qmb81NlQ9azLrg1MZbQlldUgnH2sIIxWuEcI4rI4bUuwlYUj3GawXti1XEHL8R+IhFaRe3WrLQHCa1uFNhnPTAyiSaCmsWQl8pG07kqit3KBy/Y9DK+qMa8twEn5BmXuomio9bymmk7XZrIyb3DW5Qim7s/j865ypIo8CqfmMBn9x5yIZawhd/zQoN8PSWZ/S/pD9sduDXEPnXNWJ7G2tzNciV6tiE2rHUmCopafDCEu8Zj/T7ylM/gBTbsC26KXvUOX+wDdf+zDdBR9SuVl9jWnRidLH328V0e4RKSRAFs5M1rkMCSaMLfXSiDeNLcldx0K/3EoAemBeu0+dssm6d79sAFI9SJ2mPQ9r4Y2L0pUas1Gx0qeFYwx2jmi9A7jM0BPf9kYWPmrKtddM8qjIGOL6SdFKvL5WDrRoKgz8QcoA18R8Ve2XTgTgedl5UTBLQrgwtMmCoNErnv/Tc7Tz5bXwGCMajT7qrBOldufPef43ikfg2/VkVrMdtpQjCUnCKiZirpMoIvjjr25byyrAtyHxQN64O5iNXbPGdAlfbhk4H6l990YcqUVgM05EvURLxoy+FTXZfAICEGk1pg9i1+k89JHVxGMBbHUssZjHv8xP6Q+YBCiJVRLPYDNiEHUMzVaXQ+AhUQ/Z5ZLslkjBCj/nrdqnh0hLHPGKMaZwvUrjlcHPyZEoLle1AbAqBFJb9tkBJjW+aFfkekrF26x9r7eO0VaSwWvyV9lmda0WbPiyFzGIlmvopMzK2L3P13t1X0IMz1pSnmOvmCQFqWS83mYnqQxha04dXYtqGWKBYdG0guPg1w5Gexnvk63XyOdm3t8myR5I2Ys5kKX5UbpukWsD2qjS3DHyIQze/1GHpZlggzTXXJTrGOImeRRio9Dxp18INW4eC5ZrCI1kmYEhRt7Hcc8JEJKGMYo4jNwMr4W9EkuwYoobFlaYYZ4xCC2aqdXupy6WTdAiWurE1dgZ1h5ZbwtM2IBFnnbkbSekjF8IIsAr6yLF1khJDzUhW0Tp23vMV7KG3S3n5nGYgajeb6RF4hL3ICuWBAsNM4waeg/5FjFTNW5ejQeTprZAfVzQNQ60qjCM65EchIrTlKZu8mcXYMbSk2tPLqi1siyETgNPMGN71b58Pg7de9JpjSxsimbOUiGWqwqGbLEe0p0AtWEjFkH1bAluYCtQkLMaCKnf6qS3BsRhoM6LFc0hplrzVB2u0vRDl80XBYTO2lXq22BgAABT7v53V/MIAguK460N5dntHy0Ulnztx51A2TV3BjG3XRS54QtuB2uHa48yUZ0+nRskz8+RRe5/1ZDeWKlEkBFdE7qOt9KkWlxKWPizExAbFfSmQpt4h0wMden0fXzh/0jshVpzGl6L3ho7/Zn1cSyTNcvvDpcv+Op3q37UcQhDWA8sBXAwylRSLx+KgmW85AwcwAlRkF+SLs+xgBxDeF+IteycLvilG4l+6lYqUCNPylkfTxSts6QhfHmoBU9HVWDnyPInLLaw/4/aUeqv6Ba2Pad3Cm9XxWegq9SkhsuVwf2w8biZ2QHhMg6IYM2Ulkn2UW3mzmhudyUHcgec7g/dAWuU2Aj6OiGuNNQxfFp7j5oE+YSfP8ggUw4kSLaAi8WfhBD5tLUU5Uve41NHhUgGzyfO8llCz7ygCH9nX83im2L14RleXxyi33QCjRYqRbs1T3YIFpbHl5fFtI4oCZy2WaO2PXR9a3C61pY0CJKqVYGDqy21Y3BC6G5wnWUIQUCYRIdhx5mJK59DCMJ+Uk83rn8fzwIZwh1/FuYrailcadDXs+rQctm5KuHnAPT8NW3gDl9wdLmk07qEaTlLLFwO/6XH/xJTC57jGhHI+7kKX3aykXR9yK24iB+MCuq/u8KIbNS9h6sS5YRLOUWjx3C+nJ6iaOIq4eCav5KHiv05mFjWOaQtGYsLm1Ifqqus40JfRguUnPMjpYWdmJJvz80GZwN8YS/BapXDs0Lob91lL2UNm3J7mDYDZ+HSIR+/0QKoCPsKBDracySZ6irEmZB3p/r0umAPXdpjiJKhqk11kqYuDlD2Cc23FHnRKLnWS1eLq75idSrUsQUx7HrPLwa+2uIn0s+0j/2G/lJH5/oFVeHd935YCE+6dC7hpd4I1YE7yaminQGBbm31LyVJ3i0mFxU8jt0EqnqqR43SBMz7mR4w9oeVPG8DmF1MzWBgFi0TPOQg27nTenm6BTk40DSL2FC8479wsZF7aRy1ZA81HscxuhptlzYcRoTF8yF42XVU/vIhelr5K24FBJOaOWLULNczHwDZtmqGqZJJA2jm/uI2zbFHaRnV6+hQvJj4z0xU2H/LwBb49341H78HI09ZzVzLbvCUzwRkyUg44PIBMN+wfSJ9TfD+gXpZIT1PGQoSLkjc2+XVTGG/L2NnVK5d0mGANZnXp/wi89WV+DJJc7rrY1kACx9L+YplCZvb92qYShgos6z5Dvdt8mP0syM48P6HqC3rmgJHEnOqX803slKEN2JyGeuTiXvzJuRVojGEftQ+KbjYiBuQM0g6RpasuK8yqk4Wd1Pau6tqVp5rlabObGn8EZ67TydIw8jK/MSmWwvc3c0d5GlMZoXuT5MpGeLai7hdYacZDjFOYQR83QGR1HsENDf4wKRErrNxoxZ+odOiAHeN1x31lb70vvGpPXXNi9YA5AuFE6Ey0lxuFg4jNKGZmdn2Um83e6J+Gf+DC45PLABha/ocKS83sDsyqsgq1AHUfuQfPW3Ki1Uk2VT6M617AohHjaFRud28vfae27p3jPZNfL6JzkYZtVUgC+IEXSYIWsRMJpMq3mTQrjb+Wp93Lm1pmY9kOKWvV82n6uw8YraEqwKY6+J6GqcV3mKPdE7B1jFxJJlz++eKiiIbut0fimRht1DRqSEse/T0/iPasBFHapycaSaCNgDc4pIq/8BdrDbk09nE354D56mI9gBh8n8xM2axMskU97AmZplVC9Vy9sX34QVZCa7iBYuQegiEvnhwqFW1dqqb/5/zTPc2+WLysbb7hwf0LSFDq0kxhMJLLzFnKk7I259yf5/r/QEi8n3++ATUbPYOPvowuRD7rhYCrstH8aXgHFTbk+25zk11xAGx9TOMjaiy2ykpNI9WX2I9pqvEy2OasWoOwYYb6KJYH7o0en3ksdqCwlKv8wng5BE5ViVUmAsaaIt8ulc0O6evVGBlI756LzhSWS4rd244Tp8NYgfjKmwp/BRMvmPjR/Btiuugu8XmOnT/TTIS9H4k6g0UHv0Wafia0extZPhrnn7WOaWsffZuRV2YbzCVxk63cOdlrQCuZNrxJf2yoSNUoaGPkhOEs+F4TbpsWQnjTGuzXysqXoFyih6mZWSp1a6H8D+UyyY76C18psf9WQQMHXCNKWn+rffWuH0VoNcyuRH50uj/hA6DHeb8hfQPuJhT89hCaro7b3YfN3qwosTxXxEQ+FEwkQjIU3Se5Ji/1ztgp5VD6j/k3aqwrBLDcAM/vRhyqXZnMwl+OgJrxsVTbYHnGTxkXt+OKYKK37XQFA6i6XlaWoDhMwTCaoij/jnMXP8XwoRRiJ0XDGgwXUXKY5/EMLsSrtvgUqoEO8kqyZ9IC+FlJKb2qdYoX3c0WsZxWwQ+S+baJk+RGWhGsNgp5wg2YURwIAW03e0+SgrNTy8Dk8LGXLWB/pozweoa41bD3PCQd145lyuZ8MCDcIFyOqQg6Lx4U7PHxFKMFliMgCMPDfM8ogdiBdGUFm7hKAlLxTU1sB3Uca4eCvWKv2ZK3sS0mQ6hSn6GHywHu5W23h30J2kLlY6f/TNLXy6BTURD62AJ78l35DE3thTQw5StYO7i6UqH1rf3/k6DKiKMrhgJUoh4i6uXG5LsdMPh7e0NjwrQ558UgC+Mj3+S13np5gTWIKQFRZhSexH/GI4hrHNQYkVSs/5OxOzzeiqkw8MdjnoLs8gS5DwABip59s35jWStv0Wv+nZJJ3Mg49wI3ER9KqCeZmAnKeIPORAjavuknzBl6jczS8q6D4VRnVLgoSzG9+tPxadexguvsY9Xw3k54gDIBHaPFp/e9J5ARfxZ2MJt7beuxqR8qEvgn1UOWktmwJOTbwAoi77nYUw8vlDQFeOto/OxUjsdnMGZr4dQAtmjE4hJgziBdis1eiP8HpM5b3xTnJIWNw15NT8yI2WXjJzH3GWYdEC/GW/R+fZWwWTvp/kNd91Ps2aE5oWGH4BPQYprogzuZ8uBgtNN/6fA2YD17ydVw8eUnF3FXv37wLjsvRhlk8mSNiimhRRchhSNKbtYTpuLlCvOBS1nUUwTG7P44ksGWq+NrZmCaL7FHejTK8oSl2rEsFilT2X3R8o3CLpIT7ZECeeVsovSmIvb6SMLyfL+GAIUW7J+ZiiTwweQuEaog78uiLbYckNBKFHu+qju/DA9qMiRZy65/uELpbUYtmpNDWHzzZh3UR0ShmqEz1FRHur5S5br0tX6Dbuq6YTJWI7Oein4is3XLbpJw5RhP09EchMY4fzW1e5L0C1WRwSDyO/BoZYxR6pVhR03AeabcIa+reP35H7WnzdBaIPNY8Qq7tIpoE7LVbXbdBMe1Rp92b4aj+YZMOFoWezgOrBr/5Dq9SMwqwJi7zAsSjd6XUSmnuhYfoHDjgJnggeXK8zaaL0P1N1AFY5v5TCv8TDhQkvfGLZ4U6rkYC0B39mOB1QfiFSHYC7kVZg4sFyjD/x5WViAcwCiRe/xZhsaS5FH6unbBjwZC4PeWFExiMfoT4RW8bC1SB2Gc/eDHjG1D/GLWrigguhNPeuZdghSpQaiJwtGFIiwtYL8RktmeXHuZD+vw7kBn7obFGe/YKAPCmRB01lpEDlMhT2Cfbr7FWejAZB5z1qh4rLO8Xd/F27R43s9ao/gXJfvjuIUzuilIjyNtbcQ5TAIT3BevCdLGnMpPGqNxz+AQYFh8P9f9kPt9UZ2aNNpTpluPn3TA+W08dZjHpvd9mC3eQCOUEEq679rZWgkX8tuUQDEcJpz38kptN4THBt5X0ca8unRJSU1YnYCdXtUdnywcfVk2LWQgX3FsHdlYsHfv77BUHCNmhJ6/h2S+TKZp1s8IUg3Ckbk+p1BjaXv/lu6FIKE57t8rW+RUP0V+QwSQhwYCURBHOULhyqhUpyey9CR6mk7ykdfQqTuTED0LVqOgSXvbuhns7OMDDhIly6tgHDoTY/zjrxmCjlZVroD4H0kl4tP3Y0QIrHob3iPZF7ZS9m/mFvQ6dXqWej1Np3oVFh5ZcyCp3tkgC/9woovcJC2Tb38RrDu/c9AKomXudNeKgqqsgFzurIxBxX7WKCS6ca+HRhtcf7/nzjfzu81ThEynuvKj64b0o70ramyeSHvM9VYNsdcdOguajA6QVVxQWrtFWsE7fwb5/q8v0hyslobxZ9BLbuQhoBZM1wzzCmDeIjBz0bp9sut3PsSQOB94KEELCwhK/9maqhKArSUtFt9RB8PvVqBnPvoxGu16C9vMN48P7hB1g7x2IX3Z/3csIuTKPDxK4ptf32bXNYLHz46CEwxjIszGZTFb87SFe4xArwz8QBez7Im6xhcX5czsFsgQC//BD+ONECf21DiSkn9t1sKcMgoQGYny38SV92nRalGpw1BiyQGmjW01RGc4cS1oRWfLkvGriMPWcBY04vnzI8cIAmIWk7bQxJok/ruT/LQfugUGzdlOmWeFXbP55b0wUpZzQu/S81lm2WE9kAJR0oOeYPUdlDs6E83+NBmMBxEaJh9cG2IRwzyIDenDsdK3/d5Jk3hC7zKf8DH9LsbhdtQvke9e7SgqQ1kdIdo5HErFAAAABB/oKLF0UkYXno7DPw/2ySHJ5WGMt5hD0YIpKEUN8DhrVuKQzWNrtK999CcEn4K7DNZPDwsQh7MEQZUapbYjYJrcTSulq1NPoHZdw02cAAAAAAAAAAAAAAAAAAAAAAADxXsAAAAAAAAANS86LW2R3jjxOtUWi2f9FIrFZMuQESUD2F8BhjgFKpUu8sZRL8ino2e7CmBkn+8wfdh4aICn/QpmaDB9DTXhxqmj7aHY4I1LnIQR+qB0C84GSChUFnPHl/X5Cf76u6DlQHRaLrdsIq4KxcYKqslTrLUmLiBkiER7mBDGrC2QAVpJLzbes7RfrXA0c9gXwST5fHI4CHxB/DSL/KDm9omnV4ZVjPmCG8ekwfiNFL+pcWHN+pNor5Onx814UuAghEHTaxIyrT5z1fH8miknHAWDYqsQpOf/qxJQx8bMx+GON5G8Nx1K0QbTNgswVrY9+7mgaJMY759w2qwcy4r+bR0vSYl++5azmLEvaiOvml4E40d/KyBoUTErlZ+kpPNszoA5EopuQMbmwGTHZOsOlpY5qmF1PjxQPAyu5gB+9D9DP8U4bazBil5eJC6h4McqKPZFF9gB1/UYO3ON9e3Irg9IGPZLALyEi7OyoVGBsropvTYEsqnKzVtMudADeT7VILYzRaVKGzS7MU+v8G617bKK8622QRGjsemRtTliLEzUlMrMtacqu3sQM+g2u7rDM8fhBnksQouvKK5Qm7BXVn4R/ERsW6T3Qq9kkraKXQoGksSDyxGZV/i7tAmEYFsd3Ghk6lOgDgrje3qPb+4f4r9YBeL93uEgAvwgKb8q3h/VNYJ9Kp6Ca/jOXj5ZQ6XGf6sudZH0sxI21JaJ9czUboderr6VhN+4aXf+X3fJ6wC3L8wlzFuACToN4YsFquJNvFFjcBu/0fuahdEDEmn0iFmgW8LP4f4vHvxTGd4d33ttJTdNy91UUsrAN1ikzCd38EBUwrU8Rcw2PhbLh6ToCM59OCVGH3hWZPO6TiU02BAEVN9T4JYtRWnj2hpXs1DMi9444YFRB6gRWfrqCInORtUvFkajM+dhCHIyqgxhJpDe/okEDBYqte6KF3YCffVQ1WDW0LTGtfMMNVNMrys5QM9cyk19Z6/IOkVRfr0cbCS3eHUuRa7/uWZRlRujztdxECloXSk5rOoz0XqahYn68DHx0AJg2F8fhOD2CEFDQPotVK5XIlU5ybNGbkVYJHeRsY4EArdgZygiVn00wAAVuLDUbodemXdI/y/nVeB1/hKTinfMX9MnEdXzh0me0vWgA8r8F4ilPBFC2ahuRZ8rqPsaci0B9Ew3r6g58l3f/3osjvgw0vbKcPNyr5azwmeR0Cdv68LPu7AY4Ph432rqutWL2jLaOUat0exzY+H6OIwULW+y37d3zH+AQk7tDxnHcMfovpG7gL+U9mUJH+CKGxbtkRtzy14OYvxQFgFNYTtbfrScLP/iI+N5uY/o+kOHkvnPeymlHswLb/KZojh+syP1t+bR/yjBRQpdQZ1l2Hq5P1TAUbsYMYFumwJ8OA6XSH+YInejf3FN+bUkmGCtfz1xgzztO9om9n7S74OSqCvuUciXw/ikw1TPW3PHVG4lRKlGUDoHT0FKd5xp8TuY5M5B4R/Qe7mY+Xi/Q6E1PYNyBTGIU8g4zcUMNLhAT6xCXObamGR8w6kigi1vuP/Xe6QE/dv3FM787n1F2sLfgqDFg8U//jDzN+9Bj5iRfRCEifcQ6lEZj55oV5SX4xiYUIpUrIt3lEebA4YgIWEi/iFYHYlEDC0tDUQoedN+/8FlQWscEc49lqsCDqAJuObhXuVA5y+LDcTHISwtzrG6KYj52eqP+JwHTO3LHgeqOE2R18rKtKAAAAAAAEGyOAAI3PAtEY5b8siAVSwLGKpdTFad47UOmjiuoXWBvtkm41Yxf4ArOZmUsv2EKlsz8ig8cPzF9TSjJgNAP7OUW+6S0kazejn0zHAiBmSXVwQn8DhjkaLWRtRmDIZcz8Rod5EjYeJVPWd8bFHRNZPIq9xQOZHyEN7WzM87HiNpRZuVCImDCXAVXUlrisDz6pibeQEgqvkch0jk6SZX8ZUUgljOsY6ToFNGDRdqZ/HZ9roHTfwO1mVzyM3hsAAAAAAAA+2QwAAAAAAAABc/oYGJdZ3vPZjGvnxu10ZO/bdxwH5G63XBcP+0S0R5abXcCbjZfD3W63W63W7ISeteP7RrhTqKQeyhAgEAgEAgEAgM37ODGLBH8GNZrNZrNZrNZrMymNZiSo7Cb2/AWEX4gY4yRKxohgEs1wk1jAeOqggoz9hg6gb1vlv9G8sSb5NPdCsJG3ZaEkaPeOjd2YrIPYsI+/cXUo+fMZGJ5sCz56sdGXvKYsYh9Vcp8g6v4X1slorVgcsXD9MUNqATDoLmLxZn96BTqpMzSJgOdF0lGXbyv9jfPPGqdW4m5rV4akzsWu9JSSNCzAKHpwVAzJcjGi6BRo7Xk+uVdQvkW2bvbIIywaFcIKRzUs0TkZ1wSizBSV72PX3dXBB4zqa0cmzvZgWW0DghMbeFvAxy1vBvdBna+y0iIk4m23iF0GU6PD7JpFXqGCWYWci+9HlFKKKtTt4tALK1YKYDwE7CT4B6Dz10u6HpARq7dNenTTUwLVNhCNkpggtqIHujbSLwXMp4Y3geHjx174XT7TXNBTcKlOaG3SEi7a6y7GDfGSLCycIMfqf5vR0EsuuaQC18FR11CpzSZjnxEeHbA9LnC50FgwRk13PfbNV2+rnfTQcdH/o/o9q9DhLX6e5nkZ2WogYOEQb/JNvpUkIK/rHw59fJwX1IBk3RYTQOaGYAbtgEUqHhHGRu3dXdXuKQskE3yykXyii8J8if0D1QBMOAlM/IzhmgUsU0nAr9VrGKDN8eq7N+WsY/SD+K6EN5EQ/GQSSOeFdnk1KcHaMdKYthVSYFVecx+7hvNCl52QZZf22gH4CLPVSi67L4SfoNItp4wadQQwfTGrRpkzlHiL51+GIJqIvolkvxhKzUdJueCRQO1BYqPyZYBOAaOg4ARcTKQwaIAuIO6YihVsiKb4rM5IK3da16bOTXK8oABwQE/jXqmqJhU0s+O0JOM6v3Gnhaxj3y9NagjG91ZxSsiru9tztfA2K77i+zYtsm58js7F55fCdU+3inwTv7Nf/K3+R1RnahUAvqo/DLyU1REkywOzxkEaXW/2gVY0q8BVpLtswFRzvsNG4Vb5nMqcCkc6FiVAkV8ltLZDnz7/5PaYLvOFDJ3q7urFJ25e9UqTrPoyM2OaRlAesywUposRjT6V9ykIy2fx1eOwz+HB9YNuMQZHRBcLuyq7ppLqNDsUBJMuB8MYq3cMikI9RRwndPdx+/Fa2/80xCTvO+YfuLLe522XFYeNjFQEe1s7pSHWR2iUi6pal/NqFFYRHhHzbss/lN5xz/s7PSl69OC379GGVKfukMvJJLn8RLaWp674jFFbfl76M75xwODZV3YUEGOmwOrUl9NHj/F+8u99jL4BSamMpqY1J2osObO7KjLyEpjjydX5QBWqverjh5OKRvICpyPP6cnEUSpqIkUuLVo8GBh3Id8d/i7TNYqtLMeTio8iiswrzwS30Lr+FbNid/Y1XceiBDxbc/nURgC3UpOMzFNAtOdhHrbVYmai1tz3KdQWEXyL2Mjs6elwiHAYNoToFUApZ9tqjou4NuUukp//G1Q7Q1xCqseDfk2qkOxp78cPy1BpNEClQAsnZtofE+Zwb7kMLQfBoZtKUFV/N6aj0ihOKH35HtNE2F6aipfB0FH+eCHK0bF1VQV5F9AOPE1E3HwX/tvh7dU9ZO0WzFN7S1LgO268Zg5k8e347au1ot+r+/xgDxjDIDiKKo5lI/XwJ73jIVKNt4ptV4eOKgAU8892SQZDkO6hbCZYfeGuIwZwHmD4yLc6uC7qh2S5nQZBghv3BibHgS0BVlt+oMx7gbU+P+5uUozJh/opRFFrNBI+9Aqxrt7FzzBfgaAcsNmk5GAlu9sjqIQN12u1yX77zk1MjqZjZY6mnEi60mm7tuw7N4EHDLJhcBBUV4uR5TuNCJccyIkpfantpyqceW6cJlcWn5vFMv7TeatHdm/AMJai2khJFUqP88Utma4XfmPzXaIu00M9tO10M8Jo7zZDFbAWdMAC15j8+L0h3wOv8Tew08r6H65xgaFZ8/HyjDs4pnGFWW0Dvmyo3S9MnYqHrjdds6wCWqTyB0+Oe3ybE0DQP9HKrJCQ2lw+9UlLax5crDiJIA0BuKKVeW+50sff/M3O4Joz2P4EKCKz/JqXCwkOdk/uOp6llGvirhVSGZDsCofk4l8OXt+ErrUDgxWdVoABIZAMzCK+2uwymYuKYNRFFMT82RbjwlulEPDBkWJ0tNn20Z6J3M2WKAAZcHp7yomiUVlH5f+rMyJ/igFGDiKoUWIcXgKHP46sZ1iPqafQOnR3SIPa9jQAz1JoYl2GbOnq0CuHmQWRC9Hc1F+Ypb+DL9JaGqvDiIPeNFWJuXmLmfGqgChO7icZHC7LNm32Q0qKUUFXwNYa0W19TaAh97zvFopyhYgNdEFH/UlqtLu1EwtCFauERcrkayJYTO79Tm5iSTQAe2K2/PFssSvYzw7q8PowA/GkvEMMdKl/g0dwlCMcqJELabS6po7MU3vOu8nA2PAlxi03shUt2C/jdrQ7juXi8vWe6jSE4V6QdzG6a6CGaCDu872oC/Rw0YRiNv6OfB+Un71rq/lapZXIwmP0wMcVhqBCK7wp9brRb8+CsFgctzzp0U0zrBD/tiY6063M2sWhZNotAB5+XmXgbMQ6WhY2qiwLRNBmO6eBGDQ5QskyUVs5hrp9ZW/Yoh87XUOx+4SK1bsC+sCxSw+URtQP35LWVmY8ji49EbVnnLpdGojmMmuL1RYws0cGndevsnLOnl/ZLECoyLkQb6vA5YEXlRC+Qn+93EVsSNfH24zGr0JKVtbkzfSGP4XJRe9txo7aDYWoBVkJ726sEl27jRkgJM6ZHMJg/LUzA6eD5FF0VMGAPPfkwjxazFZJ1x/iukkMsLbsdZVnegx9w2EgMrJbpB6BS2PPf2bidTFpm2uV/V8eZjMubArOY6j/fyqfz1CDWeO94RLZVgNo5deag3CSnUoYVa2GL0tF1rMGMSy3xA/Q0nlT80eu3DCGsw8wrzi93g83XrPNWFr+uHtVlWdnsFceGQrwN+dUTmIAwcGbgCZ4cg5Ic2HE9biqPAtRZL1XrbXKzB0Tv01yICtqS4uj/15+ndtpQXmq5QZD0jCTZMY2huu8AhJfhSbywWqZxdp6ILW+fp/yCowhute9FcEXt83orgQRKnQZA0uysuYWlgRVnMwhMBcRDmv/cFbILsnhF1OMlLj16hhfXQcvi37HW8VMUgWDpqT5eGfPFkqnCAQCZGf4VrBrFQx4IgEVaq7v2Qto385VpWtInOg30DvvT9YPb1fBmRKtwmN4XgkUkwBeGmDNG2W59f1gq0Wceyr59R1NoOl+NmS9FdQq/LJm1Mwt4rhWbmy5sUhwdWvc8gAm4z0ZUOrPWBO9XZd3HsCiJ0Eb4H/FpVzHNF5Y+einlLAMOLojvNwel0kRsnhi+h9Sj54dWFWJuH4rz4c9fEX3cjCpWyHc9+dIOYQi5KxYYLc+Ecld7pRiyLS4+tqnv+VhZlC2SbflPig7LKhrvrc46PbdoDG3bwd+xHFYrx3X5ifbuPPLUZYAGX5d4fqOgnNFZfPlL0bBTexX+sLFRwAa1psgs4SOynlcmYMkP/gin4V8Ve0ZFAv4snYay1FVL42315R40BXVywQfkz9zYqGFgY1QK3YAFU4oTNf/QbtxhxwnlSkjuqGd1GtQ7LhYymmeJdBKTQHX5HasLNa+i5fypl9TsJEI3ARHLv7udK16osmOABMpuAptKj52DHOFV6AkENLxY9Lkv45Z2VLRLDp5cFGcKT2G9ngBPfsDXGavg6uwJWbufHjqRjkDAiDM7CC1gOw/ADbetrb5Fl7HD3tJb3E/WJg0zaHvGlxlf0Zi6nZvIG+03+Y3CuelGXvbdI25YULwYytks3vMsLUlUqNOFJ0KT36Xq1PLlMx9Vfsg5wHSwh1RQDvHEQfxcCOkTJPYqrWgOlvZbkcaJkWyEIFuiNblYO4f2ug5Rn3reUlsEqJOAIhBn8Cio1B/ZZWTfEB8ueeeQsKzRAMcu9QbmgVOCHmtUi5zyA2XGFAMWDENxdbBAfEn/b1/LuxMX/2QOR49gGHcPRYhhXe208w8bZ79+pJwfMcgs02iMGviXQ93G+utpg+gcpTOlw6dsB1VgXt1+7vNq38zO+ccoi5g9qKT0e0YrZH65fItEHkmqT8pABIExZ6JW+mvdKI4kUAliuc8QESYAAAAAAAAAAAEKFDhoO3pSmgAnmOl78Vf2m2uJbmpq+v3D/cP9w/3D/cP9xABROKWWoNYlcCVwJXAlcCVwJXAlcCVwKZaobb69BROguYLgSuBK4ErgSuBK4ErgSuCFaD3eCkPrVcXMr3D/cP9w/3D/cP9w/3IYS3v4oXE0OJAAAAAAAAAAAALhN1nfxhEza+01/KgHUVr7/c+PHulkvdtCf7J+RzP0BBzjLD1gGDZVRwvzQYt7+JiybfMB2UVAq6/u/8C0v6RGthhgBwwtoYl/KdKB11csqqavJRXi5HXVTcDowqOTCa9mmq4CgTt972f6MksuUuGSOlFAlgAAAAAAAlDvmWaq6bCV3ZOY2OJBrfLAxvIaCnKYhncr8HqU5JPlv0YxlmoyzKhZFOS1exTqXseUBIq8mnfPAy5idXEoIKhXa58k2vF/9PRNfn7h6anLHXLrrvSY+LzfQUVPQRthKfqTnNfwfWFOC8fpFJDcIMZiBXn0UkyJcjrB75Jcg1TIC8LfDKTmeXVd1oZIwaXNrxexOu1uMq8XRVfsFwAQBHAbqKwNtNffGO0EZ86pzzHxVyG9cBmJOSeFMDqAtQsSY+/svli72tzXvVK7O4/DIjv9wJzRdztKCHJUpFaGNxZ3PnRhRcjvlNpnDkHy61W5ygKZGeRqi7BhTz6LFxIHueVw7lqhnZByr3ZRwJ1HMY90VMNKjj4YcHbn6K4XhhRMCyHKfYqUpk8q2jwbleIRRNrJPHDbplim4CLb0+en5nMO1VhV8uBpEbzmV5Piimew1/+Sm4Bcla369QmWU8of5yxMEhCFl8DShRiyx5A7HBobgjE60diAVMjLNsmGV4YQr4r36XQEWeQEHdF3OTthMGPHRdUSOD4CH7YO5SccrJ4l7n9qlCioKOb//HTf0x9rR6qQzUV38BH4yt6COZsB32QqRz8HPyUCMRVtOLviQP5Lkyot35oVP9u50NmomemUvwp/KieznK/Tem3u2x75Wr2ysRwNHU1F09ikgSWUcYVf4qvLmDLOu1wok/A6gbsgC85hE50CzJt1AyvaG6tPGmiYkZlZ8q3pG7rQJnHc4XR8pWAQrP2DcjPBNfXZfBitnt7gv/OyuLLORtKmM/PXbmFegHBpQkoJlKMAISxUSa5IkeBnfZWZ34lom6OVnCmn0Mz/8ismDLFEfxtS2xxlxezDS9sH4oMcpJtHTtG7+aMH5Xh9coc569lKPy++S+In6udKrnAtFbWGXNl5qwTe8vWkaMbV1IxDI9YytEI7+7oxOuclP0GAfdieGHMZqnvQLDLRcRDXUj9J52Ty4bqkRPJ+DndPkINbe044iEznO0CeR92dL/uXoIpoUo0yIfgdYCMr5i6PV4iKqLksE7guINzxYjxFWMuuUjWrw+6FXt43zDy7mpU5zwP32zElA0pVhvnZiGzvTeQc2+GNYd5jOgePFKxvI/MB+JWnDEqHmsQISv/VKoVX/vGBoAKoua+yWUHMAAAAAAACfwX14aMI6GCrpRBpv0WKluLy1vrjDR3qhX7cI5i/nexP3cmiqEGEISVsgCAyEG87yC2UCyo2rlWSWSojRW6WmsoTPwrNVJLLJYXpgWvFhXW6qa0qsy+569DBPbgsZWDJ49N5oah/RIwhA7ebmOIbYoAryLxuIdTpUloRUDA9EtkN1QgfBr7WEomVO1I7W2VEl5oJ9HXl7ZzdYeCKmiyDqb7iJ98ifM8AAAAAAAAGoB/lTWVs6djac/lYbrt7ulJl23fS77CxoP76Xtxip/5F0dL9NfWUWLEPYsAAAAAAAAAEblzH9ohRl/ZQWAAAAAAAAA1XhU/c4w3xu+Pd/XquVnuT2QMbcXHjeW2gp+ZJbuNsIifyetnT777v0wQilv5tUz+NrqAhRwM18hb2sDGzgdRrYsQwkjWuQ1wJcWBNXiUx/qF54MULyJePWyOTI7fHwlPT5rs8OCYkgtCGMUSPXgE7d1VObBG0uzRCuzv3Z/iZkJUkcIgPNqQDuWvNJ4k0eT8t05teRXa0RgTP+cCSvSVsklmgib38Hqsf81/iUQJVoN7DtzwFrH98/w+KfNs0nNyb9tZiGbR4YfEtIhXOm0Rb8gfmzBJ2mR/a9D8gBzssTRKmIu7uftEHN5URTf8ozmvNNM2eCfGfXlT2S7errbNYizWlmNaYLMDGZCEdI1IylR1gBjwrod1bzUM4K457V+HNhKiRGoMXtt0LuB0r56BQi3H36WuzTOQxvmMmuUIyRWFwtSFnNrCpPzxjIuJ2ltoMUdps+AAAAAABYoJjx5p+VXXbfaj6Dxpf7R1WaTUEmp0Bk8KoDJ4VQGQOsGUb1KHaChl/eVBSrjKpPk8Fl867TcUTFSjjE5EHjS0+211WskaxaDvt+9SJQClgw/YDtq8E6qNcpk6JKe8SsGgoRkLnbfr+KxfQpzHDo15sZIWiBu6XNyg/3I1MFDpTEiysVyMnOcph+QFbLdKJ5MgOrz6q9kt/ThOQPTLeB5w9+lcOfhH/RoBOZGoSsqWVy2lCkhJl7b7s+ZjLbh+eLtuX0uVcfxzSpjIi3eGPuIa79zN4tXlf8zHRAbIPFH3pzKiZg9fpFkUodkA6xy2puQd5sNN6jZJ+Bhj+fUC5d+Xtj36gdCQOt0cK4ppJ6CZg3Ac7y2Wz7MqR95qoHPtGZyEwqtdzOHXivQ098nPOfDX243aCF/9xGNE8ZixNnLWsQNn7gI9po7wqx9tncmQem2SPu/CtWu1qOvLqdMSiiGszmZF0vNt36LSDdYDsuup3h4u310OegVTsXJPQQ8RaMbJZrygrtNodeXJ+E/5YeSNxZr2zYHgbCmS+8hePxEuKfz/t4+MHV5s4PZ0my2EtXmh+awt32z7gsJVplf3aEbwr/sWaIkld1nWi/5afxY2Io01EjDW6a0zSYog3viGd2xXr4vc0JuLAmKE5YbuR1ZoAGocVRmLgasKhartH0k6lIROqAGbVl8ctkLvatYOeUtZyznH9B40vYnb+cNUTbmc2R4YuKu2uzWWvXpO3CI40fq2tPKU+tNdT5QliNaPVQQGNIXjKfYHiQHDwiboLxVg4s9+gb2hU7kHLPC12fVHQ9vBOh9C5Oq0D0/YKESobQJ6IIzzVIrDXHqUesCWIQnr2sWwzbq9YTNJ1ja4SutHpLtWshNihMfuJIQGaZAjtjXTdFEnU2IpYu1P9JASOck8H0b93Y212foYL0kgJHxNM4hm4/qSNloIYW9aG0t6WGo7iDKZQwO1BMr6TM58dx3OZVv2Ha07rdUKCsAnrRVeLwFkAB8C4B4KpNlGt925C3WqesI9YPZ6OiP4lzC7X1bzyoXZ0LR5QUjSrTBNwY9yXBeCW5ULXNPDGFk4AnxgUro1u7X6TAnBQyZp3o44hcu9r1XswsyASVYxBBU0J8sTgAX3/ZKs9vSjhxrEhFKTMpccmJd+a4u/fIHfly/Ytpk3vH49HLqwLPpBMXGdIYbvj3qLr7xRBh/kILMuA8oIzQLHDJ3xeqhFgdPHfttrsSoOzmJ6ksaN/3UOMS7k5en79Gcm0G8QodVbaQDCnNhQAAAAAACA2uA7HgzneJIFzW5aZygHSWYKpk9nTnCpBxuCcQZhbUtxGDt0fsw+qj5cT/1e02F3HtKTLUdzlGMH3GxU8RR+RpTIDORklHr9PeY5h4MNSfYJ2+18WoXndP696VJtwhI66kq0yvK/r9DtCEc9aMDS/yGmHpstjwEOvnHRW5yWW/a1zCTEE27AIjAwy9NSOdUyQ25UTIBcmIWqf1fiTxH9g0vcUs13SQbxDI+o6koFRHnXEo3JuC6iqksCo8jTay77dfMfMkTWpKbggfeZqXNztwrz8V6XDKiAGNe7f0Ildi6TjOUCDdsAAAAAAAAbePf+c3qwEuuGbnG45g1d00POER2hNNX4SZPqc+e3/WmE2PxsUqhFGjhuQ9EnNUhrAAdHIb0gsdoloInYWfmJ/B9o4L8oAyaIOz1xofPpZ4Ji0k7IHHBVD9BHio69+DwOXGH1Dj800W/6/WVjby9AgQfFcPTzfNfIQJNkQM3fMbTQRs44hWZyybiO2UXc1fmjsD57j4CYMNc+aLNSivgzhHzUugOr6Rs2NoTpfOrLZWfJ+wO6S+O6jtBwnfo/QzZh9TI014ylMhAgkrkDr6lv1dphL7wApkNuPiME57WmFlccAitgtWZxglhSCjE1UG07kd0hIlpsffTzCnoJdSVU7MsEM5vqGssNlStybPDl35lp1+WFnYGhEvyaB3U5AoByWpE8LkqBU/QSA/VwcCDGr0H9mfVlmYWafQJ8HyMWj7x+eiVodJs/ixahwqBiFJIqQjMQEVC3eX079FVqB3ZIYIeIViSdQwhFLkWAWkFPUxRKmXAChZEPogcoAp9c0rsSoIRo0N045G1TyeCEjAHGulSCW0NlhChuJSRuyX9y+16DBpNiMZsqCmEUIeBt/RkLUb7i/HhYeipqfw9ObgP25Du4PvaDr9RNjqFwPSV8ddClKBmdAPSTzFY8QPEzHKdxUsR96CWuoUD3xZ1NhKSg4usOpF4Q+dKjjwkjXDp3Fso3yHk+yYvAAKClNqZUrKFhA7bDMJng7qVCyA9E3Gy+6GFFtsHzM+lch+7/7k1+3stOb2xnyktndmqPw8zXQvgyheYT2cDIqJ9sgA7TjTXFXm5A82HDlp0qgX421KIutqGhQJFrWBvv/OotyAUd5iQJI/Sl4luEzCN6REnlDZKwwwpRdSK9eDWGKXAsB/HTBNyNu48RlTcnpw3Ywu8ycUPEtIqBZjJQXw38b7qED4qPr0NKktQftE6EqHHzTSBKQDHwb8iUMRr4Es3BOikZvELA1hMLj/5rYnwOHIF343UvGwhtuECW1XviWukac4nZhcTCiGjncFMobQmPGiim7x9WyayB3nlQcsF3xv+xyorSCr+KPUMJJjQ6jMs5w+VGSd0mkXJgHSNXQC2+D7V4wvhrkuqXUedWjl1/1mJfeosIk56oyN2DQbpMQnm7BFH+X4BaD/NrpmbfPvKz8Fqjo0IepRSwEqZRt9lVKxkNZl9CKS+G52wYAfn9dF1BFkM066LNhvjwGsTDxan6137mnGnM0hNH4FXEltlp4IxiCL0Xj7nxbsrQeNDXsewsPUq3wi/kVHGJDaFeuWKHuWRlGJOYg0I+oD3caJCj6Gbn3b5z49N79IlnjruAxgrmYoaF9ur0vrfaW+g8X6QY/lAckvn+S9Le9chsto2ZTI/lsCxPle5d8i+6c+2Zc2yiMEDGtFZ7cBgPOUNOuRd6AgXqqgEiAO+MyigUSh3GMLWPC3QXNSxlOWmUIXkPapRdFJ/g4h5Qtta08E+9NZlKDnRGReXh7Iwb+jBPnP9QjKuXyKklio8sDkgyhLmIHU1TCKzikjZBaZcsqdDoUyFHYOtNtFEoFbOXXs7ZRJxQfXjUwOu0fPlU0H0BfTupsM2PWXd9wZVHX/Iq3IiS5/ARmoooDBrn3F9QLD3/mdFOooBwzXGzWdEiSn7/mGH4CidbLqAQclS2sQhefxGL19T/E9Qj6HUiYobm9eaM/FG5IFJD/BXtrDFsPoLLykLRjZ5GdxmiAZEbtBsBBWSB44+GQUlTVIAFgJW7pGCfw6Wf+lpH/L+hCKdLdKqeeLoLdthq1LcHJXiFGGMhBRWLh5n0ApNVSHubqrtC3DR9adAOPIdQaqOvKIiRIAlS7au4H7MWW7dzrlj35qVuawXOMlebil9l1DmHT30GqKoeX8gwX04Zp5PZ0hpmltteZPIZ7NSB+uJluu+pwKIl7fUz6G5uPom1/kToj9+al+ciU9pDQsMvwmkq2zX92pdh1zyzdZ9fxlZbGI+VZOq+GLrBiP6N0QpPDNvazfQiM1tlK68FgXKd4Ji7r3XKa+8NgxYOKbC5UO5lpEHnWP9x/gVgyIA5kIdXU/5Th/OvOmmB5lOYSIBOCPY+yvHPVVFBaSj2jCXIp0djCf6QnTBwfoHIcUWB1+FCZ6hL4h61l5xDm8I76H1V2PattTcZco3vyyS5a3Z1Xkfd7+VkSwwJOMZx4YaUwDVOKUn7HRWNUczsCQMphsYVpYKa5PiEiCEGC1TSoupPYrYHpVYn7WbgrjLBp7bXrU8ytYD9w0D0wR0i0DtLaXCrWZFYz9s7EEfy19bENSSgA88K1mLivT1qa53LE3NJycf3/1HbuZH3qMN9zlGg5Gm3FvXyUASL8AjSso2jz1ULSGmp6e4cHPa9M3d2Ss018EURM4lrk3sPewV0dzpKGSOsvBldYnpgdmlVHZVpdfFN3P0CeL1RM2g2XJbdytZIQ60QGtjzCJxWA1zbu1UTOXTGNB6jYAolNYeerGdyqRl3FBqz+HQy+2oo+kMQuXtzpIWHXKBDNrF9pIrOeTMXMUOxHxE/HIZmg/w3R5ALVwgVXYmqnFuGOcnonye9GpcnDbSJeq3FFI+GmpIVMa4ATyL4Rndw0zn28QE+uf+S1KHRY2gSL5suXO8u55TLzAjyPtkZD7iwHfhp2Hskhin1THGfKgpQtA+8wpA4Vn2xbgZfOeqwPjHaSkF+dy+tkjwSzME3VyalN8PecYMVJdDLTknwNxjFvz2b+qTz3NaiWViO8jTzw52dF+0QibcOgWLdxeEUmYAKGQST2WBFr4z9sc6NpP/e+gq9n50QqgjAGFILY3Vp9Thj1qtu2LPDhjYyXDGz6KXQazNtE5JpyLoRn2ry1u7FPDs3svLTFbSv8YEjIqi8ZjbEl7v4azJ/REGJeTj3TcpapR49D6Tb0RiEsFhwdsRqrG0ZIAVPd/xBH+C+2eO3gvI6fhs2mUXiTF2FAhSEYyIXHAb1fXI63vhld8C3m7GECGnlmw1Mc7sanur0p0iAoA60oOofzywltuKSJD83gM3JYJBQ0nqvPlBHMtNeeeQHLj0zPecj7sN7uMkqGXeECpt5PFL2gCWdiIFwo3c+06TyypWxLPfUbsv9g6Lu+4gmGYyRLDjCSFsoxv+7WlTKV7LbzAKJlo4H0OeVxrRkDvGeSZZ9UBLJRFdkYbdU7in/NM1VggePq3fYAnD6edZb6nJ1RiSooKDm+NKqrbU52rWT82fmykrFSwp5rET87s0Ct4zmmWLE0MS796USpOikBvyjRFcUjbwzYS9g+mvAxzlV5syvpFTjdiK/XgL9cQ+QAZvfhYnleU20fAwu1rAKI30oK14+j1wv2Kri3O+yszFy7ZXg1oFPqxDlcWb1kQVLd7rjYADmhu2oCKyncdeTrEjMT4bTCHpfqzm0JvINAUbrkoXpO1zTQaWPo2VRpMfu1yQAuZg9bBKfLtAuVrphXtu+EIjDP1ioErDvcGEEo9eWOSN6MfR6W1zDk2UokCshHInOYudm8v7mPB9gE5751A8RSb70I0BFmzNWbaS976wI2QBk7kiJ9wSbNn0nSMgHqIr/JTSSWoWPgvzyJia5EX7+WL79K7MFNpjjVaVhNC4ymNyUnzwjDckA7UVPMYu6nq79n5Bs4C3UTnQIQAAAABKA9GWKIsabOeZQTJksSd9gMWEV1zPl8f2gHe7I4ex7ctS63LR5X32+MP3fqDgFnKGi+h9kXfjWzKtGyz+pdvscYy18wgNPEAVfIAFxAv8GuguCT2YX7kTtHvTPaerkIlAxaylqC4dsQZsfdmocGOJqhaoHShcZO/XoVvij70AJkKQELViQ7g6A/2o0tDAeWaGgUfqtW2D9/R9U7yNqGtXSvRI1KHKnIwViyJzXoqkNhhXqM7FGXQFkxkzOg0x29UWIyZbjg+O/ZyysZsQEuiQQYWFBHmtVqxxFgfQIImONubVpIozKaIe//gKYoNv8j3ZTz7R64/IezK6CxOcpzUz5+bAO45oCKZOeWbcEEmZJ2/yyp2jDXsiTYiQaYntLtEHHUV/OoYN8BYq6d34TQvMNQB8C6/6cFFA516p+E7FxW+YVndjcjBL56sQGjFEakhb/zi4LB0dRxqPgA5aWa0D1HeOpKkufpTH3LOZ2d1nM+Wct7ENzfQ5y3JGgSCYx1H/lhW/bBcAHxVrn67+B3+4/McT0AAAAAAAB5kpbTgDyHYXXpgYbfnKKuqITLXi4ABbjAAAAAAABssLCwtBGTtHNP+jN23M74rP10LCKtY71IWQAAAAAAAAOP1K/OOcGuG3W3u5v8RdEqnl61LWq2vZQ7oT/7mJuujrfyvuANtRNChKoaDLqZ6JJX/tq4jIjNVO56RAcpV8rayyXS1ytrZ+2VR6FiBpL1uUqyaE3ZfRNdEqJsOgPY28enfjdx/4bhybHpVh0VnQwV89y94hERqbOHqxymwQuFfVnlvmt5V9EXaToaNZJLUxYINU1aUlBA79sEh6qAAAAAAAAoN2gCDvo3rklZSKuqPjOdxFtG1DZtur2iK6vcTcgHU+33jq3YXCe/PhBqkOER3c6CfpVQK379CtZtuzfuF3a8K2L3Asb/+oRaRm7TtC3MiKLTViUSGMfWVTYQas5vkJ00zY2VkXjGGaCpVRLO5zey+eqXHk4/7LXL1Tgail8mkSZnVUS53vR3uLvjvVmPqMV2ZLTHVj6IoSempEH7bKQKO+73GrJWr/8xvdrOTCPO3gD9iWsDYQb0ULNKOqOIgk/yNcAASghoITIRlaFSEtW/qWNGBOizfn0kgN9VIqASMG7QeEkaDwKe4IdPfYWF5dtPcBPzdmF0JzMN6FF38cPIHHcTkVSu7aL80mB+gH4bY2n4Sf0yZniHcfh7j9oyZaDRzR9diB36N9bvChzXJo8QXnzp3Mbf23KuteRFxEaITDHa2W8Rnem0eo1/SexiRrxUAJfGQrWGkHJLCKbryRcrD3F//2OyjjxutKQ3JSKcD4sYRfXoZPTKSmZg7U8NCFHsEQN4J4uamK14kYjWnjsZTqYunXRB/DcwL7sdsr5VvDmQoTEJleZeruDRdEQJMqI2QR0JPsseAAAAAAE+CjX9/lmzaqbVY1d0Uvkmbk6T2EJRmyUuD8JPWtK4z8Sq7UNMWRG2wJyfxCvzkikGO633KlffeaXINZ+mn351p4yTaTTDRdw1ifJGoJSELlaNQRW44a5d0LP9sLLvoEDxGn5Y5dyqSsGC2abK7IlpKxuXCXl2keQvUzumbK60YlvMWgS692lYsbZNv51gu3L4Imr1pV8mFgAF42Q4/l7cP5ISECuYll2AtUqx0xfuR0FDwTQgKH9sVqg9FfxTbb46QAs0ufQkB8RAOLVNgWs/bvCcHz9C4bCh66iSkFF86rd2o2qYoB/iPL1VOLuNVh6n6qRJ5tXnyGbXHc3HJHEzIl/z5E3VItvStl5g7XDNpaCForLstWLPZeIvTIah+Q2qJLuZlaptZVmZxDXBZOGsC5LSq7LHlk/gN8EULiAo+SPQF+vM5kJbizi1j0/qoz8Jx10rTp0EhQEe9z8EnmMiNXoJrScsMcbV7i6dM+OYSI9qT1N6ehJA7cKujjW/oGjPLpl4AEu3m7k/nzkTVYEm3PrXL8yhmUbsHiOaVK6bnqbGKw7L/Fscb9910lRI+u79E6p+uMnoKbedtLpLFiDB03l0+hfBjSceDIvZWWNPCTJbSX4Uh75JLpCuDH5pKhzgg3eV0ZcPSqafWxsUZ+8mhWm178NsLu66Me4fQAOajXZhUZvMuwwGTLcZHX8esfJqNitb2Bjq4W50vXNhp60n/PPVeR59f0X1VyLUEUrq8mZgN7MbNk4GRHKfn5ayb+9+QwqmGq7yoS54q9qS4nCKJDsvpvo+hdoubHDPw91AKYH+3MlIBY7xRwjeaJwxDuttKSDy6dlJQuRHIOrLZHC6qXS3d0IrnPCeTi/yIX6zAlLFM49f1b3XTQOnqE2oSY5nsusfVaTF6+Qf0Fwqz6Y7cA94SV47YGwQt9z0GGg/G23wtUGP5ugJHTx8lfGqPazmZws7ZmynPhtsBbC67EUwJ1G8WQ46xBdoVpZtY/wSXT1IJHUx6k1s86FZkAMqEG5sTvQ+kjzzGWV6DNpta34xpJgd/Z38Edar56BRo+0AaN4TfOvQlt/q9w/9YXrRBKJYU4k8ngeBlSTJ4/lv1dSX6gg0rcRzm5EvkBWjVsqvEWq2FEugbBUW0+HGjqzsP9uJ/G+RwBtGxR9GRzEz6jdbdonuQQkE65/GE8OkGtw29XK+7AAqR+SQxE+vTnO/xNplMsLt5v6uWSSNuL4Mo9WD6RcvI6QNfGruEwQ3QeftZnX/5cW7NCC3+AQyk8ccADUjQn27ddB2J627GMz5zmDZsI1qVdtjAAhkrZd5QN7t0p+biOrk5X6YdO/vAFL1kOYgalJmn2+RbgOcMDrXxYs8ABD4O5lz11N9knw6vLKIOMfgY3xGI9Df/pTGCtnDon9Ktl4WRtf1oUl3BrXd/sU2d5a/y+2VElvPAkWK1GcDq5akgCaiNSJYevuC3meMH0UMP3wjFz/lhh+X9Te+e5GTt5Ug4NSZmVzYiQklq4DXaRmxADjy8QSStjNJY8CrjwzfVB2+Q01HB5mzLDRIintBwDj94cVMZ6UytBrRoNiVtnmw2yCSM93JFkCGmZfDnjprTy/L3qb8VVmBdJQWVK4e/M/e4+iE+/MUgk+JZnAYsnQxviTJHoJ15OyxDqD8Mg9kcb/bjwkfcc6jhJd96t1vFcz18Hwigwf4mptaleir28v2buxjsOHJ0cLFy268PRdkuv4IhqfnfQRsg7ZoGlOahh/nkDWl70Jg89GMU7I81KFAJxnAXoEFlXF7A5OzaYVNpkbZuUcKGsOjNDacVSl66XHjydXtbB1QSDlKk0KDjdYu924w7DWZuU3vr7vLqPcI2LiU6g9HrxarIyymkYfOKetX2F5iW4Lct+V/QOKqu4SGY8Ho0+pW++G66K23rOEisMGLt/HHm3CyQ2SI+mejZ02qkrNQaCOlxUy4YOZoI0XqIntSYp1/m16ia3yMx6OnM5lXk8zI7tLYHl/qJCPJdIhnbiyTcuRDVl6ifGxuq8bXNfm8BIfHdEF1QhWGrSWgnVrSFyx/iDQF3/5nKY14DP+T6W4QiXZ12oh9jRiTPbl4LT9tvnFPBpW6nealQgxLwcrF4ZElrWdXSFHGsTvUb2xHHt6VWTC98cywP/UNsfmTzbpVKFKqMqO4TU8im/7IqfKy+VDBCts117jtZjmpXGz+uZ9uIsK2qHy2Mv8IXIbyJLkQmiaI+pd8t8LGONczNFm1/4do/wYT3rh+nQao+WcgVyDVy6oilgNi8r2fJHpbknavgSxZp0znaVXBCFRQnDunvFzQKxCUZIrtln3Xm2z2KJH1NNeLMGjPbj46EmQrCfldwuHmzWavYrmA5Jl5MAoX+KUxM2ZFKIYn7uLVVVCpHlqsByfKbMdCqftJNWUCLmc6HLS8vmlWt5KTS6eie4yNbV1MFfL/4PZ2j+YIyVkKVowAAAAAOGTny6jHXNBOTqXsMvss/8lHenv066383MvzMTvpfrWgpiQKRO9uPZWWABRDjvv7z/sUI1GNVqzoYbWOuPXVm046KUlD4iK8Ux99bGH1Tu9d+sxB/EvE0x8J3jldPMRQL1B/I1JGnMOt0U9QfAgrbZu0QpYdGuhHxmm03RgMf13V+YDVCP6MfxROSgw4jZ85TI8zMWEG8GbxU1cYV+m+rqX6sV5u4k6FxZirCaIYDmjKJFh3LGx6LunahBO+B4Zc5w/67h6wwS2LEMgkz88ePyQmnkBF1AjotGmyGow/7Nh+2dDVw+3ZwJIqLdOR3OvGMa6PvmX4VksgvzBOA7zTRMP3so52QIZRC/mwGq8fMHyePXPpWw3lBgR/d6kLovJEkl0IOWir5Lw2eDTyPfQAMmPXE8xWEkp7YupxnrLsr7idofoymJT5FAKgYlABinAPqugUg67AmpQwg+7nFxkAqyAmJ/OgcqJx97UiKsQZFTo1JhMxjYB6ndLgMOfotqrUKa3o+QLCieE7Zw3r3sbG830PjAUv+0nR8RWdy0//cH8sb0g+YUA4dLlgcPUEDqgQCrn+xtem8QeuGfUAbkgPWQvLg5wobegwX1g4qoD8sWX0kv9k9YmYOY4iVXCr5eG5xmgofwLCkusiIg9mEJRzwta0l5/GdXG6+PxPrLrvu4pECnzTb+1vVij1M5lCulzXdQ+QeldMsUkNQ7AM3vAKxh2jHYPpI96PnIvdjrUTWdS8HZicfDoOBHIMNK/E+Hefty3hGE2DlnYEgcu10XHJpO1JMKHuK4okVEF8c6u4Mq/6HZntsCIlH2HVwKcLkT3+p29HWLv92BY1zD1VgMZQ0Qd1H37D7Fm6nse0x3B5eCy3FbyCX+iAbBbT0vhphC7XgJkBI45S4zrBiclE+FgXqk5clwT0LDf867e0sNoOo5c1L8tolkpENreteuSW04V7/Xcep/QbrseHfXT+KeLtIB0XBIFQXLQbcXr7r3nRjhzGYmhfqBV2X2u3cRUxufQYp/7bFDVMIxUYUnf9S11PWDWb4wSSwDYlMs8VmvG4uos6dHFTSilyF2c88J+gxd9fAMnL7es6D0ay0/MnB9jYnfI4WYW+4HMVVCfVi7+GlRIQNds6mFzzyUWnI5u9AKezbuyk9qN9YHe+WBX2r0oNvGFy1j2vrnD5MW+pWkCU3XTwW2e3UIabHqZ2XBh5PkhGXy11983ywqvD/HW+idmWQvWZ/YbZTrknnyEuacI4MbSTe/+AlpEUAHROcpx9Y2R41tx5QbevVJS98Sp+kAFEj86jseQFIPUk/4uZAbCxWL2dVOyw6y2Z/P7alPcCJMr+QoTC06ss0cl/hRcm6Hvvm93buZaM2YE7VHo8pQ+hJkd6EaI2UPgCS+6gizXGDszp+anCH9QRfiuCTQ2zxQBMUvKfoKGTB104lY8ThE+8iTWnr6wG4ADUDu1BwM0UQOthh0iAj8gRZxLbS7MVSrlgKf0y49Yv91zz85kan3LheTDlnqY/DWspuwXWSpvGKslDncWu5VlzuN1nmRix9H0bS1mBGZssst41RF3Ko35NeHce4uG82w0hX4NKMn3kM3OtnE/aRteQLrvTDztXEvwSxJt7Z3iSceLwY6Ki+B0YkwdNGfjjC7bANrnyMJVcyrLyvinJHWK25pvBtEBRBtLLusmoOfqb1NLRq4/zXjEEhDQzHnLDo8m68t5k74T6PdnS+J3Bv4vw6cj8jCtVruD7JlGB9C0m9mykB9HO/aR0UrjyAakHlM15UozDeEIUA9VShSpIBbhLAc/qmnK00FN56PV5y87kisUVudMj+Q/KNefeew2OhQy9KKjYXaG2FIuqbpovXnYmGsfjBF5If/uv3Xof1Mt/lTEq8+f2kF3/FGBzu5ugEYn7UDWD1CQ30O6Kb86Mn+FI6C+96ikiOwQYiHOg4WynRra08rL0p04F8w/I5lAJP8z/qZOvbGEe5Gy7IJIjr7wNpcOnG8oLMrwPGUuxaxJIHjFM+TBXtmtnWtYRmc2SdrhKe69RdXm6OIbDAdUt9RJhKQkShvDYywwbxPpys9YCkF6NIfP2vtWFTqh33treQdT9OYTCpKbjOU13fYUfn5tJcv5E1TgR6Tjz3GatyYAAAAAAAAAAAEyf5ReTyMR5A8vVzSeWFS9+DfeO+XxgAAAAAAAAAAAJU0WhwRT9JfjIgKulUIZK16sBTEl5qcIZI9EqDcKpG/eLaSpDs8lMHQr6SU/yrxPVxRFge5n4IiRjbPtmpi2JQz3Jw98QxwkFBFNm9w/h0JYzh6AeBurNUalDUoalDUpnD6hTD0RFJXLtkYEE3uCxKUF/RBy1ZpR/8oFn/LHmjGj0PCrUKIqaYkez/1k431X0kqRtJX0kqRtJX0kqRtseP1YlQucMiHp1soIf+nqmE+eyxwm3uYoQZ4haJ+6wBWNdGCSlN6Ye2R5+7BaOAfkPzFZk2UeQ16wKm3FXq4LT3YOdf+fUAAAN5dlt1pHUrv7egPqSGZVwltBXgB/N/R6ZZmy3Cp5CojtZroSi9Pa8WTugSWRI6MgAhclI+ZfzqJ66TxHS9HbUHBYHzXJ6QnK1l5u8Kwtdr5r44NR9ETvnk0c0WVIYbhMiq+AMrjIO1cWYDiEhF5bo1I7gMmztYAjd0yueV2cQ5fGEhrf1Bah1tEcUafJj4ApKPZ2uMoZ5s+J8pw7c5S/Pz4b7kD0ySDve5s5NnBwuR3HYR6rNGca827i6Owyb6GK6MSOrdQ/AfUH647fbQVIn9ewaQzi8iPV1Clw/bGoevn3yEdPQydHixVi1NY208hkKSnXMaVr4ZYhelKLT9Tr5gzR+wG4ezELKcs4Z+9wm4ApRgz/LmSVPXJYsRKrhTgHjOdsPthEqGuMhDfHRrRyLJRNPFdjartMw3aNekyJJnBf+UhKylK+TpQSXXHsjpr34fOirFUGvf/YhFNlixIhQkQwfdel/E82kr8K/kfYu5tBe/D8ycQPFuAXXeuKpxWsH8iLFuIlt48SZB+5IlBSaMeoHVB10WIjKRJINH4IOfgasl4RITYaldQQtXaN31TTX7EMCWn8wRkNNO186wHwdZceFz/LMfUw5GHe4VAFwvuI1Ka3o8Ikva3OvFGbnlIGju72JLvVk1UmtsQgLqFck9muXz9E7D452ITm9QOhISCO56hfbEuDMmlHRpfVFXI6LWLejyuCMEgqnFamymNoVLsD3zM1VyqMsvYttH45a9FjJHxySvG7j8AT6r3vE5nQnHGcrT5zNDRLr7ScKEqesetMKSHoRf3t52gl6Ali7ng08UcnF7qCFhxtSioXM8OezTfXQZAfaTs1GIjviK+wD1rxjwfJOwV+8yTowieRpsqNylnWBnpb6+0QWi54fpPLwPeUYGiJIcMuNxkGoXnqgJ09eTfyjjENfthuD/hIF3ZqNfWFc0qWFZqc9tB+rP1UN76wq/lQGZrIE4fo6rtWhPD1KMBq4YDJEUGCULO+dHVMDfug4Wwb3qwwrJJ9j6SbaqK2527stbOqfVLRWFn/8YrnXktklMV3XNrzIWrSwQur3X0/Epcde/vx1ROCtvv+wRciPmxXesbwtlSEpf64GZnPYl+1OIfW+3G2/8q9RMfKuNkPzdU0HEtebnMkikOqZI79qP+LSi2gSCNUe2zh8l4vONkqyFbeqCquyX7ISiWfx5kyQ6DR9D+fijFGJCqxh/cFuwwXaQUMOP2A8LXALsJ/9gKS1d1qAtRsgH4UJbYcCqHgpAYbq43RqWGiSScslJdBqVXw0t5mSEkQnZcSW8A7OZ+7Sn5Q4Pz3iPYpGyhzl6ApSjuLuGSa8AcLahr9ePEr4da6VazKGVWVob50cvktUsVUGfyJZjlqCE7V78OgAAAGqTCVDMGEjjdf1gDQCpgk3/rLYJjDKrto/hwMRR6xpeEck7W9Rjp2kWH4da+B3V9/GS2Ts4WlftUwB7amFXkchLBRZT+sd9vlPpyeIgK+DNAUSWbsMtwkKSqG0q3LSlV5wWXu/VfHNPH10ooJ9NDMDZAWU6NIVhjd7FazzvfqxqaaWf3XiXyfsPVgd8Dmr0RrglV1QZstnfu/8jkMAq5k0hjfoA0AgaxY6D80SALbNf1PUV9vsZAZ1nIDoCms7ExafeL7+IyJNUVnVh5qsPrHoEI7evIhucbxlnLtLV7l4n+jejCY1HmGGpaGyO6ziT63pvZL0gkRV8IB0EBukg2VpJeVvvGPqKk3DAag0cUjOckaCEl2ybzrO/ZhJcAZSdNn9y1k36aXSwCic+fpqfEX9Wpg3wm3AKA78E7EyEtU+EUDQQ2u1qWuDuwStNBpG2c4fMlxL8k7As0JldjArXopOUhSH9vYo1xfqynVsJzfBjt8BxANUZvJCfBVSaN8CsI2BmDnA8nv4pfo6901gWphg2Rl0DVPpKQykb50dukn+t+yHaJGieom9TTPQDHaJ4mWawaFQfVfBBqPVkbsjazNU4f8geeff2J6Ch0AsDitM/KiiucPCd1hQWogxffUg2UjfeOH/As1gv3mf5h0omrczlmx4vx04r9sdSnNm6cVyBkQDQczS9rqZKfbaYCwWIU19+t1nb7OU0IoCX8/n/Cn+Rr2JTJLASe/PXW0m+rLhhSvKNcPT0b67KYdgtjdEXwEV8c8zmiNXgHN6cKLK3/13b5oX2ur4CkzScdYIBF7q0jbDeVeW01LAdCAYieThxjoa9qfe40qH7Oi/OCLY2vn3NAH5aW8S1hIi79OuSnd8Ldkm6ap2mXoSIg3aYj4SbJj5WV8dFilbMm7okuClR+BRK42PWzEiSPcKw1ZwpEA3m4it3KljDeH/BCbxQxXp0+6/Rsc6avqrY4ZK1FpBHTSSxO0kgLZbkGJb+F2Zp3N2bvnNtelv0ZKDwZAcW/334t1Wcrh/n+ukBjoTKJINNwQ39xNG0P0eUvuJ+6dCUI2ncESHWQU6EDbyQ7Td3AXTvlFezEtQO28ZaKeXt8vsN9YF9EyOWYsuKxDWeYOGZi8wtMcYAx3G8F427Bzv3imSnJlmJiuOJPwpqA6b2nLjodYzEghhFLZvj53vUoHKx5CsquQW1fuO3Su4FlKnUg51po7g0sQP92UkRymZUdQBJOpM+anUUycntX8kL5jSeJ5XOL7NDcImKYA5OuuctjJ5aWHmg3IXxyqMLoYBl6N/IBpW2jmf58NoyaNdBuBWpru+nNcIBb7tQED9qQHpBYS3JuZ1OZ3fttdbcVT39aowTqIjUMuIz+Z9qf8LD7/56BLUuLi6KOSjxOG7xmL8aJdLtIVYy0V1lZ7/hbp+tIqNlhej1YJeAqfmHjrks9AaS2Yav3QUsYY22kdw+P0B17j1csGH257eeJD0or6NOv8tFMLEty/sz/tzEon9/U2XAY8j15WUiGOFnseq9RM1KsiSw8CXOYwVNrUrfnxc8Oxdpp8YLIRp/vjPP+/n6RZO2rjihUtw/dNnOhcsM8VzG+6c2VOtFc03jYILfUqSvrg7pHiU6hEiZjE2MlpEoqVVzKFWp3G9EXCjkKX5vR94X38WqaGdHLGlUmO7pII1iebKZcO/vkrGGdDVNp2SGYiB4HPdevkd8fN4FxPGgT7GBq7RYLzKLBAeXip0wSEGh+ZIdfhFvMmiAQXSQxKS388bMFvdaAoNu7D6suNC0D+nG32sgNNiMYvZsRWtnkIBMiK/ybWQQ2fiSLqNzNoOYu5VR7L5sPvBaVTRrD+ipYxsNWmBNTKRYzq8jOqXNPFR0afpTDrrE4Q3vmN+K1S2v5EFnmkzIKJrcSwnv5HjXbPT15k9BjLWX9zsrMaDUTXOXmr8vXYnkumRPkXQxHRC+lVeI7W+IAlvDMqZLcnd7dEI8WblfNdBtZGesmCGP+gRI8wCqB67cPHQUZFfr6Sqj2WDSx+l9AhstG6pYi+U4zneojYTNRtLVs0LciHKLjYjlZyyRmPSOiBb+6N3ukAr/QsZy836iYfLtHXABWkfZVXQ/B8zPsnVFhkcjiT+IqdSSLRc8An64MhjbuyEZmX0pMli2F0aPaCIK/e3RYEDcPDJhHxa/FFr2BjaxLTrSQrWSw94JxYJvIClhK4UlHucJYadoDbcJZTARVUeQmKANe2aC8h85ZJQ9wzdmRFFiy3dWSpqGHyW65/10bRtXwzp7bCOWTEWGIzC29kmFmzfMjlI1W2HEv/759McTO1VJ4Z7cWiNoyJI1gPPGO3RzfINqsNZJ1C7dAQ5Gv5Wetq4T4mVaXOx6A6xXPkFfBk2X19Hth+KFV8A7RnmFDCFKw6+JQD7aWYNQQJGyhYWXJQakCs+ghEy/jWYq/CmDz9OIksaGBOtjJuZLcyVUeT3nYK07va6KRLKbO7iVsV+X5TR/r/SBly4OETIJZy2hRrVRSyeuVEBaAytrzwbGT5jatIitrdoTf3+ZmGxQin1GTWLaF3FAL8MDDmtO7iUeKrlNwg2me1aef1eKzxuhYEUl67/T5/jwbX3uc8lPpnVnF4Yx4UrEJXJFLHsg2gcX0QS+ocR1yVrJK4si3/l1W5qs2k8xRypt7IDd7T0SrEeKhx1KYwt0RIFmUoBpMLYj9tAC+fsAtHVRClkWxTrb4WuemVIoCTs6ZPGG6vekS/LFvE3lPUTH5jBqBwhf6t7Q5l/ivsSTTe3//A5tfbT3RtyUQTE5yK6NuKrPouJ3ye+kZWJ+46krPR8M/LcdYaYdD7w0UHaGpUortRzZCjx8AxJCXwCe7mPxkVNgwU5KvFz5cwJscynCltp64AAA3lxADDEufxTwwACRUAAAAAAP4gAAB5MtSXMxdGT5y7ROsnQPsOnhLKRIK0oCgoqYmanplLyBffc0qERFxO8m5pNTgV9S4T4IRjpX+KHgLiJeN5SXWcxia9liBRb+bjt7/ReWJN5jZB/tkXIyCDa5f+n9FYysRz6G/fXSFgLtK/zUy3zvE/XKTE3tMJFVpWHoZ2ob1MjBsPk0ruNKhb4igXWJj0OgAAAPQfvt5QHTzJVPY8cw0atEGUaBaAtpnOmaHci9Mcc5CXGGG0fvFQXANUS/AyTQmE5Py/WSMB1WIBmDeo4U2zqfWePdsDTq9j1mNNRxgzgw1f2lzdxlNpr6bt0K0pAAlf+S21AnF1wAdHL1oSImIaobErhlYPxjIvh38R211XCtewX9YY1XyKJRgoTCQPxEbnCUh3TlcVOgL1YIkdh3CrJ8kbAK5b6sFYJxqSMgHvl712Jrzcajxp7311BQU3iHfWPP2V7ireNzDPS9Dk/tI3dg8bIKdC1E5cbmo37Fl6ZP68rygQDDkJADGibCAFgfsJ8vKre4F11pfXolYUQSLY+NRTH9e846B6qEAJ/n1oPUaNQ332+hPfJS+0/enCxKwbx7jmNmKYU3b5RXGirzTZiT3/sFRiAcWMgk2yvHNsfhhNkXOjUdepKt/hbhOwhyos6IY5rFjayt2MrNLHM/w/iRsY6/R65I+lQ92OgaJAPhTUwnjoAkz7Uf0Ha7OqgdZ4NqzOHabRWlIcvFdX8D8pMPo5SloX198YRcYb7xeLGhsKCoGZzpDctb1i2B48OrrnZiz4TI8TrW+fuhUbCMEYE3HperY1BTPGTSfH5pNxs2frkAAASXt1r6Q62YSN5S/IaFdgOwl/wAAGp/agtugr9C5kDB58UlvIARnaRteetmb3enOtvKc2wM507UA2yLKLMlsAGsyWvk7+B4Ac/CVhxdpVmC3Ky5/Q2y95ztuj0F08P3wD1aB234Ff4VjKrQVYoHQQ8BVhWuFtWpANgiHSZEsBLGD9KtPIs9G8ua4ahq9NNJeiMKcEiFPwIAVU2gUDCt73/n5KRXNoGFaolfvO67jhiX3qpAplsOR29Z2SUKCQVVnJkxBSnMfYxQ/Qzzcb11gvpB1Imom2jgkXlLn2Dpj3bstmL7xE7YBFsFGFm2/23kw1eCCa3JBceqldQsFNUM/wP/KOfYouKZiffChapwFBLN9XqC0Hw6U7CwDI7vcAA7Ee3bepno9NqNY7SSaQWQ06AOZGFO14ICgG05HD++V1HT1T/vzsRLPHNhB8yJ6uUz3hn6bRo5GOTWdtZAUbAAADFXEATs8RIYlgabgADThYAAA88IrUhoRpa0qmFr0HKysQdiUaNr8RY9srW8lHLPncYR31eQWFJbpi3TCbdY3tDrM8IrJWpyaJlGd2wuo4vGkx0s2sd3VOYQuUh7jtjiXNIHSPc0XJ5QqqrJSkpVgholnTzDx8/4y19UXGn7PmiyRfvcAK1zl+5l6xhlFKTO+m8mfH/6RBU02mO6K3XWKqJnP4W/fO2GRv2R4JYL7h0erzpZJziVrgEI29vBamppw0IlV5ioQVCMv4bkcQDeY8EmtEYcYRqz5d5qnH++97O3ROJ+H9VuJE7QCArHGTQhsqRay01c5nEE5/yAd7KTBD1GuE9iwTVGT3sj78k4WCurVljCmqkEOAZt3/s0TxTPHofCzCg8AxdaMr6JIG0dL9Ch/hT9g2d+E9Occ/49FTsFvxzyGYixx9jhP9gjQLOLKHpIPhiqk3Ce97//UZXxnsybxoKBAXgnMi6CPa5tNQ6FSNdjnJ/96SbCNnAUAAAD0HsEqhloMkIEFbQLt7DKQYRHII4ZD74iDXODLEou2+6qca3WtHHcdScYTq1ILbefIDufTE/Mq86zmL95wJFtYv1c4Tt/9IMakQAZYn+lyskIEDG1jC+kC8vJUa8yfmT8yfmT8GyUdigeTtgihNXSU7MJFLjIgCQve4ueOw0kJkzG0HuZdIjx+rBHXaSK2BurwATyNgAAAhqoFPxPT3ATlQhbiYAAAAAAAAAAAAAFv7X+WhIIUn0OWxl37jkVeWERhxfgPeqrYvVMB6JxO7u47VJ3d3HapO7u47VJ3d3HapO7u47VJ3d3HapO7u47VJ3d3HapO7u47VJ3d3HapO7u47VJ3d3HapO7u47VJ3d3HapO7u47VJ3d3HapO7u47VJ3d3HapO7u47VJ3d3HapO7u47VJ3d3HapO7u47VJ3d3HapO7u47VJ3d3HapmscrAGkJ3eKMyfB/7k6DwJDXy1EMSTIYkmGIWpuSVwzDkIZhyEMw5CGYchDMOQhmHIQzDkIZhyEMw5CGYchDMOQhmHIQzDkIZhyEMw5CGYchDMOQhmHIQzDkIZhyEMw5CGYchDMOQhmHIQzDkIZhyA1G6nmkXMEAYfpUIUKvN2gYAAAAAAAAAAAAACf8Dzm+LW4P2ViZaTcAZlWAAwvafiF522Yk7gFPgtUccRFpxs2lu0tmJ/SyfKQJqgd54a1ltNabAfBJr0NKeflG9fay1DilXWfrVNjRfwom4+Xh3kA+wd84iqncx03cElqIyIuAW9MW4ZYsdp/XfnjSku2kuuxsT+3LTR7FsWYvnuS2EjHYYU0SojJeFiUvU+dDh+i/2BModfBbj9xWoUblcVQ/jcq6fs08E4yA9bmLZji1HqmT4yfbw1a0YuV0zz3wgj2CpscpU+g+zw2UnsAAdZ0k/buCa64uNwJ41AJgBXTHI8Z00dLpHuIzHTUFlc9IvpsqSZ4MoV7qM9iVHoSO07hzWIZ4wd4sFZC/a/r5U/IZSM8OfJoc+NEBMtT9ltlWKlPHHk9T6h6TkBRQUUZYXukZeIMq3AAAAAAABCbPhhIZBCu9D7y0X74JZoJ7OBjGQVDfHUe7dyVb8PFN2/qmt9ew+aXjk6oH3quITWhUzVPFb3eUgnNZbyZsXIWACMWA37YAQ8c19Fo2wl0wswMg3p03PeqOj/YPxwywwxDXMyhbQ5h1YBy+dkDLR7aPTpt08uLWMzLjekHAYqRdNeCjsi1yOtwkY5kg80t0PvfYjbmst6B5suuvE44JCkRpDyKpsd2C6LJxyV5XCV2OSML8rKYi5PXXMOW7Xu3D59IjhJVv95sBEreywBhCIenln4Y2HjmbKG4/YpGQLmcIxCzcYPCEn+ypost3BQxDjd1aUl6iOAmpX8JsZe0lRtRyhmdzodNtS6nu3Zuflqf2W8+GTrtgRmplECZJ3gsevrg5i/QYhwyIHNbf9eYdB8WstZyr1g4XCOI5WkPE4iL4W9Yy9iSQYkK5aIhxLhe4YZ7rsp1nARtm0sVwFW7shtmw+1rbRhnuuyxWGzTx2ISvPzewtnqqeTltvlBVJnJe8wjae/t8/dyNnSD40FKYMbHH8d+MATas0ugdDUuinO+Tk+pe9e4xu8ZEFXZJk1VPBHGab7thMLRTm5IwGsiOH3fRlK0kR0LxS95gz8XGbrDQPkevwUBxAAAAAFggmQEcE7oNYThDG0vBnpDTx15QTKtYWH3f3b3ivvHWP/cp+64NzPfhOElt47dMQKBNsgLkDT36S79QlPdBwg7hkF9Y7GadJ52a/D8NJkWdU1Q0O/zwPq2m/f9CxVOxOAl0QAdt4gWbnfQByeasLy0Gy2UhjaB/EmOghKJrp7XiSthwg3G/0C+BTz/yoxF7NFHzTAqSQUiKP+l5MUrqSageAQw06fpzBptUWQLzlPyDmNJ0brul0OOY4pvVvSVYPTPjs0ARnpFZDTPP6lPh4r/0lFpI3EiLrfpou+JF/azThL7jvcopx8MuLbyZbiKGue33mTg23DpoWYpypXRKEgXjzmfcYyq+1eRb8OMcxyBD80mfH+gisDs0qIa0rUqctFtxs9VZZO2XLAYyf5cZ/p97fIWi4987XUi3m8Gj7a29yom5fKp8es89sNnl+pddQf+WaSPG/n84uGT61i+jKYEIIo0EhHTkTJYEcMku9LKUfcFK6hRE7/MZOHPTPCCGCku7b/kHoepKAu9vODEwD9cCYQtIb9mVS4a2c1tKhtsXot0K5gOzW2MuoJ9roWPiFv7PF2UprBKTOkKi/IKBPYFZZ8IBpLoukp+gm74Z0PUDdcUWN+G92QRe0c3wtFFEIiqX8W0Lqg//M28bLl20za0iS5Kn9d1hHJ9V3tVE4xegKS0c4nIuJz+g5/e7Bge7nKKqbxNQpyUvwkWGPgMRcqm8YyxZUA/DPghByxNFo+p7k3J1mZH1D0VkOCZUNPkIhhKUarqOz7J1DJZI+zIC3aceOmTqQ9fgUKuNHkv+3cbsh8CWXuP5nyCVwpTlXOmmEmOUrnz6sOERQAc6a4mR6FKZfAwIv5+MrIr+Funxwmrhj3Vav7aLEMj9wyzZS558XWq3u/1Y9dTmFXTnMlClZScctRSJ2Q8wl7IbYQmXgk36A88WsCuazvqtLgHj5Fiz/jKsMWzlc9qOI/lRh3ZKILbOlaqOuRbG0PJyRYtIKFT5fPPwbzzeXn6BT7YPY03+dqW36ZxjNc/koU7xnt2XeeKlTslE/2IRVSy4p3cEteEXeWfsXUAVGIjc+5rvseY7F9SBuJeOUMo6M49JG1lvJm/gUqeUY+W4fmEg3SCGJPrXls1tDFOaspkkdJOqp+sy/ykkrsiflbKCeEmWPSpFwZmp2d9+K+0KM9XOgOF96oGYPLIqU8nspE7O/3vfLLu8kbkygXRUA7g7BisU5ts/9z4sAsjwot4O/K0xHog48SnTES4BmR2ehDJFP+keA63h2xdWLK+gRAabFrlN0WgJSx8u+ytgZuPlr5oenrFto9Jl0yQVnA7GK2sfBTctjKqz+nu3Xr6TTz5cWj3KrVCagKXV0D0pitP3zhkEZl6BIRWTXkHUsHMh1fW4018K4tQIx90TUmPV4qmptF3ffIAx+kL63ubaOY+0wCvl8Tl64hZeA40c/H8w5g9rS7AUFlHfW+cyE7MDt4KuPxhXeB6mlatKxMKK41WnLRmkEGwkSBRmFIxYsxdd+QR17ZB2+GDApfcS3Q1/fNpkoWKJBkn1jijErgrJWsBQ7HDRDlyd6tdIqN+o22PZugEb+Mc97ZRumVJT5TinWyzuWvKViDiTDatVOjTqJO90mNQ46ha0BqcWdK4TtAzFhdHo7eSXUqW7RRh9BlsmpMEa+KrwudR6MQ9m5yeZdoGAZqAexSlND8k1SN21dDjYG9cxD2OVlppyWYAmULo6cIga5yqJ2zAI+CxexI6ujg4gN+L+FqEXGfcE0LeYxxxOV+041iaBS6GqwIIKyV2XVnze4Z4V8XNQ05RXVujfFZEcdQqxvL9QXedN79schkyRMy0+S086d7heeF0Tj4k3tU4+uGqzHIocV6yXiW5ZS73i+V5D5g37nx8zQtm/iKZ5FnjGcsnhaAlnTqo5hlYcjeHNHevGmTgwqWb0qjatsbweKv8V4g/Y6RSssOnDPM/CtcrJrad4zkx4IG3CSUefRslLgLZ97I6vH8vfALUWsZ0rmDYKm02Yu7vNHD+5tmg6Jn0pm+edeiBRm56tfqWHX8jNPHcjJ68f/b/od7WDFpiJvrObvFFbzSahq4Pj/QqZCRU0a/p0/QWHN3lveaAQcTnL+9Vdo+StbjlbHyy4Stz4GkKQtCC3BE8l9ccuzt+w6lfHuxYC8dL8bsbsAvkKl7kwHHPo2HrQdaowm+IyHMuqXc504vLqpycEkVcbYlNAay0n8RlNWMZLgPEBw9kXq2FvCudES36VxcyCUPRYu/i0jJ9MB10zSIRzUIfaNRMksEUGy4KnYCTXnStLZMDcbA92S/cmpECs/DFpGOGKN0naBVrDGeMCVTZ4mBS/DqbQ9PaiuokBY4IhZHNgOBF3OZe8id1s2VULn00tscf+By8SU/mDU0AcAP6JkDe1xBeWO8zOJMN0FKUf2y0y4/xcGJLQRvzjEW24p9L7JeyEQhd69Z9k3/BlOwYdtb30ZoW7HoRyf+URz9kcwTNRQpUM2VbqxrwZQlmeDMVIEq2mvbkYraVzekNkWLgrLGYlpmXomHiDnfrK+zWrSbYNkpIqLeyQ7GQJXyW7mmmnWFjGAsjG9m2nRWbmBQNi2d/7eyk9yIr0IV7s1NydQidP5+Y3JWzcRul4d/v+olpndMyvcDLK4q5EQ5eK1kth9A2Noj9x3emIEJkyry04rrNPmhdcIMYokPrnsGoMNSP4E+pGcj+p+Q/+DEeqIfy5bAcAac1izGIfoEeSHxRs91/e1ixo/4yz786T9Nb7mO9paJfRIPs3gDxzDNuJFNXeAHF1tRHgfoIAL8tbdqaRji37YENv7fFPLtNgjWPAAkEvbTMRE4MeIewVoep7NcIQAbBrKN9+ki1Zo1FVHwYS2u828CfzUHjL/gpDJGQvQZPLUQnHNdGD/e2ZDigNYWYNcWJws79dvcokwEdxRHrKy8Y51po2uQfDtTbJJqmo+ZxND/sb/bbdC12nWf+AxI2Kwz3MqCGTOscOSAkIUSbnXZenZNxIUyFCaypL/DW+1VJavykHcAnbybCRFKsb/4bzG7FbGiXkndGAOA9q8bIlv9fRZ4cF4wgUhJATbx9hg6Fk/AFSJcqO1vVooLQyYksII80BnjpwwXGA25K6vsrlCmdO/Us3Pzh9lzAUU1gRc86KeZ0QcoqqWR9wTWw+fPxW7G1sCdMrbk7Kxo/uXP/n+oXlQ2EvkAvC6C+TBdI8aE0T/nXmnpB3lErK2n2ocX2fN60h5OCwabE9sNh0FfAgcCjip5JuY71NBRzEXz4NLk8VuWM4L9aTRZ5hNd/BwKxA4gJxHJJb6EollSUerWhtW1ui3GJVAthIU7aCppZXEyoavqV31TgKdjOD4+7W6d6a3WHDAF9RZajCVNQEjNb7n3ujpkYCZt+D8SFyKG/8+29if+VA+iXdx5e4QAHbS/ZkywNaebzdkJuWK7DHkBLBEiPxm/F/tTKsU5e5deSkX7SaQTGd0PYLlctP/7aVdhLx52Un7jDgtCLH0fgwA5aCFuttHIZtqU4P1+eN0CtzaUZ5zKB9OFWrIVuT2982+Mh3eRbsL4VLzQCxVkc2286M/oabBgMQJRhD/1FJEOhs38IubW6dx6djzFxaV98DlSb7qfQEu1dKSSQlPwvIcKvngDDCukTsFso4Il1gsnEs43sAAAAAQySdNT4Pl7Xi+7kaCj5nk7MTNt1EXrxkj6kj9xGXO1sKMzOjI8PD36C7ZOd2vYYLjSxRagcLGR0PyNuN/n4zt3A5RzAfNLqeiQ3RJrAzy88qrlWlzAqI2807WRdnu08joD25zh5AiL4vp2oNHEOO2YOuMy08B7VX50uIVI37kfTm0JrzqZalGsOFgHJTL8DuzYJGRqLI0rBG2daYAth3bVEuZfjyFMdQYeBjwuGxEDTIPgLO2ZkAZpeNxCtEU140z2rjse1n6vgG7kPvCr/kOY0zvn/fRl8fDYRbZLNg0a7FcLFI2opjkZURAS3N3yZov2jFLAMhCl/JwB9f/yXoT+pxBqIT6KCRKC4CnLZdusDo/Kz6cbCbUV5qtzoRk5fSXHReDduZqkmDsH2oytESCmI6e1FKkrjoXziyyDd2KqhDoCfGRyXO9MWOkCgmpB/+gr75bhLdWEyy1EdVOXOhf93K5KWX4YbACgitGkKiU1X3pqwlJpxXyTmmKcQQDg/3N5UacvRSGSU/scaW5ePiXoSiWKI00HLALm1t7U833B5bS9Q6C5hjRgc2LtpJZcpXDGE4f+UUzRruc3tCNW30Q+lkljCf286lRFpFrXZ/4wsIDlNkHfPnVaOmcuyNAKkh1ma+dEyRDTErnoAxAth2lPxcOSuxzq4B1Vm0h6GvI7k+9H/TG0scn9HgqDX9aH64mDkeoozswQs0wmar8KR0nILoF18hvKUT3jbJXCwhg/3IAAAAAAAAkIoi2i8xWHHhcdZGjlYEysj0UNhpIRsJSkf4GfeigN4dVzuEfg/XahpuS+TsaqM6JwaFN5bgGPDQjgG5WIQAMh+vqdpgAAAAAALI748ePBj262/mTcxQAAQw5ojOB3Uua62CqIO9niqRkwG2DS2eJIwKtHt9cwAAAAAFQeuokYLrz8PiKbIn3PtX5qBrGNykvsl2C29EtY9i5gHRlUa16AkPX/SU8Pgx2odhPV26TslEMzkGuv9/2L+JjeJ2b4XYFCCPZ6nA29Brc0qO+HCIJMxnLhrrb5CRxsW0hFF+08GoCfc+JLoyibtSOFeae1B2e00OHEEOkkwNKqw32NLNWAwif5cMy5AWOU13RbYa48oImO+NVaDN3/+O4mcr/sYPhCxKX1+DkNMCk4wXuEk/VeTSRM2fTskKzQrvf0SvI0dO9OfC2eFGENfTDFHqiEsJ+B1CdTXh2J+scMWeEJw0fpvuYwi5QvmGwXdDom3HC8gRPsEOsTMT5PbHXEvTPZd8uqcw49O9Tkg4FsuGxyeNtgMWM14OeCUZ1FzdxsX+ROdedrLsqMJpMnFHtSelzKyYXKz0gXBJfc7OlvjOdxQW+q/40Z8IZI2Y7S0BVuRhkU9UD6+gde3S2oEm6wwTBXzVw+Pis4oHwomIYN/m8yxYj2NKIoK8YLDSbGpDXOykwV1u67MIAPEF0MQspUfgMldTz9X92QO8GrZFPoeRpPu6h69ebpsLIY1x7QaqgANxeGUi1SwfaHmPJHiRKPPY1McNmgph37nnythcQpWa1ATiL1/AWI7Qk1RunRZNk0ppHfNpGDkhq5UC4fWrQkT8TcBPwbBn+PV6XB9jK0MAuvvyfP1Kq4J5E+rnPpGC4nJOAcubvDwfnj/Ge/ihnf4GA43SfqoNJ4dZoU92l0K8CttqqtsW4sP+YSfNCE8MJymTaQqJkomaZ1HGlRtNNKS2/nKbV4u8BSwk6eXGfph8MBD7zRVhKjuNm3gRiiQVQwBTtsEzOOM6w0LLvfa59cbLXaUtUFADL5r/G/yJeXWH4W/Cbe3fi+fur5f13H/pAPS/E8DTYeu+FeCBRxfmrige5QFfpzrBdKfGR2bWbbJ7f3q9NM9jtPRhUh20HbF2ZJeMOtfU9Y0Das/m7IkYaD6V4fkhF164S/gfczfig30Fs/yWSS6zap6UVA+i8ijDI4QkKJCsfmonjby8x9tBuGHyMR6CSHPmQ+jG2F/nCLJfjiMHVnpvGZtdADhaAtBNZKiZ5H+1kvV9bdpjU8WMoQzRyB5N+b+8ObZb8dk4JY2rjoic4SkF1rXJobWFqTu9EyovlTp/ve0POuMxU4uzCMN2FkmtnLza8+t2g2B+Ia/6UYKeHlUtwi5V8ElSuYgn7jo4E1+kDWEVjAjUXsNH7sMDN3PQt8FkL3a4XupQW8M6X2HUBYC+AAAAAAIGHFVonK7lpOifXSPqAuZyKRckpxWiHXmido8cWF6TsbKJQl6fFsSzSRs9iN3m1K8m0SnwOAsppt1581ebaiFPR39vYmlbIyCWBckO6oCLz1O/ONKV6gXyGRNAtv9E9fKYopPxVl9QD3zFbxFJNwgudd3guWVSxdt7FoCTmj9ENBLlUqgZrs/+zcpnea3KeGhzajBvT+pMHp9lkHjdzlbdwAX94i5i3KTy1svhUcmE4mB1vwueqqvxH+z7vSMYTUyJSb9F9vMHpqSviRwK2M03l+O0O6Huh4CsAyN52ExNx2CoEWNsQZWij2/SmSijcrhu5t0dLzdy4KEHIMZZA8gNdoe8yxCN8iLUcZjQ6z6xolsHCVzJjEa+oV1gwiaqWU2hFVLPsUIpgXrJPn0WbZ4SyaUgfwULf0zEfN0Faey+RYtpVHoGGf+JXa13lrXzRIMR2RC1jJEXrgftnol5QHv/614JIn2G67zhEpuwVSlXdSUMC9kFsHamCza16zIHgL2BFwItSlKlMCc76LAdt9crQ97vFvuo8uGf9LlCCOWWL20IWEZksgSbD1jzbOjKXYzKCB6f0auXCfzHwfJR9HeYzyz8/az9NeZPymQSedmhsBr91NQfJKFc/4C+MK++0wKXHLfs8JxqvRTYlzZeFgOrfjoz/0hvWYZr5mq0XrkRxGWUW9WFlsb60hPSmtzmZC76wiZ9wb4R62GPzlyU0pKOCTy2HhSCwhgizMjdYpUiIMGQgZ90FHcPjQhuvzYFm3z0T7WFcUfv3EMLI74JcJn+31NlRW6toAEZMCxxQF7ZFgeI+sAKu/yMn4r0PwDYSfk80N+u4Lshc2gqhvepmi1BESi+j1g8e8dlo6gowTyQbEUNG0nfsXQqmx2rpZB60HAPJeVu+MYVFFiU9JCMzU9Q+VlVeNktLZMU61n9UeU0J3m+KqfSY5WGqFX5qupSXbbm/q+sSY5eynUhbsrdM352WJAQ2AAAAAAGpyGAPje8nVY9UAAAAAAAAFQd8ZsKhlfgZRey1A59TQUywQ6jhY4dV4znF8lomY3jq7kH7NNoSF48nz/BF1eUXWGg3t1dH56iqDiseletIMcC9EKhaZZekI3sytpOXknqOvXWkpL0u9nHWA/0DRWMndZxpF3OJqdBzn6iIbrl1HA7oq1QjzzRsJ0tFHqK41BqRCwJJp2VrWl2o+xhGbSp/W7NlvvLsZ81AAAAAAAPuYzCULnZLwv5o/wODJ7AwFiQ8q/RTcty5aHUF3Ap3IOpud8BJ86ROS2h0Xe5Nqxlzuf7ODlwEqOn3bH1B50iy2ZLruKgVNGlkkYDh6P6FY3dqmHk4YYb93aSclyx3arN16eUs5WrXZ5zzmV7xAq0CiUJmz41WHGt5BVHJzfZYELBSlqh6NTfhRiLzYWV2gsi5ISHXVThYPh9oGjjWLop+NZQb2KYGtjnHfbwIG7GcZ6Zk6NDOSUhqSuJkHvoUWllo3loPyNFsBbscZ2cEbmWuG2JVUuettqzM//iJfJwDb2EeGxxzbWBP57lDCqWiVvM7ZY5kbaHEwgochqjfdKYRpROUrlLXTuoTwxnYrSSVOAAAAAAAB5y1CWdEnjB/uxTsJwOy7QRAdMJcguz0PswzjjgIWV0yjiS9XhxThaS5KPjaBPBID2g4yAx5kthUaX3o4B2QQH+kWmGQyvy9koc3GEJEAAAAAAAHvMabFtJFu0YiujYt0dkGy3iTR70z7sUeaz0hzf/5+7+3hxNs1dnFgPYkFlUU1PUVDFUW53/1LvRrSePjBDkSIYOJ4R0b85DUmsmjwefJzzfr8i6YK3BNEHr/Sr+QqBLD3uzm1IM6cz8U577w2kP2J3BLP/LUaG/XymssEHA294Yn7+t3TZWVlZSPUAAAAAAVh3yGDONSdbVqn2GG8M8ME0K0sszVqy/UxBHeu0yUUDcrjIqACGm6x2GVio1lx1Lb+oO4CHGuIaTgNFQibioEBhJ7hl8UPH5SNqKzLTUsM+yFGdB9OjqGFEKe7reKapgkDlAmywSeqAAAAAADK5KhRdr3JU2zIxaySFCWwbfPCjxYz58T758T5kqB3Q9TJygDQmTn1VSN1PmeslMQwd19g2JFw92aVxhTv+bnXadVAAAAAAVIXX63aenp7VdXVQJUGyree4nFVUmlt8wLRYgpX4eA0r8G+UFKClBSgpQUoKUvbH0E+IsDKTXYwLKRvx7Bw704msHDvTiawb9RH49h/0p1nPpTrOfSnWc+lOs59KdZz6U6zn0p1nPpTrOfSnWc+lOs59KdZz6U6zn0p1nPpTrOfSnWc+lOs59KdZz6U6zn0p1nPpTrOfSnWc+lOs59KdZz6U6zn0p1nPpTrOfSnWc+lOs59KdZz6U6zn0p1nPpTrOfSnWc+lOs59KdZz6U6zn0p1nPpRV7pWA1UbsK3ANmXFzTrAAAA" alt="벡터 DB 개요 화면. 예시 데이터로 데이터베이스 2개, 컬렉션 2개, 파티션 6개, 청크 43건, 1024차원과 768차원 컬렉션별 파티션 분포." loading="lazy"></button>
         <figcaption><b>벡터 DB.</b> Milvus의 컬렉션·파티션 구성과 저장된 청크를 읽을 수 있는 형태로 보여 준다. 읽기 전용이다. 접속 주소만 바꾸면 자체 Milvus와 watsonx.data Milvus를 같은 화면으로 확인한다(교체 지점 ③, D6).</figcaption>
       </div>
-    </div>
-
-    <div class="block">
-      <h3>주간 평가 17회차 계획</h3>
-      <div class="chart-key"><span><i class="sw own"></i>자체 Milvus에서 진행</span><span><i class="sw prod"></i>제품 위에서 진행 (1월 중순 입고, 2주 안정화 가정)</span></div>
-      <div class="weeks">
-        <div class="wk own"><span class="no"><b>1회</b>11/30</span><p>기준선: 기존 RAG를 평가셋으로 측정</p></div>
-        <div class="wk own"><span class="no"><b>2회</b>12/7</span><p>파서 비교: Docling·기존 파서</p></div>
-        <div class="wk own"><span class="no"><b>3회</b>12/14</span><p>청킹 전략 비교</p></div>
-        <div class="wk own"><span class="no"><b>4회</b>12/21</span><p>임베딩 후보: 기존 4096·Qwen3-4B·MRL 축소</p></div>
-        <div class="wk own"><span class="no"><b>5회</b>12/28</span><p>하이브리드 가중치</p><span class="g">G1</span></div>
-        <div class="wk own"><span class="no"><b>6회</b>1/4</span><p>리랭커 추가</p></div>
-        <div class="wk own"><span class="no"><b>7회</b>1/11</span><p>검색 API·MCP 도구 계약 점검</p></div>
-        <div class="wk own"><span class="no"><b>8회</b>1/18</span><p>오답 유형 보정 1차 (입고·안정화 시작)</p></div>
-        <div class="wk own"><span class="no"><b>9회</b>1/25</span><p>이관 리허설</p><span class="g">G2</span></div>
-        <div class="wk prod"><span class="no"><b>10회</b>2/1</span><p>제품 Milvus 전환 후 재평가</p></div>
-        <div class="wk prod"><span class="no"><b>11회</b>2/8</span><p>UDI 형식별 비교</p></div>
-        <div class="wk prod"><span class="no"><b>12회</b>2/15</span><p>전체 적재 후 재평가</p></div>
-        <div class="wk prod"><span class="no"><b>13회</b>2/22</span><p>부하·응답 시간</p></div>
-        <div class="wk prod"><span class="no"><b>14회</b>3/1</span><p>오답 유형 보정 2차</p></div>
-        <div class="wk prod"><span class="no"><b>15회</b>3/8</span><p>운영 시나리오 재평가 (권한·필터)</p></div>
-        <div class="wk prod"><span class="no"><b>16회</b>3/15</span><p>오픈 후보 평가</p></div>
-        <div class="wk prod"><span class="no"><b>17회</b>3/22</span><p>최종 회귀 평가</p><span class="g">오픈 판정</span></div>
-      </div>
-      <p class="note">회차별 주제는 계획이다. 앞 회차 결과에 따라 순서를 바꾸거나 같은 주제를 한 번 더 측정한다. 회차 사이에는 재구축 비용이 낮은 시도(가중치·리랭커·청킹 설정)를 여러 번 돌리고, 가장 나은 것 하나를 회차에 올려 기록한다. 입고나 안정화가 늦어지면 10회차 이후도 자체 Milvus에서 진행하고, 제품 전환 재평가는 안정화 직후로 옮긴다.</p>
     </div>
   </div></section>
 
@@ -1300,10 +1348,10 @@ details.tview .tbl { margin-top: 10px; }
           <li><span class="tag calc">계산</span><span>1월 중순 입고면 제품 위 시험은 약 8주, 2월 중순 입고가 최소 4주를 남기는 경계다(01 그림, 안정화 2주 가정).</span></li>
         </ul>
         <div class="ab">
-          <div class="opt a"><h4><span class="ab-k">A</span>1월 말까지 입고·안정화되면</h4><p>2월 첫 주에 제품 Milvus로 전환하고, 2월에 UDI 판정·전체 적재·통합·부하 테스트를 한다. 3월에 운영 시나리오와 최종 회귀 평가를 거쳐 3/31에 오픈한다.</p></div>
+          <div class="opt a"><h4><span class="ab-k">A</span>1월 말까지 입고·안정화되면</h4><p>2월 첫 주에 제품 Milvus로 전환해 재평가하고, UDI 형식별 판정까지 마쳐 2/12에 개발을 완료한다. 2월 후반 통합·성능 테스트, 3월 전반 인수 테스트, 3월 후반 이행을 거쳐 3/31에 오픈한다.</p></div>
           <div class="opt b"><h4><span class="ab-k">B</span>늦어지면</h4>
             <ul>
-              <li><b>기본: 자체 Milvus로 오픈 후 이관.</b> 제품과 같은 버전의 자체 Milvus로 3/31에 오픈하고, 제품이 안정화되면 청크 정본에서 다시 적재해 전환한다. 검색 API 주소는 그대로라 에이전트 쪽 변경은 없다. 상단 구조도의 ‘Milvus 입고 전/후’가 이 전환이다.</li>
+              <li><b>기본: 자체 Milvus로 오픈 후 이관.</b> 개발 완료(2/12)와 통합·인수·이행을 제품과 같은 버전의 자체 Milvus에서 진행해 3/31에 오픈하고, 제품이 안정화되면 청크 정본에서 다시 적재해 전환한다. 검색 API 주소는 그대로라 에이전트 쪽 변경은 없다. 상단 구조도의 ‘제품이 늦어지면’이 이 전환이다.</li>
               <li><b>예외: 오픈 연기.</b> 임시 운영이 허용되지 않는 경우에만 제품 안정화와 통합 테스트 이후로 미룬다.</li>
             </ul>
           </div>
@@ -1313,7 +1361,7 @@ details.tview .tbl { margin-top: 10px; }
       </article>
 
       <article class="branch" id="d4">
-        <header><span class="did">D4</span><h3>파싱 경로</h3><span class="when-t">제품 위 시험 중 형식별 판정</span></header>
+        <header><span class="did">D4</span><h3>파싱 경로</h3><span class="when-t">11회차(2/8) 형식별 판정</span></header>
         <p class="q">UDI가 해당 형식을 자체 기준 이상으로 처리하나?</p>
         <ul class="facts">
           <li><span class="tag ok">확인됨</span><span>IBM 자료는 70종 이상의 형식을 지원한다고 소개한다. 버전별 실제 목록은 해당 버전 문서로 확인해야 한다.</span></li>
@@ -1398,12 +1446,12 @@ details.tview .tbl { margin-top: 10px; }
   <section class="band alt" id="s8"><div class="wrap band-in">
     <div class="sec-head">
       <span class="kicker"><b>08</b>일정과 판단 시점</span>
-      <h2>G1(12월 말)과 G2(1월 말)에 분기를 닫고 3월 31일에 오픈한다</h2>
-      <p>두 판단 시점 사이를 주간 평가가 채운다. 입고 뒤 첫 2주는 <span class="pen">인프라 안정화</span>로 보고, 그동안에도 개발·평가는 자체 Milvus에서 계속한다.</p>
+      <h2>2월 12일 개발을 마치고 테스트·이행을 거쳐 3월 31일에 오픈한다</h2>
+      <p>분기는 G1(12월 말)과 G2(1월 말)에 닫는다. 입고 뒤 첫 2주는 <span class="pen">인프라 안정화</span>로 보고, 그동안에도 개발·평가는 자체 Milvus에서 계속한다. <mark class="hl">개발 완료 뒤 약 7주는 통합·성능, 인수, 이행에 쓴다.</mark></p>
     </div>
     <figure>
       <div class="chart-head">
-        <h4>3월 31일 오픈까지의 경로</h4>
+        <h4>SI 단계 · 환경 · 평가 · 산출물</h4>
         <div class="seg" role="group" aria-label="경로 강조" id="timeSeg">
           <button type="button" data-v="all" aria-pressed="true">전체</button>
           <button type="button" data-v="a" aria-pressed="false">예상대로 (A)</button>
@@ -1411,113 +1459,144 @@ details.tview .tbl { margin-top: 10px; }
         </div>
       </div>
       <div class="panel">
-        <svg class="time" viewBox="0 0 1000 304" role="img" aria-label="11월 말부터 3월 31일까지의 일정. 기본 경로는 11월 말 착수, 1월 17일까지 제품 없이 개발, 1월 중순 입고 후 2주 인프라 안정화, 2월부터 제품 위 통합·부하 시험, 3월 운영 전환과 3월 31일 오픈이다. 11월 30일부터 3월 22일까지 매주 평가한다. 12월 말 G1, 1월 말 G2에서 판단한다. 지연되면 자체 Milvus로 오픈 후 전환한다.">
-          <text class="month" x="168" y="20" text-anchor="middle">11월</text>
-          <text class="month" x="306" y="20" text-anchor="middle">12월</text>
-          <text class="month" x="505" y="20" text-anchor="middle">1월</text>
-          <text class="month" x="695" y="20" text-anchor="middle">2월</text>
-          <text class="month" x="870" y="20" text-anchor="middle">3월</text>
-          <line class="grid-l" x1="207" y1="30" x2="207" y2="272"/>
-          <line class="grid-l" x1="406" y1="30" x2="406" y2="272"/>
-          <line class="grid-l" x1="605" y1="30" x2="605" y2="272"/>
-          <line class="grid-l" x1="785" y1="30" x2="785" y2="272"/>
-          <line class="today-l" x1="130" y1="30" x2="130" y2="272"/>
-          <text class="gate-s" x="133" y="290">오늘 11/19</text>
-          <path class="dead-l" d="M977.6,28 V272"/>
-          <text class="dead-t" x="973" y="290" text-anchor="end">3/31 오픈 기한</text>
+        <svg class="time" viewBox="0 0 1000 312" role="img" aria-label="11월 23일부터 3월 31일까지의 SI 단계와 평가 회차. 분석·설계 11/23~12/18, 개발 12/21~2/12, 통합·성능 테스트 2/13~2/28, 인수 테스트 3/1~3/13, 이행 3/14~3/30, 3/31 오픈. 산출물은 12/4, 12/18, 2/12, 2/26, 3/12, 3/26에 낸다. 환경은 1월 18일 입고까지 자체 Milvus, 2주 안정화 뒤 2월부터 제품 Milvus. 12월 말 G1, 1월 말 G2에서 판단한다. 평가는 11/30부터 3/22까지 매주 17회이고, 개발 완료 전 11회는 설계 비교·튜닝, 뒤 6회는 회귀 평가다. 지연되면 자체 Milvus로 통합·인수·이행을 하고 오픈 뒤 제품으로 이관한다.">
+          <text class="month" x="168.0" y="18" text-anchor="middle">11월</text>
+          <text class="month" x="306.0" y="18" text-anchor="middle">12월</text>
+          <text class="month" x="505.0" y="18" text-anchor="middle">1월</text>
+          <text class="month" x="695.0" y="18" text-anchor="middle">2월</text>
+          <text class="month" x="870.0" y="18" text-anchor="middle">3월</text>
+          <line class="grid-l" x1="207" y1="26" x2="207" y2="284"/>
+          <line class="grid-l" x1="406" y1="26" x2="406" y2="284"/>
+          <line class="grid-l" x1="605" y1="26" x2="605" y2="284"/>
+          <line class="grid-l" x1="785" y1="26" x2="785" y2="284"/>
+          <line class="today-l" x1="130" y1="26" x2="130" y2="284"/>
+          <path class="dev-l" d="M682.1,26 V284"/>
+          <path class="dead-l" d="M977.4,24 V284"/>
+          <text class="gate-s" x="133" y="302">오늘 11/19</text>
+          <text class="dev-t" x="682.1" y="302" text-anchor="middle">개발 완료 2/12</text>
+          <text class="dead-t" x="973.4" y="302" text-anchor="end">3/31 오픈</text>
+          <text class="rowlab" x="16" y="46">SI 단계</text>
+          <text class="rowlab-s" x="16" y="62">개발 완료 뒤 기능 고정</text>
+          <rect class="n n-si" x="156.6" y="32" width="177.8" height="32" rx="5"/>
+          <text class="bt" x="245.5" y="53" text-anchor="middle">분석·설계</text>
+          <rect class="n n-own" x="336.4" y="32" width="344.7" height="32" rx="5"/>
+          <text class="bt-strong" x="508.8" y="53" text-anchor="middle">개발 · 튜닝 8회</text>
+          <rect class="n n-si2" x="683.1" y="32" width="100.7" height="32" rx="5"/>
+          <text class="bt" x="733.5" y="53" text-anchor="middle">통합·성능</text>
+          <rect class="n n-si2" x="785.8" y="32" width="81.5" height="32" rx="5"/>
+          <text class="bt" x="826.5" y="53" text-anchor="middle">인수 테스트</text>
+          <rect class="n n-si2" x="869.3" y="32" width="107.1" height="32" rx="5"/>
+          <text class="bt" x="922.8" y="53" text-anchor="middle">이행</text>
+          <text class="rowlab" x="16" y="90">산출물</text>
+          <text class="rowlab-s" x="16" y="106">6회 제출</text>
+          <path class="doc" d="M220.3,80 h8 l4,4 v12 h-12 z"/>
+          <path class="doc-f" d="M228.3,80 v4 h4"/>
+          <text class="doc-t" x="226.3" y="112" text-anchor="middle">분석</text>
+          <circle class="hit" cx="226.3" cy="88" r="13" data-tip="산출물 12/4 · 현행 분석서(기존 RAG 기준선), 요구사항 정의서, 평가 기준서"/>
+          <path class="doc" d="M310.1,80 h8 l4,4 v12 h-12 z"/>
+          <path class="doc-f" d="M318.1,80 v4 h4"/>
+          <text class="doc-t" x="316.1" y="112" text-anchor="middle">설계</text>
+          <circle class="hit" cx="316.1" cy="88" r="13" data-tip="산출물 12/18 · 아키텍처·인터페이스·컬렉션 정의서"/>
+          <path class="doc" d="M659.1,80 h8 l4,4 v12 h-12 z"/>
+          <path class="doc-f" d="M667.1,80 v4 h4"/>
+          <text class="doc-t" x="665.1" y="112" text-anchor="middle">개발</text>
+          <circle class="hit" cx="665.1" cy="88" r="13" data-tip="산출물 2/12 · 소스·프로그램 목록, 단위 테스트 결과서, 회차별 평가 결과서, 모델·설정 선정 근거서"/>
+          <path class="doc" d="M759.5,80 h8 l4,4 v12 h-12 z"/>
+          <path class="doc-f" d="M767.5,80 v4 h4"/>
+          <text class="doc-t" x="765.5" y="112" text-anchor="middle">통합·성능</text>
+          <circle class="hit" cx="765.5" cy="88" r="13" data-tip="산출물 2/26 · 통합 테스트 결과서, 성능 테스트 결과서"/>
+          <path class="doc" d="M849.4,80 h8 l4,4 v12 h-12 z"/>
+          <path class="doc-f" d="M857.4,80 v4 h4"/>
+          <text class="doc-t" x="855.4" y="112" text-anchor="middle">인수</text>
+          <circle class="hit" cx="855.4" cy="88" r="13" data-tip="산출물 3/12 · 인수 테스트 결과서, 결함 조치 내역, 이행 계획서"/>
+          <path class="doc" d="M939.3,80 h8 l4,4 v12 h-12 z"/>
+          <path class="doc-f" d="M947.3,80 v4 h4"/>
+          <text class="doc-t" x="945.3" y="112" text-anchor="middle">이행</text>
+          <circle class="hit" cx="945.3" cy="88" r="13" data-tip="산출물 3/26 · 이행 결과서, 최종 평가 결과서, 운영자 매뉴얼"/>
           <g data-row="a">
-            <text class="rowlab" x="16" y="58">예상대로 (A)</text>
-            <text class="rowlab-s" x="16" y="74">1월 중순 입고</text>
-            <text class="gate-s" x="517" y="38">입고 1/18</text>
-            <rect class="n n-hatch" x="517" y="44" width="80" height="32" rx="5"/>
-            <text class="bt" x="557" y="65" text-anchor="middle">안정화</text>
-            <rect class="n n-prod" x="601" y="44" width="272" height="32" rx="5"/>
-            <text class="bt" x="737" y="65" text-anchor="middle">제품 위 통합·부하 시험</text>
-            <rect class="n n-prod" x="877" y="44" width="99" height="32" rx="5"/>
-            <text class="bt-strong" x="926.5" y="65" text-anchor="middle">전환·오픈</text>
+          <text class="rowlab" x="16" y="142">환경 (A)</text>
+          <text class="rowlab-s" x="16" y="158">1월 중순 입고</text>
+          <text class="gate-s" x="517.2" y="122">입고 1/18</text>
+          <rect class="n n-hatch" x="516.2" y="128" width="87.8" height="32" rx="5"/>
+          <text class="bt" x="560.1" y="149" text-anchor="middle">안정화</text>
+          <rect class="n n-prod" x="606.0" y="128" width="370.4" height="32" rx="5"/>
+          <text class="bt" x="791.2" y="149" text-anchor="middle">제품 Milvus (watsonx.data)</text>
           </g>
-          <rect class="n n-own" x="131" y="44" width="74" height="32" rx="5"/>
-          <text class="bt" x="168" y="65" text-anchor="middle">착수</text>
-          <rect class="n n-own" x="209" y="44" width="304" height="32" rx="5"/>
-          <text class="bt" x="300" y="65" text-anchor="middle">제품 없이 개발</text>
-          <text class="bt" x="461" y="65" text-anchor="middle">자체 Milvus</text>
-          <path class="gate" d="M399.7,50 L409.7,60 L399.7,70 L389.7,60 Z"/>
-          <path class="gate" d="M598.7,50 L608.7,60 L598.7,70 L588.7,60 Z"/>
-          <text class="gate-t" x="407" y="98">G1</text>
-          <text class="gate-s" x="429" y="98">임베딩·GPU·기존 수요</text>
-          <text class="gate-t" x="606" y="98">G2</text>
-          <text class="gate-s" x="628" y="98">입고·안정화 확인</text>
-          <text class="rowlab" x="16" y="128">주간 평가</text>
-          <text class="rowlab-s" x="16" y="144">17회</text>
-          <line class="grid-l" x1="200.6" y1="132" x2="919.8" y2="132"/>
-          <circle class="pt-own" cx="200.6" cy="132" r="5"/>
-          <circle class="pt-own" cx="245.6" cy="132" r="5"/>
-          <circle class="pt-own" cx="290.5" cy="132" r="5"/>
-          <circle class="pt-own" cx="335.5" cy="132" r="5"/>
-          <circle class="pt-own" cx="380.4" cy="132" r="5"/>
-          <circle class="pt-own" cx="425.4" cy="132" r="5"/>
-          <circle class="pt-own" cx="470.3" cy="132" r="5"/>
-          <circle class="pt-own" cx="515.3" cy="132" r="5"/>
-          <circle class="pt-own" cx="560.2" cy="132" r="5"/>
-          <circle class="pt-prod" cx="605.2" cy="132" r="5"/>
-          <circle class="pt-prod" cx="650.1" cy="132" r="5"/>
-          <circle class="pt-prod" cx="695" cy="132" r="5"/>
-          <circle class="pt-prod" cx="740" cy="132" r="5"/>
-          <circle class="pt-prod" cx="784.9" cy="132" r="5"/>
-          <circle class="pt-prod" cx="829.9" cy="132" r="5"/>
-          <circle class="pt-prod" cx="874.8" cy="132" r="5"/>
-          <circle class="pt-prod" cx="919.8" cy="132" r="5"/>
-          <circle class="hit" cx="200.6" cy="132" r="11" data-tip="1회 · 11/30 · 기준선: 기존 RAG 측정"/>
-          <circle class="hit" cx="245.6" cy="132" r="11" data-tip="2회 · 12/7 · 파서 비교"/>
-          <circle class="hit" cx="290.5" cy="132" r="11" data-tip="3회 · 12/14 · 청킹 전략 비교"/>
-          <circle class="hit" cx="335.5" cy="132" r="11" data-tip="4회 · 12/21 · 임베딩 후보·MRL 축소 비교"/>
-          <circle class="hit" cx="380.4" cy="132" r="11" data-tip="5회 · 12/28 · 하이브리드 가중치 → G1"/>
-          <circle class="hit" cx="425.4" cy="132" r="11" data-tip="6회 · 1/4 · 리랭커 추가"/>
-          <circle class="hit" cx="470.3" cy="132" r="11" data-tip="7회 · 1/11 · 검색 API·MCP 도구 계약 점검"/>
-          <circle class="hit" cx="515.3" cy="132" r="11" data-tip="8회 · 1/18 · 오답 유형 보정 1차 (입고·안정화 시작)"/>
-          <circle class="hit" cx="560.2" cy="132" r="11" data-tip="9회 · 1/25 · 이관 리허설 → G2"/>
-          <circle class="hit" cx="605.2" cy="132" r="11" data-tip="10회 · 2/1 · 제품 Milvus 전환 후 재평가"/>
-          <circle class="hit" cx="650.1" cy="132" r="11" data-tip="11회 · 2/8 · UDI 형식별 비교"/>
-          <circle class="hit" cx="695" cy="132" r="11" data-tip="12회 · 2/15 · 전체 적재 후 재평가"/>
-          <circle class="hit" cx="740" cy="132" r="11" data-tip="13회 · 2/22 · 부하·응답 시간"/>
-          <circle class="hit" cx="784.9" cy="132" r="11" data-tip="14회 · 3/1 · 오답 유형 보정 2차"/>
-          <circle class="hit" cx="829.9" cy="132" r="11" data-tip="15회 · 3/8 · 운영 시나리오 재평가"/>
-          <circle class="hit" cx="874.8" cy="132" r="11" data-tip="16회 · 3/15 · 오픈 후보 평가"/>
-          <circle class="hit" cx="919.8" cy="132" r="11" data-tip="17회 · 3/22 · 최종 회귀 평가 → 오픈 판정"/>
+          <rect class="n n-own" x="156.6" y="128" width="357.6" height="32" rx="5"/>
+          <text class="bt" x="271.6" y="149" text-anchor="middle">자체 Milvus</text>
+          <path class="gate" d="M399.6,134 L409.6,144 L399.6,154 L389.6,144 Z"/>
+          <text class="gate-t" x="407.6" y="180">G1</text>
+          <text class="gate-s" x="427.6" y="180">임베딩·GPU·기존 수요</text>
+          <path class="gate" d="M598.6,134 L608.6,144 L598.6,154 L588.6,144 Z"/>
+          <text class="gate-t" x="606.6" y="180">G2</text>
+          <text class="gate-s" x="626.6" y="180">입고·안정화 확인</text>
+          <text class="rowlab" x="16" y="204">주간 평가</text>
+          <text class="rowlab-s" x="16" y="220">튜닝 11 · 회귀 6</text>
+          <line class="grid-l" x1="200.6" y1="206" x2="919.6" y2="206"/>
+          <circle class="pt-own" cx="200.6" cy="206" r="5.5"/>
+          <text class="pt-n" x="200.6" y="226" text-anchor="middle">1</text>
+          <circle class="pt-own" cx="245.5" cy="206" r="5.5"/>
+          <text class="pt-n" x="245.5" y="226" text-anchor="middle">2</text>
+          <circle class="pt-own" cx="290.5" cy="206" r="5.5"/>
+          <text class="pt-n" x="290.5" y="226" text-anchor="middle">3</text>
+          <circle class="pt-own" cx="335.4" cy="206" r="5.5"/>
+          <text class="pt-n" x="335.4" y="226" text-anchor="middle">4</text>
+          <circle class="pt-own" cx="380.3" cy="206" r="5.5"/>
+          <text class="pt-n" x="380.3" y="226" text-anchor="middle">5</text>
+          <circle class="pt-own" cx="425.3" cy="206" r="5.5"/>
+          <text class="pt-n" x="425.3" y="226" text-anchor="middle">6</text>
+          <circle class="pt-own" cx="470.2" cy="206" r="5.5"/>
+          <text class="pt-n" x="470.2" y="226" text-anchor="middle">7</text>
+          <circle class="pt-own" cx="515.2" cy="206" r="5.5"/>
+          <text class="pt-n" x="515.2" y="226" text-anchor="middle">8</text>
+          <circle class="pt-own" cx="560.1" cy="206" r="5.5"/>
+          <text class="pt-n" x="560.1" y="226" text-anchor="middle">9</text>
+          <circle class="pt-prod" cx="605.0" cy="206" r="5.5"/>
+          <text class="pt-n" x="605.0" y="226" text-anchor="middle">10</text>
+          <circle class="pt-prod" cx="650.0" cy="206" r="5.5"/>
+          <text class="pt-n" x="650.0" y="226" text-anchor="middle">11</text>
+          <circle class="pt-reg" cx="694.9" cy="206" r="5.5"/>
+          <text class="pt-n" x="694.9" y="226" text-anchor="middle">12</text>
+          <circle class="pt-reg" cx="739.9" cy="206" r="5.5"/>
+          <text class="pt-n" x="739.9" y="226" text-anchor="middle">13</text>
+          <circle class="pt-reg" cx="784.8" cy="206" r="5.5"/>
+          <text class="pt-n" x="784.8" y="226" text-anchor="middle">14</text>
+          <circle class="pt-reg" cx="829.7" cy="206" r="5.5"/>
+          <text class="pt-n" x="829.7" y="226" text-anchor="middle">15</text>
+          <circle class="pt-reg" cx="874.7" cy="206" r="5.5"/>
+          <text class="pt-n" x="874.7" y="226" text-anchor="middle">16</text>
+          <circle class="pt-reg" cx="919.6" cy="206" r="5.5"/>
+          <text class="pt-n" x="919.6" y="226" text-anchor="middle">17</text>
+          <circle class="hit" cx="200.6" cy="210" r="12" data-tip="1회 · 11/30 · 설계 비교 · 기준선: 기존 RAG를 평가셋으로 측정"/>
+          <circle class="hit" cx="245.5" cy="210" r="12" data-tip="2회 · 12/7 · 설계 비교 · 파서 비교: Docling·기존 파서"/>
+          <circle class="hit" cx="290.5" cy="210" r="12" data-tip="3회 · 12/14 · 설계 비교 · 청킹 전략 비교"/>
+          <circle class="hit" cx="335.4" cy="210" r="12" data-tip="4회 · 12/21 · 튜닝 · 임베딩 후보: 기존 4096·Qwen3-4B·MRL 축소"/>
+          <circle class="hit" cx="380.3" cy="210" r="12" data-tip="5회 · 12/28 · 튜닝 · 검색 순위 튜닝: 하이브리드 가중치·리랭커 → G1"/>
+          <circle class="hit" cx="425.3" cy="210" r="12" data-tip="6회 · 1/4 · 튜닝 · 메타·권한 필터"/>
+          <circle class="hit" cx="470.2" cy="210" r="12" data-tip="7회 · 1/11 · 튜닝 · 검색 API·MCP 도구 계약 점검"/>
+          <circle class="hit" cx="515.2" cy="210" r="12" data-tip="8회 · 1/18 · 튜닝 · 오답 유형 보정 (입고·안정화 시작)"/>
+          <circle class="hit" cx="560.1" cy="210" r="12" data-tip="9회 · 1/25 · 튜닝 · 이관 리허설 → G2"/>
+          <circle class="hit" cx="605.0" cy="210" r="12" data-tip="10회 · 2/1 · 튜닝 · 제품 Milvus 전환 후 재평가"/>
+          <circle class="hit" cx="650.0" cy="210" r="12" data-tip="11회 · 2/8 · 튜닝 · UDI 형식별 비교, 개발 완료 기준 점수"/>
+          <circle class="hit" cx="694.9" cy="210" r="12" data-tip="12회 · 2/15 · 회귀 · 전체 적재 후 회귀 평가"/>
+          <circle class="hit" cx="739.9" cy="210" r="12" data-tip="13회 · 2/22 · 회귀 · 부하·응답 시간 측정과 회귀 평가"/>
+          <circle class="hit" cx="784.8" cy="210" r="12" data-tip="14회 · 3/1 · 회귀 · 업무 담당자 질문으로 회귀 평가"/>
+          <circle class="hit" cx="829.7" cy="210" r="12" data-tip="15회 · 3/8 · 회귀 · 운영 시나리오(권한·필터) 회귀 평가"/>
+          <circle class="hit" cx="874.7" cy="210" r="12" data-tip="16회 · 3/15 · 회귀 · 운영 환경 적재 후 회귀 평가"/>
+          <circle class="hit" cx="919.6" cy="210" r="12" data-tip="17회 · 3/22 · 회귀 · 최종 회귀 평가 → 오픈 판정"/>
           <g data-row="b">
-            <path class="branch-l" d="M598.7,72 V124"/>
-            <path class="branch-l" d="M598.7,140 V248"/>
-            <path class="branch-l" d="M598.7,184 H601"/>
-            <text class="rowlab" x="16" y="182">지연 (B 기본)</text>
-            <text class="rowlab-s" x="16" y="198">자체 Milvus로 오픈</text>
-            <rect class="n n-cond" x="601" y="168" width="272" height="32" rx="5"/>
-            <text class="bt" x="737" y="189" text-anchor="middle">자체 Milvus에서 통합·부하 시험</text>
-            <rect class="n n-cond" x="877" y="168" width="99" height="32" rx="5"/>
-            <text class="bt-strong" x="926.5" y="189" text-anchor="middle">오픈·이관</text>
-            <text class="rowlab" x="16" y="246">지연 (B 예외)</text>
-            <text class="rowlab-s" x="16" y="262">오픈 연기</text>
-            <rect class="n n-cond" x="601" y="232" width="272" height="32" rx="5"/>
-            <text class="bt" x="737" y="253" text-anchor="middle">자체 Milvus 스테이징</text>
-            <rect class="n n-ext n-dash" x="877" y="232" width="99" height="32" rx="5"/>
-            <text class="bt" x="926.5" y="253" text-anchor="middle">연기</text>
+          <path class="branch-l" d="M598.6,154 V168"/>
+          <path class="branch-l" d="M598.6,232 V262 H606.0"/>
+          <text class="rowlab" x="16" y="260">지연 (B)</text>
+          <text class="rowlab-s" x="16" y="276">G2에 안정화 미확인</text>
+          <rect class="n n-cond" x="606.0" y="246" width="370.4" height="32" rx="5"/>
+          <text class="bt" x="791.2" y="267" text-anchor="middle">자체 Milvus로 통합·인수·이행 → 오픈 뒤 제품으로 이관</text>
           </g>
-        </svg>
+          </svg>
       </div>
-      <div class="chart-key"><span><i class="sw own"></i>자체 Milvus에서 진행</span><span><i class="sw hatch"></i>인프라 안정화 (가정 2주)</span><span><i class="sw prod"></i>제품 위에서 진행</span><span><i class="sw cond"></i>지연 시</span></div>
-      <figcaption>1월 말(G2)까지 입고·안정화가 확인되지 않으면 아래 경로로 간다. 기본은 자체 Milvus로 3/31에 오픈하고, 제품이 안정화되면 같은 청크 정본에서 다시 적재해 전환하는 것이다. 에이전트가 호출하는 검색 API 주소는 바뀌지 않는다. 주간 평가 점에 마우스를 올리면 회차 주제가 보인다.</figcaption>
+      <div class="chart-key"><span><i class="sw own"></i>자체 Milvus에서 진행</span><span><i class="sw hatch"></i>인프라 안정화 (가정 2주)</span><span><i class="sw prod"></i>제품 위에서 진행</span><span><i class="sw cond"></i>지연 시</span><span><i class="sw dot"></i>튜닝 평가</span><span><i class="sw ring"></i>회귀 평가</span></div>
+      <figcaption>1월 말(G2)까지 입고·안정화가 확인되지 않으면 B로 간다. 자체 Milvus로 통합·인수·이행을 진행해 3/31에 오픈하고, 제품이 안정화되면 청크 정본에서 다시 적재해 이관한다. 에이전트가 호출하는 검색 API 주소는 바뀌지 않는다. 평가 점과 산출물 표시에 마우스를 올리면 내용이 보인다. 단계별 회차와 산출물 목록은 <a href="#s3">03</a>에 있다.</figcaption>
     </figure>
-    <div class="tbl wide">
-      <table>
-        <thead><tr><th>기간</th><th>주요 작업</th><th>평가 회차</th><th>산출물</th></tr></thead>
-        <tbody>
-          <tr><th>11월 말</th><td>확인 질문 발송(10), 첫 평가셋 작성, 자체 Milvus 개발 환경 구성</td><td>—</td><td>평가셋 v1, 회신 기한</td></tr>
-          <tr><th>12월</th><td>제품 없이 개발: 수집·파서·청킹, 임베딩 후보·MRL 축소 비교, 자체 Milvus 위 검색 API·MCP 서버</td><td class="nw">1~5회</td><td><span class="did">G1</span> 임베딩 경로(D1), GPU(D5), 기존 수요 수용 범위(D7)</td></tr>
-          <tr><th>1월</th><td>1월 중순 입고 예상. on-prem 인프라 안정화 점검(OCP·watsonx.ai·watsonx.data·LLM 서빙·벡터 DB), 접속·권한 확인(D6), 이관 리허설. 개발·평가는 자체 Milvus에서 계속</td><td class="nw">6~9회</td><td><span class="did">G2</span> 입고·안정화 확인(D3)</td></tr>
-          <tr><th>2월</th><td>제품 Milvus 전환, 하이브리드 검색 실측(D2), UDI 형식별 판정(D4), 전체 적재, 통합·부하 테스트</td><td class="nw">10~13회</td><td>제품 위 기준 점수 확인</td></tr>
-          <tr><th>3월</th><td>운영 시나리오 재평가, 최종 회귀 평가, 운영 전환</td><td class="nw">14~17회</td><td>3/31 오픈: 검색 API, MCP 서버, 수집·파싱 파이프라인</td></tr>
-        </tbody>
-      </table>
-    </div>
   </div></section>
 
   <!-- 09 리스크 -->
@@ -1533,6 +1612,8 @@ details.tview .tbl { margin-top: 10px; }
           <tr><th>on-prem 인프라 안정화 지연</th><td><span class="pen">제품 위 시험 기간이 줄어든다</span></td><td>자체 Milvus 경로를 오픈까지 유지한다. 입고 첫 주에 OCP·watsonx.ai·watsonx.data·LLM 서빙·벡터 DB 안정화 항목을 점검하고 인프라 담당과 일정을 공유한다.</td><td><span class="did">D3</span></td></tr>
           <tr><th>평가셋 부재</th><td>변경 효과를 판단할 수 없다</td><td>11월 말까지 업무 담당자와 첫 평가셋을 만들고 회차마다 보강한다.</td><td>전체</td></tr>
           <tr><th>점수 정체</th><td>무엇을 바꿔야 할지 보이지 않는다</td><td>단계별 분리 측정과 오답 유형 분류로 원인 단계를 좁히고, 재구축 비용이 낮은 시도부터 빨리·많이 돌린다(02).</td><td>전체</td></tr>
+          <tr><th>개발 완료 지연</th><td><span class="pen">테스트·이행 기간이 줄어든다</span></td><td>회차마다 기준선 대비 추이를 보고한다. 11회차(2/8)에도 기준에 못 미치는 형식·문서군은 오픈 범위에서 빼는 안을 함께 올려 2/12 개발 완료를 지킨다.</td><td>전체</td></tr>
+          <tr><th>산출물 작성이 개발을 잠식</th><td>튜닝 회차가 줄어든다</td><td>회차 기록과 선정 근거를 처음부터 산출물 양식으로 남긴다. 설계서는 설계 비교 회차(1~3회) 결과를 근거로 쓴다.</td><td>전체</td></tr>
           <tr><th>점수 하락을 실패로 해석</th><td>재구축이 막히고 부분 수정만 남는다</td><td>주간 보고에 변경 내용·점수·원인을 함께 싣는다. 오픈 판정은 마지막 회차 점수로 한다.</td><td>—</td></tr>
           <tr><th>제품 입고 지연</th><td>제품 위 시험 기간이 줄거나 없어진다</td><td>같은 버전 자체 Milvus로 먼저 개발하고 접속 주소만 바꾸는 구조로 둔다. 지연 시 자체 Milvus로 오픈 후 이관한다.</td><td><span class="did">D3</span></td></tr>
           <tr><th>제품 Milvus 버전이 낮음</th><td>BM25 내장 기능을 쓸 수 없다</td><td>sparse 벡터를 직접 만드는 쪽으로 개발한다.</td><td><span class="did">D2</span></td></tr>
@@ -1670,9 +1751,9 @@ details.tview .tbl { margin-top: 10px; }
     }
   } catch (e) {}
 
-  /* ---------- 3D layer stack ---------- */
+  /* ---------- 3D layer stack + packet walkthrough ---------- */
   try {
-    var scene = $('#isoScene'), stage = $('#isoStage'), fit = $('#isoFit'), panel = $('#isoExplain');
+    var scene = $('#isoScene'), stage = $('#isoStage'), fit = $('#isoFit'), panel = $('#isoExplain'), cap = $('#isoCap');
     var CX = [20, 188, 356, 524, 692], RY = [20, 125], TW = 150, TH = 85;
     var L = {
       base: { label: ['기반', '제품·인프라'], tiles: [
@@ -1724,16 +1805,124 @@ details.tview .tbl { margin-top: 10px; }
     });
     POSTS.forEach(function (d) {
       var p = el('div', 'post' + (d.seam ? ' seam' : '') + (d.up ? ' up' : ''));
+      if (d.seam) p.setAttribute('data-seam', d.seam);
       p.style.left = (CX[d.c] + TW - 10) + 'px'; p.style.top = (RY[d.r] + TH / 2) + 'px';
       p.appendChild(el('div', 'strip')); p.appendChild(el('div', 'strip b'));
       if (d.badge) p.appendChild(bb('badge', String(d.badge)));
       planes[d.on].appendChild(p);
     });
-    var doFit = function () { var w = stage.clientWidth, h = stage.clientHeight; var f = Math.min(1, (w - 24) / 800, h / 580); fit.style.setProperty('--fit', f.toFixed(3)); };
+    var pk = el('div', 'packet off jump'), pkA = el('div', 'anchor'), pkB = el('div', 'bb pk', '문서');
+    pkA.appendChild(pkB); pk.appendChild(pkA); scene.appendChild(pk);
+
+    var doFit = function () { var w = stage.clientWidth, h = stage.clientHeight; var f = Math.min(1, (w - 24) / 800, (h - 60) / 580); fit.style.setProperty('--fit', f.toFixed(3)); };
     doFit();
     if ('ResizeObserver' in window) new ResizeObserver(doFit).observe(stage); else addEventListener('resize', doFit);
-
     var setCam = function (v) { scene.setAttribute('data-cam', v); setPressed($('#isoCam'), v); };
+
+    /* 시나리오. 좌표는 판 위 (x, y), 높이는 b=기반 · m=처리 · t=사용 · T=사용 층 위 */
+    var SC = {
+      doc: { k: '문서가 들어갈 때', h: '문서 한 건이 검색 가능해지기까지', p: '처리는 모두 처리 층(자체)에서 일어난다. 제품은 기둥을 타고 내려가는 주황 번호 단계에서만 만난다.', f: '기둥 ①②③ 아래만 바꿀 수 있게 만든다. 제품이 늦거나 평가 기준에 못 미쳐도 위쪽 코드는 그대로다.', steps: [
+        { t: '문서가 들어온다', d: '실제 형식을 판별하고 문서 속 문서·링크를 펼친다', L: 'own', keys: 'ingest', pk: '문서', cls: '', jump: 1, path: [[-60, 62, 'm'], [95, 62, 'm']] },
+        { t: '파서 라우터가 엔진을 고른다', d: '형식마다 평가 점수가 높은 파서로 보낸다', L: 'own', keys: 'router', path: [[263, 62, 'm']] },
+        { t: '기둥 ①: UDI가 맡는 형식만 내려간다', d: '평가 기준을 넘는 형식만 제품 UDI로 보낸다. 결과는 공통 형식으로 돌아온다', L: 'prod', seam: 1, keys: 'router,udi', path: [[328, 62, 'm'], [328, 62, 'b'], [263, 62, 'b']] },
+        { t: '청킹하고 정본을 남긴다', d: '청크 정본은 모델이나 Milvus가 바뀔 때 다시 적재하는 원천이다', L: 'own', keys: 'chunk', path: [[328, 62, 'b'], [328, 62, 'm'], [431, 62, 'm']] },
+        { t: '기둥 ②: 벡터를 만들 때만 서빙처를 부른다', d: 'watsonx.ai, 사내 게이트웨이, 직접 서빙 중 어디든 주소만 바꾼다', L: 'prod', seam: 2, keys: 'embed,wxai,gw', path: [[599, 62, 'm'], [664, 62, 'm'], [664, 62, 'b'], [599, 62, 'b']] },
+        { t: '기둥 ③: Milvus에 저장한다', d: '이제 이 문서는 검색할 수 있다', L: 'prod', seam: 3, keys: 'load,milvus', path: [[664, 62, 'b'], [664, 62, 'm'], [767, 62, 'm'], [832, 62, 'm'], [832, 62, 'b'], [767, 172, 'b']] } ] },
+      qa: { k: '질문이 들어올 때', h: '질문 하나가 근거로 돌아오기까지', p: 'Milvus에 닿는 순간만 제품이다. 근거를 고르고 만드는 일은 처리 층(자체)이 한다.', f: '질문 흐름에서 제품과 만나는 곳은 기둥 ③ 한 곳이다.', steps: [
+        { t: '에이전트가 질문한다', d: '고객사 에이전트가 MCP 도구를 호출한다', L: 'ext', keys: 'agent', pk: '질문', cls: 'q', jump: 1, path: [[599, 167, 'T'], [599, 167, 't']] },
+        { t: 'MCP 서버가 검색을 요청한다', d: '도구 명세는 자체 설계. 기존 도구와의 호환 범위는 D7', L: 'own', keys: 'mcp', path: [[599, 167, 'm']] },
+        { t: '검색 API가 하이브리드 검색을 시작한다', d: 'dense + BM25, 권한·범위 필터', L: 'own', keys: 'search', path: [[767, 167, 'm']] },
+        { t: '기둥 ③: Milvus에서 후보를 찾는다', d: '질문 흐름에서 제품과 닿는 곳은 이 기둥 하나다', L: 'prod', seam: 3, keys: 'search,milvus', path: [[832, 167, 'm'], [832, 167, 'b'], [767, 172, 'b']] },
+        { t: '순위를 다시 매기고 근거를 만든다', d: '근거 = 청크 + 원문 위치(페이지·시트·셀) + 문서 버전', L: 'own', keys: 'search', pk: '근거', cls: 'ans', path: [[832, 167, 'b'], [832, 167, 'm'], [767, 167, 'm']] },
+        { t: '근거가 에이전트로 돌아간다', d: '에이전트는 이 근거로 답한다', L: 'ext', keys: 'mcp,agent', path: [[599, 167, 'm'], [599, 167, 't']] } ] },
+      delay: { k: '제품이 늦어지면', h: '제품이 늦어도 위층은 그대로다', p: '기둥 ③ 아래만 바뀐다. 에이전트와 처리 층은 아래에 무엇이 있는지 모른다.', f: 'D3의 기본 대응이다. 바뀌는 것은 접속 주소 하나다.', steps: [
+        { t: '기둥 ③ 아래에 자체 Milvus를 둔다', d: '제품과 같은 버전. 처리 층과 사용 층은 그대로다', L: 'own', seam: 3, keys: 'milvus', phase: 'before', pk: null },
+        { t: '질문 흐름은 똑같이 돈다', d: '에이전트 → MCP → 검색 API → 기둥 ③ → 자체 Milvus', L: 'own', seam: 3, keys: 'agent,mcp,search,milvus', phase: 'before', pk: '질문', cls: 'q', jump: 1, path: [[599, 167, 'T'], [599, 167, 't'], [599, 167, 'm'], [767, 167, 'm'], [832, 167, 'm'], [832, 167, 'b'], [767, 172, 'b']] },
+        { t: '입고·안정화 뒤 정본에서 다시 적재한다', d: '청크 정본 → 제품 Milvus. 파싱은 다시 하지 않는다', L: 'prod', seam: 3, keys: 'chunk,load,milvus', phase: 'after', pk: '재적재', cls: '', jump: 1, path: [[431, 62, 'm'], [599, 62, 'm'], [767, 62, 'm'], [832, 62, 'm'], [832, 62, 'b'], [767, 172, 'b']] },
+        { t: '바뀐 것은 접속 주소 하나', d: '에이전트, 검색 API 주소, 처리 층 코드는 그대로다', L: 'prod', seam: 3, keys: 'milvus,search,load', phase: 'after', pk: null } ] }
+    };
+    var LBL = { own: '처리 · 자체', prod: '기반 · 제품', ext: '사용 · 고객사' };
+    var SEAMN = ['', '①', '②', '③'];
+    var IDLE = { doc: '문서 한 건을', qa: '질문 하나를', delay: '제품이 늦을 때의 전환을' };
+    var walk = { sc: 'doc', i: -1 }, token = 0, playT = null, playing = false, touched = false;
+    var playBtn = $('#isoPlay'), PZ = 62;
+    /* z는 --gap을 따라가므로 카메라를 바꿔도 패킷이 층에 붙어 있다 */
+    var zOf = function (k) { return k === 'b' ? PZ + 'px' : k === 'm' ? 'calc(var(--gap) + ' + PZ + 'px)' : k === 't' ? 'calc(var(--gap) * 2 + ' + PZ + 'px)' : 'calc(var(--gap) * 2 + 130px)'; };
+    var place = function (p, instant) { pk.classList.toggle('jump', !!instant); pk.style.transform = 'translate3d(' + p[0] + 'px, ' + p[1] + 'px, ' + zOf(p[2]) + ')'; };
+    var STEP_MS = reduce ? 0 : 440;
+    var runPath = function (path, tk) {
+      var j = 0;
+      (function nxt() { if (tk !== token || j >= path.length) return; place(path[j], false); j++; setTimeout(nxt, STEP_MS); })();
+    };
+    var isTouch = function (st) { return !!(st.seam && st.L === 'prod'); };
+    var marks = function (st, done) {
+      $$('.tile.hot, .tile.done', scene).forEach(function (t) { t.classList.remove('hot'); t.classList.remove('done'); });
+      $$('.post.lit', scene).forEach(function (p) { p.classList.remove('lit'); });
+      scene.classList.toggle('touching', !!(st && isTouch(st)));
+      if (!st) return;
+      (done || []).forEach(function (k) { $$('.tile[data-key="' + k + '"]', scene).forEach(function (t) { t.classList.add('done'); }); });
+      (st.keys || '').split(',').forEach(function (k) { $$('.tile[data-key="' + k + '"]', scene).forEach(function (t) { t.classList.add('hot'); }); });
+      if (st.seam) $$('.post[data-seam="' + st.seam + '"]', scene).forEach(function (p) { p.classList.add('lit'); });
+    };
+    var setCap = function (st, i) {
+      if (!st) { cap.className = 'iso-cap idle'; cap.innerHTML = '<span class="cap-n">▶</span><div><b>재생을 누르면 ' + IDLE[walk.sc] + ' 따라간다</b><span class="d">주황 번호 단계에서만 제품과 만난다</span></div><span></span>'; return; }
+      cap.className = 'iso-cap' + (isTouch(st) ? ' touch' : '');
+      cap.innerHTML = '<span class="cap-n">' + (i + 1) + '</span><div><b>' + st.t + '</b><span class="d">' + st.d + '</span></div><span class="cap-chip ' + st.L + '">' + LBL[st.L] + (st.seam ? ' · 기둥 ' + SEAMN[st.seam] : '') + '</span>';
+    };
+    var renderPanel = function () {
+      var S = SC[walk.sc];
+      var html = '<span class="ie-k">' + S.k + '</span><h3>' + S.h + '</h3><p>' + S.p + '</p><ol class="ie-steps">';
+      S.steps.forEach(function (st, i) { html += '<li' + (isTouch(st) ? ' class="touch"' : '') + '><button type="button" data-i="' + i + '"><span class="sn">' + (i + 1) + '</span><span><b>' + st.t + '</b><small>' + st.d + '</small></span></button></li>'; });
+      html += '</ol><p class="ie-foot">' + S.f + '</p>';
+      panel.innerHTML = html; panel.classList.remove('swap'); void panel.offsetWidth; panel.classList.add('swap');
+      $$('.ie-steps button', panel).forEach(function (b) { b.addEventListener('click', function () { touched = true; stop(); go(+b.getAttribute('data-i')); }); });
+    };
+    var markPanel = function (i) { $$('.ie-steps button', panel).forEach(function (b) { if (+b.getAttribute('data-i') === i) b.setAttribute('aria-current', 'step'); else b.removeAttribute('aria-current'); }); };
+    /* 앞 단계를 건너뛰고 들어와도 패킷 모양·위치가 맞도록, 그 단계까지의 마지막 패킷 상태를 찾는다 */
+    var pkState = function (S, i) { var lab = null, cls = ''; for (var j = 0; j <= i; j++) { var x = S.steps[j]; if (x.pk) { lab = x.pk; cls = x.cls || ''; } else if (x.pk === null) lab = null; } return { lab: lab, cls: cls }; };
+    var go = function (i) {
+      var S = SC[walk.sc]; if (i < 0 || i >= S.steps.length) return;
+      token++; var tk = token, prev = walk.i; walk.i = i; var st = S.steps[i];
+      if (st.phase) scene.setAttribute('data-phase', st.phase);
+      var done = []; for (var j = 0; j < i; j++) done = done.concat((S.steps[j].keys || '').split(','));
+      marks(st, done); setCap(st, i); markPanel(i);
+      var ps = pkState(S, i);
+      if (st.pk === null || !ps.lab || !st.path) { if (st.pk === null || !ps.lab) pk.classList.add('off'); return; }
+      pkB.textContent = ps.lab; pkB.className = 'bb pk' + (ps.cls ? ' ' + ps.cls : '');
+      var path = st.path;
+      /* 순서대로 이어질 때만 미끄러지고, 건너뛰거나 되돌아가면 단계 시작점으로 옮긴다 */
+      if (st.jump || prev !== i - 1 || pk.classList.contains('off')) { place(path[0], true); void pk.offsetWidth; path = path.slice(1); }
+      pk.classList.remove('off');
+      runPath(path, tk);
+    };
+    var setPlayUI = function (on) { playBtn.setAttribute('aria-pressed', on ? 'true' : 'false'); playBtn.querySelector('span').textContent = on ? '일시정지' : '재생'; };
+    var stop = function () { playing = false; clearTimeout(playT); setPlayUI(false); };
+    var play = function () {
+      var S = SC[walk.sc]; playing = true; setPlayUI(true);
+      if (walk.i >= S.steps.length - 1) walk.i = -1;
+      (function tick() {
+        if (!playing) return;
+        var n = walk.i + 1; if (n >= S.steps.length) { stop(); return; }
+        go(n); var st = S.steps[n];
+        playT = setTimeout(tick, reduce ? 3200 : ((st.path ? st.path.length : 0) * STEP_MS + 2300));
+      })();
+    };
+    var setScenario = function (v) {
+      stop(); token++; walk.sc = v; walk.i = -1; marks(null);
+      scene.setAttribute('data-phase', 'after'); pk.classList.add('off');
+      var keys = []; SC[v].steps.forEach(function (st) { keys = keys.concat((st.keys || '').split(',')); });
+      $$('.tile', scene).forEach(function (t) { t.classList.toggle('onpath', keys.indexOf(t.getAttribute('data-key')) > -1); });
+      scene.classList.add('flowmode');
+      setPressed($('#isoScn'), v); renderPanel(); setCap(null);
+    };
+    seg('isoScn', function (v) { touched = true; setScenario(v); play(); });
+    seg('isoCam', function (v) { touched = true; setCam(v); });
+    playBtn.addEventListener('click', function () { touched = true; if (playing) stop(); else play(); });
+    $('#isoPrev').addEventListener('click', function () { touched = true; stop(); go(Math.max(0, walk.i - 1)); });
+    $('#isoNext').addEventListener('click', function () { touched = true; stop(); go(Math.min(SC[walk.sc].steps.length - 1, walk.i + 1)); });
+    setScenario('doc');
+
+    /* 처음 보일 때 층이 쌓이며 조립되고, 이어서 문서 흐름을 한 번 재생한다 */
     if (!reduce && hasIO) {
       scene.setAttribute('data-cam', 'stack');
       var aio = new IntersectionObserver(function (es) {
@@ -1742,88 +1931,11 @@ details.tview .tbl { margin-top: 10px; }
           aio.disconnect();
           scene.classList.add('assembling');
           requestAnimationFrame(function () { requestAnimationFrame(function () { setCam('iso'); }); });
-          setTimeout(function () { scene.classList.remove('assembling'); }, 1800);
+          setTimeout(function () { scene.classList.remove('assembling'); if (!touched) play(); }, 1900);
         });
-      }, { threshold: 0.3 });
+      }, { threshold: 0.35 });
       aio.observe(stage);
     }
-
-    /* explanation panel */
-    var PANEL = {
-      all: { k: '전체', h: '세 층이 세 기둥으로만 연결된다', p: '위로 갈수록 사용자에 가깝다. 제품 입고나 인프라 안정화가 늦어도 처리 층은 자체 Milvus 위에서 계속 개발·평가한다.', items: [
-        ['prod', '기반 · 제품과 고객사 인프라', '운영 기반, Milvus, UDI·watsonx.ai(선택), 사내 게이트웨이, GPU. 모두 on-prem', 'ops,udi,wxai,milvus,gw,gpu'],
-        ['own', '처리 · 자체 설계', '수집부터 검색 API·MCP 서버까지, 품질을 좌우하는 단계', 'ingest,router,chunk,embed,load,eval,mcp,search'],
-        ['ext', '사용 · 고객사', '에이전트 4개와 평가셋을 만드는 업무 담당자', 'agent,biz'],
-        ['cond', '기둥 ①②③ · 교체 지점', '기반과 처리가 만나는 유일한 접점', 'router,udi,embed,wxai,load,search,milvus'] ],
-        f: '항목에 마우스를 올리면 해당 타일이 떠오른다.' },
-      prod: { k: '제품 영역', h: '제품은 저장과 운영을 맡는다', p: '위층을 걷어 내면 제품이 맡는 범위가 드러난다. 확정은 Milvus와 운영 기반이고, 나머지는 평가로 정한다.', items: [
-        ['prod', 'Milvus', '벡터 저장·검색. 확정', 'milvus'],
-        ['prod', '운영 기반', '배포·형상·권한은 제품 체계를 따른다', 'ops'],
-        ['prod', 'UDI', '형식별 평가에서 기준을 넘을 때 사용 (D4)', 'udi'],
-        ['prod', 'watsonx.ai', 'Qwen3-Embedding-4B 서빙이 가능할 때 사용 (D1)', 'wxai'],
-        ['ext', '사내 게이트웨이 · GPU', '고객사 인프라. 임베딩 서빙 대안 (D1·D5)', 'gw,gpu'] ],
-        f: '전 구성이 on-prem이라 입고 뒤 안정화 기간이 필요하다. 이 층이 늦어도 처리 층 개발은 멈추지 않는다.' },
-      own: { k: '자체 설계', h: '품질을 좌우하는 단계는 모두 처리 층에 있다', p: '아래층과 위층을 밀어내면 문서가 근거가 되기까지의 흐름만 남는다.', items: [
-        ['own', '수집·형식 판별', '문서 속 문서·링크까지 펼친다', 'ingest'],
-        ['own', '파서 라우터', '형식별로 엔진을 고른다 ①', 'router'],
-        ['own', '청킹 · 청크 정본', '재구축의 출발점을 보관한다', 'chunk'],
-        ['own', '임베딩 호출', '서빙처와 무관한 하나의 호출 ②', 'embed'],
-        ['own', '벡터 적재 · 검색 API', 'Milvus 위치와 무관 ③. 근거(원문 위치·버전) 반환', 'load,search'],
-        ['own', 'MCP 서버', '에이전트가 쓰는 도구', 'mcp'],
-        ['own', '평가 콘솔', '주간 평가로 품질을 측정한다', 'eval'] ],
-        f: '흐르는 화살표가 색인 경로다. 이 층은 제품 일정과 무관하게 진행한다.' },
-      seam: { k: '교체 지점', h: '제품과 만나는 곳은 세 기둥뿐이다', p: '기둥 위쪽 코드는 그대로 두고, 기둥 아래 연결만 바꾼다.', items: [
-        ['cond', '① 파서 라우터 ↔ UDI', '바뀜: 형식별 파서 엔진 · 그대로: 공통 결과 형식, 청킹 이후 전부', 'router,udi'],
-        ['cond', '② 임베딩 호출 ↔ 서빙처', '바뀜: 서빙 주소(watsonx.ai·게이트웨이·직접) · 그대로: 호출 코드', 'embed,wxai,gw'],
-        ['cond', '③ 적재·검색 ↔ Milvus', '바뀜: 접속 주소(자체 → 제품) · 그대로: 검색 API 주소, 에이전트 코드', 'load,search,milvus'] ],
-        f: '‘Milvus 입고 전/후’를 누르면 ③의 전환을 볼 수 있다.' }
-    };
-    var hot = function (keys, on) {
-      (keys || '').split(',').forEach(function (k) { $$('.tile[data-key="' + k + '"]', scene).forEach(function (t) { t.classList.toggle('hot', on); }); });
-    };
-    var renderPanel = function (v) {
-      var d = PANEL[v];
-      var html = '<span class="ie-k">' + d.k + '</span><h3>' + d.h + '</h3><p>' + d.p + '</p><ul class="ie-list">';
-      d.items.forEach(function (it) { html += '<li tabindex="0" data-keys="' + it[3] + '"><i class="' + it[0] + '"></i><div><b>' + it[1] + '</b><span>' + it[2] + '</span></div></li>'; });
-      html += '</ul><p class="ie-foot">' + d.f + '</p>';
-      panel.innerHTML = html;
-      panel.classList.remove('swap'); void panel.offsetWidth; panel.classList.add('swap');
-      $$('li', panel).forEach(function (li) {
-        var on = function () { $$('.tile.hot', scene).forEach(function (t) { t.classList.remove('hot'); }); hot(li.getAttribute('data-keys'), true); li.classList.add('on'); };
-        var off = function () { hot(li.getAttribute('data-keys'), false); li.classList.remove('on'); };
-        li.addEventListener('mouseenter', on); li.addEventListener('focus', on);
-        li.addEventListener('mouseleave', off); li.addEventListener('blur', off);
-      });
-    };
-    var setFocus = function (v) {
-      $$('.tile.hot', scene).forEach(function (t) { t.classList.remove('hot'); });
-      scene.setAttribute('data-focus', v); setPressed($('#isoFocus'), v); renderPanel(v);
-    };
-    renderPanel('all');
-
-    var tourBtn = $('#isoTour'), tourT = null;
-    var stopTour = function () { clearTimeout(tourT); tourT = null; tourBtn.setAttribute('aria-pressed', 'false'); };
-    seg('isoFocus', function (v) { stopTour(); setFocus(v); });
-    seg('isoCam', function (v) { setCam(v); });
-    tourBtn.addEventListener('click', function () {
-      if (tourT) { stopTour(); return; }
-      var order = ['all', 'prod', 'own', 'seam', 'all'], i = 0;
-      tourBtn.setAttribute('aria-pressed', 'true');
-      var step = function () {
-        setFocus(order[i]); i++;
-        if (i < order.length) tourT = setTimeout(step, reduce ? 2500 : 4200); else stopTour();
-      };
-      step();
-    });
-    var live = $('#isoLive'), flowT = null;
-    seg('isoPhase', function (v) {
-      scene.setAttribute('data-phase', v);
-      scene.classList.add('flowing');
-      live.innerHTML = v === 'before'
-        ? '<b>입고 전.</b> 같은 버전의 자체 Milvus 위에서 개발하고 평가한다. 처리 층은 그대로다.'
-        : '<b>입고 후.</b> 접속 주소만 watsonx.data Milvus로 바꾸고 청크 정본에서 다시 적재한다. 처리 층의 코드는 바뀌지 않는다.';
-      clearTimeout(flowT); flowT = setTimeout(function () { scene.classList.remove('flowing'); }, 2400);
-    });
   } catch (e) { /* 3D 구조도는 부가 기능 */ }
 
   /* ---------- cascade ---------- */
