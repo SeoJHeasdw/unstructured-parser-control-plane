@@ -47,7 +47,7 @@ die() { printf '[error] %s\n' "$*" >&2; exit 1; }
 
 # ---------------------------------------------------------------- Python (1/2)
 pick_python() {
-  local versions="3.12 3.13 3.14 3.11"
+  local versions="3.12 3.13 3.14 3.15"
   [ "$DOCLING" = 1 ] && versions="3.12"
   local v c
   for v in $versions; do
@@ -73,7 +73,7 @@ fingerprint() { cksum < "$LOCK" | tr -d ' '; }
 STAMP="$VENV/.lock-stamp"
 
 if [ ! -f "$VPY" ]; then
-  PY="$(pick_python)" || die "Python 3.11~3.14 가 필요합니다(Docling은 3.12). 설치 후 새 터미널에서 다시 실행하세요."
+  PY="$(pick_python)" || die "Python 3.12~3.15 가 필요합니다(Docling은 3.12). 설치 후 새 터미널에서 다시 실행하세요."
   say "가상환경 만드는 중: $(basename "$VENV") ($("$PY" -c 'import sys; print(sys.version.split()[0])'))"
   "$PY" -m venv "$VENV"
   if [ -x "$VENV/bin/python" ]; then VPY="$VENV/bin/python"; else VPY="$VENV/Scripts/python.exe"; fi

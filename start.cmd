@@ -22,20 +22,20 @@ for %%P in ("%LocalAppData%\Programs\Python\Python312\python.exe" "%ProgramFiles
     )
   )
 )
-for %%V in (3.13 3.14 3.11) do (
+for %%V in (3.13 3.14 3.15) do (
   py -%%V -c "import sysconfig; raise SystemExit(sysconfig.get_platform() != 'win-amd64')" >nul 2>nul
   if not errorlevel 1 (
     py -%%V "%~dp0scripts\windows_launcher.py" %*
     goto :finished
   )
 )
-python -c "import sys, sysconfig; raise SystemExit(not ((3,11) <= sys.version_info[:2] <= (3,14) and sysconfig.get_platform() == 'win-amd64'))" >nul 2>nul
+python -c "import sys, sysconfig; raise SystemExit(not ((3,12) <= sys.version_info[:2] <= (3,15) and sysconfig.get_platform() == 'win-amd64'))" >nul 2>nul
 if not errorlevel 1 (
   python "%~dp0scripts\windows_launcher.py" %*
   goto :finished
 )
 
-echo [setup] Windows x64 Python 3.11-3.14 is required. Use 3.12 for Docling.
+echo [setup] Windows x64 Python 3.12-3.15 is required. Use 3.12 for Docling.
 echo     winget install --exact --id Python.Python.3.12 --architecture x64
 echo Open a new terminal after installation.
 popd

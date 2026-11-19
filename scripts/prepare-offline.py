@@ -10,7 +10,7 @@ from zipfile import ZIP_DEFLATED, ZipFile
 
 from windows_launcher import ROOT, BACKEND, FRONTEND, OFFLINE, SetupError, frontend_ready, locked_versions, offline_pip_env
 
-CORE_PY = ("3.11", "3.12", "3.13", "3.14")
+CORE_PY = ("3.12", "3.13", "3.14", "3.15")
 DOCLING_PY = "3.12"
 MODEL_DIRS = (
     Path("docling-project--docling-layout-heron"),

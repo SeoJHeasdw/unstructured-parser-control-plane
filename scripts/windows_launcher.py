@@ -27,7 +27,7 @@ import sysconfig
 import fastapi, pydantic_core, python_multipart, uvicorn
 
 docling = sys.argv[2] == "docling"
-supported = sys.version_info[:2] == (3, 12) if docling else (3, 11) <= sys.version_info[:2] <= (3, 14)
+supported = sys.version_info[:2] == (3, 12) if docling else (3, 12) <= sys.version_info[:2] <= (3, 15)
 if sysconfig.get_platform() != "win-amd64" or not supported:
     raise SystemExit("Unsupported virtual environment interpreter.")
 for name, version in json.loads(sys.argv[1]).items():
@@ -113,7 +113,7 @@ def ensure_python(offline, docling):
     if python.is_file():
         probe = "import sys, sysconfig; print(f'{sys.version_info.major}.{sys.version_info.minor}'); raise SystemExit(sysconfig.get_platform() != 'win-amd64')"
         result = subprocess.run([python, "-c", probe], capture_output=True, text=True, check=False)
-        valid_versions = {"3.12"} if docling else {"3.11", "3.12", "3.13", "3.14"}
+        valid_versions = {"3.12"} if docling else {"3.12", "3.13", "3.14", "3.15"}
         if result.returncode != 0 or result.stdout.strip() not in valid_versions:
             raise SetupError(f"Cannot use {environment}. Rename this virtual environment and run start.cmd again.")
         if packages_ready(python, requirements, docling):

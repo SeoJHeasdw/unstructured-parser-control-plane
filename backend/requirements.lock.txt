@@ -1,4 +1,4 @@
-# 실행에 필요한 정확한 버전 (Windows x64 · Python 3.12/3.13 휠 확인 완료).
+# 실행에 필요한 정확한 버전 (Windows x64 · Python 3.12~3.15 휠 확인 완료, 2026-11-19).
 # 오프라인 설치: pip install --no-index --find-links ..\offline\wheels -r requirements.lock.txt
 annotated-doc==0.0.6
 annotated-types==0.8.0

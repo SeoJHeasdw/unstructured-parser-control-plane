@@ -7,7 +7,7 @@
 
 ## Windows PC에서 실행
 
-Windows x64에서 실행합니다. **Python 3.12 x64**를 설치하면 기본 실행과 Docling 환경에 같은 버전을 사용할 수 있습니다. 기본 실행은 3.11~3.14를 지원합니다. 기존에 설치한 Python 3.15는 그대로 두고 3.12를 추가하세요.
+Windows x64에서 실행합니다. 기본 실행은 **Python 3.12~3.15**를 지원합니다(3.11 이하는 지원하지 않음). Docling(PDF·Office 파싱)은 잠금 파일이 3.12 기준이라 **Python 3.12 x64**가 필요합니다. 3.15만 설치돼 있으면 기본 실행은 되고, Docling을 쓰려면 3.12를 함께 설치하세요.
 
 ```cmd
 winget install --exact --id Python.Python.3.12 --architecture x64
@@ -25,7 +25,7 @@ py -3.12 --version
 
 ### macOS·Linux·WSL·Git Bash: `run.sh`
 
-루트의 `run.sh`는 `start.cmd`와 같은 일을 bash로 합니다. Python 3.11~3.14(Docling은 3.12)와 소스 ZIP이면 Node.js도 필요합니다. 첫 실행에서 `backend/.venv`를 만들어 `requirements.lock.txt`를 설치하고(잠금 파일이 바뀌면 다시 설치), `frontend/dist`가 없으면 `npm ci`와 빌드를 한 뒤, `.env`가 없으면 `.env.example`에서 만들고 서버를 띄웁니다.
+루트의 `run.sh`는 `start.cmd`와 같은 일을 bash로 합니다. Python 3.12~3.15(Docling은 3.12)와 소스 ZIP이면 Node.js도 필요합니다. 첫 실행에서 `backend/.venv`를 만들어 `requirements.lock.txt`를 설치하고(잠금 파일이 바뀌면 다시 설치), `frontend/dist`가 없으면 `npm ci`와 빌드를 한 뒤, `.env`가 없으면 `.env.example`에서 만들고 서버를 띄웁니다.
 
 ```bash
 ./run.sh                 # http://127.0.0.1:8000/ 로 시작하고 브라우저를 엽니다
