@@ -99,7 +99,7 @@ def test_file_names_keep_symbol_meaning():
     assert parse_name("시료 -70℃ 보관 기준.xlsx").base_key == parse_name("시료 −70°C 보관 기준_v2.xlsx").base_key
     nfd = unicodedata.normalize("NFD", "섭씨 −70℃ 보관.xlsx")
     assert display_name(nfd) == "섭씨 −70℃ 보관.xlsx"
-    assert display_name("보고서‮xcod.exe") == "보고서xcod.exe"
+    assert display_name("보고서\u202excod.exe") == "보고서xcod.exe"
 
 
 def test_upload_name_is_nfc_and_download_header_keeps_symbols(client):

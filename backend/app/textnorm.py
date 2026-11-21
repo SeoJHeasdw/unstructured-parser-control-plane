@@ -139,7 +139,7 @@ LOW_CONTRAST = 1.6  # D9D9D9(1.41)·F2F2F2(1.12)는 걸리고 BFBFBF(1.84)는 �
 
 # ---------------------------------------------------------------- 파일명
 
-_INVISIBLE = dict.fromkeys(map(ord, "​﻿‪‫‬‭‮⁦⁧⁨⁩"))
+_INVISIBLE = dict.fromkeys(map(ord, "\u200b\ufeff\u202a\u202b\u202c\u202d\u202e\u2066\u2067\u2068\u2069"))
 _DASHES = dict.fromkeys(map(ord, "‐‑‒–—―−﹘﹣－"), "-")
 _DEGREES = {ord("˚"): "°", ord("º"): "°", ord("⁰"): "°"}
 # 부호로 보는 붙임표: 맨 앞·공백·괄호 뒤의 '-숫자', 또는 온도처럼 '-숫자°'. '보고서-2026'의 붙임표는 구분자다.
