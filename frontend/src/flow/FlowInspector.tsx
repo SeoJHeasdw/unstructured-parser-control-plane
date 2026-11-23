@@ -35,11 +35,30 @@ function TextField({ label, value, onCommit, multiline, placeholder }: { label: 
 function NumberField({ label, value, onCommit, min, max, step = 1, suffix }: { label: string; value: number; onCommit: (value: number) => void; min: number; max: number; step?: number; suffix?: string }) {
   const [draft, setDraft] = useState(String(value));
   useEffect(() => setDraft(String(value)), [value]);
-  const commit = () => { const parsed = Number(draft); if (Number.isFinite(parsed)) { const next = Math.max(min, Math.min(max, parsed)); if (next !== value) onCommit(next); setDraft(String(next)); } else setDraft(String(value)); };
+  const commit = () => {
+    const parsed = Number(draft);
+    const next = draft.trim() && Number.isFinite(parsed)
+      ? Math.max(min, Math.min(max, step === 1 ? Math.round(parsed) : parsed))
+      : value;
+    if (next !== value) onCommit(next);
+    setDraft(String(next));
+  };
   return <label className="fi-field fi-number"><span>{label}</span><div><input inputMode="decimal" value={draft} onChange={event => setDraft(event.target.value)} onBlur={commit} onKeyDown={event => { if (event.key === 'Enter') event.currentTarget.blur(); }} />{suffix && <em>{suffix}</em>}</div></label>;
 }
 function Section({ title, children, aside }: { title: string; children: ReactNode; aside?: ReactNode }) {
   return <section className="fi-section"><header><h4>{title}</h4>{aside}</header>{children}</section>;
+}
+const hasCapacity = (kind: NodeKind) => kind === 'task' || kind === 'store' || kind === 'review';
+
+export function ParallelSettings({ flow, metrics, design, onChange }: {
+  flow: FlowDoc; metrics: Record<string, NodeMetric | undefined>; design: boolean; onChange: (node: string, capacity: number) => void;
+}) {
+  const nodes = flow.nodes.filter(node => hasCapacity(node.data.kind));
+  if (!nodes.length) return <p className="fi-muted">이 흐름에는 동시 처리 수를 설정할 작업·검토·저장 단계가 없습니다.</p>;
+  return <div className="ps-parallel-list">{nodes.map(({id, data}) => {
+    const capacity = (design ? data.capacity : metrics[id]?.capacity ?? data.capacity) ?? 3;
+    return <NumberField key={id} label={data.label} value={capacity} min={1} max={32} suffix="개" onCommit={n => onChange(id, n)}/>;
+  })}</div>;
 }
 const pct = (value?: number) => Math.round((value ?? 0) * 1000) / 10;
 
@@ -99,7 +118,7 @@ function NodeDesign({ library, flow, node, onNodeData, onNodeKind, onSelectEdge,
   const incoming = flow.edges.filter(edge => edge.target === node.id), outgoing = flow.edges.filter(edge => edge.source === node.id);
   const name = (id: string) => flow.nodes.find(item => item.id === id)?.data.label ?? id;
   const Icon = KIND_META[data.kind].icon;
-  const runnable = data.kind === 'task' || data.kind === 'store' || data.kind === 'review';
+  const runnable = hasCapacity(data.kind);
   return <div className="fi-body">
     <div className="fi-head"><span className="fi-kicker"><Icon size={13} /> {KIND_META[data.kind].label}</span><h3>{data.label}</h3>{data.description && <p>{data.description}</p>}</div>
     <Section title="속성">
@@ -227,7 +246,7 @@ function NodeMonitor({ library, flow, node, snapshot, sim, metrics, onNavigate, 
   }, [flow, node.id, library, sim]);
   if (!metric) return <div className="fi-body"><div className="fi-head"><h3>{data.label}</h3><p>이 노드는 운영 지표가 없습니다.</p></div></div>;
   const Icon = data.kind === 'task' || data.kind === 'store' ? TASK_ICON[data.icon ?? 'custom'].icon : KIND_META[data.kind].icon;
-  const processable = data.kind === 'task' || data.kind === 'store' || data.kind === 'review';
+  const processable = hasCapacity(data.kind);
   const outgoing = flow.edges.filter(edge => edge.source === node.id);
   const children = childFlow ? Object.entries(snapshot.metrics).filter(([key, value]) => key.startsWith(`${childFlow}::`) && (value.status === 'error' || value.status === 'warn' || value.status === 'paused')) : [];
   const act = (doc: SimDoc, action: DocAction) => sim.docAction(doc.id, action);

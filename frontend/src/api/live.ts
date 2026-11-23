@@ -26,6 +26,18 @@ async function readResponse<T>(response:Response):Promise<T> {
  return await response.json() as T;
 }
 
+export type ParserCatalog = {
+ routes: Record<string, string>; docling_installed: boolean; pdf_model_directory: boolean;
+ ocr_enabled: boolean; ocr_models_found: boolean;
+};
+export async function getParserCatalog(signal: AbortSignal): Promise<ParserCatalog> {
+ const catalog = await readResponse<ParserCatalog>(await fetch('/api/live/parsers', { signal }));
+ if (!catalog?.routes || typeof catalog.routes !== 'object' || Array.isArray(catalog.routes)) {
+  throw new Error('파서 목록의 응답 형식을 확인할 수 없습니다.');
+ }
+ return catalog;
+}
+
 export async function listLiveDocuments(signal?: AbortSignal):Promise<LiveDoc[]> {
  const body = await readResponse<{documents:LiveDoc[]}>(await (signal ? fetch(DOCUMENTS_URL, {signal}) : fetch(DOCUMENTS_URL)));
  if(!Array.isArray(body.documents))throw new Error('문서 목록의 응답 형식을 확인할 수 없습니다.');

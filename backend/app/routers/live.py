@@ -1,11 +1,27 @@
 """File metadata, explicit parsing, and local result routes."""
+from importlib.util import find_spec
+
 from fastapi import APIRouter, File, HTTPException, Query, Request, UploadFile
 from fastapi.responses import FileResponse
+from app.adapters.registry import PARSER_BY_EXTENSION
+from app.adapters.ocr import model_dir
 from app.models import DocumentHistory, DocumentList, LiveDocument, ParseResult, ParseRunList, StoredParseRun
 from app.service import Conflict, InvalidName, MissingDocument, MissingRun, QueueUnavailable, TooLarge
 
 router = APIRouter(prefix="/api/live/documents", tags=["local documents"])
 summary_router = APIRouter(prefix="/api/live", tags=["local documents"])
+
+
+@summary_router.get("/parsers")
+def parser_catalog(request: Request):
+    settings = request.app.state.settings
+    return {
+        "routes": PARSER_BY_EXTENSION,
+        "docling_installed": find_spec("docling") is not None,
+        "pdf_model_directory": bool(settings.docling_artifacts and settings.docling_artifacts.is_dir()),
+        "ocr_enabled": settings.ocr_enabled,
+        "ocr_models_found": model_dir(settings) is not None,
+    }
 
 
 @summary_router.get("/structure-summary")

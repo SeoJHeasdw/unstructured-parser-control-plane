@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { CheckCircle2, CircleAlert, Clock3, FilePlus2, FolderOpen, ListFilter, LoaderCircle, RefreshCw, Search } from 'lucide-react';
+import { ArrowUpRight, Scissors, Workflow, CheckCircle2, CircleAlert, Clock3, FilePlus2, FolderOpen, ListFilter, LoaderCircle, RefreshCw, Search } from 'lucide-react';
 import { LiveRequestError, getLiveDocument, getLiveResult, listLiveDocuments, processLiveDocument, uploadLiveDocument } from './api/live';
 import type { LiveDoc, LiveResult, LiveStatus } from './api/live';
 import LiveDocumentView, { displayDate, displaySize, failureReason, FileGlyph, StatusBadge } from './LiveDocumentView';
 import { ArrowLeft } from 'lucide-react';
 import { DocumentRuns } from './compare/LiveCompare';
 import { workspaceHref, type WorkspaceRoute } from './navigation';
+import { WorkspaceLink } from './WorkspaceLink';
 import './live.css';
 
 type Filter = 'all' | 'attention' | LiveStatus;
@@ -28,10 +29,11 @@ function FileName({name}: {name: string}) {
 
 type LiveWorkspaceProps = {
  active?: boolean; route?: WorkspaceRoute; onRoute?: (next: WorkspaceRoute) => void; onFamily?: (id: string) => void;
+ onNavigate?: (next: WorkspaceRoute) => void;
  onUploadStateChange?: (uploading: boolean) => void;
 };
 
-export default function LiveWorkspace({ active = true, route, onRoute, onFamily, onUploadStateChange }: LiveWorkspaceProps = {}) {
+export default function LiveWorkspace({ active = true, route, onRoute, onFamily, onNavigate, onUploadStateChange }: LiveWorkspaceProps = {}) {
  const [documents,setDocuments]=useState<LiveDoc[]>([]);
  const [loading,setLoading]=useState(true);
  const [listError,setListError]=useState('');
@@ -274,6 +276,10 @@ export default function LiveWorkspace({ active = true, route, onRoute, onFamily,
       <div><h1 id="lw-inbox-title" tabIndex={-1}>문서함</h1><p>파일을 이 컴퓨터에 저장하고, 문서를 열어 파싱을 실행하세요.</p></div>
       <button className="lw-btn is-primary" onClick={pickFiles} disabled={uploading}><FilePlus2 size={18} />파일 추가</button>
     </header>
+    {onNavigate && <nav className="lw-shortcuts" aria-label="문서 처리 바로가기">
+      <WorkspaceLink to={{page:'parsers'}} onNavigate={onNavigate}><span><Workflow size={21}/></span><span><b>파서 플로우</b><small>형식별 파서와 처리 경로</small></span><ArrowUpRight size={17}/></WorkspaceLink>
+      <WorkspaceLink to={{page:'chunking'}} onNavigate={onNavigate}><span><Scissors size={21}/></span><span><b>청킹 비교</b><small>분할 전략과 청크 품질</small></span><ArrowUpRight size={17}/></WorkspaceLink>
+    </nav>}
     <div className="lw-sheet">
       <div className="lw-tools">
         <label className="lw-search"><Search size={17} /><input aria-label="실제 문서 검색" placeholder="파일명, 확장자 또는 ID 검색" value={query} onChange={event => setQuery(event.target.value)} /></label>
@@ -317,6 +323,6 @@ export default function LiveWorkspace({ active = true, route, onRoute, onFamily,
     resultError={resultError} submittingId={processingId} onBack={() => selectFile(null)} onProcess={() => void process(current)}
     tab={liveRoute.tab ?? 'result'} onTab={tab => changeRoute({page:'live', doc:current.id, tab})}
     onCompare={() => changeRoute({page:'live', doc:current.id, review:'source'})} onFamily={onFamily && (() => onFamily(current.id))}
-    onPickFile={pickFiles} />}
+    onPickFile={pickFiles} onNavigate={onNavigate} />}
  </div>;
 }

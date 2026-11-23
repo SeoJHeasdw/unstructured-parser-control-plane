@@ -17,6 +17,7 @@
 |---|---|---:|---|
 | `GET /api/health` | API 기능 제공 상태 | `200` | 해당 응답은 고정값으로, Docling 설치·모델 또는 실제 문서의 파싱 성공을 확인하지 않음 |
 | `GET /api/data` | `mock-data/data.json` 전체 | `200` | 예시 파일을 읽지 못하면 서버 오류 가능 |
+| `GET /api/live/parsers` | `routes`는 서버에 등록된 확장자 → 파서 ID 매핑. `docling_installed`, `pdf_model_directory`, `ocr_enabled`, `ocr_models_found`는 패키지·폴더·설정·로컬 모델 파일 확인값이다. 조회는 모델 로딩이나 파싱을 실행하지 않는다. | `200` | |
 | `GET /api/live/documents` | 로컬 문서 목록, `{ "documents": [...] }` | `200` | 현재 필터·페이지네이션 없음 |
 | `POST /api/live/documents` | `multipart/form-data`의 `file` **1개**. 저장만 수행 | `201`, `LiveDocument` | `400` 파일명 오류/길이 정보 문제, `403` 허용되지 않은 Origin, `413` 크기 초과, `422` 필수 파일 필드 누락 등 |
 | `GET /api/live/documents/{id}` | 해당 문서 상태 | `200`, `LiveDocument` | `404` ID 형식이 틀렸거나 없는 문서 |
@@ -34,7 +35,7 @@
 | `GET /api/lineage?source=live\|example` | 문서 계보(판 묶음·최신 판단·포함·참조 연결 상태). `live`는 업로드 목록과 **이미 실행해 둔** 구조 분석 결과만 읽고 분석·파싱을 새로 시작하지 않는다. `example`은 `mock-data/lineage-example.json`으로 계산한다 | `200`, `LineageData` | `400` 출처 값 오류, `503` 예시 파일 읽기 실패 |
 | `GET /api/retrieval/config` | 임베딩 연결(`EMBED_*`와 주소가 있는 `MODEL_*`·`MODEL2_*`, 키 값 제외), 모델 사양, 청킹 전략 설명, 요청 한도, 벡터 캐시 크기 | `200` | `403` 허용되지 않은 Origin(이하 `/api/retrieval`, `/api/vectordb` 공통) |
 | `GET /api/retrieval/documents`, `GET /api/retrieval/samples` | 청킹 원문 후보: 성공 결과가 있는 실제 문서 / 합성 예시 3종(`sop` 절차서, `report` 그림 많은 점검 보고서, `coa` 표 많은 시험 성적서)과 요소 구성 | `200` | |
-| `POST /api/retrieval/chunk` | `{source: {doc_id} · {sample} · {text,name}, strategies(1~6개), limit_tokens}` → 원문 요소 목록(제목·본문·목록·표·그림·캡션·코드·반복 머리말, 쪽)과 전략별 청크·통계·요소별 결과(`outcomes`, `by_kind`). 전략은 기준선 4종(고정·재귀·문장·제목 구조)과 요소 인지·부모-자식·페이지 단위. 외부 호출 없음 | `200` | `400` 원문·전략 오류, `404` 문서 없음, `409` 성공 결과 없음, `413` 원문·청크 수 한도 초과 |
+| `POST /api/retrieval/chunk` | `{source: {doc_id} · {sample} · {text,name}, strategies(1~6개), limit_tokens, parallelism?}` → 원문 요소 목록(제목·본문·목록·표·그림·캡션·코드·반복 머리말, 쪽)과 전략별 청크·통계·요소별 결과(`outcomes`, `by_kind`). 전략은 기준선 4종(고정·재귀·문장·제목 구조)과 요소 인지·부모-자식·페이지 단위. 외부 호출 없음 | `200` | `400` 원문·전략 오류, `404` 문서 없음, `409` 성공 결과 없음, `413` 원문·청크 수 한도 초과 |
 | `POST /api/retrieval/tokens` | 고른 연결·모델로 표본 텍스트(최대 16개)를 임베딩해 실제 토큰 수·차원을 잰다. **외부 모델 호출** | `200` | `400` 표본 오류, `409` 연결 미설정 |
 | `GET`·`PUT /api/retrieval/questions`, `POST .../questions/parse`, `GET .../questions/export?format=csv\|jsonl` | 평가 질문 세트(질문·정답 문서·정답 구절). `runtime/retrieval/questions.json`에 저장 | `200` | `400` 형식 오류, `409` 저장 파일 읽기 실패 |
 | `POST /api/retrieval/runs` | 문서(실제·`sample:<id>`)·청킹 프리셋·후보 모델·`top_k`로 검색 정확도 평가 시작. 결과는 질문 유형(본문·표·그림)별 지표 포함. 한 번에 하나만 실행. **외부 모델 호출**, 청크 벡터는 `runtime/retrieval/embeddings.sqlite3`에 캐시 | `202`, `Run` | `400` 요청 오류, `409` 다른 평가 실행 중 |
@@ -44,6 +45,8 @@
 | `GET /api/vectordb/sources`, `POST /api/vectordb/milvus/check` | 출처(예시 데이터·Milvus)와 연결 설정의 공개 정보(토큰 값 제외), Milvus 연결 확인. `sources`는 Milvus에 요청하지 않으며, 최근 연결 실패로 쉬는 중이면 `milvus.unreachable`(`retry_in`초, `error`)을 담고 기본 출처를 `example`로 돌려준다. `check`는 사용자가 누를 때만 실제로 요청하고 쉬는 상태를 풀어 다시 시도한다 | `200` | |
 | `GET /api/vectordb/{source}/tree`, `GET .../collection?db=&name=` | 데이터베이스·컬렉션·파티션 트리, 컬렉션 스키마·인덱스·감지한 필드 역할(텍스트·문서·순서·쪽) | `200` | Milvus 오류의 상태 코드와 메시지를 그대로 전달. 연결 실패(연결 거부·시간 초과·인증서)와 `collections/list`의 HTTP 404(Milvus REST v2 주소가 아님)가 나면 같은 주소로 30초(`UNREACHABLE_COOLDOWN`) 동안 요청을 보내지 않고 `503`으로 바로 답한다. 첫 오류는 원래 메시지(`502`/`504`)를 보여 준다 |
 | `POST /api/vectordb/{source}/browse`, `/chunk`, `/similar`, `/documents`, `/document` | 청크 조회(필터·파티션·페이지, `offset+limit` 16,384 미만), 청크 상세, 유사 청크, 문서 값 목록, 한 문서의 청크를 순서대로 다시 읽기. **읽기 전용**, 쓰기·삭제 요청 없음 | `200` | `422` 요청 값 오류, Milvus 오류 전달 |
+
+청킹 비교의 `parallelism`은 동시에 실행할 전략 수다. 기본값은 1이고 현재 서버는 1~4의 정수를 받는다. 화면은 `GET /api/retrieval/config`의 `caps.max_parallel_strategies`로 한도를 확인한다. 요청마다 원문을 한 번 읽고, 서버 프로세스 전체에서 최대 네 전략을 동시에 실행한다. 결과 배열은 요청 순서를 유지하며 잘못된 전략의 오류는 해당 결과에 담긴다.
 
 `202`는 요청이 **접수되었다는 뜻**이다. 반환된 스냅샷의 `processing`은 실행 중 **또는 메모리 대기열에서 대기 중**을 뜻하며, 결과가 준비됐음을 의미하지 않는다. 아주 빠른 처리는 응답 후 조회 시 이미 끝나 있을 수 있다. 목록을 다시 조회하거나 상세 문서를 폴링해 최종 상태를 확인한다.
 

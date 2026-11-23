@@ -4,7 +4,7 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-li
 import userEvent from '@testing-library/user-event';
 import PipelineStudio from '../PipelineStudio';
 import { FlowSimulator } from '../flow/flowSim';
-import { addFormatRoute, defaultLibrary, formatRoutes, OVERVIEW_ID } from '../flow/flowTemplates';
+import { addFormatRoute, defaultLibrary, formatRoutes, loadLibrary, OVERVIEW_ID } from '../flow/flowTemplates';
 import { installFlowDomMocks, memoryStorage } from './flowTestEnv';
 
 // 사용자가 제공한 초기 19종. 목록이 닫힌 집합이라는 의미는 아니다.
@@ -118,6 +118,31 @@ describe('형식과 경로', () => {
 });
 
 describe('설계 모드', () => {
+  it('단계별 설계 병렬 수를 저장하고 모의 운영 중에는 현재 실행에만 적용한다', async () => {
+    const user = userEvent.setup();
+    const sim = new FlowSimulator(defaultLibrary());
+    const {unmount} = render(<PipelineStudio formats={[]} simulator={sim} onOpenDocuments={() => {}}/>);
+    const openCapacity = async () => {
+      await user.click(screen.getByRole('button',{name:'병렬 설정'}));
+      return within(screen.getByRole('dialog')).getByLabelText(/형식 판별/);
+    };
+    await user.click(screen.getByRole('button',{name:'설계'}));
+    const designField = await openCapacity();
+    await user.clear(designField);
+    await user.type(designField,'12{Enter}');
+    await user.keyboard('{Escape}');
+    await user.click(screen.getByRole('button',{name:'운영'}));
+    const runtimeField = await openCapacity();
+    expect(runtimeField).toHaveProperty('value','12');
+    await user.clear(runtimeField);
+    await user.type(runtimeField,'40{Enter}');
+    await user.keyboard('{Escape}');
+    expect(await openCapacity()).toHaveProperty('value','32');
+    unmount();
+    expect(loadLibrary().flows[OVERVIEW_ID].nodes.find(n => n.data.label === '형식 판별')?.data.capacity).toBe(12);
+    expect(onlyGets()).toBe(true);
+  });
+
   it('도형을 추가하고 연결 사이에 단계를 넣고, 지우면 앞뒤를 다시 잇고, 되돌릴 수 있다', async () => {
     const user = userEvent.setup(); render(<PipelineStudio formats={[]} onOpenDocuments={() => {}} />);
     await user.click(screen.getByRole('button', { name: '설계' }));

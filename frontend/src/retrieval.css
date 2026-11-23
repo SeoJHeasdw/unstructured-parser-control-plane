@@ -28,7 +28,7 @@
 .cb-bar { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 14px 16px; margin-bottom: 16px; padding: 16px; border: 1px solid var(--rule); border-radius: 13px; background: var(--surface); box-shadow: var(--shadow-1); }
 .cb-source { display: flex; align-items: center; gap: 12px; min-width: 0; }
 .cb-source-icon, .cb-empty-icon { display: grid; place-items: center; width: 42px; height: 42px; flex: none; border-radius: 10px; background: var(--accent-soft); color: var(--accent); }
-.cb-source-content { min-width: 0; }
+.cb-source-content { flex:1; min-width:0; }
 .cb-source-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-bottom: 3px; }
 .cb-bar-label { color: var(--ink-3); font-size: 12px; font-weight: 600; }
 .cb-srcbtn { display: flex; align-items: center; gap: 8px; min-height: 36px; max-width: 100%; padding: 0 9px; margin-left: -9px; border: 1px solid transparent; border-radius: 7px; background: transparent; color: var(--ink-1); font-size: 16px; text-align: left; }
@@ -270,3 +270,36 @@
   .cb-bar-actions .cb-btn { min-height: 40px; }
 }
 @media(max-width:760px){.cb-split{grid-template-columns:1fr;grid-template-rows:40% 1fr}.cb-split-list{border-right:0;border-bottom:1px solid var(--rule)}.cb-epane{padding:16px 0 0}.cb-frow{grid-template-columns:1fr;gap:4px}.cb-dl>div{grid-template-columns:1fr;gap:2px}.cb-mini{grid-template-columns:minmax(0,1fr) 120px}}
+
+.cb-strategies { margin:0 0 16px; padding:14px 16px; border:1px solid var(--rule); border-radius:13px; background:var(--surface); }
+.cb-strategies header,.cb-strategies > div { display:flex; flex-wrap:wrap; align-items:center; gap:6px; }
+.cb-strategies header { gap:9px; margin-bottom:10px; }
+.cb-strategies h2 { font-size:15px; }
+.cb-strategies header span { color:var(--ink-3); font-size:12px; }
+.cb-strategies button { display:inline-flex; align-items:center; gap:5px; border:1px solid var(--rule); border-radius:7px; background:var(--surface); color:var(--ink-3); min-height:32px; padding:5px 9px; font-size:13px; overflow-wrap:anywhere; text-align:start; }
+.cb-strategies button[aria-pressed=true] { border-color:#d9ceeb; background:var(--comparison-surface); color:var(--comparison-ink); }
+.cb-strategies button:hover:not(:disabled) { border-color:var(--comparison-ink); }
+.cb-rowedit { display:inline-grid; width:28px; height:28px; vertical-align:middle; margin-left:5px; place-items:center; padding:0; border:0; background:transparent; border-radius:5px; color:var(--ink-3); }
+.cb-rowedit:hover { background:var(--comparison-surface); color:var(--comparison-ink); }
+@media(pointer:coarse) { .cb-rowedit,.cb-strategies button { min-height:44px; } .cb-rowedit { width:44px; } }
+.cb-strategies > header { justify-content:space-between; gap:7px 16px; }
+.cb-run-options { display:flex; align-items:center; gap:6px 12px; flex-wrap:wrap; }
+.cb-run-options small { color:var(--ink-3); font-size:12px; }
+.cb-quick-sizing .cb-advanced { margin-left:auto; min-height:35px; }
+.cb-parallel { display:inline-flex; align-items:center; gap:8px; color:var(--ink-2); font-size:13px; font-weight:620; }
+.cb-parallel select,.cb-sizing select,.cb-sizing input { min-height:35px; max-width:100%; min-width:0; border:1px solid var(--rule-strong); border-radius:6px; padding:5px 8px; color:var(--ink-1); background:var(--surface); font:inherit; }
+.cb-sizing { display:flex; align-items:flex-end; flex-wrap:wrap; gap:9px 12px; }
+.cb-sizing label { display:grid; min-width:0; gap:4px; font-size:13px; }
+.cb-sizing label > span,.cb-choice-label { color:var(--ink-2); font-size:12px; font-weight:650; }
+.cb-table-rows { padding-block:8px; }
+.cb-sizing input { width:98px; font-variant-numeric:tabular-nums; }
+.cb-quick-sizing { border:0; border-block:1px solid var(--rule); padding:12px 0; margin:0 0 10px; min-width:0; }
+.cb-quick-sizing .cb-edit-target { flex:0 1 235px; }
+.cb-choice-label { margin:0 0 6px; }
+.cb-choice-label span { padding-left:5px; font-weight:450; color:var(--ink-3); }
+@container(max-width:540px) {
+  .cb-quick-sizing { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .cb-quick-sizing .cb-edit-target { grid-column:1/-1; }
+  .cb-quick-sizing input { width:100%; }
+  .cb-quick-sizing .cb-advanced { margin-left:0; }
+}

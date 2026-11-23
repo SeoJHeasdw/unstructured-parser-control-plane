@@ -58,7 +58,7 @@ export type ChunkResponse = { source: ChunkSource; results: StrategyResult[] };
 
 export type ModelSpec = { id: string; dims: number; dims_note: string; max_tokens: number; arch: string; pooling: string; query_prefix: string; doc_prefix: string; prefix_note: string; languages: string; note: string };
 export type EmbedConnection = { key: string; label: string; base_url: string; api_key_set: boolean; configured: boolean; models: string[]; source: 'embed' | 'model' };
-export type Caps = { max_chunks: number; max_questions: number; max_presets: number; max_candidates: number; max_documents: number; max_question_rows: number; top_k_min: number; top_k_max: number; max_source_chars: number; max_bench_chunks: number };
+export type Caps = { max_parallel_strategies?: number; max_chunks: number; max_questions: number; max_presets: number; max_candidates: number; max_documents: number; max_question_rows: number; top_k_min: number; top_k_max: number; max_source_chars: number; max_bench_chunks: number };
 export type RetrievalConfig = { connections: EmbedConnection[]; configured: boolean; specs: ModelSpec[]; strategies: Record<string, string>; caps: Caps; cache: { entries: number; bytes: number } };
 export type RetrievalDoc = { id: string; name: string; format: string; status: string; updated_at: string; is_stale: boolean };
 /** 질문 유형: 정답이 본문·표·그림(캡션) 중 어디에 있는가. 비우면 서버가 정답 위치로 판단한다. */
@@ -111,8 +111,8 @@ export const listDocuments = async (): Promise<RetrievalDoc[]> => (await read<{ 
 export const getSamples = async (): Promise<Sample[]> => (await read<{ samples: Sample[] }>(await fetch(`${BASE}/samples`))).samples;
 /** 평가 문서 id: 실제 문서는 그대로, 합성 예시는 'sample:<id>' */
 export const sampleDocId = (id: string) => `sample:${id}`;
-export async function chunkSource(source: { doc_id?: string; sample?: string; text?: string; name?: string }, strategies: Preset[], limitTokens: number | null, signal?: AbortSignal): Promise<ChunkResponse> {
-  return read(await fetch(`${BASE}/chunk`, json('POST', { source, strategies, limit_tokens: limitTokens }, signal)));
+export async function chunkSource(source: { doc_id?: string; sample?: string; text?: string; name?: string }, strategies: Preset[], limitTokens: number | null, signal?: AbortSignal, parallelism = 1): Promise<ChunkResponse> {
+  return read(await fetch(`${BASE}/chunk`, json('POST', { source, strategies, limit_tokens: limitTokens, parallelism }, signal)));
 }
 export async function measureTokens(connection: string, model: string, texts: string[]): Promise<TokenMeasure> {
   return read(await fetch(`${BASE}/tokens`, json('POST', { connection, model, texts })));

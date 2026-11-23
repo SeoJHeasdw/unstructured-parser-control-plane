@@ -31,6 +31,7 @@ def _local_only(request: Request) -> None:
 router = APIRouter(prefix="/api/retrieval", tags=["chunking and embedding bench"], dependencies=[Depends(_local_only)])
 _STATE_LOCK = threading.Lock()
 MAX_COMPARE = 6  # 청킹 벤치 비교표에 한 번에 올리는 전략 수
+MAX_PARALLEL_STRATEGIES = 4
 MAX_MEASURE_TEXTS = 16
 MAX_MEASURE_CHARS = 60_000
 
@@ -67,7 +68,7 @@ def config(request: Request):
         cache = {"entries": 0, "bytes": 0}
     return {"connections": [c.public() for c in connections], "configured": any(c.configured for c in connections),
             "specs": list(MODEL_SPECS), "strategies": STRATEGY_LABELS,
-            "caps": {**CAPS, "max_source_chars": MAX_SOURCE_CHARS, "max_bench_chunks": MAX_CHUNKS}, "cache": cache}
+            "caps": {**CAPS, "max_parallel_strategies": MAX_PARALLEL_STRATEGIES, "max_source_chars": MAX_SOURCE_CHARS, "max_bench_chunks": MAX_CHUNKS}, "cache": cache}
 
 
 @router.get("/documents")
@@ -122,19 +123,29 @@ def _load_source(source, request: Request) -> tuple[Source, dict]:
 
 @router.post("/chunk")
 def chunk(request: Request, body: dict = Body(...)):
-    src, meta = _load_source(body.get("source"), request)
     strategies = body.get("strategies")
     if not isinstance(strategies, list) or not 1 <= len(strategies) <= MAX_COMPARE:
         raise HTTPException(400, f"청킹 전략을 1~{MAX_COMPARE}개 보내 주세요.")
+    parallelism = body.get("parallelism", 1)
+    if type(parallelism) is not int or not 1 <= parallelism <= MAX_PARALLEL_STRATEGIES:
+        raise HTTPException(400, f"전략 병렬 수는 1~{MAX_PARALLEL_STRATEGIES} 사이의 정수여야 합니다.")
+    src, meta = _load_source(body.get("source"), request)
     limit = body.get("limit_tokens")
     limit = int(limit) if isinstance(limit, (int, float)) and not isinstance(limit, bool) and limit > 0 else None
-    results = []
-    for index, spec in enumerate(strategies):
+
+    def evaluate(index):
+        spec = strategies[index]
         try:
-            results.append(run_strategy(src, spec, limit))
+            return run_strategy(src, spec, limit)
         except ChunkingError as exc:
             sid = str(spec.get("id") or index) if isinstance(spec, dict) else str(index)
-            results.append({"id": sid, "error": str(exc), "chunks": [], "stats": None, "outcomes": {}, "by_kind": {}})
+            return {"id": sid, "error": str(exc), "chunks": [], "stats": None, "outcomes": {}, "by_kind": {}}
+
+    # One source index per request. The shared pool bounds simultaneous comparison work across tabs.
+    results = []
+    for start in range(0, len(strategies), parallelism):
+        batch = range(start, min(start + parallelism, len(strategies)))
+        results.extend(request.app.state.chunk_pool.map(evaluate, batch))
     return {"source": {**meta, **describe_source(src), "text": src.text}, "results": results}
 
 

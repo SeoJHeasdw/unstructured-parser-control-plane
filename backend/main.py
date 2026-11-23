@@ -1,5 +1,6 @@
 """Local API: mock UI data, explicit real document processing, model connection checks,
 and (when built) the frontend itself so the target PC needs Python only."""
+from concurrent.futures import ThreadPoolExecutor
 from contextlib import asynccontextmanager
 import json
 from pathlib import Path
@@ -11,7 +12,7 @@ from app.middleware import LocalRequestGuard
 from app.routers.live import router as live_router, summary_router as live_summary_router
 from app.routers.models import router as models_router
 from app.routers.lineage import router as lineage_router
-from app.routers.retrieval import router as retrieval_router
+from app.routers.retrieval import MAX_PARALLEL_STRATEGIES, router as retrieval_router
 from app.routers.vectordb import router as vectordb_router
 from app.service import DocumentService
 
@@ -25,7 +26,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         service.start()
         app.state.documents = service
         try:
-            yield
+            with ThreadPoolExecutor(max_workers=MAX_PARALLEL_STRATEGIES, thread_name_prefix="chunk-bench") as pool:
+                app.state.chunk_pool = pool
+                yield
         finally:
             service.stop()
     app = FastAPI(title="Unstructured Data Console Local API", version="0.4.0", lifespan=lifespan)

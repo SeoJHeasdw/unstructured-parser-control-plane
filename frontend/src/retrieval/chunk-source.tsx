@@ -7,8 +7,9 @@ export type SourceKey = `sample:${string}` | `doc:${string}`;
 type Item = { key: SourceKey; group: string; name: string; note: string; composition?: Partial<Record<ElementKind, number>>; stale?: boolean };
 
 /** 원문 고르기: 예시 문서와 실제 문서를 한 목록에서, 각자의 구성과 함께 본다. */
-export function SourceModal({ samples, docs, current, currentComposition, onPick, onClose }: {
+export function SourceModal({ samples, docs, current, currentComposition, docsError, onRetry, onPick, onClose }: {
   samples: Sample[]; docs: RetrievalDoc[]; current: SourceKey | null; currentComposition: Partial<Record<ElementKind, number>> | null;
+  docsError: string; onRetry: () => void;
   onPick: (key: SourceKey) => void; onClose: () => void;
 }) {
   const items: Item[] = [
@@ -18,9 +19,10 @@ export function SourceModal({ samples, docs, current, currentComposition, onPick
   ];
   const [pending, setPending] = useState<SourceKey | null>(current && items.some(i => i.key === current) ? current : items[0]?.key ?? null);
   const confirm = () => { if (pending) onPick(pending); };
-  return <Modal open onClose={onClose} size="md" flush title="원문" subtitle={docs.length ? undefined : '처리가 끝난 실제 문서가 아직 없습니다.'}
+  return <Modal open onClose={onClose} size="md" flush title="원문" subtitle={docs.length || docsError ? undefined : '처리가 끝난 실제 문서가 아직 없습니다.'}
     footer={<><button type="button" className="button-quiet cb-btn" onClick={onClose}>취소</button>
       <button type="button" className="button-primary cb-btn" disabled={!pending} onClick={confirm}>이 문서로 나누기</button></>}>
+    {docsError && <p className="cb-error" role="alert">실제 문서 목록을 불러오지 못했습니다. <button className="text-button" onClick={onRetry}>다시 시도</button></p>}
     <div className="cb-source-list" onDoubleClick={confirm} onKeyDown={event => { if (event.key === 'Enter' && pending) { event.preventDefault(); confirm(); } }}>
       <ListBox label="원문 목록" items={items} getKey={i => i.key} value={pending} onChange={key => setPending(key as SourceKey)} groupBy={i => i.group}
         render={item => <span className="cb-sopt">

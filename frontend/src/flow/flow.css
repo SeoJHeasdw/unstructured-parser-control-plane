@@ -566,3 +566,68 @@
   .ps-stage-numbers { padding: 5px 3px 0; text-align: left; border-top: 1px solid var(--line); }
   .ps-stage-list { padding-inline: 8px; }
 }
+
+/* Keep the canvas between two tool rows and a compact live status bar. */
+.shell-fill > .ps-root { min-height:0; }
+.ps-toolbar { flex-flow:row wrap; align-items:center; gap:5px 12px; padding:5px 10px; }
+.ps-title { gap:8px; }
+.ps-title-line h1 { font-size:clamp(16px,1.7cqw,20px); }
+.ps-title-copy :is(.ps-command-caption,.ps-run-state) { gap:5px; min-height:16px; font-size:11px; line-height:1.3; }
+.ps-title-copy .ps-command-caption svg { width:12px; height:12px; }
+.ps-flow-icon,.ps-back { height:32px; width:32px; border-radius:7px; }
+.ps-tools-global { flex:0 1 auto; gap:5px; }
+.ps-mode { padding:2px; }
+.ps-mode button { min-height:28px; padding-inline:8px; }
+.ps-toolbar :is(.ps-btn,.ps-icon) { min-height:32px; padding-inline:8px; }
+.ps-toolbar .ps-icon { width:32px; }
+.ps-parallel-trigger { color:var(--brand-ink); }
+.ps-command { flex-wrap:nowrap; align-items:center; gap:8px; padding:0 7px; }
+.ps-pages { flex:1 1 0%; min-width:0; gap:1px; padding:0; }
+.ps-pages,.ps-pages button { min-height:35px; }
+.ps-pages button { padding-inline:8px; }
+.ps-tools-mode { flex:0 0 auto; flex-wrap:nowrap; gap:3px; padding:2px 0 2px 8px; border-left:1px solid var(--line); }
+.ps-tools-mode :is(.ps-icon,.ps-btn,.ps-pill) { min-height:28px; padding-inline:6px; }
+.ps-tools-mode .ps-icon { width:28px; }
+.ps-tools-mode .ps-view-choice { padding:1px; }
+.ps-palette { width:48px; padding:4px; gap:2px; }
+.ps-palette.is-expanded { width:88px; }
+.ps-palette:not(.is-expanded) .ps-shape span { display:none; }
+.ps-palette:not(.is-expanded) .ps-shape { min-height:34px; padding:3px; }
+.ps-palette-toggle { display:grid; place-items:center; min-height:30px; padding:0; color:var(--ink3); background:none; border:none; border-bottom:1px solid var(--line); }
+.ps-canvas-footer { gap:7px; padding:2px 7px; min-height:33px; flex-wrap:wrap; }
+.ps-metrics { display:flex; flex-wrap:wrap; gap:3px; background:none; border:0; padding:0; }
+.ps-metric { min-height:25px; padding:1px 6px; gap:4px; border-color:transparent; background:none; }
+.ps-metric strong,.ps-metric-label { font-size:12px; }
+.ps-metric-mark { width:auto; height:auto; background:none; }
+.ps-metric-mark svg { width:13px; height:13px; }
+.ps-metric-arrow { display:none; }
+.ps-parallel-list { --line2:var(--rule-strong); --ink:var(--ink-1); --ink2:var(--ink-2); --ink3:var(--ink-3); --brand:var(--accent); display:grid; gap:0; }
+.ps-parallel-list .fi-number { display:flex; flex-direction:row; align-items:center; justify-content:space-between; gap:12px; padding-block:7px; margin:0; border-bottom:1px solid var(--rule); }
+.ps-parallel-list .fi-number:last-child { border:0; }
+.ps-parallel-list .fi-number > div { display:flex; flex:none; align-items:center; gap:5px; }
+.ps-parallel-list input { max-width:64px; }
+@container(max-width:960px) {
+  .ps-action-label,.ps-metric-mark { display:none; }
+}
+@container(max-width:745px) {
+  .ps-command { display:grid; grid-template-columns:minmax(0,1fr); gap:0; }
+  .ps-tools-mode { border-left:0; border-top:1px solid var(--line); padding:3px 0; overflow-x:auto; scrollbar-width:thin; }
+  .ps-tools-mode > * { flex-shrink:0; }
+  .ps-tools-mode .ps-inspector-trigger { margin-left:auto; }
+  .ps-canvas-footer .ps-footer-context { display:none; }
+  .ps-design .ps-canvas-footer .ps-footer-context { display:flex; }
+}
+@container(max-width:480px) {
+  .ps-toolbar { padding:4px 7px; }
+  .ps-title { flex:1 1 100%; }
+  .ps-tools-global { flex:1; }
+  .ps-tools-global .flow-fullscreen-toggle { margin-left:auto; padding-inline:6px; }
+  .ps-tools-global .flow-fullscreen-toggle span { display:none; }
+  .ps-canvas-footer { gap:2px; }
+  .ps-canvas-footer .ps-metric { padding-inline:3px; }
+  .ps-canvas-footer .ps-dock-toggle { padding-inline:3px; }
+}
+@media(pointer:coarse) {
+  .ps-toolbar :is(.ps-btn,.ps-icon,.ps-mode button),.ps-tools-mode :is(.ps-btn,.ps-icon,.ps-pill),.ps-pages button,.ps-shape,.ps-palette-toggle { min-height:44px; }
+  .ps-palette:not(.is-expanded) .ps-shape { min-height:44px; }
+}

@@ -115,6 +115,7 @@ Mock 모델과 로컬 API 상태명은 프로토타입 계약이다. 운영 계�
 | `frontend/src/flow/flowSim.ts` | 모의 운영 엔진: 하위 흐름을 펼친 실행 그래프, 유입·처리·실패·재시도·보류, 운영자 개입, 이벤트 기록 | 실제 작업 큐·워커 상태 API로 교체할 수 있도록 스냅숏·개입 메서드 형태를 유지 |
 | `frontend/src/flow/FlowCanvasParts.tsx`, `FlowInspector.tsx`, `FlowDock.tsx`, `FormatPanel.tsx`, `LiveFlowPanel.tsx` | 노드·플로팅 연결선, 설계/운영 상세 패널과 검증, 이벤트·문서 추적, 형식과 경로, 대시보드 처리 흐름 | 표시 컴포넌트는 엔진·저장소에 직접 의존하지 않고 props로 받음 |
 | `frontend/src/LineageView.tsx`, `lineage/*`, `api/lineage.ts` | 문서 계보 조립, 문서군 목록·판·포함 트리·참조·관계 그래프, hover 툴팁과 고정 상세 | 표시 전용. 관계 계산은 백엔드 `lineage.py` |
+| `frontend/src/ParserWorkspace.tsx`, `api/live.ts`, `backend/app/adapters/registry.py` | 실제 형식별 처리 경로·실행 환경 조회, 같은 형식의 문서 처리와 청킹 진입 | 로컬 레지스트리를 조회하고 사용자가 선택한 문서만 기존 처리 API로 접수한다. 설계는 별도 모의 플로우에서 편집한다. |
 | `frontend/src/ChunkBench.tsx`, `EmbeddingEval.tsx`, `retrieval/shared.tsx`, `api/retrieval.ts` | 청킹 비교, 임베딩 평가 실행·폴링·결과 행렬, 공유 툴팁·사이드 패널·프리셋 저장 | 청킹·평가 계산은 백엔드. 프리셋은 브라우저 저장값 |
 | `frontend/src/VectorDbWorkspace.tsx`, `vectordb/*`, `api/vectordb.ts` | 벡터 DB 트리·청크 표·스키마·상세 패널 | 조회 전용. Milvus 접근은 백엔드 `vectordb.py`만 |
 | `frontend/src/types.ts` | 화면이 사용하는 문서·관계 등 타입 | API DTO와 화면 표현 타입을 구분. ID, 처리 상태, 실제/예시 출처를 명시 |

@@ -64,12 +64,12 @@ const SAMPLES = [
   { id: 'report', name: '합성 점검 보고서', description: '그림이 많고 스캔 쪽이 하나 있음', composition: COMPOSITION, pages: 2 },
   { id: 'coa', name: '합성 시험 성적서', description: '표 위주', composition: { text: 3, table: 6, caption: 6 }, pages: 3 },
 ];
-const CONFIG = { connections: [], configured: false, specs: [{ id: '예시 모델', dims: 8, dims_note: '', max_tokens: 512, arch: '', pooling: '', query_prefix: '', doc_prefix: '', prefix_note: '', languages: '', note: '' }], strategies: {}, caps: { max_source_chars: 400000, max_bench_chunks: 10000 }, cache: { entries: 0, bytes: 0 } };
+const CONFIG = { connections: [], configured: false, specs: [{ id: '예시 모델', dims: 8, dims_note: '', max_tokens: 512, arch: '', pooling: '', query_prefix: '', doc_prefix: '', prefix_note: '', languages: '', note: '' }], strategies: {}, caps: { max_parallel_strategies: 4, max_source_chars: 400000, max_bench_chunks: 10000 }, cache: { entries: 0, bytes: 0 } };
 
-let fetchMock: ReturnType<typeof vi.fn>;
+let fetchMock: ReturnType<typeof vi.fn<(url: string, init?: RequestInit) => Promise<Response>>>;
 let store: Map<string, string>;
 const calls = (part: string) => fetchMock.mock.calls.filter(([url]) => String(url).includes(part));
-const lastChunkBody = () => JSON.parse(String(calls('/chunk').at(-1)![1].body)) as { source: { sample?: string }; strategies: { id: string; params: Record<string, unknown> }[]; limit_tokens: number | null };
+const lastChunkBody = () => JSON.parse(String(calls('/chunk').at(-1)?.[1]?.body)) as { source: { sample?: string }; strategies: { id: string; params: Record<string, unknown> }[]; limit_tokens: number | null; parallelism: number };
 beforeEach(() => {
   store = new Map<string, string>();
   vi.stubGlobal('localStorage', { getItem: (key: string) => store.get(key) ?? null, setItem: (key: string, value: string) => store.set(key, String(value)), removeItem: (key: string) => store.delete(key), clear: () => store.clear(), key: (index: number) => [...store.keys()][index] ?? null, get length() { return store.size; } });
@@ -138,6 +138,60 @@ describe('청킹 벤치', () => {
     expect(screen.queryByRole('dialog')).toBeNull();
     expect(screen.queryByRole('tooltip')).toBeNull();
     expect(calls('/tokens')).toHaveLength(0);
+  });
+
+  it('선택한 전략의 크기와 겹침, 동시 실행 수를 바로 변경하고 다시 열어 사용한다', async () => {
+    const user = userEvent.setup();
+    await ready();
+    await user.selectOptions(screen.getByLabelText('편집할 전략'), 'builtin-element-rows');
+    await user.selectOptions(screen.getByLabelText('길이 단위'), 'tokens');
+    const size = screen.getByLabelText('청크 크기');
+    await user.clear(size);
+    await user.type(size, '240{Enter}');
+    const overlap = screen.getByLabelText('겹침');
+    await user.clear(overlap);
+    await user.type(overlap, '150{Enter}');
+    expect(overlap).toHaveProperty('value', '120');
+    await user.selectOptions(screen.getByLabelText('전략 동시 실행'), '3');
+    await waitFor(() => expect(lastChunkBody().parallelism).toBe(3));
+    const params = () => lastChunkBody().strategies.find(s => s.id === 'builtin-element-rows')?.params;
+    expect(params()).toMatchObject({size:240, overlap:120, unit:'tokens', table:'rows'});
+    await user.click(screen.getByRole('button', {name:'전략 설정'}));
+    expect(within(screen.getByRole('dialog')).getByLabelText('전략 이름')).toHaveProperty('value','요소 인지 · 행 묶음');
+    cleanup();
+    await ready();
+    expect(screen.getByLabelText('전략 동시 실행')).toHaveProperty('value','3');
+    expect(params()).toMatchObject({size:240, overlap:120, unit:'tokens', table:'rows'});
+    expect(calls('/tokens')).toHaveLength(0);
+  });
+
+  it('서버가 병렬 비교를 제공하지 않으면 저장된 병렬 수가 있어도 순차 실행한다', async () => {
+    const serve = fetchMock.getMockImplementation()!;
+    fetchMock.mockImplementation((url: string, init?: RequestInit) => url.endsWith('/config')
+      ? Promise.resolve(new Response(JSON.stringify({...CONFIG, caps:{}}))) : serve(url, init));
+    store.set(STORE.bench, JSON.stringify({source:'sample:report', selected:['builtin-element'], parallelism:3}));
+    await ready();
+    expect(screen.getByLabelText('전략 동시 실행')).toHaveProperty('disabled',true);
+    expect(screen.getByText('현재 서버는 순차 실행만 지원')).toBeTruthy();
+    expect(lastChunkBody().parallelism).toBe(1);
+  });
+
+  it('첫 화면에서 전략을 빼고 특정 전략의 편집기로 바로 이동한다', async () => {
+    const user = userEvent.setup();
+    await ready();
+    await user.click(screen.getByRole('button', {name:'재귀 500자 비교 선택'}));
+    await waitFor(() => expect(lastChunkBody().strategies).toHaveLength(5));
+    await user.click(await screen.findByRole('button', {name:'고정 500자 설정 편집'}));
+    const dialog = screen.getByRole('dialog', {name:'전략 설정'});
+    expect(within(dialog).getByRole('textbox', {name:'전략 이름'})).toHaveProperty('value', '고정 500자');
+    await user.click(within(dialog).getByRole('button', {name:'완료'}));
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
+  it('지정한 실제 문서의 결과가 없으면 다른 예시로 청킹하지 않는다', async () => {
+    render(<ChunkBench active requestedSource="doc:missing"/>);
+    expect(await screen.findByText('선택한 원문을 불러올 수 없습니다')).toBeTruthy();
+    expect(calls('/chunk')).toHaveLength(0);
   });
 
   it('줄을 누르면 그 전략의 팝업: 청크 목록 + 상세, 문서 위 청크, 설정. Escape로 닫으면 그 줄로 초점이 돌아온다', async () => {

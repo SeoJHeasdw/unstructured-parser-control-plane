@@ -1,19 +1,22 @@
 import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import type { MouseEvent, ReactNode } from 'react';
-import { AlertCircle, ArrowLeft, ArrowRight, Boxes, ChevronRight, FlaskConical, FolderOpen, Layers3, Menu, PanelLeftClose, PanelLeftOpen, Search, Server, Settings2 } from 'lucide-react';
+import { AlertCircle, ArrowLeft, ArrowRight, Boxes, ChevronRight, FlaskConical, FolderOpen, Layers3, Maximize2, Minimize2, Menu, PanelLeftClose, PanelLeftOpen, Search, Server, Settings2 } from 'lucide-react';
 import Dashboard from './Dashboard';
 import LiveWorkspace from './LiveWorkspace';
 import ModelWorkspace from './ModelWorkspace';
 import SearchPipeline from './SearchPipeline';
+import { useFlowFullscreen } from './flow/useFlowFullscreen';
 import { FlowSimulator } from './flow/flowSim';
 import { loadLibrary } from './flow/flowTemplates';
 import { DocumentBrowser, DocumentDrawer, CompareView } from './DocumentViews';
+import { WorkspaceLink } from './WorkspaceLink';
 import { WorkspaceFinder } from './WorkspaceFinder';
 import { Modal } from './ui';
 import { destinations, examples, toolsList, useWorkspaceRoute, workspaceHref } from './navigation';
 import type { Page, WorkspaceRoute } from './navigation';
 import type { AppData, DocumentFilter } from './types';
 
+const ParserWorkspace = lazy(() => import('./ParserWorkspace'));
 const PipelineStudio = lazy(() => import('./PipelineStudio'));
 const LineageView = lazy(() => import('./LineageView'));
 const ChunkBench = lazy(() => import('./ChunkBench'));
@@ -27,7 +30,14 @@ export default function App() {
   const { route, go } = useWorkspaceRoute();
   const active = route.page;
   const info = destinations[active];
-  const example = examples.includes(active);
+  const flowPage = active === 'parsers' || active === 'pipeline';
+  const fullscreen = useFlowFullscreen(flowPage);
+  const fullscreenLabel = fullscreen.expanded ? '전체화면 종료' : '전체화면';
+  const FullscreenIcon = fullscreen.expanded ? Minimize2 : Maximize2;
+  const fullscreenButton = <button className="flow-fullscreen-toggle" onClick={fullscreen.toggle}
+    aria-pressed={fullscreen.expanded} aria-label={fullscreenLabel} title={fullscreen.expanded ? '전체화면 종료 (Esc)' : fullscreenLabel}>
+    <FullscreenIcon size={16} aria-hidden="true"/><span>{fullscreenLabel}</span></button>;
+  const example = examples.includes(active) || active === 'pipeline';
   const [visited, setVisited] = useState<Page[]>([active]);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [mobileMenu, setMobileMenu] = useState(false);
@@ -38,7 +48,6 @@ export default function App() {
   const [attempt, setAttempt] = useState(0);
   const [filter, setFilter] = useState<DocumentFilter>({});
   const [selected, setSelected] = useState<string | null>(null);
-  const [pipelineFormat, setPipelineFormat] = useState<{ format?: string; version: number }>({ version: 0 });
   const [simulator] = useState(() => new FlowSimulator(loadLibrary()));
   const content = useRef<HTMLDivElement>(null);
   const lastPage = useRef(active);
@@ -78,10 +87,12 @@ export default function App() {
   }, [active, route, finderOpen, mobileMenu]);
   function navigate(page: Page, nextFilter?: DocumentFilter) {
     if (page === 'documents' && nextFilter) setFilter(nextFilter);
-    if (page === 'pipeline' && nextFilter?.format) setPipelineFormat(prev => ({ format: nextFilter.format, version: prev.version + 1 }));
+    openRoute({ page, format: page === 'pipeline' ? nextFilter?.format : undefined });
+  }
+  function openRoute(next: WorkspaceRoute) {
     setMobileMenu(false); setFinderOpen(false); setSelected(null);
     focusContent.current = true;
-    go({ page });
+    go(next);
   }
   function link(event: MouseEvent<HTMLAnchorElement>, page: Page) {
     if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
@@ -91,17 +102,22 @@ export default function App() {
     return <a href={workspaceHref({ page })} onClick={e => link(e, page)} className={'shell-nav-item' + (isCurrent ? ' is-active' : '')}
       aria-current={isCurrent ? 'location' : undefined} aria-label={label} title={label}><Icon size={20} strokeWidth={1.75} aria-hidden="true"/>{expanded && <span>{label}</span>}</a>;
   }
+  const chunkSource = active !== 'chunking' ? undefined
+    : route.doc ? `doc:${route.doc}` as const : route.sample ? `sample:${route.sample}` as const : undefined;
   const nav = (expanded: boolean) => <nav className="shell-nav" aria-label="업무 메뉴">
     {navLink('live', '문서함', FolderOpen, active === 'live', expanded)}
+    {navLink('parsers', '파서 플로우', destinations.parsers.icon, active === 'parsers' || active === 'pipeline', expanded)}
+    {navLink('chunking', '청킹 비교', destinations.chunking.icon, active === 'chunking', expanded)}
+    <hr className="shell-nav-rule" />
     {navLink('analysis', '분석 도구', Boxes, info.group === '분석 도구', expanded)}
     {navLink('models', '설정', Settings2, active === 'models', expanded)}
-    <div className="shell-examples">{navLink('overview', '예시 둘러보기', FlaskConical, example, expanded)}</div>
+    <div className="shell-examples">{navLink('overview', '예시 둘러보기', FlaskConical, examples.includes(active), expanded)}</div>
   </nav>;
   const keep = (page: Page, child: ReactNode) => (active === page || visited.includes(page)) && <div hidden={active !== page} className={page === 'pipeline' ? 'shell-fill' : undefined}><Suspense fallback={<p role="status" className="workspace-empty">화면을 불러오는 중입니다.</p>}>{child}</Suspense></div>;
   function changeLive(next: WorkspaceRoute) {
     if (active === 'live') go(next);
   }
-  return <div className={'shell-root' + (sidebarOpen ? '' : ' shell-collapsed')}>
+  return <div className={'shell-root' + (sidebarOpen ? '' : ' shell-collapsed') + (flowPage ? ' shell-flow-page' : '') + (fullscreen.expanded ? ' shell-flow-fullscreen' : '')}>
     <a className="shell-skip" href="#workspace-content">본문으로 건너뛰기</a>
     <aside className="shell-sidebar" aria-label="주 탐색 메뉴">
       <div className="shell-brand"><span className="shell-mark"><Layers3 size={24} aria-hidden="true"/></span>
@@ -114,28 +130,30 @@ export default function App() {
     <main className="shell-main">
       <header className="shell-header"><div className="shell-topbar">
         <button className="shell-menu-toggle" aria-label="탐색 메뉴 열기" aria-expanded={mobileMenu} onClick={() => setMobileMenu(true)}><Menu size={21}/></button>
-        <div className="shell-breadcrumb" aria-label="현재 위치"><span>{info.group}</span>{info.group !== info.label && <><ChevronRight size={14}/><strong>{info.label}</strong></>}{active === 'live' && route.doc && <><ChevronRight size={14}/><strong>{route.review ? '결과 검수' : '문서 상세'}</strong></>}</div>
+        <div className="shell-breadcrumb" aria-label="현재 위치">{active === 'pipeline' ? <WorkspaceLink to={{page:'parsers', format:route.format}} onNavigate={openRoute} aria-label="실제 파서 플로우"><ArrowLeft size={15}/>파서 플로우</WorkspaceLink> : <span>{info.group}</span>}{info.group !== info.label && <><ChevronRight size={14}/><strong>{info.label}</strong></>}{active === 'live' && route.doc && <><ChevronRight size={14}/><strong>{route.review ? '결과 검수' : '문서 상세'}</strong></>}</div>
         <div className="shell-top-right">{uploading && active !== 'live' && <a href={workspaceHref({page:'live'})} onClick={e => link(e, 'live')}>파일 저장 중</a>}
           {example && <span className="workspace-source"><FlaskConical size={15}/>예시 데이터</span>}
           <button className="shell-finder-trigger" aria-label="화면 찾기" aria-keyshortcuts="Meta+K Control+K" onClick={() => setFinderOpen(true)}><Search size={17}/><span>화면 찾기</span><kbd>{shortcut}</kbd></button></div>
       </div></header>
       <div id="workspace-content" ref={content} tabIndex={-1} className={'shell-content' + (active === 'pipeline' ? ' is-fill' : '')}>
         {toolsList.includes(active) && <a className="workspace-back" href={workspaceHref({page:'analysis'})} onClick={e => link(e, 'analysis')}><ArrowLeft size={15}/>분석 도구로</a>}
-        {example && <nav className="example-nav" aria-label="예시 둘러보기">{examples.map(page => <a key={page} href={workspaceHref({page})} aria-current={active === page ? 'page' : undefined} onClick={e => link(e, page)}>{destinations[page].label}</a>)}</nav>}
-        {active !== 'live' && active !== 'pipeline' && <div className="shell-title-row"><h1 tabIndex={-1}>{info.label}</h1></div>}
+        {examples.includes(active) && <nav className="example-nav" aria-label="예시 둘러보기">{examples.map(page => <a key={page} href={workspaceHref({page})} aria-current={active === page ? 'page' : undefined} onClick={e => link(e, page)}>{destinations[page].label}</a>)}</nav>}
+        {active !== 'live' && active !== 'pipeline' && <div className="shell-title-row"><div><h1 tabIndex={-1}>{info.label}</h1>{active === 'parsers' && <p>파일 형식별 처리 경로와 로컬 문서의 파싱 상태를 확인하세요.</p>}{active === 'chunking' && <p>같은 원문에서 전략을 바꿔 가며 청크의 크기와 표·그림 보존 결과를 비교하세요.</p>}</div>
+          {active === 'parsers' && <div className="shell-flow-actions"><WorkspaceLink className="button-secondary" to={{page:'pipeline', mode:'design'}} onNavigate={openRoute}><FlaskConical size={16}/>모의 플로우 설계</WorkspaceLink>{fullscreenButton}</div>}</div>}
         {active === 'analysis' && <div className="tools-directory">{toolsList.map(page => {
           const tool = destinations[page], Icon = tool.icon;
           return <a key={page} href={workspaceHref({page})} onClick={e => link(e, page)}><Icon size={22} strokeWidth={1.75}/><span><strong>{tool.label}</strong><small>{tool.description}</small></span><ArrowRight size={17}/></a>;
         })}</div>}
-        {keep('live', <LiveWorkspace active={active === 'live'} route={route} onRoute={changeLive} onUploadStateChange={setUploading} onFamily={id => go({ page: 'relations', familyDoc: id })}/>)}
+        {keep('live', <LiveWorkspace active={active === 'live'} route={route} onRoute={changeLive} onNavigate={openRoute} onUploadStateChange={setUploading} onFamily={id => go({ page: 'relations', familyDoc: id })}/>)}
         {example && !data && active !== 'pipeline' && <div className="panel shell-loading" role={mockError ? 'alert' : 'status'}><AlertCircle size={21}/><p>{mockError ? '예시 데이터를 불러오지 못했습니다.' : '예시 데이터를 불러오는 중입니다.'}</p>{mockError && <button className="button-secondary" onClick={() => setAttempt(n => n + 1)}>다시 시도</button>}</div>}
         {active === 'overview' && data && <Dashboard docs={data.documents} onOpenDoc={setSelected} onNavigate={navigate}/>}
         {data && keep('documents', <DocumentBrowser docs={data.documents} filter={filter} onFilterChange={setFilter} onOpenDoc={setSelected} onPipeline={format => navigate('pipeline', {format})}/>)}
-        {keep('pipeline', <PipelineStudio key={pipelineFormat.version} active={active === 'pipeline'} simulator={simulator} formats={[...new Set(data?.documents.map(d => d.format) ?? [])]} initialFormat={pipelineFormat.format} onOpenDocuments={format => navigate('documents', {format: format || '확장자 없음'})} onOpenLiveDocuments={() => navigate('live')}/>)}
+        {active === 'parsers' && <ParserWorkspace format={route.format} onNavigate={go}/>}
+        {keep('pipeline', <PipelineStudio fullscreenControl={fullscreenButton} active={active === 'pipeline'} simulator={simulator} formats={[...new Set(data?.documents.map(d => d.format) ?? [])]} initialFormat={active === 'pipeline' ? route.format : undefined} mode={route.mode ?? 'monitor'} onModeChange={mode => go({...route, mode:mode === 'design' ? mode : undefined})} onOpenDocuments={format => navigate('documents', {format: format || '확장자 없음'})} onOpenLiveDocuments={() => navigate('live')}/>)}
         {active === 'compare' && data && <CompareView docs={data.documents} selectedId={route.doc ?? 'DOC-0842'} onChange={doc => go({page:'compare', doc})} onOpenDoc={setSelected}/>}
         {keep('relations', <LineageView active={active === 'relations'} documentId={route.familyDoc} onOpenLive={doc => doc ? go({page:'live', doc, tab:'structure'}) : navigate('live')}/>)}
         {keep('search', <SearchPipeline active={active === 'search'} onNavigate={navigate}/>)}
-        {keep('chunking', <ChunkBench active={active === 'chunking'}/>)}
+        {keep('chunking', <ChunkBench active={active === 'chunking'} requestedSource={chunkSource} onSourceChange={key => go(key.startsWith('doc:') ? {page:'chunking',doc:key.slice(4)} : {page:'chunking',sample:key.slice(7)})}/>)}
         {keep('embedding', <EmbeddingEval active={active === 'embedding'}/>)}
         {keep('vectordb', <VectorDbWorkspace active={active === 'vectordb'}/>)}
         {keep('models', <ModelWorkspace/>)}

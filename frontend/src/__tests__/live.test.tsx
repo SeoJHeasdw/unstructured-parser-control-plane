@@ -24,6 +24,35 @@ afterEach(()=>{cleanup();vi.unstubAllGlobals();vi.restoreAllMocks()});
 beforeEach(()=>{history.replaceState(null, '', '/');vi.stubGlobal('fetch',vi.fn(async()=>{throw new Error('예상하지 못한 네트워크 호출')}))});
 
 describe('실제 문서 로컬 작업 공간',()=>{
+  it('실제 문서에서 이전 성공본을 청킹하면 그 문서 ID로만 나누고 뒤로가기로 복귀한다', async () => {
+    const sample = {id:'report',name:'예시 보고서',description:'',composition:{},pages:null};
+    const staleDoc = {...uploaded, status:'failed' as const, error:'최근 실행 실패'};
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const path = String(input);
+      if (path === url) return jsonResponse({documents:[staleDoc]});
+      if (path === detailUrl) return jsonResponse(staleDoc);
+      if (path === detailUrl + '/result') return jsonResponse({id:uploaded.id,markdown:'이전 본문',parser:'python-text',parser_version:'1',is_stale:true,warnings:[]});
+      if (path === detailUrl + '/runs') return jsonResponse({runs:[]});
+      if (path.endsWith('/retrieval/documents')) return jsonResponse({documents:[{...staleDoc,is_stale:true}]});
+      if (path.endsWith('/retrieval/samples')) return jsonResponse({samples:[sample]});
+      if (path.endsWith('/retrieval/config')) return jsonResponse({connections:[],specs:[]});
+      if (path.endsWith('/retrieval/chunk')) return jsonResponse({source:{name:uploaded.name,is_stale:true,elements:[],composition:{}},results:[]});
+      throw new Error(path + ' ' + init?.method);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    history.replaceState(null, '', '?view=live&doc=' + uploaded.id);
+    const user = userEvent.setup();
+    render(<App/>);
+    await user.click(await screen.findByRole('link', {name:'이전 성공본 청킹'}));
+    expect(location.search).toBe('?view=chunking&doc=' + uploaded.id);
+    expect(await screen.findByText('이전 처리 결과')).toBeTruthy();
+    await waitFor(() => expect(fetchMock.mock.calls.some(([path]) => String(path).endsWith('/retrieval/chunk'))).toBe(true));
+    const bodies = fetchMock.mock.calls.filter(([path]) => String(path).endsWith('/retrieval/chunk')).map(([,init]) => JSON.parse(String(init?.body)));
+    expect(bodies.every(body => body.source.doc_id === uploaded.id && !body.source.sample)).toBe(true);
+    expect(fetchMock.mock.calls.some(([path]) => String(path).endsWith('/process'))).toBe(false);
+    history.back();
+    expect(await screen.findByRole('link', {name:'이전 성공본 청킹'})).toBeTruthy();
+  });
   it('앞서 시작한 목록 조회가 늦게 끝나도 방금 저장한 파일을 유지한다', async () => {
     let resolveList!: (response: Response) => void;
     const pendingList = new Promise<Response>(resolve => { resolveList = resolve; });
@@ -58,7 +87,7 @@ describe('실제 문서 로컬 작업 공간',()=>{
     render(<App />);
     await screen.findByText('업로드된 문서가 없습니다');
     await user.upload(screen.getByLabelText('로컬에 업로드할 파일 선택'), [new File(['첫 파일'], uploaded.name), new File(['둘째 파일'], second.name)]);
-    const nav = within(screen.getByRole('navigation'));
+    const nav = within(screen.getByRole('navigation', {name:'업무 메뉴'}));
     await user.click(nav.getByRole('link', { name: '분석 도구' }));
     expect(screen.getByRole('link', { name: '파일 저장 중' })).toBeTruthy();
     await act(async () => { resolveUpload(jsonResponse(uploaded, 201)); });

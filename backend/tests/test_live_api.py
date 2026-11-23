@@ -30,6 +30,18 @@ def wait_status(client, doc_id, expected, timeout=5):
         time.sleep(0.01)
     raise AssertionError(f"Expected {expected}, last document: {doc}")
 
+def test_parser_catalog_reports_local_routing_without_running_a_job(client):
+    catalog = client.get('/api/live/parsers').json()
+    assert catalog["routes"]["PDF"] == catalog["routes"]["XLSX"] == "docling"
+    assert catalog["routes"]["JPEG"] == "easyocr"
+    assert catalog["routes"]["SVG"] == "python-svg"
+    assert catalog["routes"]["CSV"] == "python-csv"
+    assert catalog["routes"]["TXT"] == "python-text"
+    assert "ZIP" not in catalog["routes"]
+    assert isinstance(catalog["ocr_models_found"], bool)
+    assert client.get('/api/live/documents').json() == {"documents": []}
+
+
 def test_text_upload_requires_explicit_processing_and_returns_real_result(client):
     assert client.get('/api/health').json() == {'status': 'ok', 'mode': 'local', 'mock_data': 'available', 'live_processing': 'available'}
     assert client.get('/api/live/documents').json() == {'documents': []}

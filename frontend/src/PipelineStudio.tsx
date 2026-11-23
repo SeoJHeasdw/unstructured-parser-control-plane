@@ -1,8 +1,9 @@
+import type { ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState, useSyncExternalStore } from 'react';
 import { applyEdgeChanges, applyNodeChanges, Background, BackgroundVariant, ConnectionLineType, ConnectionMode, getNodesBounds, getViewportForBounds, MiniMap, Panel, ReactFlow, ReactFlowProvider, SelectionMode, useReactFlow, useViewport } from '@xyflow/react';
 import type { Connection, EdgeChange, FinalConnectionState, FitViewOptions, NodeChange, NodeMouseHandler, XYPosition } from '@xyflow/react';
-import { Activity, ArrowLeft, ArrowRight, ArrowUpRight, Check, CircleHelp, CirclePause, CirclePlay, Clock3, LayoutGrid, List, ListTree, Maximize, Minus, PanelBottomClose, PanelBottomOpen, PanelRightClose, PanelRightOpen, PenTool, Plus, Redo2, RotateCcw, Rows3, TriangleAlert, Undo2, Workflow, X } from 'lucide-react';
+import { Activity, ArrowLeft, ArrowRight, ArrowUpRight, Check, CircleHelp, CirclePause, CirclePlay, Clock3, Columns2, LayoutGrid, List, ListTree, Maximize, Minus, PanelBottomClose, PanelBottomOpen, PanelRightClose, PanelRightOpen, PenTool, Plus, Redo2, RotateCcw, Rows3, TriangleAlert, Undo2, Workflow, X } from 'lucide-react';
 import '@xyflow/react/dist/style.css';
 import './flow/flow.css';
 import { listLiveDocuments } from './api/live';
@@ -10,7 +11,7 @@ import { ArrowDefs, edgeRoute, distanceToPath, FlowEdgeView, FlowNodeView, FlowU
 import type { FlowUI } from './flow/FlowCanvasParts';
 import FlowDock from './flow/FlowDock';
 import type { DockState } from './flow/FlowDock';
-import { DesignInspector, getAttentionStages, MonitorInspector, validateFlow } from './flow/FlowInspector';
+import { DesignInspector, getAttentionStages, MonitorInspector, ParallelSettings, validateFlow } from './flow/FlowInspector';
 import { autoLayout, NODE_SIZE, sizeOf, snap } from './flow/flowLayout';
 import { aggregate, FlowSimulator, rid } from './flow/flowSim';
 import type { NodeMetric } from './flow/flowSim';
@@ -19,7 +20,7 @@ import type { EditorMode, FlowDirection, FlowDoc, FlowEdge, FlowEdgeData, FlowLi
 import FormatPanel, { displayFormat, normalizeFormat } from './flow/FormatPanel';
 import { Modal } from './ui';
 
-type Props = { formats: string[]; onOpenDocuments: (format: string) => void; onOpenLiveDocuments?: () => void; initialFormat?: string; active?: boolean; simulator?: FlowSimulator; focus?: { flowId: string; nodeId?: string; n: number } };
+type Props = { fullscreenControl?: ReactNode; formats: string[]; onOpenDocuments: (format: string) => void; onOpenLiveDocuments?: () => void; initialFormat?: string; mode?: EditorMode; onModeChange?: (mode: EditorMode) => void; active?: boolean; simulator?: FlowSimulator; focus?: { flowId: string; nodeId?: string; n: number } };
 
 const nodeTypes = { flow: FlowNodeView };
 const edgeTypes = { flow: FlowEdgeView };
@@ -46,15 +47,17 @@ export default function PipelineStudio(props: Props) {
   return <ReactFlowProvider><Studio {...props} /></ReactFlowProvider>;
 }
 
-function Studio({ formats, onOpenDocuments, onOpenLiveDocuments, initialFormat, active = true, simulator, focus }: Props) {
+function Studio({ fullscreenControl, formats, onOpenDocuments, onOpenLiveDocuments, initialFormat, mode: requestedMode, onModeChange, active = true, simulator, focus }: Props) {
   const [library, setLibraryState] = useState<FlowLibrary>(loadLibrary);
   const [ownSim] = useState(() => simulator ? null : new FlowSimulator(library));
   const sim = simulator ?? ownSim!;
   const initialExt = initialFormat !== undefined ? normalizeFormat(initialFormat) : null;
   const [flowId, setFlowId] = useState(() => (initialExt !== null && formatRoutes(library)[initialExt]) || OVERVIEW_ID);
   const [pendingExt, setPendingExt] = useState<string | null>(() => initialExt !== null && !formatRoutes(library)[initialExt] ? initialExt : null);
-  const [mode, setMode] = useState<EditorMode>('monitor');
-  const [monitorView, setMonitorView] = useState<'graph' | 'list'>(() => window.matchMedia?.('(max-width: 720px), (max-height: 730px)').matches ? 'list' : 'graph');
+  const [localMode, setLocalMode] = useState<EditorMode>('monitor');
+  const mode = requestedMode ?? localMode;
+  const setMode = onModeChange ?? setLocalMode;
+  const [monitorView, setMonitorView] = useState<'graph' | 'list'>(() => window.matchMedia?.('(max-width: 720px)').matches ? 'list' : 'graph');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [hoveredEdge, setHoveredEdgeState] = useState<string | null>(null);
   const [dropEdge, setDropEdge] = useState<string | null>(null);
@@ -64,6 +67,8 @@ function Studio({ formats, onOpenDocuments, onOpenLiveDocuments, initialFormat, 
   const [dockTab, setDockTab] = useState<'events' | 'docs'>('events');
   const [dockState, setDockState] = useState<DockState>('all');
   const [dockQuery, setDockQuery] = useState('');
+  const [parallelOpen, setParallelOpen] = useState(false);
+  const [paletteExpanded, setPaletteExpanded] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
   const [formatsOpen, setFormatsOpen] = useState(() => pendingExt !== null);
   const [notice, setNotice] = useState('');
@@ -96,6 +101,7 @@ function Studio({ formats, onOpenDocuments, onOpenLiveDocuments, initialFormat, 
 
   /* ----- 저장 · 동기화 ----- */
   useEffect(() => { const timer = window.setTimeout(() => saveLibrary(library), 250); return () => window.clearTimeout(timer); }, [library]);
+  useEffect(() => () => saveLibrary(libRef.current), []);
   const structure = useMemo(() => JSON.stringify(library.order.map(id => { const doc = library.flows[id]; return [id, doc.title, doc.nodes.map(node => [node.id, node.data]), doc.edges.map(edge => [edge.id, edge.source, edge.target, edge.data])]; })), [library]);
   useEffect(() => { sim.setLibrary(libRef.current); }, [structure, sim]);
   useEffect(() => { if (!active || mode !== 'monitor') return; return sim.acquire(); }, [active, mode, sim]);
@@ -308,6 +314,13 @@ function Studio({ formats, onOpenDocuments, onOpenLiveDocuments, initialFormat, 
     setView(prev => ({ nodeId, n: prev.n + 1 }));
   }, [apply]);
 
+  useEffect(() => {
+    if (!active) return;
+    const id = initialExt === null ? OVERVIEW_ID : formatRoutes(libRef.current)[initialExt];
+    setPendingExt(id ? null : initialExt);
+    openFlow(id || OVERVIEW_ID);
+    if (!id) setFormatsOpen(true);
+  }, [active, initialExt, openFlow]);
   useEffect(() => { if (focus) { setMode('monitor'); openFlow(focus.flowId, focus.nodeId); } }, [focus?.n]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const createRoute = useCallback((ext: string) => {
@@ -316,7 +329,7 @@ function Studio({ formats, onOpenDocuments, onOpenLiveDocuments, initialFormat, 
     if (result.library !== libRef.current) commit(() => result.library);
     setPendingExt(null); setMode('design'); openFlow(result.flowId);
     setNotice(`${displayFormat(ext)} 흐름을 만들고 전체 흐름의 라우팅에 연결했습니다. 실제 파서는 등록되지 않습니다.`);
-  }, [commit, openFlow]);
+  }, [commit, openFlow, setMode]);
   const addManual = useCallback((value: string) => {
     const ext = normalizeFormat(value);
     if (!/^[A-Z0-9]{1,20}$/.test(ext)) return '영문과 숫자 1~20자로 입력해 주세요.';
@@ -461,8 +474,12 @@ function Studio({ formats, onOpenDocuments, onOpenLiveDocuments, initialFormat, 
             ? <button type="button" className="ps-back" onClick={() => openFlow(OVERVIEW_ID)} aria-label="뒤로가기" aria-keyshortcuts="Escape" title="전체 처리 흐름으로 돌아가기 (Esc)"><ArrowLeft size={20} aria-hidden="true" /></button>
             : <span className="ps-flow-icon" aria-hidden="true"><Workflow size={23} strokeWidth={1.7} /></span>}
           <div className="ps-title-copy">
-            <div className="ps-title-line"><h1 tabIndex={-1}>{flow.title}</h1></div>
-            <p>{flow.summary}</p>
+            <div className="ps-title-line" title={flow.summary}><h1 tabIndex={-1}>{flow.title}</h1></div>
+            {design
+          ? <div className="ps-command-caption"><PenTool size={15} aria-hidden="true" /><span>모의 설계 · 브라우저 저장</span></div>
+          : <div className={`ps-run-state ${snapshot.running ? 'is-running' : 'is-paused'}`}>
+              <i aria-hidden="true" /><strong>{snapshot.running ? '모의 운영 중' : '모의 운영 일시정지'}</strong><time>{snapshot.clock}</time>
+            </div>}
           </div>
         </div>
         <div className="ps-tools ps-tools-global">
@@ -471,15 +488,23 @@ function Studio({ formats, onOpenDocuments, onOpenLiveDocuments, initialFormat, 
             <button className={design ? 'is-on' : ''} aria-pressed={design} onClick={() => setMode('design')}><PenTool size={16} aria-hidden="true" /> 설계</button>
           </div>
           <button className={`ps-btn ${formatsOpen ? 'is-on' : ''}`} onClick={() => setFormatsOpen(true)} aria-haspopup="dialog"><ListTree size={16} aria-hidden="true" /> 형식 · 경로</button>
+          <button className="ps-btn ps-parallel-trigger" onClick={() => setParallelOpen(true)} aria-haspopup="dialog"><Columns2 size={16} aria-hidden="true"/>병렬 설정</button>
+          {fullscreenControl}
           <button className="ps-icon ps-guide-trigger" onClick={() => setHelpOpen(true)} aria-label="처리 흐름 사용 방법" title="처리 흐름 사용 방법" aria-haspopup="dialog"><CircleHelp size={19} strokeWidth={1.7} /></button>
         </div>
       </header>
       <div className={`ps-command ${design ? 'is-design' : 'is-monitor'}`}>
-        {design
-          ? <div className="ps-command-caption"><PenTool size={15} aria-hidden="true" /><span>설계 변경은 이 브라우저에 저장됩니다.</span></div>
-          : <div className={`ps-run-state ${snapshot.running ? 'is-running' : 'is-paused'}`}>
-              <i aria-hidden="true" /><strong>{snapshot.running ? '모의 운영 중' : '모의 운영 일시정지'}</strong><time>{snapshot.clock}</time>
-            </div>}
+        <nav className="ps-pages" aria-label="흐름 페이지" ref={pagesRef}>
+          {library.order.map(id => {
+            const status = flowStatus[id]?.status ?? 'idle';
+            const alerts = (flowStatus[id]?.failed ?? 0) + (flowStatus[id]?.held ?? 0);
+            return <button key={id} className={id === flowId ? 'is-on' : ''} aria-current={id === flowId ? 'page' : undefined} onClick={() => openFlow(id)}>
+              {id === OVERVIEW_ID ? <Workflow size={15} aria-hidden="true" /> : !design && <i className={`fx-dot is-${status}`} aria-hidden="true" />}
+              {library.flows[id].title}{!design && alerts > 0 && <b className={`is-${status}`} title={`보류·실패 ${alerts}건`}>{alerts}</b>}
+            </button>;
+          })}
+          <button className="ps-page-add" onClick={() => setFormatsOpen(true)} aria-label="새 형식 경로 추가" title="새 형식 경로 추가" aria-haspopup="dialog"><Plus size={17} /></button>
+        </nav>
         <div className="ps-tools ps-tools-mode">
           {!design && <div className="ps-view-choice" role="group" aria-label="흐름 보기 방법">
             <button className="ps-btn" aria-pressed={monitorView === 'graph'} onClick={() => setMonitorView('graph')}><Workflow size={16} aria-hidden="true" /> 흐름도</button>
@@ -490,8 +515,8 @@ function Studio({ formats, onOpenDocuments, onOpenLiveDocuments, initialFormat, 
               <button className="ps-icon" onClick={undo} disabled={!history.current.past.length} aria-keyshortcuts="Meta+Z Control+Z" aria-label="되돌리기" title="되돌리기 (Ctrl/⌘+Z)"><Undo2 size={17} /></button>
               <button className="ps-icon" onClick={redo} disabled={!history.current.future.length} aria-keyshortcuts="Meta+Shift+Z Control+Shift+Z Control+Y" aria-label="다시 실행" title="다시 실행 (Ctrl/⌘+Shift+Z)"><Redo2 size={17} /></button>
             </div>
-            <button className="ps-btn" onClick={() => layout('TB')} aria-label="세로 자동 정렬" title="세로(위→아래) 자동 정렬"><LayoutGrid size={15} aria-hidden="true" /> 세로 정렬</button>
-            <button className="ps-btn" onClick={() => layout('LR')} aria-label="가로 자동 정렬" title="가로(왼쪽→오른쪽) 자동 정렬"><Rows3 size={15} aria-hidden="true" /> 가로 정렬</button>
+            <button className="ps-btn" onClick={() => layout('TB')} aria-label="세로 자동 정렬" title="세로(위→아래) 자동 정렬"><LayoutGrid size={15} aria-hidden="true" /><span className="ps-action-label">세로 정렬</span></button>
+            <button className="ps-btn" onClick={() => layout('LR')} aria-label="가로 자동 정렬" title="가로(왼쪽→오른쪽) 자동 정렬"><Rows3 size={15} aria-hidden="true" /><span className="ps-action-label">가로 정렬</span></button>
             <button className={`ps-pill ${issues.length ? 'is-warn' : 'is-ok'}`} onClick={() => { selectInFlow(); setInspectorOpen(true); }} title="검증 결과 보기">{issues.length ? <><TriangleAlert size={15} aria-hidden="true" /> 검증 {issues.length}</> : <><Check size={15} aria-hidden="true" /> 검증 통과</>}</button>
           </> : <>
             {attention.length > 0 && <button className="ps-pill is-warn" onClick={() => { selectInFlow(); setInspectorOpen(true); }}>
@@ -505,32 +530,12 @@ function Studio({ formats, onOpenDocuments, onOpenLiveDocuments, initialFormat, 
       </div>
       {pendingExt !== null && <div className="ps-banner" role="status"><TriangleAlert size={15} /><span><b>{displayFormat(pendingExt)}</b> 형식은 아직 처리 경로가 없어 <b>형식 확인 대기열</b>로 모입니다.</span><button className="ps-btn is-primary" onClick={() => createRoute(pendingExt)} disabled={!pendingExt}><Plus size={13} /> {displayFormat(pendingExt)} 경로 만들기</button><button className="ps-icon" onClick={() => setPendingExt(null)} aria-label="안내 닫기"><X size={14} /></button></div>}
 
-      <div className="ps-flow-tabs">
-        <nav className="ps-pages" aria-label="흐름 페이지" ref={pagesRef}>
-          {library.order.map(id => {
-            const status = flowStatus[id]?.status ?? 'idle';
-            const alerts = (flowStatus[id]?.failed ?? 0) + (flowStatus[id]?.held ?? 0);
-            return <button key={id} className={id === flowId ? 'is-on' : ''} aria-current={id === flowId ? 'page' : undefined} onClick={() => openFlow(id)}>
-              {id === OVERVIEW_ID ? <Workflow size={15} aria-hidden="true" /> : !design && <i className={`fx-dot is-${status}`} aria-hidden="true" />}
-              {library.flows[id].title}{!design && alerts > 0 && <b className={`is-${status}`} title={`보류·실패 ${alerts}건`}>{alerts}</b>}
-            </button>;
-          })}
-          <button className="ps-page-add" onClick={() => setFormatsOpen(true)} aria-label="새 형식 경로 추가" title="새 형식 경로 추가" aria-haspopup="dialog"><Plus size={17} /></button>
-        </nav>
-      </div>
       <div className="ps-body">
-        {design && <aside className="ps-palette" aria-label="도형">
+        {design && <aside className={'ps-palette' + (paletteExpanded ? ' is-expanded' : '')} aria-label="도형">
+          <button className="ps-palette-toggle" aria-label={paletteExpanded ? '도형 이름 숨기기' : '도형 이름 표시'} aria-expanded={paletteExpanded} title={paletteExpanded ? '도형 이름 숨기기' : '도형 이름 표시'} onClick={() => setPaletteExpanded(!paletteExpanded)}><List size={17}/></button>
           {PALETTE.map(kind => { const Icon = KIND_META[kind].icon; return <button key={kind} className={`ps-shape is-${kind}`} draggable onDragStart={event => { event.dataTransfer.setData(DND, kind); event.dataTransfer.effectAllowed = 'copy'; }} onClick={() => addNode(kind)} aria-label={`${KIND_META[kind].label} 추가`} title={`${KIND_META[kind].label} — ${KIND_META[kind].hint}. 끌어 놓거나 눌러 추가`}><Icon size={18} /><span>{KIND_META[kind].label}</span></button>; })}
         </aside>}
         <div className="ps-center">
-          {!design && scopedMetrics && <div className="ps-metrics" role="group" aria-label={flow.id === OVERVIEW_ID ? '전체 흐름 문서 상태' : `${flow.title} 상태 요약`}>
-            {TRACKED_STATES.map(({ key, label, icon: Icon }) => <button key={key} className={`ps-metric is-${key}`} onClick={() => trackDocuments(key)}
-              aria-pressed={dockOpen && dockTab === 'docs' && dockState === key} title={`${label} 문서 추적`}>
-              <span className="ps-metric-mark"><Icon size={16} strokeWidth={1.8} aria-hidden="true" /></span>
-              <span className="ps-metric-label">{label}</span><strong>{scopedMetrics[key].toLocaleString('ko-KR')}</strong>
-              <ArrowRight className="ps-metric-arrow" size={14} aria-hidden="true" />
-            </button>)}
-          </div>}
           <div className="ps-canvas" hidden={!showGraph} role="region" aria-label="처리 흐름 캔버스" ref={canvasRef} onDragOver={onDragOver} onDragLeave={() => setDropEdge(null)} onDrop={onDrop}>
             <ReactFlow<FlowNode, FlowEdge>
               nodes={flow.nodes} edges={labeledEdges} nodeTypes={nodeTypes} edgeTypes={edgeTypes}
@@ -564,6 +569,14 @@ function Studio({ formats, onOpenDocuments, onOpenLiveDocuments, initialFormat, 
               <span>{flow.edges.length}개 연결</span>
               {flowFormats.length > 0 && <span className="ps-format-summary" title={flowFormats.join(', ')}>{flowFormats.join(' · ')}</span>}
             </div>
+          {!design && scopedMetrics && <div className="ps-metrics" role="group" aria-label={flow.id === OVERVIEW_ID ? '전체 흐름 문서 상태' : `${flow.title} 상태 요약`}>
+            {TRACKED_STATES.map(({ key, label, icon: Icon }) => <button key={key} className={`ps-metric is-${key}`} onClick={() => trackDocuments(key)}
+              aria-pressed={dockOpen && dockTab === 'docs' && dockState === key} title={`${label} 문서 추적`}>
+              <span className="ps-metric-mark"><Icon size={16} strokeWidth={1.8} aria-hidden="true" /></span>
+              <span className="ps-metric-label">{label}</span><strong>{scopedMetrics[key].toLocaleString('ko-KR')}</strong>
+              <ArrowRight className="ps-metric-arrow" size={14} aria-hidden="true" />
+            </button>)}
+          </div>}
             {!design && <button className={`ps-dock-toggle ${dockOpen ? 'is-on' : ''}`} onClick={() => setDockOpen(open => !open)} aria-expanded={dockOpen}
               aria-label={dockOpen ? '운영 기록 접기' : '운영 기록 펼치기'}>
               {dockOpen ? <PanelBottomClose size={17} aria-hidden="true" /> : <PanelBottomOpen size={17} aria-hidden="true" />}운영 기록
@@ -584,12 +597,19 @@ function Studio({ formats, onOpenDocuments, onOpenLiveDocuments, initialFormat, 
         </aside>}
       </div>
 
+      {active && parallelOpen && <Modal open title="단계별 병렬 설정" size="md" onClose={() => setParallelOpen(false)}
+        subtitle={flow.title + (design ? ' · 모의 설계에 저장할 기본 동시 처리 수' : ' · 현재 모의 운영에 적용할 동시 처리 수')}>
+        <ParallelSettings flow={flow} metrics={viewMetrics} design={design} onChange={(id, capacity) => {
+          if (design) setNodeData(id, {capacity});
+          else sim.setCapacity(rid(flow.id, id), capacity);
+        }}/>
+      </Modal>}
       {active && formatsOpen && <FormatPanel library={library} routes={routes} mockFormats={formats} manual={manual} liveCounts={liveCounts} liveFailed={liveFailed} highlight={pendingExt}
         onRefresh={() => setRefreshId(value => value + 1)} onAddManual={addManual} onOpenFlow={id => openFlow(id)} onCreateRoute={createRoute}
         onOpenDocuments={ext => onOpenDocuments(ext)} onOpenLive={onOpenLiveDocuments} onClose={() => setFormatsOpen(false)} />}
       {active && helpOpen && <Modal open title="처리 흐름 사용 방법" size="md" onClose={() => setHelpOpen(false)}>
         <div className="ps-guide">
-          <section><div className="ps-guide-icon"><Activity size={19} aria-hidden="true" /></div><div><h3>운영</h3><p>단계를 선택해 지표, 문서, 개입 방법을 확인하세요. 상단의 문서 상태를 누르면 하단의 문서 추적이 열립니다.</p><p>상단의 보기 전환으로 흐름도와 단계 목록을 오갈 수 있습니다. 하위 흐름은 카드의 열기 버튼이나 화면 위 흐름 탭에서 열 수 있습니다.</p></div></section>
+          <section><div className="ps-guide-icon"><Activity size={19} aria-hidden="true" /></div><div><h3>운영</h3><p>단계를 선택해 지표, 문서, 개입 방법을 확인하세요. 하단에서 문서 상태를 누르면 해당 문서를 추적할 수 있습니다.</p><p>상단의 보기 전환으로 흐름도와 단계 목록을 오갈 수 있습니다. 하위 흐름은 카드의 열기 버튼이나 화면 위 흐름 탭에서 열 수 있습니다.</p></div></section>
           <section><div className="ps-guide-icon"><PenTool size={19} aria-hidden="true" /></div><div><h3>설계</h3><p>도형을 누르거나 끌어 놓아 단계를 추가하세요. 선택한 단계는 오른쪽 속성에서 편집하고, 연결선의 + 버튼으로 사이에 단계를 넣을 수 있습니다.</p><p><kbd>Ctrl/⌘+Z</kbd> 되돌리기 · <kbd>Ctrl/⌘+D</kbd> 복제 · <kbd>Delete</kbd> 삭제</p></div></section>
           <p className="ps-guide-scope">모의 운영 지표와 설계 변경은 브라우저 작업 공간에 적용됩니다. 실제 문서는 실제 파일 처리에서 관리하세요.</p>
         </div>

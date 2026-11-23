@@ -2,6 +2,12 @@
 
 > **기준 시점: 2026-11-12.** 이 문서는 인수인계 시점의 스냅샷이다. 코드·실행 상태·의존성·데이터는 바뀔 수 있으므로 새 세션에서는 아래 확인 순서부터 진행한다. 이 문서는 요구사항이나 고객 환경이 확정되었다는 뜻이 아니다.
 
+## 2026-11-23 파서 플로우와 청킹 탐색
+
+문서함과 주 메뉴에서 파서 플로우·청킹 비교를 바로 연다. 형식별 실제 파서 조회에는 `GET /api/live/parsers`가 필요하므로 서버와 프론트 빌드를 함께 갱신한다. 모의 설계와 실제 문서별 청킹 주소는 [프론트 화면 계약](FRONTEND_AND_INTERACTION_CONTRACT.md)에 있다.
+
+실행 중이던 서버가 청킹 설정에서 순차 실행만 제공하면 현재 작업이 끝난 뒤 서버를 다시 시작한다. 갱신된 서버의 `GET /api/retrieval/config` 응답에는 `caps.max_parallel_strategies: 4`가 포함된다. 청킹 비교에서 전략 동시 실행을 바꾸면 다음 비교부터 적용된다.
+
 ## 2026-11-23 파서 변경
 
 로컬 EasyOCR 모델 준비 방법은 프로젝트 README의 PDF·Office 실제 파싱 절에 있다. 이전 실행의 결과와 설정은 그대로 조회할 수 있다. 새 회귀 사례는 `backend/tests/test_parser_resilience.py`에서 확인한다. 합성 입력으로 긴 한글 CSV 셀, 다중 프레임, SVG 내부 이미지, 빈 PDF 페이지, 희소 워크시트 등을 검증한다. 다중 시트 XLSX 회귀 테스트는 데이터 시트 1,001개 사이에 빈 시트와 숨김 시트를 끼운 파일을 업로드하고, 저장된 결과의 데이터 순서·원본 행 좌표·마지막 시트의 캐시 없는 수식과 원본 미리보기를 대조한다. 별도 합성 파일로 시트 1,001개 × 데이터 100행, 시트 2,000개 × 데이터 10행의 전체 순서와 원본 행 연결도 확인했다. 두 파일 모두 시트당 2열이다.
@@ -50,7 +56,7 @@
 | 화면 | 파일 | 기본 화면 |
 |---|---|---|
 | 문서 계보 | `LineageView.tsx`, `lineage/*`, `lineage.css`, `__tests__/lineage.test.tsx`(+`fixtures/lineage.json`) | 문서군 목록 + 선택 문서군(판·포함 트리·참조 탭 또는 관계 그래프). 요약 접힘, hover 강조, 클릭 상세 고정. 옛 `RelationsView.tsx` 삭제, `workspace.test.tsx` 해당 케이스 교체 |
-| 청킹 벤치 | `ChunkBench.tsx`, `retrieval.css`, `__tests__/chunk-bench.test.tsx` | 전략별 청크 띠 하나. 전략 설정·세부 지표·토큰 실측 접힘. 처음 열 때 저장된 설정으로 한 번 나눔(서버 계산만) |
+| 청킹 벤치 | `ChunkBench.tsx`, `retrieval.css`, `__tests__/chunk-bench.test.tsx` | 첫 화면에서 전략별 크기·겹침과 동시 실행 수를 변경한다. 표·그림·캡션 정책과 토큰 실측은 상세 창에서 설정한다. 처음 열 때 저장된 설정으로 한 번 나눈다. |
 | 임베딩 평가 | `EmbeddingEval.tsx`, `embedding.css`, `__tests__/embedding-eval.test.tsx` | 후보 × 프리셋 결과 행렬 하나. 설정은 서랍. 기본 후보 Harrier-OSS-v1 0.6B, 512토큰 모델은 표시만 |
 | 벡터 DB | `VectorDbWorkspace.tsx`, `vectordb/*`, `vectordb.css`, `__tests__/vectordb.test.tsx` | 트리 + 청크 표(기본 탭) / 스키마·인덱스 탭. Milvus 미설정이면 예시 데이터 |
 

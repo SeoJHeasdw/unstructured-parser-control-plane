@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
-import { AlertCircle, ArrowLeft, BookOpen, CircleAlert, CircleCheck, CircleSlash, Clock3, Download, File, FileText, FileSpreadsheet, FileImage, FileArchive, Presentation, GitCompareArrows, LoaderCircle, Play, RefreshCw, TriangleAlert } from 'lucide-react';
+import { AlertCircle, ArrowLeft, BookOpen, CircleAlert, Scissors, CircleCheck, CircleSlash, Clock3, Download, File, FileText, FileSpreadsheet, FileImage, FileArchive, Presentation, GitCompareArrows, LoaderCircle, Play, RefreshCw, TriangleAlert, Workflow } from 'lucide-react';
 import { getDocumentHistory, listParseRuns, liveSourceUrl } from './api/live';
 import type { HistoryEntry, LiveDoc, LiveResult, LiveStatus, ParseRun } from './api/live';
-import type { DetailTab } from './navigation';
+import { WorkspaceLink } from './WorkspaceLink';
+import type { DetailTab, WorkspaceRoute } from './navigation';
 import { Tabs } from './ui';
 import { StructurePanel } from './StructurePanel';
 
@@ -76,10 +77,11 @@ function History({ doc }: { doc: LiveDoc }) {
 
 type Props = {
   doc: LiveDoc; result: LiveResult | null; resultError: string; resultLoading: boolean; submittingId: string | null;
+  onNavigate?: (route: WorkspaceRoute) => void;
   onBack: () => void; onProcess: () => void; tab: DetailTab; onTab: (tab: DetailTab) => void; onCompare: () => void; onFamily?: () => void; onPickFile: () => void;
 };
 
-export default function LiveDocumentView({ doc, result, resultError, resultLoading, submittingId, onBack, onProcess, onCompare, tab, onTab, onFamily, onPickFile }: Props) {
+export default function LiveDocumentView({ doc, result, resultError, resultLoading, submittingId, onBack, onProcess, onCompare, tab, onTab, onFamily, onPickFile, onNavigate }: Props) {
   const replaceFile = ['format_mismatch','encrypted','drm_protected','drm_suspected'].includes(doc.error_code ?? '');
   const failed = doc.status === 'failed' || doc.status === 'unsupported';
   const running = doc.status === 'processing';
@@ -105,8 +107,11 @@ export default function LiveDocumentView({ doc, result, resultError, resultLoadi
     <button className="lw-back" onClick={onBack}><ArrowLeft size={16} />문서함으로</button>
     <header className="lw-detail-head">
       <FileGlyph format={doc.format} />
-      <div className="lw-detail-name"><h1 tabIndex={-1}>{doc.name}</h1><div className="lw-subline"><StatusBadge status={doc.status} /><span>{doc.format || '확장자 없음'} · {displaySize(doc.size_bytes)}</span></div></div>
+      <div className="lw-detail-name"><h1 tabIndex={-1}>{doc.name}</h1><div className="lw-subline"><StatusBadge status={doc.status} />{onNavigate
+        ? <WorkspaceLink className="lw-flow-link" to={{page:'parsers',format:doc.format}} onNavigate={onNavigate}><Workflow size={14}/>{doc.format || '확장자 없음'} 파서 플로우</WorkspaceLink>
+        : <span>{doc.format || '확장자 없음'}</span>}<span>{displaySize(doc.size_bytes)}</span></div></div>
       <div className="lw-head-actions">
+        {result && onNavigate && <WorkspaceLink className="lw-btn" to={{page:'chunking', doc:doc.id}} onNavigate={onNavigate}><Scissors size={16}/>{result.is_stale ? '이전 성공본 청킹' : '청킹 비교'}</WorkspaceLink>}
         {hasComparison && <button className="lw-btn is-compare" onClick={onCompare}><GitCompareArrows size={17} />원문과 대조</button>}
         {doc.status === 'unsupported' ? <a className="lw-btn" href="#detail-formats" onClick={() => { const node = document.querySelector<HTMLDetailsElement>('#detail-formats'); if (node) node.open = true; }}>지원 형식 보기</a> : replaceFile && failed ? <button className="lw-btn" onClick={onPickFile}>다른 파일 추가</button> : <button className={`lw-btn ${hasComparison ? '' : 'is-primary'}`} disabled={running || !!submittingId} onClick={onProcess}>
           {submitting || running ? <LoaderCircle size={16} className="live-spin" /> : doc.status === 'uploaded' ? <Play size={16} /> : <RefreshCw size={16} />}

@@ -241,6 +241,42 @@ def test_unconfigured_screen_still_has_specs_questions_and_sample(client):
     assert client.get("/api/retrieval/config", headers={"Origin": "https://evil.example"}).status_code == 403
 
 
+def test_chunk_parallelism_overlaps_work_and_preserves_order_and_errors(client, monkeypatch):
+    from app.routers import retrieval
+
+    body = {"source": {"sample": "report"}, "strategies": [
+        {"id": kind, "kind": kind} for kind in ("element", "invalid", "fixed", "parent_child")
+    ]}
+    expected = client.post("/api/retrieval/chunk", json=body).json()
+    assert [r["id"] for r in expected["results"]] == ["element", "invalid", "fixed", "parent_child"]
+    assert expected["results"][1]["error"]
+    assert client.get("/api/retrieval/config").json()["caps"]["max_parallel_strategies"] == 4
+    for bad in (True, 0, 5, "2", 1.5):
+        assert client.post("/api/retrieval/chunk", json={**body, "parallelism": bad}).status_code == 400
+
+    run = retrieval.run_strategy
+    gate = threading.Barrier(2, timeout=5)
+    lock = threading.Lock()
+    active = peak = 0
+
+    def observed(*args):
+        nonlocal active, peak
+        with lock:
+            active += 1
+            peak = max(peak, active)
+        try:
+            gate.wait()
+            return run(*args)
+        finally:
+            with lock:
+                active -= 1
+
+    monkeypatch.setattr(retrieval, "run_strategy", observed)
+    response = client.post("/api/retrieval/chunk", json={**body, "parallelism": 2})
+    assert response.status_code == 200 and response.json() == expected
+    assert peak == 2
+
+
 def test_chunk_endpoint_accepts_text_and_completed_documents(client):
     body = {"source": {"text": DOC_A}, "strategies": [{"id": "s1", "kind": "markdown", "params": {"size": 80}}, {"id": "bad", "kind": "magic"}], "limit_tokens": 20}
     result = client.post("/api/retrieval/chunk", json=body).json()

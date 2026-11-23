@@ -10,6 +10,14 @@ from app.config import Settings
 
 DOCLING_FORMATS = {"PDF", "DOCX", "PPTX", "XLSX"}
 
+PARSER_BY_EXTENSION = {
+    **dict.fromkeys(sorted(DOCLING_FORMATS), "docling"),
+    **dict.fromkeys(sorted(TEXT_FORMATS - {"CSV"}), "python-text"),
+    "CSV": "python-csv",
+    **dict.fromkeys(sorted(IMAGE_FORMATS), "easyocr"),
+    "SVG": "python-svg",
+}
+
 class ParserRegistry:
     def __init__(self, settings: Settings):
         self.settings = settings
@@ -17,12 +25,7 @@ class ParserRegistry:
         self.docling = DoclingAdapter(settings)
 
     def parser_name(self, extension: str) -> str | None:
-        if extension == "SVG": return "python-svg"
-        if extension in IMAGE_FORMATS: return "easyocr"
-        if extension == "CSV": return "python-csv"
-        if extension in TEXT_FORMATS: return "python-text"
-        if extension in DOCLING_FORMATS: return "docling"
-        return None
+        return PARSER_BY_EXTENSION.get(extension)
 
     def parse(self, path: Path, extension: str) -> ParsedDocument:
         if extension == "SVG":
