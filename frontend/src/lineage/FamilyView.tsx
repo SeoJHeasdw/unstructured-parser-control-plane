@@ -47,7 +47,7 @@ export function FamilyView({ data, family, entryId, onEntry, view, onView, refTa
             {family.docno && <span className="ln-tag">{family.docno}</span>}
             <span className="ln-tag is-quiet">{family.formats.join(' · ') || '형식 없음'}</span>
             <span className={`ln-state is-${meta.tone}`}>{meta.label}</span>
-            {family.related.map(id => { const other = data.families.find(item => item.id === id); return other ? <button key={id} type="button" className="ln-tag is-link" onClick={() => onFamily(id)} title="이름이 같고 형식이 다른 문서군">{other.formats.join('·')} 판 보기 <ArrowRight size={13} aria-hidden="true" /></button> : null; })}
+            {family.related.map(id => { const other = data.families.find(item => item.id === id); return other ? <button key={id} type="button" className="ln-tag is-link" onClick={() => onFamily(id)} data-tip="이름이 같고 형식이 다른 문서군">{other.formats.join('·')} 판 보기 <ArrowRight size={13} aria-hidden="true" /></button> : null; })}
           </div>
         </div>
       </div>
@@ -69,7 +69,7 @@ export function FamilyView({ data, family, entryId, onEntry, view, onView, refTa
             <i className={`ln-dot is-${tone}`} aria-hidden="true" />
             <b>{item.label}</b>
             {family.formats.length > 1 && <small>{item.ext}</small>}
-            {item.duplicates > 0 && <small title="같은 내용 파일">×{item.duplicates + 1}</small>}
+            {item.duplicates > 0 && <small>×{item.duplicates + 1}</small>}
             {item.contained_only && <Box size={11} aria-label="다른 파일 안에만 있음" />}
             {badge && <em>{badge}</em>}
           </button>
@@ -80,7 +80,7 @@ export function FamilyView({ data, family, entryId, onEntry, view, onView, refTa
 
     {view === 'graph' ? <LineageGraph data={data} family={family} entry={entry} onPin={onPin} onFamily={onFamily} /> : <div className="ln-body">
       <section className="ln-pane" aria-label="포함 구조">
-        <div className="ln-pane-head"><ListTree size={16} aria-hidden="true" /><h3>포함 구조</h3><span title={root.name}>{entry.label} · {root.name}</span></div>
+        <div className="ln-pane-head"><ListTree size={16} aria-hidden="true" /><h3>포함 구조</h3><span data-tip={root.name} data-tip-overflow>{entry.label} · {root.name}</span></div>
         {entry.contained_only && <p className="ln-crumb">{holderText(data, root.id)} 안</p>}
         <TreeOrState data={data} root={root} hl={hl} pinnedId={pinnedId} onPin={onPin} onHover={setHovered} onOpenLive={onOpenLive} />
       </section>
@@ -171,7 +171,7 @@ function TreeRow({ data, node, depth, open, toggle, hl, pinnedId, onPin, onHover
         <Icon size={15} aria-hidden="true" />
         <span className="ln-tname">{node.name}</span>
         {depth > 0 && <span className="ln-kind">{CHILD_KIND[node.kind] ?? node.kind}</span>}
-        {family && <span className="ln-kind is-fam" title={`문서군: ${family.title}`}>{data.entries[node.entry ?? '']?.label ?? '문서군'}</span>}
+        {family && <span className="ln-kind is-fam">{data.entries[node.entry ?? '']?.label ?? '문서군'}</span>}
         {node.same_as && <span className="ln-kind is-dup">사본</span>}
         {warn && <i className={`ln-dot is-${FLAG[warn].tone === 'error' ? 'error' : 'warn'}`} aria-label={FLAG[warn].label} />}
         {node.links > 0 && <span className="ln-count"><Link2 size={10} aria-hidden="true" />{node.links}</span>}

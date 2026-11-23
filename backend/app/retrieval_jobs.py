@@ -231,7 +231,7 @@ def load_source(service, doc_id: str) -> tuple[dict, Source]:
     return {"id": doc_id, "name": doc["name"]}, src
 
 
-def preview_plan(body: dict, service, questions: list[dict]) -> dict:
+def preview_plan(body: dict, service, questions: list[dict], embedder_for=None) -> dict:
     """실행 전 계획: 한 프리셋으로 문서를 나눠 모델별 입력 한도 초과와 벡터 용량을 계산한다. 외부 호출이 없다.
     찾을 수 없거나 나눌 수 없는 문서는 errors에 적고 나머지로 계산한다."""
     from app.embedding import spec_for
@@ -256,7 +256,7 @@ def preview_plan(body: dict, service, questions: list[dict]) -> dict:
     for doc_id in doc_ids:
         try:
             meta, src = load_source(service, doc_id)
-            result = run_strategy(src, preset)
+            result = run_strategy(src, preset, embed=embedder_for(preset) if embedder_for and preset["kind"] == "semantic" else None)
         except PlanError as exc:
             errors.append(str(exc))
             continue
@@ -324,7 +324,7 @@ def _int(value, default: int, lo: int, hi: int, name: str) -> int:
     return min(hi, max(lo, number))
 
 
-def build_plan(body: dict, service, questions: list[dict], connections: list[EmbedConnection]) -> Plan:
+def build_plan(body: dict, service, questions: list[dict], connections: list[EmbedConnection], embedder_for=None) -> Plan:
     """요청을 검증하고 문서를 미리 청킹해 한도를 확인한다. 이 단계에서는 외부 호출이 없다."""
     if not isinstance(body, dict):
         raise PlanError("요청 형식이 올바르지 않습니다.")
@@ -393,7 +393,7 @@ def build_plan(body: dict, service, questions: list[dict], connections: list[Emb
         chunks: list[dict] = []
         for doc in documents:
             try:
-                result = run_strategy(sources[doc["id"]], preset)
+                result = run_strategy(sources[doc["id"]], preset, embed=embedder_for(preset) if embedder_for and preset["kind"] == "semantic" else None)
             except ChunkingError as exc:
                 raise PlanError(f"{doc['name']}: {exc}") from None
             for c in result["chunks"]:

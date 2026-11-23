@@ -18,7 +18,7 @@ type OriginalProps = {
 export function OriginalPane({ name, label, href, downloadName, preview, fallback }: OriginalProps) {
   const [expanded, setExpanded] = useState(false);
   const originalLink = href && (downloadName
-    ? <a className="button-secondary" href={href} download={downloadName} title={downloadName}><ArrowDownToLine size={15} aria-hidden="true" />원본 다운로드</a>
+    ? <a className="button-secondary" href={href} download={downloadName}><ArrowDownToLine size={15} aria-hidden="true" />원본 다운로드</a>
     : <a className="button-secondary" href={href} target="_blank" rel="noreferrer">원본 열기 <ExternalLink size={15} aria-hidden="true" /></a>);
   return <section className="panel compare-original" aria-label="원본 문서">
     <header>
@@ -27,7 +27,7 @@ export function OriginalPane({ name, label, href, downloadName, preview, fallbac
           <h2><FileText size={18} aria-hidden="true" />원본 문서</h2>
           <span className="compare-source-badge">{label}</span>
         </div>
-        <p className="compare-source-filename" title={name}>{name}</p>
+        <p className="compare-source-filename" data-tip={name} data-tip-overflow>{name}</p>
       </div>
       <div className="compare-original-actions">
         {preview && <button type="button" className="button-secondary compare-enlarge" aria-haspopup="dialog" onClick={() => setExpanded(true)}><Maximize2 size={14} aria-hidden="true" />크게 보기</button>}
@@ -47,9 +47,9 @@ export function PdfSource({ href, page, expanded, pages, onPage }: {
 }) {
   return <div className="compare-pdf-source">
     {!expanded && pages !== undefined && pages > 1 && onPage && <div className="compare-source-pages" role="group" aria-label="원본 PDF 페이지">
-      <button type="button" className="plain-icon" aria-label="이전 원본 페이지" onClick={() => onPage(page - 1)} disabled={page <= 1}><ArrowLeft size={16} aria-hidden="true" /></button>
+      <button type="button" className="plain-icon" aria-label="이전 원본 페이지" data-tip="이전 페이지" onClick={() => onPage(page - 1)} disabled={page <= 1}><ArrowLeft size={16} aria-hidden="true" /></button>
       <span aria-live="polite">{page} / {pages}쪽</span>
-      <button type="button" className="plain-icon" aria-label="다음 원본 페이지" onClick={() => onPage(page + 1)} disabled={page >= pages}><ArrowRight size={16} aria-hidden="true" /></button>
+      <button type="button" className="plain-icon" aria-label="다음 원본 페이지" data-tip="다음 페이지" onClick={() => onPage(page + 1)} disabled={page >= pages}><ArrowRight size={16} aria-hidden="true" /></button>
     </div>}
     <iframe key={`${href}#${page}`} title="PDF 원문" src={`${href}#page=${page}&view=FitH${expanded ? '' : '&toolbar=0'}`} />
   </div>;
@@ -85,7 +85,7 @@ export function WorksheetSource({ data, onLocation }: { data: Worksheet; onLocat
     <div className="compare-sheet-scroll" role="region" aria-label="시트 원본 셀 값" tabIndex={0}><table>
       <thead><tr><td />{data.columns.map(column => <th key={column} scope="col">{column}</th>)}</tr></thead>
       <tbody>{data.rows.map((row, index) => <tr key={data.first_row + index}><th scope="row">{data.first_row + index}</th>
-        {row.map((value, col) => <td key={data.columns[col]} className={data.cell === `${data.columns[col]}${data.first_row + index}` ? 'is-cell' : ''} title={value}>{value}</td>)}
+        {row.map((value, col) => <td key={data.columns[col]} className={data.cell === `${data.columns[col]}${data.first_row + index}` ? 'is-cell' : ''}>{value}</td>)}
       </tr>)}</tbody>
     </table></div>
   </div>;

@@ -39,6 +39,62 @@
   --fs-2xl: 24px;
   --shadow-1: 0 1px 2px rgba(22, 30, 48, .06);
   --shadow-pop: 0 24px 56px rgba(22, 30, 48, .20), 0 2px 8px rgba(22, 30, 48, .08);
+  --shadow-float: 0 12px 32px rgba(22, 30, 48, .14), 0 2px 6px rgba(22, 30, 48, .08);
+  /* 모션: 호버 120ms, 메뉴·툴팁 140ms, 패널 240ms. 빠르게 출발해 부드럽게 멈춘다. */
+  --ease-out: cubic-bezier(.22, 1, .36, 1);
+  --ease-in-out: cubic-bezier(.65, 0, .35, 1);
+  --dur-1: .12s;
+  --dur-2: .16s;
+  --dur-3: .24s;
+}
+
+/* ---------- 툴팁 ---------- */
+.ui-tip {
+  position: fixed; z-index: 90; max-width: 280px;
+  display: flex; align-items: center; gap: 8px; padding: 5px 8px;
+  border-radius: 7px; background: #172238; color: #f2f5fa; box-shadow: 0 6px 18px rgba(16, 24, 40, .18), 0 1px 3px rgba(16, 24, 40, .16);
+  font-size: var(--fs-xs); font-weight: 550; line-height: 1.45; letter-spacing: -.01em; word-break: keep-all;
+  opacity: 0; transition: opacity .1s ease;
+}
+.ui-tip.is-open { opacity: 1; animation: ui-tip-in .14s var(--ease-out); }
+.ui-tip.is-glide { transition: opacity .1s ease, left .14s var(--ease-out), top .14s var(--ease-out); }
+.ui-tip.is-bottom { --tip-shift: 0 -3px; }
+.ui-tip.is-top { --tip-shift: 0 3px; }
+.ui-tip.is-right { --tip-shift: -3px 0; }
+.ui-tip.is-left { --tip-shift: 3px 0; }
+.ui-tip kbd {
+  flex: none; padding: 1px 5px; border-radius: 4px; background: rgba(255, 255, 255, .12); color: #c7d2e4;
+  box-shadow: inset 0 -1px 0 rgba(255, 255, 255, .08); font: inherit; font-size: 11px; font-weight: 600; letter-spacing: .02em;
+}
+@keyframes ui-tip-in { from { opacity: 0; translate: var(--tip-shift, 0 0); scale: .97; } }
+
+/* ---------- 호버 메뉴 ---------- */
+.ui-hover-menu { display: inline-flex; position: relative; }
+.ui-hover-trigger .ui-hover-chevron { margin-left: -2px; color: var(--ink-4); transition: rotate var(--dur-2) var(--ease-out), color var(--dur-1); }
+.ui-hover-trigger.is-open .ui-hover-chevron { rotate: 180deg; color: var(--accent); }
+.ui-menu {
+  position: fixed; z-index: 65; min-width: 212px; display: flex; flex-direction: column; gap: 2px; padding: 5px;
+  border: 1px solid var(--rule); border-radius: 11px; background: var(--surface); box-shadow: var(--shadow-float);
+  opacity: 0; translate: 0 -4px; scale: .98; transform-origin: top left;
+  transition: opacity .1s ease, translate .12s var(--ease-out), scale .12s var(--ease-out);
+}
+.ui-menu.is-open { opacity: 1; translate: none; scale: none; transition-duration: .14s; }
+.ui-menu button {
+  display: flex; align-items: center; gap: 10px; width: 100%; min-height: 44px; padding: 6px 10px 6px 7px;
+  border: 0; border-radius: 7px; background: transparent; color: var(--ink-2); text-align: left;
+  transition: background-color var(--dur-1), color var(--dur-1);
+}
+.ui-menu button:hover, .ui-menu button:focus-visible { background: var(--surface-3); color: var(--ink-1); }
+.ui-menu button:focus-visible { outline: 2px solid var(--accent-ring); outline-offset: -2px; }
+.ui-menu-icon { display: grid; place-items: center; flex: none; width: 30px; height: 30px; border-radius: 7px; background: var(--surface-2); color: var(--ink-3); box-shadow: inset 0 0 0 1px var(--rule); transition: background-color var(--dur-1), color var(--dur-1); }
+.ui-menu button:hover .ui-menu-icon, .ui-menu button.is-checked .ui-menu-icon { background: var(--accent-soft); color: var(--accent); box-shadow: inset 0 0 0 1px #d4defa; }
+.ui-menu-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.ui-menu-text b { font-size: var(--fs-sm); font-weight: 650; color: inherit; }
+.ui-menu-text small { font-size: 11.5px; color: var(--ink-3); }
+.ui-menu-check { flex: none; color: var(--accent); opacity: 0; }
+.ui-menu button.is-checked .ui-menu-check { opacity: 1; }
+@media (prefers-reduced-motion: reduce) {
+  .ui-tip, .ui-tip.is-open, .ui-menu, .ui-hover-chevron { animation: none !important; transition: none !important; }
 }
 
 /* ---------- 팝업 ---------- */
@@ -142,3 +198,23 @@
 .ui-pill.is-accent { background: var(--accent-soft); color: var(--accent); }
 .ui-empty { padding: 40px 16px; text-align: center; color: var(--ink-3); font-size: var(--fs-sm); }
 .ui-empty b { display: block; margin-bottom: 4px; font-size: var(--fs-md); color: var(--ink-1); }
+
+/* ---------- 공통 모션: 나타남·누름 ----------
+ * 새로 붙는 패널·알림·펼친 내용은 짧게 떠오르고, 버튼은 누를 때 살짝 들어간다. */
+@keyframes ui-enter { from { opacity: 0; translate: 0 4px; } }
+@keyframes ui-enter-down { from { opacity: 0; translate: 0 -4px; } }
+@keyframes ui-pop { from { opacity: 0; scale: .97; translate: 0 -3px; } }
+.ui-tabpanel { animation: ui-fade .16s ease-out; }
+:where(details[open]) > :where(:not(summary)) { animation: ui-enter-down .18s var(--ease-out); }
+:where(.button-secondary, .button-primary, .button-quiet, .text-button, .lw-btn, .lw-back, .lw-reset, .ee-btn, .cb-btn, .fi-button, .fi-chip, .workspace-back, .vdb-refresh, .segmented button, .ui-seg button, .ui-tab) {
+  transition: background-color var(--dur-1) ease, border-color var(--dur-1) ease, color var(--dur-1) ease, box-shadow var(--dur-2) ease, scale var(--dur-1) var(--ease-out);
+}
+:where(.plain-icon, .inventory-icon-button, .lw-icon-btn, .ln-icon, .ln-close, .pr-reload, .rb-icon, .ui-dialog-close) {
+  transition: background-color var(--dur-1) ease, color var(--dur-1) ease, scale var(--dur-1) var(--ease-out);
+}
+:where(.button-secondary, .button-primary, .button-quiet, .lw-btn, .ee-btn, .cb-btn, .fi-button, .vdb-refresh):active:not(:disabled) { scale: .98; }
+:where(.plain-icon, .inventory-icon-button, .lw-icon-btn, .ln-icon, .ln-close, .pr-reload, .rb-icon, .ui-dialog-close):active:not(:disabled) { scale: .92; }
+/* 모션 감소: 포털로 뜨는 창까지 포함해 전환·반복 회전을 모두 끈다. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
+}

@@ -55,7 +55,7 @@ export default function FormatPanel({ library, routes, mockFormats, manual, live
       </span>
       <div>
         {onOpenLive && <button type="button" className="button-secondary" onClick={() => { onClose(); onOpenLive(); }}>실제 파일 목록 <ArrowRight size={15} aria-hidden="true" /></button>}
-        <button type="button" className="fp-docs" onClick={onRefresh} aria-label="로컬 형식 새로고침" title="로컬 형식 새로고침"><RefreshCw size={16} /></button>
+        <button type="button" className="fp-docs" onClick={onRefresh} aria-label="로컬 형식 새로고침" data-tip="로컬 형식 새로고침"><RefreshCw size={16} /></button>
       </div>
     </div>}>
     <div className="fp-root">
@@ -85,7 +85,7 @@ export default function FormatPanel({ library, routes, mockFormats, manual, live
               <span className="fp-meta"><b>{displayFormat(ext)}</b><small>{origin}{isReported && local ? ` · 로컬 ${local}건` : ''}</small></span>
               {flowId ? <button className="fp-route" onClick={() => onOpenFlow(flowId)} aria-label={`${displayFormat(ext)} 경로 열기`}><span>{library.flows[flowId]?.title ?? flowId}</span><ArrowRight size={15} aria-hidden="true" /></button>
                 : <button className="fp-create" onClick={() => onCreateRoute(ext)} disabled={!ext} aria-label={`${displayFormat(ext)} 경로 만들기`}><Plus size={15} aria-hidden="true" /> 경로 만들기</button>}
-              <button className="fp-docs" onClick={() => { onClose(); onOpenDocuments(ext); }} aria-label={`${displayFormat(ext)} 예시 문서 보기`} title="예시 문서 보기"><FileSearch size={16} /></button>
+              <button className="fp-docs" onClick={() => { onClose(); onOpenDocuments(ext); }} aria-label={`${displayFormat(ext)} 예시 문서 보기`} data-tip="예시 문서 보기"><FileSearch size={16} /></button>
             </li>;
           })}</ul>
         </section>)}

@@ -132,7 +132,7 @@ export function DocumentDrawer({ doc, relations, onClose, onCompare, onPipeline,
       <aside className="inventory-drawer" ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby={dialogTitle} onKeyDown={onKeyDown}>
         <header className="inventory-drawer-header">
           <div><FileSearch size={19} strokeWidth={1.8} aria-hidden="true" /><h2 id={dialogTitle}>문서 상세</h2></div>
-          <button type="button" ref={closeRef} className="inventory-icon-button" aria-label="문서 상세 닫기" onClick={onClose}>
+          <button type="button" ref={closeRef} className="inventory-icon-button" aria-label="문서 상세 닫기" data-tip="닫기" data-tip-key="Esc" onClick={onClose}>
             <X size={20} aria-hidden="true" />
           </button>
         </header>
@@ -147,7 +147,7 @@ export function DocumentDrawer({ doc, relations, onClose, onCompare, onPipeline,
                 <div className="inventory-drawer-meta">
                   <code>{doc.id}</code>
                   <span className="inventory-format">{doc.format}</span>
-                  <button type="button" className="inventory-icon-button inventory-copy" aria-label="문서 ID 복사" title="문서 ID 복사"
+                  <button type="button" className="inventory-icon-button inventory-copy" aria-label="문서 ID 복사" data-tip="문서 ID 복사"
                     onClick={() => void copyId()}><Clipboard size={16} aria-hidden="true" /></button>
                 </div>
                 <h3 ref={documentName} tabIndex={-1}>{doc.name}</h3>

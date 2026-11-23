@@ -49,7 +49,7 @@ export default function FlowDock({ snapshot, library, flowId, tab, onTab, state,
     <div className="fd-heading">
       <Tabs<DockTab> items={[{ id: 'events', label: '이벤트 로그', badge: scopedEvents.length }, { id: 'docs', label: '문서 추적', badge: scopedDocs.length }]}
         value={tab} onChange={onTab} label="운영 기록 보기" />
-      <span className="fd-scope" title={scope}>{scope}</span>
+      <span className="fd-scope" data-tip={scope} data-tip-overflow>{scope}</span>
     </div>
     <div className="fd-tools" role="group" aria-label={tab === 'events' ? '이벤트 종류' : '문서 상태'}>
       {tab === 'events'
@@ -76,11 +76,11 @@ export default function FlowDock({ snapshot, library, flowId, tab, onTab, state,
         : docs.length ? <>
           <table className="fd-table"><thead><tr><th scope="col">문서</th><th scope="col">형식</th><th scope="col">계보</th><th scope="col">현재 위치</th><th scope="col">상태</th><th scope="col">머문 시간</th><th scope="col">사유</th></tr></thead><tbody>
             {docs.slice(0, limit).map(doc => { const at = where(doc.node); return <tr key={doc.id} className={`is-${doc.state}`}>
-              <td><b title={doc.name}>{doc.name}</b><small>{doc.id}</small></td>
+              <td><b data-tip={doc.name} data-tip-overflow>{doc.name}</b><small>{doc.id}</small></td>
               <td><span className="fd-ext">{doc.ext}</span></td>
-              <td className="fd-lineage" title={doc.parentName}>{doc.depth ? <>{`깊이 ${doc.depth}`} · {doc.parentName}</> : '원본'}</td>
+              <td className="fd-lineage" data-tip={doc.parentName} data-tip-overflow>{doc.depth ? <>{`깊이 ${doc.depth}`} · {doc.parentName}</> : '원본'}</td>
               <td><button className="fd-location" onClick={() => onNavigate(at.flowId, at.nodeId)}>{at.flow} › {at.node}<ArrowUpRight size={13} aria-hidden="true" /></button></td>
-              <td><em className={`fd-state is-${doc.state}`}>{STATE[doc.state]}</em></td><td>{wait(snapshot.now - doc.enteredAt)}</td><td className="fd-reason" title={doc.reason}>{doc.reason || '—'}</td>
+              <td><em className={`fd-state is-${doc.state}`}>{STATE[doc.state]}</em></td><td>{wait(snapshot.now - doc.enteredAt)}</td><td className="fd-reason" data-tip={doc.reason} data-tip-overflow>{doc.reason || '—'}</td>
             </tr>; })}
           </tbody></table>
           {docs.length > limit && <div className="fd-more"><span>{docs.length}건 중 {limit}건 표시</span><button className="ps-btn" onClick={() => setLimit(value => value + PAGE_SIZE)}>문서 더 보기</button></div>}

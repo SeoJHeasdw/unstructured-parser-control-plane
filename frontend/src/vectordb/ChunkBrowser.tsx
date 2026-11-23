@@ -83,13 +83,13 @@ export default function ChunkBrowser({ source, detail, textField, onTextField, p
       <button type="button" className={`vdb-opt-toggle ${optionsOpen ? 'is-open' : ''}`} aria-expanded={optionsOpen} aria-controls={optionsId} onClick={() => setOptionsOpen(!optionsOpen)}>
         <SlidersHorizontal size={14} aria-hidden /> 조건·필드{customised > 0 && <em aria-label={`${customised}개 적용 중`}>{customised}</em>}
       </button>
-      {applied && !optionsOpen && <span className="vdb-chip is-filter" title={applied}><code>{oneLine(applied, 48)}</code><button type="button" aria-label="조건 지우기" onClick={clearFilter}><X size={12} /></button></span>}
+      {applied && !optionsOpen && <span className="vdb-chip is-filter" data-tip={applied} data-tip-overflow={oneLine(applied, 48) === applied ? true : undefined}><code>{oneLine(applied, 48)}</code><button type="button" aria-label="조건 지우기" data-tip="조건 지우기" onClick={clearFilter}><X size={12} /></button></span>}
       <span className="vdb-toolbar-gap" />
       <span className="vdb-range" aria-live="polite">{loading ? <LoaderCircle size={14} className="vdb-spin" aria-label="불러오는 중" /> : rows.length ? `${fmtCount(offset + 1)}–${fmtCount(end)}` : '0건'}{total !== null && <> / <b>{fmtCount(total)}</b>건</>}</span>
       <div className="vdb-pager">
-        <button type="button" className="plain-icon" aria-label="첫 페이지" disabled={loading || offset === 0} onClick={() => setOffset(0)}><ChevronsLeft size={16} /></button>
-        <button type="button" className="plain-icon" aria-label="이전 페이지" disabled={loading || offset === 0} onClick={() => setOffset(offset - pageSize)}><ChevronLeft size={16} /></button>
-        <button type="button" className="plain-icon" aria-label="다음 페이지" disabled={nextDisabled} onClick={() => setOffset(offset + pageSize)}><ChevronRight size={16} /></button>
+        <button type="button" className="plain-icon" aria-label="첫 페이지" data-tip="첫 페이지" disabled={loading || offset === 0} onClick={() => setOffset(0)}><ChevronsLeft size={16} /></button>
+        <button type="button" className="plain-icon" aria-label="이전 페이지" data-tip="이전 페이지" disabled={loading || offset === 0} onClick={() => setOffset(offset - pageSize)}><ChevronLeft size={16} /></button>
+        <button type="button" className="plain-icon" aria-label="다음 페이지" data-tip="다음 페이지" disabled={nextDisabled} onClick={() => setOffset(offset + pageSize)}><ChevronRight size={16} /></button>
       </div>
     </div>
 
@@ -121,7 +121,7 @@ export default function ChunkBrowser({ source, detail, textField, onTextField, p
     </div>}
 
     {effectiveText
-      ? <p className="vdb-truth" title="벡터는 텍스트로 되돌릴 수 없습니다."><Info size={13} aria-hidden /><span>글은 함께 저장된 <code>{effectiveText}</code> 필드 값입니다.</span></p>
+      ? <p className="vdb-truth" data-tip="벡터는 텍스트로 되돌릴 수 없습니다."><Info size={13} aria-hidden /><span>글은 함께 저장된 <code>{effectiveText}</code> 필드 값입니다.</span></p>
       : <p className="vdb-truth is-warn" role="note"><TriangleAlert size={14} aria-hidden /><span>텍스트 필드가 없어 청크 내용을 읽을 수 없습니다. 벡터는 텍스트로 되돌릴 수 없습니다.</span></p>}
     {error && <div className="vdb-problem" role="alert"><TriangleAlert size={18} aria-hidden="true" /><div><strong>청크를 불러오지 못했습니다</strong><p>{error}</p></div><button type="button" className="button-secondary" onClick={() => setRetry(value => value + 1)}><RefreshCw size={15} aria-hidden="true" /> 다시 시도</button></div>}
 
@@ -139,14 +139,14 @@ export default function ChunkBrowser({ source, detail, textField, onTextField, p
             const doc = docOf(row);
             return <tr key={row.pk} className={`${row.pk === activePk ? 'is-active' : ''} ${hoverDoc !== null && doc === hoverDoc ? 'is-lit' : ''}`}
               onMouseEnter={() => setHoverDoc(doc)} onMouseLeave={() => setHoverDoc(null)}>
-            <td className="is-pk" title={row.pk}><code>{shortPk(row.pk)}</code></td>
+            <td className="is-pk" data-tip={row.pk} data-tip-overflow={shortPk(row.pk) === row.pk ? true : undefined}><code>{shortPk(row.pk)}</code></td>
             <td className="is-text">
               <button type="button" className="vdb-open" aria-label={`청크 ${shortPk(row.pk)} 열기`} onClick={() => onOpen(row.pk)}
                 onFocus={() => setHoverDoc(doc)} onBlur={() => setHoverDoc(null)}>
                 {row.text ? oneLine(row.text, 150) : <i>텍스트 없음</i>}
               </button>
             </td>
-            {columns.map(name => <td key={name} title={typeof row.fields[name] === 'string' ? String(row.fields[name]) : undefined}>{fmtValue(row.fields[name], 28)}</td>)}
+            {columns.map(name => <td key={name} data-tip={typeof row.fields[name] === 'string' ? String(row.fields[name]) : undefined} data-tip-overflow={fmtValue(row.fields[name], 28) === row.fields[name] ? true : undefined}>{fmtValue(row.fields[name], 28)}</td>)}
             <td className="is-part">{row.partition ? <><i className="vdb-swatch" style={{ background: partColor(row.partition) }} aria-hidden />{row.partition}</> : '—'}</td>
             {includeVector && <td className="is-vec">{row.vector?.head ? <><span>{row.vector.dim}차원</span><VectorStrip values={row.vector.head} /></> : row.vector ? <span>{row.vector.type}</span> : '—'}</td>}
           </tr>;

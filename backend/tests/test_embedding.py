@@ -495,3 +495,24 @@ def test_run_on_sample_documents_reports_metrics_by_question_kind(client, config
     assert combos["s::el"]["phrase_missing"] == 0  # 요소 단위는 표·그림 정답 문구를 잃지 않는다
     detail = client.get("/api/retrieval/runs/current/questions/0", params={"combo": "s::el"}).json()
     assert detail["question"]["kind"] == examples[0]["kind"]
+
+
+def test_semantic_strategy_only_calls_the_model_when_the_user_asks_and_reuses_the_cache(client, configured):
+    body = {"source": {"sample": "report"}, "strategies": [{"id": "sem", "name": "의미", "kind": "semantic", "params": {"unit": "chars", "size": 800, "model": "fake-small"}},
+                                                          {"id": "fixed", "kind": "fixed", "params": {"unit": "chars", "size": 500}}]}
+    auto = client.post("/api/retrieval/chunk", json=body).json()["results"]
+    assert auto[0]["pending"]["missing"] > 0 and auto[0]["pending"]["model"] == "fake-small" and auto[0]["name"] == "의미"
+    assert auto[0]["chunks"] == [] and auto[1]["chunks"]
+    assert not FakeEmbeddings.calls
+    asked = client.post("/api/retrieval/chunk", json={**body, "embed": True}).json()["results"][0]
+    assert asked["chunks"] and asked["semantic"]["model"] == "fake-small" and asked["semantic"]["sentences"] > 10
+    calls = len(FakeEmbeddings.calls)
+    assert calls and all(call["model"] == "fake-small" for call in FakeEmbeddings.calls)
+    again = client.post("/api/retrieval/chunk", json=body).json()["results"][0]
+    assert again["chunks"] == asked["chunks"] and len(FakeEmbeddings.calls) == calls
+
+
+def test_semantic_strategy_reports_missing_connection(client):
+    result = client.post("/api/retrieval/chunk", json={"source": {"sample": "report"}, "embed": True,
+                                                       "strategies": [{"id": "sem", "kind": "semantic", "params": {}}]}).json()["results"][0]
+    assert "임베딩 연결이 없습니다" in result["error"] and result["kind"] == "semantic"

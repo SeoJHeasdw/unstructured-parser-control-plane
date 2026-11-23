@@ -72,7 +72,7 @@ export function ChunkView({ source, detail, textField, pk, onNavigate, showParti
           const full = String(chunk.fields[field]);
           const text = fmtValue(chunk.fields[field], 48);
           return <div key={label} className={label === '문서' && hoverDoc !== null && String(docValue) === hoverDoc ? 'is-doc-hl' : ''}>
-            <dt>{label}</dt><dd title={text !== full ? full : undefined}>{text}</dd>
+            <dt>{label}</dt><dd data-tip={full} data-tip-overflow={text !== full ? undefined : true}>{text}</dd>
           </div>;
         })}
       </dl>

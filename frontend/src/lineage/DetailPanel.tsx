@@ -85,7 +85,7 @@ export function DetailPanel({ data, pin, current, onClose, onFamily }: Props) {
       })}</ul></section>}
       <section><h4>근거 {group.refs.length}곳</h4>
         <div className="ln-table-wrap"><table className="ln-table"><thead><tr><th>출발 파일</th><th>위치</th><th>근거</th></tr></thead><tbody>
-          {group.refs.slice(0, 200).map(ref => <tr key={ref.id}><td title={holderText(data, ref.source)}>{data.instances[ref.source]?.name}</td><td>{ref.location || '—'}</td><td>{ref.evidence ? <q>{ref.evidence}</q> : <span className="ln-muted">{ref.target}</span>}</td></tr>)}
+          {group.refs.slice(0, 200).map(ref => <tr key={ref.id}><td data-tip={holderText(data, ref.source) || undefined}>{data.instances[ref.source]?.name}</td><td>{ref.location || '—'}</td><td>{ref.evidence ? <q>{ref.evidence}</q> : <span className="ln-muted">{ref.target}</span>}</td></tr>)}
         </tbody></table></div>
       </section>
       <div className="ln-panel-actions">
@@ -98,7 +98,7 @@ export function DetailPanel({ data, pin, current, onClose, onFamily }: Props) {
     body = <p className="ln-panel-sub">목록을 다시 불러오면서 사라진 항목입니다.</p>;
   }
   return <aside className="ln-panel" aria-label="상세">
-    <header><div><span>{KICKER[pin.type]}</span><h3 title={title}>{title}</h3></div><button type="button" ref={close} className="ln-close" onClick={onClose} aria-label="상세 닫기" title="닫기 (Esc)"><X size={17} aria-hidden="true" /></button></header>
+    <header><div><span>{KICKER[pin.type]}</span><h3>{title}</h3></div><button type="button" ref={close} className="ln-close" onClick={onClose} aria-label="상세 닫기" data-tip="닫기" data-tip-key="Esc"><X size={17} aria-hidden="true" /></button></header>
     <div className="ln-panel-body">{body}</div>
   </aside>;
 }

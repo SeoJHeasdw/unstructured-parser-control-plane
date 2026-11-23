@@ -368,3 +368,6 @@ button.compare-line-no:hover { background: var(--pane-mark); }
   .diff-mobile p { margin: 6px 0; line-height: 1.7; white-space: pre-wrap; overflow-wrap: anywhere; }
   .diff-mobile mark { background: var(--comparison-surface); }
 }
+
+.compare-review-detail { animation: ui-fade .16s ease-out; }
+.review-desk > div:not([hidden]) { animation: ui-fade .18s ease-out; }

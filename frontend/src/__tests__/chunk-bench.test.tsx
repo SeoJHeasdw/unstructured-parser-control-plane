@@ -69,7 +69,7 @@ const CONFIG = { connections: [], configured: false, specs: [{ id: '예시 모�
 let fetchMock: ReturnType<typeof vi.fn<(url: string, init?: RequestInit) => Promise<Response>>>;
 let store: Map<string, string>;
 const calls = (part: string) => fetchMock.mock.calls.filter(([url]) => String(url).includes(part));
-const lastChunkBody = () => JSON.parse(String(calls('/chunk').at(-1)?.[1]?.body)) as { source: { sample?: string }; strategies: { id: string; params: Record<string, unknown> }[]; limit_tokens: number | null; parallelism: number };
+const lastChunkBody = () => JSON.parse(String(calls('/chunk').at(-1)?.[1]?.body)) as { source: { sample?: string }; strategies: { id: string; params: Record<string, unknown> }[]; limit_tokens: number | null; parallelism: number; embed?: boolean };
 beforeEach(() => {
   store = new Map<string, string>();
   vi.stubGlobal('localStorage', { getItem: (key: string) => store.get(key) ?? null, setItem: (key: string, value: string) => store.set(key, String(value)), removeItem: (key: string) => store.delete(key), clear: () => store.clear(), key: (index: number) => [...store.keys()][index] ?? null, get length() { return store.size; } });
@@ -140,40 +140,49 @@ describe('청킹 벤치', () => {
     expect(calls('/tokens')).toHaveLength(0);
   });
 
-  it('선택한 전략의 크기와 겹침, 동시 실행 수를 바로 변경하고 다시 열어 사용한다', async () => {
+  it('카드에서 바로 연 전략 설정에서 크기·겹침·동시 실행 수를 고치고 다시 열어 사용한다', async () => {
     const user = userEvent.setup();
     await ready();
-    await user.selectOptions(screen.getByLabelText('편집할 전략'), 'builtin-element-rows');
-    await user.selectOptions(screen.getByLabelText('길이 단위'), 'tokens');
-    const size = screen.getByLabelText('청크 크기');
+    await user.click(screen.getByRole('button', {name:'요소 인지 · 행 묶음 전략 편집'}));
+    const dialog = screen.getByRole('dialog', {name:'전략 설정'});
+    expect(within(dialog).getByRole('textbox', {name:'전략 이름'})).toHaveProperty('value','요소 인지 · 행 묶음');
+    await user.click(within(dialog).getByRole('radio', {name:'추정 토큰'}));
+    const size = within(dialog).getByRole('spinbutton', {name:'청크 크기'});
     await user.clear(size);
     await user.type(size, '240{Enter}');
-    const overlap = screen.getByLabelText('겹침');
+    const overlap = within(dialog).getByRole('spinbutton', {name:'겹침'});
     await user.clear(overlap);
     await user.type(overlap, '150{Enter}');
     expect(overlap).toHaveProperty('value', '120');
-    await user.selectOptions(screen.getByLabelText('전략 동시 실행'), '3');
+    await user.click(within(within(dialog).getByRole('group', {name:'겹침 빠른 선택'})).getByRole('button', {name:'10%'}));
+    expect(overlap).toHaveProperty('value', '24');
+    await user.click(within(within(dialog).getByRole('group', {name:'청크 크기 빠른 선택'})).getByRole('button', {name:'400토큰'}));
+    expect(size).toHaveProperty('value', '400');
+    await user.selectOptions(within(dialog).getByLabelText('전략 동시 실행'), '3');
     await waitFor(() => expect(lastChunkBody().parallelism).toBe(3));
     const params = () => lastChunkBody().strategies.find(s => s.id === 'builtin-element-rows')?.params;
-    expect(params()).toMatchObject({size:240, overlap:120, unit:'tokens', table:'rows'});
-    await user.click(screen.getByRole('button', {name:'전략 설정'}));
-    expect(within(screen.getByRole('dialog')).getByLabelText('전략 이름')).toHaveProperty('value','요소 인지 · 행 묶음');
+    await waitFor(() => expect(params()).toMatchObject({size:400, overlap:24, unit:'tokens', table:'rows'}));
+    await user.click(within(dialog).getByRole('button', {name:'완료'}));
     cleanup();
     await ready();
-    expect(screen.getByLabelText('전략 동시 실행')).toHaveProperty('value','3');
-    expect(params()).toMatchObject({size:240, overlap:120, unit:'tokens', table:'rows'});
+    await user.click(screen.getByRole('button', {name:'전략 설정'}));
+    expect(within(screen.getByRole('dialog')).getByLabelText('전략 동시 실행')).toHaveProperty('value','3');
+    expect(params()).toMatchObject({size:400, overlap:24, unit:'tokens', table:'rows'});
     expect(calls('/tokens')).toHaveLength(0);
   });
 
   it('서버가 병렬 비교를 제공하지 않으면 저장된 병렬 수가 있어도 순차 실행한다', async () => {
+    const user = userEvent.setup();
     const serve = fetchMock.getMockImplementation()!;
     fetchMock.mockImplementation((url: string, init?: RequestInit) => url.endsWith('/config')
       ? Promise.resolve(new Response(JSON.stringify({...CONFIG, caps:{}}))) : serve(url, init));
     store.set(STORE.bench, JSON.stringify({source:'sample:report', selected:['builtin-element'], parallelism:3}));
     await ready();
-    expect(screen.getByLabelText('전략 동시 실행')).toHaveProperty('disabled',true);
-    expect(screen.getByText('현재 서버는 순차 실행만 지원')).toBeTruthy();
     expect(lastChunkBody().parallelism).toBe(1);
+    await user.click(screen.getByRole('button', {name:'전략 설정'}));
+    const select = within(screen.getByRole('dialog')).getByLabelText('전략 동시 실행');
+    expect(select).toHaveProperty('disabled', true);
+    expect(select.closest('label')?.getAttribute('data-tip')).toBe('현재 서버는 순차 실행만 지원');
   });
 
   it('첫 화면에서 전략을 빼고 특정 전략의 편집기로 바로 이동한다', async () => {
@@ -186,6 +195,36 @@ describe('청킹 벤치', () => {
     expect(within(dialog).getByRole('textbox', {name:'전략 이름'})).toHaveProperty('value', '고정 500자');
     await user.click(within(dialog).getByRole('button', {name:'완료'}));
     expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
+  it('의미 기반 전략은 자동으로 다시 나눌 때 모델을 부르지 않고, 사용자가 누를 때만 문장 임베딩을 계산한다', async () => {
+    const user = userEvent.setup();
+    const semantic = { id: 'p-sem', name: '의미 기반 800자', kind: 'semantic', params: { unit: 'chars', size: 800, min_size: 200, breakpoint: 90, buffer: 1, connection: 'embed', model: '' } };
+    store.set(STORE.presets, JSON.stringify([semantic, { id: 'builtin-fixed', name: '고정 500자', kind: 'fixed', params: { unit: 'chars', size: 500, overlap: 50 } }]));
+    store.set(STORE.bench, JSON.stringify({ source: 'sample:report', selected: ['p-sem', 'builtin-fixed'] }));
+    const serve = fetchMock.getMockImplementation()!;
+    fetchMock.mockImplementation(async (url: string, init?: RequestInit) => {
+      const response = await serve(url, init);
+      if (!url.endsWith('/chunk')) return response;
+      const body = JSON.parse(String(init?.body));
+      const payload = await response.json();
+      payload.results = payload.results.map((r: { id: string }) => r.id === 'p-sem' && !body.embed
+        ? { ...r, chunks: [], stats: null, pending: { missing: 42, total: 42, model: 'BAAI/bge-m3' } } : r);
+      return new Response(JSON.stringify(payload), { status: 200 });
+    });
+    await ready();
+    expect(lastChunkBody()).not.toHaveProperty('embed');
+    const row = await waitFor(() => rowOf('의미 기반 800자'));
+    expect(within(row).getByText(/문장 창 42개의 임베딩이 필요합니다/)).toBeTruthy();
+    expect(screen.getByText(/의미 기반 전략 1개가 문장 임베딩을 기다립니다/)).toBeTruthy();
+    expect(calls('/chunk').every(([, init]) => !JSON.parse(String(init?.body)).embed)).toBe(true);
+    await user.click(screen.getByRole('button', { name: '임베딩 계산하고 나누기' }));
+    await waitFor(() => expect(lastChunkBody().embed).toBe(true));
+    await waitFor(() => expect(within(rowOf('의미 기반 800자')).queryByText(/임베딩이 필요합니다/)).toBeNull());
+    // 설정을 바꿔 자동으로 다시 나눌 때는 다시 embed 없이 보낸다(캐시만 쓴다).
+    await user.click(screen.getByRole('button', { name: '고정 500자 비교 선택' }));
+    await waitFor(() => expect(lastChunkBody().strategies).toHaveLength(1));
+    expect(lastChunkBody()).not.toHaveProperty('embed');
   });
 
   it('지정한 실제 문서의 결과가 없으면 다른 예시로 청킹하지 않는다', async () => {
@@ -277,11 +316,12 @@ describe('청킹 벤치', () => {
     expect((within(list).getByRole('checkbox', { name: '요소 인지 7 비교에 포함' }) as HTMLInputElement).disabled).toBe(true);
     expect((within(dialog).getByRole('textbox', { name: '전략 이름' }) as HTMLInputElement).value).toBe('요소 인지 7');
     expect(within(dialog).queryByRole('spinbutton', { name: '행 묶음 크기' })).toBeNull();
+    await user.click(within(dialog).getByText('표·그림·머리말 처리'));
     await user.click(within(dialog).getByRole('radio', { name: '행 묶음마다 머리행 반복' }));
     expect(within(dialog).getByRole('spinbutton', { name: '행 묶음 크기' })).toBeTruthy();
     expect((within(dialog).getByRole('radio', { name: /그림 설명 생성/ }) as HTMLInputElement).disabled).toBe(true);
     expect(within(dialog).getByText('시각 모델 연결 필요')).toBeTruthy();
-    await user.selectOptions(within(dialog).getByRole('combobox', { name: '나누는 방식' }), 'fixed');
+    await user.click(within(within(dialog).getByRole('radiogroup', { name: '나누는 방식' })).getByRole('radio', { name: /고정 길이/ }));
     expect(within(dialog).queryByRole('radiogroup', { name: '표 처리' })).toBeNull();
 
     const before = calls('/chunk').length;

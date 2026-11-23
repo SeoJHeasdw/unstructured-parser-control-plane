@@ -164,7 +164,7 @@ function LineageScreen({ active, onOpenLive, documentId }: { active: boolean; do
         {data && <span className="ln-asof">{source === 'example' && <em>예시 데이터</em>}기준 {timeText(data.as_of ?? data.generated_at)}</span>}
         {data && data.families.length > 0 && <button type="button" className="ln-sum-toggle" aria-expanded={prefs.summaryOpen} aria-controls="ln-summary" onClick={() => updatePrefs({ summaryOpen: !prefs.summaryOpen })}>
           요약 <ChevronDown size={15} className={prefs.summaryOpen ? '' : 'ln-rot'} aria-hidden="true" /></button>}
-        <button type="button" className="ln-icon" onClick={() => setReload(n => n + 1)} disabled={load.status === 'loading'} aria-label="다시 불러오기" title="다시 불러오기"><RotateCw size={16} aria-hidden="true" /></button>
+        <button type="button" className="ln-icon" onClick={() => setReload(n => n + 1)} disabled={load.status === 'loading'} aria-label="다시 불러오기" data-tip="다시 불러오기"><RotateCw size={16} aria-hidden="true" /></button>
       </div>
     </div>
     {data && data.families.length > 0 && prefs.summaryOpen && <Summary data={data} filter={filter} onFilter={pickFilter} />}

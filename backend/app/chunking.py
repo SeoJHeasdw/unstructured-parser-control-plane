@@ -31,10 +31,11 @@ import statistics
 import unicodedata
 
 UNITS = ("chars", "tokens")
-STRATEGY_KINDS = ("fixed", "recursive", "markdown", "sentence", "element", "parent_child", "page")
+STRATEGY_KINDS = ("fixed", "recursive", "markdown", "sentence", "element", "parent_child", "page", "semantic")
 ELEMENT_STRATEGIES = ("element", "parent_child", "page")
 STRATEGY_LABELS = {"fixed": "고정 길이", "recursive": "재귀 분할", "markdown": "문서 구조(마크다운)", "sentence": "문장 묶음",
-                   "element": "요소 단위(표·그림 구분)", "parent_child": "부모·자식(작게 찾고 넓게 읽기)", "page": "페이지 단위"}
+                   "element": "요소 단위(표·그림 구분)", "parent_child": "부모·자식(작게 찾고 넓게 읽기)", "page": "페이지 단위",
+                   "semantic": "의미 기반(임베딩 경계)"}
 TABLE_POLICIES = ("whole", "rows", "row_text")
 IMAGE_POLICIES = ("drop", "caption")
 QUESTION_KINDS = ("text", "table", "image")
@@ -46,6 +47,14 @@ DEFAULT_SIZE = {"chars": 800, "tokens": 400}
 
 class ChunkingError(ValueError):
     """사용자에게 그대로 보여 줄 수 있는 입력·한도 오류."""
+
+
+class NeedsEmbedding(ChunkingError):
+    """의미 기반 청킹에 아직 캐시에 없는 문장 임베딩이 필요하다. 사용자가 누른 요청에서만 모델을 부른다."""
+
+    def __init__(self, missing: int, total: int):
+        super().__init__(f"문장 창 {total:,}개 중 {missing:,}개의 임베딩이 아직 없습니다.")
+        self.missing, self.total = missing, total
 
 
 # ---------------------------------------------------------------- 토큰 추정
@@ -779,6 +788,192 @@ def _sentence(src: Source, unit: str, size: float, overlap_sentences: int) -> li
     return out
 
 
+# ---------------------------------------------------------------- 의미 기반
+
+SEMANTIC_WINDOW_CHARS = 1500  # 창 하나의 최대 길이(작은 임베딩 모델의 입력 한도 안쪽)
+
+
+class _SemUnit:
+    __slots__ = ("s", "e", "atomic", "hard", "block")
+
+    def __init__(self, s: int, e: int, atomic: bool = False, hard: bool = False, block: Block | None = None):
+        self.s, self.e, self.atomic, self.hard, self.block = s, e, atomic, hard, block
+
+
+def semantic_units(src: Source) -> list[_SemUnit]:
+    """문장 단위. 표·코드는 통째 한 단위로 두고 앞뒤를 경계로 삼는다. 제목(연달아 나온 제목 포함)은 다음 문장이나 표 앞에 붙고 새 절을 시작한다."""
+    units: list[_SemUnit] = []
+    heading_start: int | None = None
+    for block in src.blocks:
+        if block.kind == "heading":
+            if heading_start is None:  # 제목이 연달아 나오면(2장 → 2.1절) 함께 다음 문장 앞에 붙인다
+                heading_start = block.start
+            continue
+        if block.kind in ("table", "code"):
+            # 표·코드 바로 위 제목은 표와 함께 둔다(제목만 따로 떨어진 청크를 만들지 않게).
+            units.append(_SemUnit(heading_start if heading_start is not None else block.start, block.end, atomic=True, hard=True, block=block))
+            heading_start = None
+            continue
+        first = True
+        for a, b in _cut(src, block.start, block.end, 2):
+            if not src.has_text(a, b):
+                continue
+            start = heading_start if first and heading_start is not None else a
+            units.append(_SemUnit(start, b, hard=first and heading_start is not None))
+            if first:
+                heading_start = None
+            first = False
+    if heading_start is not None:
+        units.append(_SemUnit(heading_start, src.n, hard=True))
+    # 표 바로 위·아래 캡션('표 1. …')은 표와 한 덩어리로 둔다.
+    is_caption = lambda u: not u.atomic and any(el.kind == "caption" for el in src.elements_near(u.s, u.e))  # noqa: E731
+    merged: list[_SemUnit] = []
+    for u in units:
+        if u.atomic and u.block is not None and u.block.kind == "table":
+            # 표 위에 제목이 붙어 있으면(새 절) 그 앞 캡션은 앞 절의 것이다. 쪼개진 캡션('표 1.' / 설명)은 모두 붙이고,
+            # 제목에서 시작한 조각까지 붙이면 멈춘다.
+            if u.s >= u.block.start:
+                while merged and is_caption(merged[-1]):
+                    prev = merged.pop()
+                    u = _SemUnit(prev.s, u.e, atomic=True, hard=True, block=u.block)
+                    if prev.hard:
+                        break
+        elif merged and merged[-1].atomic and merged[-1].block is not None and merged[-1].block.kind == "table" and is_caption(u) and not u.hard:
+            table = merged.pop()
+            u = _SemUnit(table.s, u.e, atomic=True, hard=True, block=table.block)
+        merged.append(u)
+    return merged
+
+
+def _noise(src: Source, u: _SemUnit) -> bool:
+    """쪽 표시(<!-- page N -->)와 반복 머리말·쪽 번호. 뜻 비교에서 빼고 앞 청크에 그대로 붙인다."""
+    el = src.element_at(u.s)
+    return (el is not None and el.kind == "furniture") or bool(_PAGE_MARK.match(src.text[u.s:u.e]))
+
+
+def _windows(src: Source, units: list[_SemUnit], ids: list[int], buffer: int) -> tuple[list[str], list[int]]:
+    """내용 문장마다 같은 절 안의 앞뒤 buffer개 문장을 이은 글, 그리고 문장마다 절 번호.
+    표·코드·제목이 끼면 다른 절로 본다(창이 넘어가지 않는다)."""
+    seg, current = [], 0
+    for k, i in enumerate(ids):
+        if k and any(units[m].hard or units[m].atomic for m in range(ids[k - 1] + 1, i + 1)):
+            current += 1
+        seg.append(current)
+    texts = [" ".join(src.text[units[i].s:units[i].e].split()) for i in ids]
+    out = []
+    for k in range(len(ids)):
+        lo = k
+        while lo > 0 and k - lo < buffer and seg[lo - 1] == seg[k]:
+            lo -= 1
+        hi = k
+        while hi + 1 < len(ids) and hi - k < buffer and seg[hi + 1] == seg[k]:
+            hi += 1
+        out.append(" ".join(texts[lo:hi + 1])[:SEMANTIC_WINDOW_CHARS])
+    return out, seg
+
+
+def _cosine_distance(a, b) -> float:
+    dot = math.fsum(x * y for x, y in zip(a, b))
+    na = math.sqrt(math.fsum(x * x for x in a))
+    nb = math.sqrt(math.fsum(y * y for y in b))
+    return 1.0 - (dot / (na * nb) if na > 0 and nb > 0 else 0.0)
+
+
+def _percentile(values: list[float], pct: int) -> float:
+    ordered = sorted(values)
+    rank = max(0, min(len(ordered) - 1, math.ceil(pct / 100 * len(ordered)) - 1))
+    return ordered[rank]
+
+
+def _semantic(src: Source, p: dict, embed) -> tuple[list[_Piece], dict]:
+    """이웃 문장(앞뒤 문장을 묶은 창)의 임베딩 거리가 문서 안에서 상위 구간이면 경계로 삼고, 크기로 다듬는다."""
+    if embed is None:
+        raise ChunkingError("의미 기반 청킹에는 임베딩 모델이 필요합니다. 설정에서 임베딩 연결을 확인하세요.")
+    unit, size, min_size = p["unit"], p["size"], p["min_size"]
+    units = semantic_units(src)
+    text_ids = [i for i, u in enumerate(units) if not u.atomic and not _noise(src, u)]
+    windows, seg = _windows(src, units, text_ids, p["buffer"])
+    vectors = embed(windows) if windows else []
+    if len(vectors) != len(windows):
+        raise ChunkingError("임베딩 응답 수가 문장 수와 다릅니다.")
+    # 같은 절 안에서 이어지는 두 내용 문장 사이의 거리. 경계는 뒤 문장 앞에 두고, 사이의 머리말은 앞 청크에 남는다.
+    # 그림과 캡션, 한 캡션의 조각('그림 1.' / 설명) 사이는 나누지 않는다.
+    figure = {"image", "caption"}
+    kind = {i: getattr(src.element_at(units[i].s), "kind", None) for i in text_ids}
+    gaps: dict[int, float] = {}
+    for k in range(1, len(text_ids)):
+        a, b = text_ids[k - 1], text_ids[k]
+        if seg[k] != seg[k - 1] or (kind[a] in figure and kind[b] in figure):
+            continue
+        gaps[b] = _cosine_distance(vectors[k - 1], vectors[k])
+    threshold = _percentile(list(gaps.values()), p["breakpoint"]) if gaps else None
+    breaks = {i for i, d in gaps.items() if threshold is not None and d >= threshold and d > 1e-6}
+
+    groups: list[tuple[list[_SemUnit], bool]] = []  # (문장들, 다음 묶음과 같은 절인지)
+    cur: list[_SemUnit] = []
+    size_cut = 0
+    for i, u in enumerate(units):
+        if cur:
+            hard = u.hard or u.atomic or cur[-1].atomic
+            if hard or i in breaks or src.measure(cur[0].s, u.e, unit) > size:
+                soft = not hard and i not in breaks
+                size_cut += soft
+                groups.append((cur, soft or i in breaks))
+                cur = []
+        cur.append(u)
+    if cur:
+        groups.append((cur, False))
+
+    # 최소 크기보다 작은 묶음은 같은 절의 다음 묶음과, 안 되면 앞 묶음과 합친다(최대 크기를 넘지 않을 때만).
+    # 쪽 표시·반복 머리말만 든 묶음은 절·표와 상관없이 앞 묶음에(문서 맨 앞이면 뒤 묶음에) 붙인다.
+    measure = lambda a, b: src.measure(a[0].s, b[-1].e, unit)  # noqa: E731
+    noise_only = lambda group: all(_noise(src, u) for u in group)  # noqa: E731
+    forward: list[tuple[list[_SemUnit], bool]] = []
+    carry: list[_SemUnit] = []
+    for k, (group, joined_next) in enumerate(groups):
+        group = carry + group
+        carry = []
+        small = measure(group, group) < min_size and not group[-1].atomic
+        nxt = groups[k + 1][0] if k + 1 < len(groups) else None
+        stray = noise_only(group) and not forward
+        fits = nxt is not None and (stray or not nxt[0].atomic) and measure(group, nxt) <= size
+        if small and fits and (joined_next or stray):
+            carry = group
+            continue
+        forward.append((group, joined_next))
+    final: list[tuple[list[_SemUnit], bool]] = []
+    for group, joined_next in forward:
+        small = measure(group, group) < min_size and not group[0].atomic and not group[-1].atomic
+        stray = noise_only(group)
+        if small and final and (stray or (final[-1][1] and not final[-1][0][-1].atomic)) and measure(final[-1][0], group) <= size:
+            final.append((final.pop()[0] + group, joined_next))
+            continue
+        final.append((group, joined_next))
+    merged = [group for group, _ in final]
+
+    pieces: list[_Piece] = []
+    for group in merged:
+        s, e = group[0].s, group[-1].e
+        if src.measure(s, e, unit) <= size:
+            piece = _Piece(s, e)
+        elif len(group) == 1 and group[0].atomic and group[0].block is not None and group[0].block.kind == "table":
+            table = group[0].block
+            if s < table.start:  # 표 위 제목
+                pieces.append(_Piece(s, table.start))
+            pieces += _table_pieces(src, table, unit, size, size)
+            _cap(pieces)
+            continue
+        else:
+            pieces += _recursive(src, s, e, unit, size, 0, level=2)
+            _cap(pieces)
+            continue
+        pieces.append(piece)
+        _cap(pieces)
+    meta = {"sentences": len(text_ids), "breakpoints": len(breaks), "size_cuts": size_cut,
+            "threshold": round(threshold, 4) if threshold is not None else None}
+    return pieces, meta
+
+
 def _table_pieces(src: Source, table: Block, unit: str, size: float, first_limit: float) -> list[_Piece]:
     """표를 행 단위로 나눈다. 두 번째 조각부터 머리행을 반복한다. 한 행이 너무 길면 그 행만 다시 나눈다."""
     rows = table.rows
@@ -1275,6 +1470,12 @@ def normalize_params(kind: str, params: dict | None) -> dict:
         out["min_size"] = min(size, max(0, _int(params.get("min_size"), size // 4, "최소 크기")))
     elif kind == "sentence":
         out["overlap_sentences"] = min(5, max(0, _int(params.get("overlap_sentences"), 1, "겹칠 문장 수")))
+    elif kind == "semantic":
+        out["min_size"] = min(size, max(0, _int(params.get("min_size"), size // 4, "최소 크기")))
+        out["breakpoint"] = min(99, max(50, _int(params.get("breakpoint"), 90, "경계 기준")))
+        out["buffer"] = min(3, max(0, _int(params.get("buffer"), 1, "앞뒤 문장 수")))
+        out["connection"] = str(params.get("connection") or "embed").strip()[:64]
+        out["model"] = str(params.get("model") or "").strip()[:200]
     else:
         if kind != "page":
             out["overlap"] = min(size // 2, max(0, _int(params.get("overlap"), 0, "겹침")))
@@ -1437,9 +1638,15 @@ def summarize(src: Source, chunks: list[dict], limit_tokens: int | None = None) 
     }
 
 
-def run_strategy(src: Source, spec: dict, limit_tokens: int | None = None) -> dict:
+def run_strategy(src: Source, spec: dict, limit_tokens: int | None = None, embed=None) -> dict:
+    """embed: 의미 기반 전략에만 쓰는 함수 texts → 벡터 목록. 없으면 의미 기반 전략은 오류를 낸다."""
     strategy = normalize_strategy(spec)
-    pieces, parents, extra = _pieces(src, strategy["kind"], strategy["params"])
+    semantic = None
+    if strategy["kind"] == "semantic":
+        pieces, semantic = _semantic(src, strategy["params"], embed)
+        parents, extra = None, {}
+    else:
+        pieces, parents, extra = _pieces(src, strategy["kind"], strategy["params"])
     chunks, roles = _build(src, pieces, limit_tokens)
     outcomes, tally = element_outcomes(src, roles)
     stats = summarize(src, chunks, limit_tokens)
@@ -1447,6 +1654,8 @@ def run_strategy(src: Source, spec: dict, limit_tokens: int | None = None) -> di
     result = {**strategy, "chunks": chunks, "stats": stats, "outcomes": outcomes, "by_kind": tally}
     if parents is not None:
         result["parents"] = parents
+    if semantic is not None:
+        result["semantic"] = semantic
     return result
 
 

@@ -6,9 +6,9 @@ from fastapi import APIRouter, Body, Depends, HTTPException, Request
 from fastapi.responses import Response
 
 from app.chunking import (EXAMPLE_QUESTIONS, MAX_CHUNKS, MAX_SOURCE_CHARS, SAMPLE_MARKDOWN, SAMPLE_NAME, SAMPLE_PREFIX, SAMPLES,
-                          STRATEGY_LABELS, ChunkingError, Source, describe_source, estimate_tokens, line_pages, run_strategy,
-                          sample_list, sample_source)
-from app.embedding import MODEL_SPECS, EmbedError, embed_batch, embed_connections, find_connection
+                          STRATEGY_LABELS, ChunkingError, NeedsEmbedding, Source, describe_source, estimate_tokens, line_pages,
+                          normalize_strategy, run_strategy, sample_list, sample_source)
+from app.embedding import MODEL_SPECS, EmbedError, embed_batch, embed_connections, find_connection, semantic_embedder
 from app.retrieval_jobs import (CAPS, Busy, PlanError, QuestionError, QuestionStore, RunManager, build_plan, export_rows, parse_import,
                                 preview_plan)
 from app.service import Conflict, MissingDocument
@@ -121,6 +121,28 @@ def _load_source(source, request: Request) -> tuple[Source, dict]:
         raise HTTPException(413, str(exc)) from None
 
 
+def _semantic_target(params: dict) -> tuple:
+    """의미 기반 전략의 (연결, 모델 ID, 문제). 모델을 비워 두면 연결의 첫 모델을 쓴다."""
+    params = params if isinstance(params, dict) else {}
+    conn = find_connection(str(params.get("connection") or "embed"))
+    if not conn or not conn.configured:
+        return None, "", "임베딩 연결이 없습니다. 설정 › 임베딩 모델에서 게이트웨이를 연결하세요."
+    model = str(params.get("model") or "").strip() or (conn.models[0] if conn.models else "")
+    if not model:
+        return None, "", "임베딩 모델 ID가 없습니다. 설정 › 임베딩 모델에서 모델을 추가하세요."
+    return conn, model, ""
+
+
+def _embedder_for(request: Request, allow_calls: bool):
+    """평가 계획·실행용: 의미 기반 프리셋마다 캐시를 쓰는 임베더를 만든다."""
+    def build(preset: dict):
+        conn, model, problem = _semantic_target(preset.get("params"))
+        if problem:
+            raise ChunkingError(problem)
+        return semantic_embedder(conn.for_model(model), _runs(request).cache(), allow_calls)
+    return build
+
+
 @router.post("/chunk")
 def chunk(request: Request, body: dict = Body(...)):
     strategies = body.get("strategies")
@@ -133,13 +155,28 @@ def chunk(request: Request, body: dict = Body(...)):
     limit = body.get("limit_tokens")
     limit = int(limit) if isinstance(limit, (int, float)) and not isinstance(limit, bool) and limit > 0 else None
 
+    # 의미 기반 전략은 캐시에 있는 문장 임베딩만 쓴다. 사용자가 '나누기'를 눌러 embed=true로 보낸 요청에서만 모델을 부른다.
+    allow_calls = body.get("embed") is True
+
     def evaluate(index):
         spec = strategies[index]
+        sid = str(spec.get("id") or index) if isinstance(spec, dict) else str(index)
+        empty = {"chunks": [], "stats": None, "outcomes": {}, "by_kind": {}}
         try:
-            return run_strategy(src, spec, limit)
+            embed, model = None, ""
+            if isinstance(spec, dict) and spec.get("kind") == "semantic":
+                conn, model, problem = _semantic_target(spec.get("params"))
+                if problem:
+                    return {**normalize_strategy(spec), "error": problem, **empty}
+                embed = semantic_embedder(conn.for_model(model), _runs(request).cache(), allow_calls)
+            result = run_strategy(src, spec, limit, embed)
+            if model:
+                result["semantic"]["model"] = model
+            return result
+        except NeedsEmbedding as exc:
+            return {**normalize_strategy(spec), "pending": {"missing": exc.missing, "total": exc.total, "model": model}, **empty}
         except ChunkingError as exc:
-            sid = str(spec.get("id") or index) if isinstance(spec, dict) else str(index)
-            return {"id": sid, "error": str(exc), "chunks": [], "stats": None, "outcomes": {}, "by_kind": {}}
+            return {"id": sid, "error": str(exc), **empty}
 
     # One source index per request. The shared pool bounds simultaneous comparison work across tabs.
     results = []
@@ -258,7 +295,7 @@ def plan_run(request: Request, body: dict = Body(...)):
     except QuestionError:
         questions = []
     try:
-        return preview_plan(body, request.app.state.documents, questions)
+        return preview_plan(body, request.app.state.documents, questions, _embedder_for(request, allow_calls=False))
     except PlanError as exc:
         raise HTTPException(400, str(exc)) from None
 
@@ -268,7 +305,7 @@ def start_run(request: Request, body: dict = Body(...)):
     runs = _runs(request)
     try:
         questions = _questions(request).load()["questions"]
-        plan = build_plan(body, request.app.state.documents, questions, embed_connections())
+        plan = build_plan(body, request.app.state.documents, questions, embed_connections(), _embedder_for(request, allow_calls=True))
     except (PlanError, QuestionError) as exc:
         raise HTTPException(400, str(exc)) from None
     try:

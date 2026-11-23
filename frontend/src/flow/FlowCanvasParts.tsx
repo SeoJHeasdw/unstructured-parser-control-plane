@@ -56,7 +56,7 @@ function Label({ id, data }: { id: string; data: FlowNodeData }) {
   const input = useRef<HTMLInputElement>(null);
   const editing = ui.editingId === id;
   useEffect(() => { if (editing) input.current?.select(); }, [editing]);
-  if (!editing) return <b className="fx-label" title={data.label}>{data.label}</b>;
+  if (!editing) return <b className="fx-label" data-tip={data.label} data-tip-overflow>{data.label}</b>;
   const commit = () => { const value = input.current?.value.trim(); if (value) ui.rename(id, value); ui.setEditingId(null); };
   return <input ref={input} className="fx-label-input nodrag" defaultValue={data.label} aria-label="노드 이름" onBlur={commit} onKeyDown={event => { event.stopPropagation(); if (event.key === 'Enter') commit(); if (event.key === 'Escape') ui.setEditingId(null); }} />;
 }
@@ -70,8 +70,8 @@ function Counters({ metric, kind }: { metric: NodeMetric; kind: NodeKind }) {
     <span>처리 <b>{metric.processing}</b>{kind !== 'subflow' && <i>/{metric.capacity}</i>}</span>
     {(metric.held > 0 || kind === 'review') && <span className={metric.held ? 'is-warn' : ''}>보류 <b>{metric.held}</b></span>}
     {metric.failed > 0 && <span className="is-error">실패 <b>{metric.failed}</b></span>}
-    {metric.spawned > 0 && !crowded && <span className="is-spawn" title="최근 1분 동안 만든 하위 문서">파생 <b>{metric.spawned}</b></span>}
-    {!crowded && <em title={`분당 처리 ${n(metric.throughput)}건`}>{n(metric.throughput)}<small>/분</small></em>}
+    {metric.spawned > 0 && !crowded && <span className="is-spawn" data-tip="최근 1분 동안 만든 하위 문서" data-tip-side="top">파생 <b>{metric.spawned}</b></span>}
+    {!crowded && <em data-tip={`분당 처리 ${n(metric.throughput)}건`} data-tip-side="top">{n(metric.throughput)}<small>/분</small></em>}
   </div>;
 }
 export const wait = (seconds: number) => seconds >= 60 ? `${Math.floor(seconds / 60)}분 ${Math.round(seconds % 60)}초` : `${Math.round(seconds)}초`;
@@ -120,7 +120,7 @@ export const FlowNodeView = memo(function FlowNodeView({ id, data, selected }: N
   if (kind === 'subflow') {
     const formats = data.subflow ? ui.flowFormats(data.subflow) : [];
     return <div className={`fx-box fx-subflow${state}`}>
-      <div className="fx-sub-head"><span className="fx-icon"><Icon size={15} /></span>{!monitor && <span className="fx-sub-tag">하위 흐름</span>}{metric && metric.spawned > 0 && <span className="fx-sub-spawn" title="최근 1분 동안 만든 하위 문서">파생 {metric.spawned}</span>}<button className="fx-subflow-open nodrag" onClick={open} disabled={!data.subflow} aria-label={`${data.label} 하위 흐름 열기`} title="하위 흐름 열기"><Maximize2 size={14} /></button>{monitor && <span className={`fx-status is-${status}`} title={STATUS_LABEL[status]}>{status === 'paused' ? <CirclePause size={14} /> : <i />}</span>}</div>
+      <div className="fx-sub-head"><span className="fx-icon"><Icon size={15} /></span>{!monitor && <span className="fx-sub-tag">하위 흐름</span>}{metric && metric.spawned > 0 && <span className="fx-sub-spawn" data-tip="최근 1분 동안 만든 하위 문서" data-tip-side="top">파생 {metric.spawned}</span>}<button className="fx-subflow-open nodrag" onClick={open} disabled={!data.subflow} aria-label={`${data.label} 하위 흐름 열기`} data-tip="하위 흐름 열기"><Maximize2 size={14} /></button>{monitor && <span className={`fx-status is-${status}`} data-tip={STATUS_LABEL[status]}>{status === 'paused' ? <CirclePause size={14} /> : <i />}</span>}</div>
       <Label id={id} data={data} />
       {metric ? <div className="fx-sub-grid">
         <span className={metric.queued >= 12 ? 'is-warn' : ''}>대기<b>{n(metric.queued)}</b></span><span>처리<b>{metric.processing}</b></span>
@@ -133,8 +133,8 @@ export const FlowNodeView = memo(function FlowNodeView({ id, data, selected }: N
   return <div className={`fx-box fx-${kind}${state}`}>
     <div className="fx-box-head">
       <span className="fx-icon"><Icon size={16} /></span>
-      <div className="fx-titles"><Label id={id} data={data} /><small title={data.engine}>{data.engine || KIND_META[kind].label}</small></div>
-      {monitor && <span className={`fx-status is-${status}`} title={STATUS_LABEL[status]}>{status === 'paused' ? <CirclePause size={14} /> : <i />}</span>}
+      <div className="fx-titles"><Label id={id} data={data} /><small data-tip={data.engine} data-tip-overflow>{data.engine || KIND_META[kind].label}</small></div>
+      {monitor && <span className={`fx-status is-${status}`} data-tip={STATUS_LABEL[status]}>{status === 'paused' ? <CirclePause size={14} /> : <i />}</span>}
     </div>
     {metric ? <Counters metric={metric} kind={kind} /> : <DesignMeta data={data} flowFormats={ui.flowFormats} />}
     {metric?.bypass && <span className="fx-flag">우회 중</span>}
@@ -211,7 +211,7 @@ export function FlowEdgeView({ id, source, target, data, selected }: EdgeProps<F
       {(label || traffic > 0) && <div className={`fx-edge-label${exception ? ' is-exception' : ''}${forced ? ' is-forced' : ''}${label ? '' : ' is-count'}`} style={{ transform: label ? labelAt : `translate(-50%, -50%) translate(${route.mid.x}px, ${route.mid.y}px)` }}>
         {label}{traffic > 0 && <b>{label ? ' · ' : ''}{traffic}</b>}
       </div>}
-      {showInsert && <button className="fx-edge-insert nodrag nopan" style={{ transform: `translate(-50%, -50%) translate(${route.mid.x}px, ${route.mid.y}px)` }} aria-label="이 연결 사이에 단계 삽입" title="이 연결 사이에 단계 삽입"
+      {showInsert && <button className="fx-edge-insert nodrag nopan" style={{ transform: `translate(-50%, -50%) translate(${route.mid.x}px, ${route.mid.y}px)` }} aria-label="이 연결 사이에 단계 삽입" data-tip="이 연결 사이에 단계 삽입"
         onMouseEnter={() => ui.setHoveredEdge(id)} onMouseLeave={() => ui.setHoveredEdge(null)} onClick={event => ui.requestInsert(id, event.currentTarget)}><Plus size={13} /></button>}
     </EdgeLabelRenderer>
   </>;

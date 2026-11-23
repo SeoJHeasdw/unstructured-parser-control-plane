@@ -84,7 +84,7 @@ export function DocumentRuns({ doc, active, mode, onMode }: {
 
         {runs.map(run => <option key={run.run_id} value={run.run_id} disabled={run.run_id === other}>{runLabel(run)}</option>)}
       </select>
-      {side === 'right' && left && right && <button className="button-quiet" title="이전과 현재 바꾸기" aria-label="이전과 현재 바꾸기"
+      {side === 'right' && left && right && <button className="button-quiet" data-tip="이전과 현재 바꾸기" aria-label="이전과 현재 바꾸기"
         onClick={() => change({ left: right, right: left })}><ArrowRightLeft size={15} /></button>}
     </div>;
   }

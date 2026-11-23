@@ -197,3 +197,9 @@
   .lw-file-copy .lw-long-name { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; white-space: normal; }
   .lw-long-name > span { display: inline; }
 }
+
+/* 알림·진행·화면 전환이 툭 끊기지 않게 */
+.lw-message, .lw-progress { animation: ui-enter-down .2s var(--ease-out); }
+.lw-drop-hint { animation: ui-fade .14s ease-out; }
+.lw-inbox, .lw-detail, .lw-empty, .compare-space { animation: ui-fade .2s ease-out; }
+.st-row { animation: ui-fade .16s ease-out; }

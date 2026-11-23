@@ -93,11 +93,11 @@ export default function VdbTree({ source, tree, selected, partition, onSelect }:
           onMouseEnter={tipBind?.onMouseEnter} onMouseLeave={tipBind?.onMouseLeave} onBlur={tipBind?.onBlur} aria-describedby={tipBind?.['aria-describedby']}
           onFocus={event => { setFocusId(item.id); tipBind?.onFocus(event); }}>
           <span className="vdb-ti-chev" aria-hidden onClick={event => { if (item.expandable && item.kind !== 'db') { event.stopPropagation(); toggle(item); } }}>{item.expandable && <ChevronRight size={13} className={item.expanded ? 'is-open' : ''} />}</span>
-          {item.kind === 'db' && <><Database size={14} className="vdb-ti-icon" aria-hidden /><span className="vdb-ti-name" title={item.db}>{item.db}</span><span className="vdb-ti-meta">{item.rows ? `컬렉션 ${item.rows}` : '컬렉션 없음'}</span></>}
-          {item.kind === 'coll' && item.coll && <><Layers size={14} className="vdb-ti-icon" aria-hidden /><span className="vdb-ti-name" title={item.coll.name}>{item.coll.name}</span>
+          {item.kind === 'db' && <><Database size={14} className="vdb-ti-icon" aria-hidden /><span className="vdb-ti-name" data-tip={item.db} data-tip-overflow>{item.db}</span><span className="vdb-ti-meta">{item.rows ? `컬렉션 ${item.rows}` : '컬렉션 없음'}</span></>}
+          {item.kind === 'coll' && item.coll && <><Layers size={14} className="vdb-ti-icon" aria-hidden /><span className="vdb-ti-name">{item.coll.name}</span>
             {item.coll.dim && <span className="vdb-dim">{item.coll.dim}d</span>}<span className="vdb-ti-meta">{fmtCount(item.rows)}</span>
             <i className={`vdb-load ${item.coll.load_state === 'LoadStateLoaded' ? 'is-on' : ''}`} aria-label={loadLabel(item.coll.load_state)} /></>}
-          {item.kind === 'part' && <><i className="vdb-swatch" style={{ background: item.color }} aria-hidden /><span className="vdb-ti-name" title={item.part}>{item.part}</span>
+          {item.kind === 'part' && <><i className="vdb-swatch" style={{ background: item.color }} aria-hidden /><span className="vdb-ti-name">{item.part}</span>
             <span className="vdb-ti-bar" aria-hidden><i style={{ width: `${Math.max(share * 100, item.rows ? 3 : 0)}%`, background: item.color }} /></span><span className="vdb-ti-meta">{fmtCount(item.rows)}</span></>}
           {item.error && <TriangleAlert size={13} className="vdb-ti-warn" aria-label="일부 정보를 읽지 못함" />}
         </div>;

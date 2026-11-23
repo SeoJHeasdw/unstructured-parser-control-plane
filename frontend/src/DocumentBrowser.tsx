@@ -84,7 +84,7 @@ export function DocumentBrowser({ docs, filter, onFilterChange, onOpenDoc, onPip
             <Search size={18} aria-hidden="true" />
             <input ref={searchInput} value={query} onChange={event => onFilterChange({ ...filter, query: event.target.value })}
               placeholder="파일명, ID, 원천 검색" aria-label="문서 검색" />
-            {query && <button type="button" className="inventory-icon-button" aria-label="검색어 지우기" onClick={() => {
+            {query && <button type="button" className="inventory-icon-button" aria-label="검색어 지우기" data-tip="검색어 지우기" onClick={() => {
               onFilterChange({ ...filter, query: undefined });
               searchInput.current?.focus();
             }}><X size={16} aria-hidden="true" /></button>}
@@ -152,7 +152,7 @@ export function DocumentBrowser({ docs, filter, onFilterChange, onOpenDoc, onPip
                     <button type="button" className="doc-name-button inventory-file-button" onClick={() => onOpenDoc(doc.id)}>
                       <FileIcon format={doc.format} />
                       <span className="inventory-file-text">
-                        <b title={doc.name}>{doc.name}</b>
+                        <b data-tip={doc.name} data-tip-overflow>{doc.name}</b>
                         <span className="inventory-file-meta">
                           <span className="inventory-format">{doc.format}</span>
                           <span className="inventory-file-size">{doc.size}</span>

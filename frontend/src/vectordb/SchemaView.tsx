@@ -31,7 +31,7 @@ export default function SchemaView({ detail }: { detail: CollectionDetail }) {
       <span className="vdb-chip">{v.metric ?? '측정 방식 미확인'}</span><span className="vdb-chip">{v.index_type ?? '인덱스 없음'}</span>
       {v.index_params ? Object.entries(v.index_params).map(([k, val]) => <span key={k} className="vdb-chip is-param">{k} <b>{fmtValue(val)}</b></span>) : v.index_type ? <span className="vdb-muted">인덱스 매개변수 제공 안 됨</span> : null}
       {v.index_state && <span className={`vdb-chip ${v.index_state === 'Finished' ? 'is-ok' : 'is-warn'}`}>{v.index_state}{v.total_rows !== null ? ` · ${fmtCount(v.indexed_rows)}/${fmtCount(v.total_rows)}` : ''}{v.pending_rows ? ` · 대기 ${fmtCount(v.pending_rows)}` : ''}</span>}
-      {v.fail_reason && <span className="vdb-chip is-warn" title={v.fail_reason}>실패: {fmtValue(v.fail_reason, 40)}</span>}
+      {v.fail_reason && <span className="vdb-chip is-warn" data-tip={v.fail_reason} data-tip-overflow={fmtValue(v.fail_reason, 40) === v.fail_reason ? true : undefined}>실패: {fmtValue(v.fail_reason, 40)}</span>}
     </div>)}{!detail.vector_fields.length && <p className="vdb-muted">벡터 필드가 없습니다.</p>}</div>
 
     <div className="vdb-table-wrap">
@@ -46,7 +46,7 @@ export default function SchemaView({ detail }: { detail: CollectionDetail }) {
           <td>{f.partition_key ? '예' : ''}</td>
           <td>{f.index_type ?? ''}</td>
           <td>{(roles[f.name] ?? []).filter(r => r !== 'pk').map(r => <span key={r} className="vdb-role">{ROLE_LABEL[r]}</span>)}</td>
-          <td className="is-desc" title={f.description}>{f.description || ''}</td>
+          <td className="is-desc" data-tip={f.description || undefined} data-tip-overflow>{f.description || ''}</td>
         </tr>)}</tbody>
       </table>
     </div>

@@ -23,8 +23,8 @@ function displayError(error: unknown) {
 
 function FileName({name}: {name: string}) {
  const chars = Array.from(name);
- if (chars.length <= 28) return <strong title={name}>{name}</strong>;
- return <strong className="lw-long-name" title={name} aria-label={name}><span>{chars.slice(0,-12).join('')}</span><span>{chars.slice(-12).join('')}</span></strong>;
+ if (chars.length <= 28) return <strong data-tip={name} data-tip-overflow>{name}</strong>;
+ return <strong className="lw-long-name" data-tip={name} data-tip-overflow aria-label={name}><span>{chars.slice(0,-12).join('')}</span><span>{chars.slice(-12).join('')}</span></strong>;
 }
 
 type LiveWorkspaceProps = {
@@ -288,7 +288,7 @@ export default function LiveWorkspace({ active = true, route, onRoute, onFamily,
         </select></label>
         {(query || filter !== 'all') && filtered.length > 0 && <button className="lw-reset" onClick={resetFilters}>조건 초기화</button>}
         {countsAvailable && <span className="lw-count">{filtered.length.toLocaleString('ko-KR')}개 문서</span>}
-        {!listError && <button className="lw-icon-btn" title="문서 목록 새로고침" aria-label="문서 목록 새로고침" onClick={() => void refresh(true)}><RefreshCw size={16} /></button>}
+        {!listError && <button className="lw-icon-btn" data-tip="문서 목록 새로고침" aria-label="문서 목록 새로고침" onClick={() => void refresh(true)}><RefreshCw size={16} /></button>}
       </div>
       <div className="live-list">
         {loading ? <p className="lw-placeholder" role="status">문서 목록을 불러오는 중입니다.</p> :

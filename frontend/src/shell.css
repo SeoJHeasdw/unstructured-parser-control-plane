@@ -21,13 +21,14 @@
   position: fixed; z-index: 20; inset: 0 auto 0 0; width: var(--sidebar-width);
   display: flex; flex-direction: column; padding: 0 12px 12px;
   background: var(--rail); color: var(--rail-ink); border-right: 1px solid var(--rule);
+  overflow: hidden; transition: width var(--dur-3) var(--ease-out);
 }
-.shell-brand { min-height: 76px; display: flex; align-items: center; gap: 9px; padding: 0 3px; }
+.shell-brand { position: relative; min-height: 76px; display: flex; align-items: center; gap: 9px; padding: 0 3px; }
 .shell-mark {
   display: grid; place-items: center; width: 36px; height: 36px; flex: none;
   border: 0; border-radius: 9px; color: white;
-  background: var(--ink-1);
-
+  background: var(--ink-1); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .12), 0 1px 2px rgba(22, 30, 48, .18);
+  transition: opacity var(--dur-2) ease, scale var(--dur-2) var(--ease-out);
 }
 .shell-brand-text { flex: 1; min-width: 0; }
 .shell-brand-text strong { display: block; color: var(--ink-1); font-size: 16px; letter-spacing: -.32px; white-space: nowrap; }
@@ -36,8 +37,9 @@
   display: grid; place-items: center; flex: none; width: 32px; height: 34px; padding: 0;
   border: 0; border-radius: 7px; background: transparent; color: inherit;
 }
-.shell-sidebar-toggle { color: var(--ink-3); }
+.shell-sidebar-toggle { color: var(--ink-3); transition: background-color var(--dur-1), color var(--dur-1), opacity var(--dur-2) ease, scale var(--dur-1) var(--ease-out); }
 .shell-sidebar-toggle:hover { background: var(--surface-3); color: var(--ink-1); }
+.shell-sidebar-toggle:active { scale: .92; }
 .shell-nav { flex: 1; min-height: 0; overflow: auto; scrollbar-width: thin; padding: 3px 3px 12px; }
 .shell-sidebar .shell-nav { scrollbar-color: #44546e transparent; margin: 0 -3px; }
 .shell-nav-group { margin: 0 0 16px; }
@@ -60,16 +62,13 @@
 .shell-nav-item.is-active::before { content: ''; position: absolute; width: 3px; inset: 10px auto 10px -1px; border-radius: 2px; background: var(--accent); }
 .shell-nav-item em { color: #ffdc9a; background: #4a4140; border-radius: 5px; padding: 2px 6px; font-size: 11px; font-weight: 650; font-style: normal; line-height: 1.4; }
 .shell-environment {
-  display: flex; align-items: center; gap: 9px; min-height: 45px; margin-top: 8px; padding: 6px 8px;
+  display: flex; align-items: center; gap: 9px; min-height: 45px; margin-top: 8px; padding: 6px 13px;
   border-top: 1px solid var(--rule); color: var(--ink-3); font-size: 12px; white-space: nowrap;
 }
 .shell-environment-icon { display: grid; width: 28px; height: 28px; flex: none; place-items: center; background: #23314a; border-radius: 7px; color: #b5c6eb; }
-.shell-collapsed .shell-brand { flex-direction: column; padding: 14px 0 7px; gap: 7px; }
-.shell-collapsed .shell-sidebar .shell-nav-item { justify-content: center; padding-inline: 0; }
 .shell-collapsed .shell-nav-group { margin-bottom: 11px; }
-.shell-collapsed .shell-environment { justify-content: center; padding-inline: 0; }
 
-.shell-main { margin-left: var(--sidebar-width); min-width: 0; }
+.shell-main { margin-left: var(--sidebar-width); min-width: 0; transition: margin-left var(--dur-3) var(--ease-out); }
 .shell-header { position: sticky; inset-block-start: 0; z-index: 15; background: var(--surface); }
 .shell-topbar {
   height: var(--shell-top-height); display: flex; align-items: center; gap: 10px;
@@ -216,7 +215,7 @@
 }
 
 .shell-sidebar .shell-nav { display: flex; flex-direction: column; gap: 3px; }
-.shell-nav-item { text-decoration: none; min-height: 42px; transition: background-color .12s; font-size: 14px; }
+.shell-nav-item { text-decoration: none; min-height: 42px; overflow: hidden; transition: background-color var(--dur-1), color var(--dur-1), scale var(--dur-1) var(--ease-out); font-size: 14px; }
 .shell-examples { margin-top: auto; padding-top: 24px; }
 .shell-mobile-nav .shell-examples { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--rule); }
 .shell-title-row h1,.lw-workspace h1 { font-size: clamp(25px,2.4vw,30px); line-height: 1.3; font-weight: 650; }
@@ -328,3 +327,39 @@
 .shell-flow-fullscreen .shell-fill > .ps-root { border:0; border-radius:0; }
 .shell-flow-fullscreen .shell-content:not(.is-fill) { padding:14px clamp(12px,2vw,32px); }
 @media(pointer:coarse) { .flow-fullscreen-toggle { min-width:44px; min-height:44px; } }
+
+/* ---------- 사이드바 접기·펼치기 ----------
+ * 폭이 줄면서 이름이 먼저 흐려지고, 아이콘은 제자리에 머문다(접힌 폭 68px의 가운데).
+ * 접힌 상태에서는 로고에 마우스를 올리면 펼치기 버튼으로 바뀐다. */
+.shell-brand-text, .shell-sidebar .shell-nav-item span, .shell-environment span {
+  transition: opacity var(--dur-2) ease .06s, translate var(--dur-3) var(--ease-out);
+}
+.shell-collapsed :is(.shell-brand-text, .shell-sidebar .shell-nav-item span, .shell-environment span) {
+  opacity: 0; translate: -6px 0; pointer-events: none; transition-delay: 0s; transition-duration: .1s, var(--dur-2);
+}
+.shell-collapsed .shell-sidebar-toggle {
+  position: absolute; left: 3px; top: 50%; translate: 0 -50%; width: 36px; height: 36px; border-radius: 9px;
+  background: var(--surface-3); color: var(--ink-1); opacity: 0;
+}
+.shell-collapsed .shell-sidebar-toggle:active { scale: .92; }
+.shell-collapsed .shell-sidebar-toggle:is(:hover, :focus-visible) { opacity: 1; }
+.shell-collapsed .shell-brand:has(.shell-sidebar-toggle:is(:hover, :focus-visible)) .shell-mark { opacity: 0; scale: .9; }
+.shell-sidebar .shell-nav-item:active { scale: .98; }
+.shell-sidebar .shell-nav-item > svg { transition: color var(--dur-1); }
+.shell-nav-item.is-active::before { animation: shell-indicator .3s var(--ease-out); }
+@keyframes shell-indicator { from { opacity: 0; scale: 1 .3; } }
+/* 화면을 옮기면 본문이 짧게 떠오른다(투명도만 바꿔 고정 위치 요소에 영향을 주지 않는다). */
+.shell-content > :not([hidden]) { animation: shell-page-in .2s ease-out; }
+@keyframes shell-page-in { from { opacity: 0; } }
+
+/* 접기·펼치기 아이콘: 테두리는 옅게, 막대·화살표는 진하게(두 톤) */
+.shell-glyph-frame { stroke-opacity: .42; transition: stroke-opacity var(--dur-1); }
+.shell-sidebar-toggle:is(:hover, :focus-visible) .shell-glyph-frame { stroke-opacity: .6; }
+.shell-glyph-bar { transform-box: fill-box; transform-origin: left center; transition: scale .28s var(--ease-out), fill var(--dur-1); }
+.shell-glyph-arrow { transform-box: fill-box; transform-origin: center; transition: rotate .34s var(--ease-out), translate .2s var(--ease-out), stroke var(--dur-1); }
+.shell-collapsed .shell-glyph-bar { scale: .5 1; }
+.shell-collapsed .shell-glyph-arrow { rotate: 180deg; }
+.shell-sidebar-toggle:is(:hover, :focus-visible) .shell-glyph-bar { scale: .5 1; fill: var(--accent); }
+.shell-sidebar-toggle:is(:hover, :focus-visible) .shell-glyph-arrow { translate: -1px 0; }
+.shell-collapsed .shell-sidebar-toggle:is(:hover, :focus-visible) .shell-glyph-bar { scale: 1 1; }
+.shell-collapsed .shell-sidebar-toggle:is(:hover, :focus-visible) .shell-glyph-arrow { translate: 1px 0; }

@@ -1,6 +1,6 @@
 import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import type { MouseEvent, ReactNode } from 'react';
-import { AlertCircle, ArrowLeft, ArrowRight, Boxes, ChevronRight, FlaskConical, FolderOpen, Layers3, Maximize2, Minimize2, Menu, PanelLeftClose, PanelLeftOpen, Search, Server, Settings2 } from 'lucide-react';
+import { AlertCircle, ArrowLeft, ArrowRight, Boxes, ChevronRight, FlaskConical, FolderOpen, Layers3, Maximize2, Minimize2, Menu, Search, Server, Settings2 } from 'lucide-react';
 import Dashboard from './Dashboard';
 import LiveWorkspace from './LiveWorkspace';
 import ModelWorkspace from './ModelWorkspace';
@@ -11,7 +11,7 @@ import { loadLibrary } from './flow/flowTemplates';
 import { DocumentBrowser, DocumentDrawer, CompareView } from './DocumentViews';
 import { WorkspaceLink } from './WorkspaceLink';
 import { WorkspaceFinder } from './WorkspaceFinder';
-import { Modal } from './ui';
+import { Modal, TooltipLayer } from './ui';
 import { destinations, examples, toolsList, useWorkspaceRoute, workspaceHref } from './navigation';
 import type { Page, WorkspaceRoute } from './navigation';
 import type { AppData, DocumentFilter } from './types';
@@ -22,6 +22,16 @@ const LineageView = lazy(() => import('./LineageView'));
 const ChunkBench = lazy(() => import('./ChunkBench'));
 const EmbeddingEval = lazy(() => import('./EmbeddingEval'));
 const VectorDbWorkspace = lazy(() => import('./VectorDbWorkspace'));
+
+/** 사이드바 접기·펼치기 아이콘. 둥근 막대가 사이드바, 화살표가 누를 때 갈 방향이다.
+ * 상태가 바뀌면 막대가 줄고 늘며 화살표가 뒤집히고, 마우스를 올리면 누른 뒤 모습을 미리 보여 준다(shell.css). */
+function SidebarGlyph() {
+  return <svg className="shell-glyph" viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <rect className="shell-glyph-frame" x="2.75" y="3.75" width="14.5" height="12.5" rx="3.25"/>
+    <rect className="shell-glyph-bar" x="4.75" y="5.75" width="3.5" height="8.5" rx="1.75" fill="currentColor" stroke="none"/>
+    <path className="shell-glyph-arrow" d="M13 8 11 10l2 2"/>
+  </svg>;
+}
 
 const finderItems = (Object.keys(destinations) as Page[]).map(id => ({ id, ...destinations[id] }));
 const shortcut = /Mac|iPhone|iPad/.test(navigator.platform) ? '⌘ K' : 'Ctrl K';
@@ -35,7 +45,7 @@ export default function App() {
   const fullscreenLabel = fullscreen.expanded ? '전체화면 종료' : '전체화면';
   const FullscreenIcon = fullscreen.expanded ? Minimize2 : Maximize2;
   const fullscreenButton = <button className="flow-fullscreen-toggle" onClick={fullscreen.toggle}
-    aria-pressed={fullscreen.expanded} aria-label={fullscreenLabel} title={fullscreen.expanded ? '전체화면 종료 (Esc)' : fullscreenLabel}>
+    aria-pressed={fullscreen.expanded} aria-label={fullscreenLabel} data-tip={fullscreen.expanded ? fullscreenLabel : undefined} data-tip-key="Esc">
     <FullscreenIcon size={16} aria-hidden="true"/><span>{fullscreenLabel}</span></button>;
   const example = examples.includes(active) || active === 'pipeline';
   const [visited, setVisited] = useState<Page[]>([active]);
@@ -100,7 +110,7 @@ export default function App() {
   }
   function navLink(page: Page, label: string, Icon: typeof FolderOpen, isCurrent: boolean, expanded: boolean) {
     return <a href={workspaceHref({ page })} onClick={e => link(e, page)} className={'shell-nav-item' + (isCurrent ? ' is-active' : '')}
-      aria-current={isCurrent ? 'location' : undefined} aria-label={label} title={label}><Icon size={20} strokeWidth={1.75} aria-hidden="true"/>{expanded && <span>{label}</span>}</a>;
+      aria-current={isCurrent ? 'location' : undefined} aria-label={label} data-tip={expanded ? undefined : label} data-tip-side="right"><Icon size={20} strokeWidth={1.75} aria-hidden="true"/><span>{label}</span></a>;
   }
   const chunkSource = active !== 'chunking' ? undefined
     : route.doc ? `doc:${route.doc}` as const : route.sample ? `sample:${route.sample}` as const : undefined;
@@ -121,11 +131,12 @@ export default function App() {
     <a className="shell-skip" href="#workspace-content">본문으로 건너뛰기</a>
     <aside className="shell-sidebar" aria-label="주 탐색 메뉴">
       <div className="shell-brand"><span className="shell-mark"><Layers3 size={24} aria-hidden="true"/></span>
-        {sidebarOpen && <div className="shell-brand-text"><strong>비정형 관리 콘솔</strong></div>}
-        <button className="shell-sidebar-toggle" aria-expanded={sidebarOpen} aria-label={sidebarOpen ? '사이드바 접기' : '사이드바 펼치기'} onClick={() => setSidebarOpen(!sidebarOpen)}>
-          {sidebarOpen ? <PanelLeftClose size={17}/> : <PanelLeftOpen size={17}/>}</button></div>
+        <div className="shell-brand-text" aria-hidden={!sidebarOpen || undefined}><strong>비정형 관리 콘솔</strong></div>
+        <button className="shell-sidebar-toggle" aria-expanded={sidebarOpen} aria-label={sidebarOpen ? '사이드바 접기' : '사이드바 펼치기'}
+          data-tip={sidebarOpen ? '사이드바 접기' : '사이드바 펼치기'} data-tip-side={sidebarOpen ? 'bottom' : 'right'} onClick={() => setSidebarOpen(!sidebarOpen)}>
+          <SidebarGlyph/></button></div>
       {nav(sidebarOpen)}
-      <div className="shell-environment"><Server size={16}/>{sidebarOpen && <span>로컬 워크스페이스</span>}</div>
+      <div className="shell-environment" data-tip={sidebarOpen ? undefined : '로컬 워크스페이스'} data-tip-side="right"><Server size={16} aria-hidden="true"/><span aria-hidden={!sidebarOpen || undefined}>로컬 워크스페이스</span></div>
     </aside>
     <main className="shell-main">
       <header className="shell-header"><div className="shell-topbar">
@@ -160,6 +171,7 @@ export default function App() {
       </div>
     </main>
     {mobileMenu && <Modal open title="탐색 메뉴" size="sm" onClose={() => setMobileMenu(false)}><div className="shell-mobile-nav">{nav(true)}</div></Modal>}
+    <TooltipLayer/>
     {finderOpen && <WorkspaceFinder destinations={finderItems} current={active} onClose={() => setFinderOpen(false)} onNavigate={navigate}/>}
     {current && data && <DocumentDrawer doc={current} relations={data.relations} onClose={() => setSelected(null)}
       onCompare={() => { setSelected(null); go({page:'compare', doc:current.id}); }}

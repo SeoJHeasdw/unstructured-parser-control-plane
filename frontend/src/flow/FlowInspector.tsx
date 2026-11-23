@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
-import { ArrowDownToLine, ArrowRight, ArrowRightLeft, Ban, Check, ChevronsUp, CirclePause, CirclePlay, Copy, Download, ExternalLink, FileSearch, LayoutGrid, Minus, Plus, RotateCcw, Route, SkipForward, Trash2, TriangleAlert, Upload, X } from 'lucide-react';
+import { ArrowDownToLine, ArrowRight, ArrowRightLeft, Ban, Check, ChevronsUp, CirclePause, CirclePlay, Copy, Download, ExternalLink, FileSearch, GitCommitHorizontal, GitCommitVertical, Minus, Plus, RotateCcw, Route, SkipForward, Trash2, TriangleAlert, Upload, X } from 'lucide-react';
 import { KIND_META, STATUS_LABEL, TASK_ICON, wait } from './FlowCanvasParts';
 import { aggregate, rid, splitRid } from './flowSim';
 import type { DocAction, FlowSimulator, NodeMetric, SimDoc, SimSnapshot } from './flowSim';
@@ -93,7 +93,7 @@ function FlowDesign({ library, flow, issues, onSelectNode, onFlowMeta, onLayout,
     <Section title="기본 정보">
       <TextField label="흐름 이름" value={flow.title} onCommit={title => title.trim() && onFlowMeta({ title: title.trim() })} />
       <TextField label="설명" value={flow.summary} onCommit={summary => onFlowMeta({ summary })} multiline />
-      {flow.id !== OVERVIEW_ID && <div className="fi-field"><span>들어오는 형식</span><div className="fi-chips">{formats.length ? formats.map(format => <button key={format} className="fi-chip" onClick={() => onOpenDocuments(format)} title={`${format} 예시 문서 보기`}>{format}<FileSearch size={11} /></button>) : <small className="fi-muted">전체 흐름의 라우팅에 연결되지 않았습니다.</small>}</div></div>}
+      {flow.id !== OVERVIEW_ID && <div className="fi-field"><span>들어오는 형식</span><div className="fi-chips">{formats.length ? formats.map(format => <button key={format} className="fi-chip" onClick={() => onOpenDocuments(format)} data-tip={`${format} 예시 문서 보기`}>{format}<FileSearch size={11} /></button>) : <small className="fi-muted">전체 흐름의 라우팅에 연결되지 않았습니다.</small>}</div></div>}
       <div className="fi-stats"><span>노드 <b>{flow.nodes.length}</b></span><span>연결 <b>{flow.edges.length}</b></span><span>방향 <b>{flow.direction === 'TB' ? '세로' : '가로'}</b></span></div>
     </Section>
     <Section title="검증" aside={<span className={`fi-badge ${issues.length ? 'is-warn' : 'is-ok'}`}>{issues.length ? `${issues.length}건` : '문제 없음'}</span>}>
@@ -101,8 +101,8 @@ function FlowDesign({ library, flow, issues, onSelectNode, onFlowMeta, onLayout,
     </Section>
     <Section title="정렬과 파일">
       <div className="fi-grid2">
-        <button className="fi-button" onClick={() => onLayout('TB')}><LayoutGrid size={14} /> 세로 자동 정렬</button>
-        <button className="fi-button" onClick={() => onLayout('LR')}><ArrowRightLeft size={14} /> 가로 자동 정렬</button>
+        <button className="fi-button" onClick={() => onLayout('TB')}><GitCommitVertical size={15} /> 세로 자동 정렬</button>
+        <button className="fi-button" onClick={() => onLayout('LR')}><GitCommitHorizontal size={15} /> 가로 자동 정렬</button>
         <button className="fi-button" onClick={onExport}><Download size={14} /> JSON 내보내기</button>
         <button className="fi-button" onClick={onImport}><Upload size={14} /> JSON 가져오기</button>
       </div>
@@ -125,7 +125,7 @@ function NodeDesign({ library, flow, node, onNodeData, onNodeKind, onSelectEdge,
       <TextField label="이름" value={data.label} onCommit={label => label.trim() && set({ label: label.trim() })} multiline={data.kind === 'note'} />
       {data.kind !== 'note' && <label className="fi-field"><span>도형</span><select value={data.kind} onChange={event => onNodeKind(node.id, event.target.value as NodeKind)}>{(Object.keys(KIND_META) as NodeKind[]).filter(kind => kind !== 'note').map(kind => <option key={kind} value={kind}>{KIND_META[kind].label}</option>)}</select></label>}
       {(data.kind === 'task' || data.kind === 'store') && <label className="fi-field"><span>작업 종류</span><select value={data.icon ?? 'custom'} onChange={event => set({ icon: event.target.value as TaskIcon })}>{(Object.keys(TASK_ICON) as TaskIcon[]).map(icon => <option key={icon} value={icon}>{TASK_ICON[icon].label}</option>)}</select></label>}
-      {data.kind === 'subflow' && <label className="fi-field"><span>하위 흐름</span><div className="fi-inline"><select value={data.subflow ?? ''} onChange={event => set({ subflow: event.target.value || undefined })}><option value="">선택하세요</option>{library.order.filter(id => id !== flow.id).map(id => <option key={id} value={id}>{library.flows[id].title}</option>)}</select><button className="fi-icon" disabled={!data.subflow} onClick={() => data.subflow && onOpenFlow(data.subflow)} aria-label="하위 흐름 열기" title="하위 흐름 열기"><ExternalLink size={14} /></button></div></label>}
+      {data.kind === 'subflow' && <label className="fi-field"><span>하위 흐름</span><div className="fi-inline"><select value={data.subflow ?? ''} onChange={event => set({ subflow: event.target.value || undefined })}><option value="">선택하세요</option>{library.order.filter(id => id !== flow.id).map(id => <option key={id} value={id}>{library.flows[id].title}</option>)}</select><button className="fi-icon" disabled={!data.subflow} onClick={() => data.subflow && onOpenFlow(data.subflow)} aria-label="하위 흐름 열기" data-tip="하위 흐름 열기"><ExternalLink size={14} /></button></div></label>}
       {data.kind !== 'note' && data.kind !== 'gateway' && data.kind !== 'start' && data.kind !== 'end' && <TextField label="처리 엔진 · 담당" value={data.kind === 'exception' ? data.assignee ?? '' : data.engine ?? ''} onCommit={value => set(data.kind === 'exception' ? { assignee: value } : { engine: value })} placeholder="예: Docling" />}
       {data.kind !== 'note' && <TextField label="설명" value={data.description ?? ''} onCommit={description => set({ description })} multiline />}
       {runnable && <div className="fi-grid2"><TextField label="입력" value={data.input ?? ''} onCommit={input => set({ input })} /><TextField label="출력" value={data.output ?? ''} onCommit={output => set({ output })} /></div>}
@@ -148,7 +148,7 @@ function NodeDesign({ library, flow, node, onNodeData, onNodeKind, onSelectEdge,
         <div><span>들어옴 {incoming.length}</span>{incoming.map(edge => <button key={edge.id} onClick={() => onSelectEdge(edge.id)}>{name(edge.source)}{edge.data?.label && <em>{edge.data.label}</em>}</button>)}</div>
         <div><span>나감 {outgoing.length}</span>{outgoing.map(edge => <button key={edge.id} onClick={() => onSelectEdge(edge.id)} className={edge.data?.kind === 'exception' ? 'is-exception' : ''}>{name(edge.target)}{edge.data?.label && <em>{edge.data.label}</em>}</button>)}</div>
       </div>
-      {data.kind !== 'end' && data.kind !== 'exception' && <div className="fi-append"><span>다음에 추가</span><div>{INSERTABLE.map(kind => { const KindIcon = KIND_META[kind].icon; return <button key={kind} onClick={() => onAppend(node.id, kind)} title={`${KIND_META[kind].label} 추가`} aria-label={`다음에 ${KIND_META[kind].label} 추가`}><KindIcon size={14} /></button>; })}</div></div>}
+      {data.kind !== 'end' && data.kind !== 'exception' && <div className="fi-append"><span>다음에 추가</span><div>{INSERTABLE.map(kind => { const KindIcon = KIND_META[kind].icon; return <button key={kind} onClick={() => onAppend(node.id, kind)} data-tip={`${KIND_META[kind].label} 추가`} aria-label={`다음에 ${KIND_META[kind].label} 추가`}><KindIcon size={14} /></button>; })}</div></div>}
     </Section>}
     <div className="fi-actions"><button className="fi-button" onClick={onDuplicate}><Copy size={14} /> 복제</button><button className="fi-button is-danger" onClick={onRemove}><Trash2 size={14} /> 삭제</button></div>
     {incoming.length === 1 && outgoing.length === 1 && <p className="fi-muted fi-note">삭제하면 앞뒤 단계가 자동으로 다시 연결됩니다.</p>}
@@ -286,14 +286,14 @@ function NodeMonitor({ library, flow, node, snapshot, sim, metrics, onNavigate, 
 
     {data.kind !== 'gateway' && data.kind !== 'start' && data.kind !== 'end' && <Section title={`문서 ${docs.length}건`} aside={<div className="fi-filter" role="group" aria-label="단계 문서 상태">{(['all', 'held', 'failed', 'queued', 'processing'] as const).map(value => <button key={value} className={filter === value ? 'is-on' : ''} aria-pressed={filter === value} onClick={() => setFilter(value)}>{value === 'all' ? '전체' : STATE_LABEL[value]}</button>)}</div>}>
       {shown.length ? <ul className="fi-docs">{shown.slice(0, 40).map(doc => <li key={doc.id} className={`is-${doc.state}`}>
-        <div className="fi-doc-main"><b title={doc.parentName ? `${doc.name} ← ${doc.parentName}` : doc.name}>{doc.priority && <ChevronsUp size={12} />}{doc.depth > 0 && <i className="fi-depth">{'↳'.repeat(Math.min(doc.depth, 3))}</i>}{doc.name}</b><span><em className={`fi-state is-${doc.state}`}>{STATE_LABEL[doc.state]}</em>{childFlow && <>{nodeLabel(library, doc.node).label} · </>}{doc.state === 'processing' ? `${Math.round(doc.progress * 100)}%` : wait(snapshot.now - doc.enteredAt)}{doc.reason && <> · {doc.reason}</>}</span></div>
+        <div className="fi-doc-main"><b data-tip={doc.parentName ? `${doc.name} ← ${doc.parentName}` : doc.name} data-tip-overflow={doc.parentName ? undefined : true}>{doc.priority && <ChevronsUp size={12} />}{doc.depth > 0 && <i className="fi-depth">{'↳'.repeat(Math.min(doc.depth, 3))}</i>}{doc.name}</b><span><em className={`fi-state is-${doc.state}`}>{STATE_LABEL[doc.state]}</em>{childFlow && <>{nodeLabel(library, doc.node).label} · </>}{doc.state === 'processing' ? `${Math.round(doc.progress * 100)}%` : wait(snapshot.now - doc.enteredAt)}{doc.reason && <> · {doc.reason}</>}</span></div>
         {!childFlow && <div className="fi-doc-actions">
-          {doc.state === 'held' && data.kind === 'review' && <><button onClick={() => act(doc, 'approve')} aria-label={`${doc.name} 승인`} title="승인"><Check size={13} /></button><button onClick={() => act(doc, 'reject')} aria-label={`${doc.name} 반려`} title="반려"><X size={13} /></button></>}
-          {doc.state === 'failed' && <><button onClick={() => act(doc, 'retry')} aria-label={`${doc.name} 재시도`} title="재시도"><RotateCcw size={13} /></button><button onClick={() => act(doc, 'skip')} aria-label={`${doc.name} 건너뛰기`} title="이 단계 건너뛰기"><SkipForward size={13} /></button></>}
-          {doc.state === 'queued' && !doc.priority && <button onClick={() => act(doc, 'prioritize')} aria-label={`${doc.name} 우선 처리`} title="우선 처리"><ChevronsUp size={13} /></button>}
-          {doc.state === 'queued' && processable && <button onClick={() => act(doc, 'skip')} aria-label={`${doc.name} 건너뛰기`} title="이 단계 건너뛰기"><SkipForward size={13} /></button>}
+          {doc.state === 'held' && data.kind === 'review' && <><button onClick={() => act(doc, 'approve')} aria-label={`${doc.name} 승인`} data-tip="승인"><Check size={13} /></button><button onClick={() => act(doc, 'reject')} aria-label={`${doc.name} 반려`} data-tip="반려"><X size={13} /></button></>}
+          {doc.state === 'failed' && <><button onClick={() => act(doc, 'retry')} aria-label={`${doc.name} 재시도`} data-tip="재시도"><RotateCcw size={13} /></button><button onClick={() => act(doc, 'skip')} aria-label={`${doc.name} 건너뛰기`} data-tip="이 단계 건너뛰기"><SkipForward size={13} /></button></>}
+          {doc.state === 'queued' && !doc.priority && <button onClick={() => act(doc, 'prioritize')} aria-label={`${doc.name} 우선 처리`} data-tip="우선 처리"><ChevronsUp size={13} /></button>}
+          {doc.state === 'queued' && processable && <button onClick={() => act(doc, 'skip')} aria-label={`${doc.name} 건너뛰기`} data-tip="이 단계 건너뛰기"><SkipForward size={13} /></button>}
           {(doc.state === 'held' || doc.state === 'failed') && <select className="fi-doc-move" aria-label={`${doc.name} 보낼 위치`} value="" onChange={event => event.target.value && sim.moveDoc(doc.id, event.target.value)}><option value="">이동…</option><optgroup label="이 흐름의 단계">{targets.local.map(item => <option key={item.value} value={item.value}>{item.label}</option>)}</optgroup><optgroup label="처리 흐름">{targets.starts.map(item => <option key={item.value} value={item.value}>{item.label}</option>)}</optgroup></select>}
-          <button onClick={() => act(doc, 'cancel')} aria-label={`${doc.name} 처리 제외`} title="처리 제외"><Ban size={13} /></button>
+          <button onClick={() => act(doc, 'cancel')} aria-label={`${doc.name} 처리 제외`} data-tip="처리 제외"><Ban size={13} /></button>
         </div>}
       </li>)}</ul> : <p className="fi-muted">{filter === 'all' ? '이 단계에 머문 문서가 없습니다.' : '해당 상태의 문서가 없습니다.'}</p>}
       {shown.length > 40 && <p className="fi-muted">상위 40건만 표시합니다. 아래 문서 추적에서 전체를 볼 수 있습니다.</p>}

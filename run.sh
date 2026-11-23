@@ -4,7 +4,7 @@
 #   ./run.sh [port] [--docling] [--rebuild] [--check] [--no-browser]
 #
 # 처음 한 번: Python 가상환경(backend/.venv) 만들고 의존성 설치, 화면(frontend/dist) 빌드, .env 생성.
-# 이후에는 이미 준비된 것을 건너뛰고 바로 서버를 띄운다. 기본 주소는 http://127.0.0.1:8000/
+# 이후에는 이미 준비된 것을 건너뛴다. 기본 포트는 8000이며 충돌하면 다음 빈 포트를 사용한다.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -19,7 +19,7 @@ BROWSER=1
 usage() {
   cat <<'EOF'
 Usage: ./run.sh [port] [--docling] [--rebuild] [--check] [--no-browser]
-  port          서버 포트 (기본 8000)
+  port          포트 탐색 시작값 (기본 8000)
   --docling     PDF·Office 파싱용 Docling 환경(Python 3.12) 사용
   --rebuild     frontend/dist 가 있어도 화면을 다시 빌드
   --check       서버를 띄우지 않고 준비 상태만 확인
@@ -110,33 +110,5 @@ if [ "$CHECK" = 1 ]; then
 fi
 
 # ---------------------------------------------------------------- 실행
-if "$VPY" - "$PORT" <<'EOF'
-import socket, sys
-with socket.socket() as s:
-    try:
-        s.bind(("127.0.0.1", int(sys.argv[1])))
-    except OSError:
-        raise SystemExit(1)
-EOF
-then :; else die "포트 $PORT 가 이미 사용 중입니다. 예: ./run.sh $((PORT + 10))"; fi
-
-URL="http://127.0.0.1:$PORT/"
-printf '\nUnstructured Data Console - %s\nStop: Ctrl+C\n\n' "$URL"
-
-if [ "$BROWSER" = 1 ]; then
-  (
-    for _ in $(seq 1 100); do
-      if "$VPY" -c "import json, sys, urllib.request as u; sys.exit(0 if json.load(u.build_opener(u.ProxyHandler({})).open('${URL}api/health', timeout=0.5)).get('status') == 'ok' else 1)" >/dev/null 2>&1; then
-        if command -v open >/dev/null 2>&1; then open "$URL"
-        elif command -v xdg-open >/dev/null 2>&1; then xdg-open "$URL" >/dev/null 2>&1
-        elif command -v cmd.exe >/dev/null 2>&1; then cmd.exe /c start "" "$URL" >/dev/null 2>&1
-        fi
-        exit 0
-      fi
-      sleep 0.25
-    done
-  ) &
-fi
-
 cd "$BACKEND"
-exec "$VPY" -m uvicorn main:app --host 127.0.0.1 --port "$PORT"
+exec "$VPY" launch_local.py "$PORT" "$BROWSER"

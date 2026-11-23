@@ -45,7 +45,7 @@ export function Tabs<T extends string>({ items, value, onChange, label, variant 
         </button>;
       })}
     </div>
-    {children && <div className="ui-tabpanel" role="tabpanel" id={`${base}-panel`} aria-labelledby={`${base}-tab-${value}`} tabIndex={0}>{children(value)}</div>}
+    {children && <div key={value} className="ui-tabpanel" role="tabpanel" id={`${base}-panel`} aria-labelledby={`${base}-tab-${value}`} tabIndex={0}>{children(value)}</div>}
   </>;
 }
 

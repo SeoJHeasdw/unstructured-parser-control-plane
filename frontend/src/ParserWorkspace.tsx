@@ -157,7 +157,7 @@ export default function ParserWorkspace({ format: requested, onNavigate }: { for
 
   return <div className="pr-workspace">
     <aside className="pr-index" aria-label="형식별 파서 목록">
-      <header><h2>형식별 파서</h2><button className="pr-reload" onClick={refresh} title="파서와 문서 새로고침" aria-label="파서와 문서 새로고침"><RefreshCw size={16}/></button></header>
+      <header><h2>형식별 파서</h2><button className="pr-reload" onClick={refresh} data-tip="파서와 문서 새로고침" aria-label="파서와 문서 새로고침"><RefreshCw size={16}/></button></header>
       <div className="pr-index-list">{Array.from(groups, ([id, formats]) => {
         const info = engines.get(id), Icon = info?.icon ?? GitBranch;
         return <section key={id}><h3><Icon size={17} aria-hidden="true"/>{info?.name ?? (id || '미지원 형식')}</h3><div>{formats.map(ext =>

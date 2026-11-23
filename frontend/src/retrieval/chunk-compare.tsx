@@ -1,4 +1,4 @@
-import { ChevronRight, Pencil } from 'lucide-react';
+import { Brain, ChevronRight, Pencil } from 'lucide-react';
 import type { DocElement, ElementKind, ElementOutcome, StrategyResult } from '../api/retrieval';
 import { ELEMENT_META, outcomeTone } from './elements';
 import type { Column } from './chunk-board';
@@ -70,10 +70,10 @@ const KIND_COLUMNS: { kind: ElementKind; label: string }[] = [
  * 전략 비교 표: 줄 = 전략, 칸 = 청크 수·길이와 요소 종류별 보존.
  * 칸마다 가장 나은 값은 굵게, 문제(잘림·빠짐·떨어짐·남음·한도 초과)만 붉게.
  */
-type TableProps = { columns: Column[]; elements: DocElement[]; limit: number | null; busy: boolean; onOpen: (id: string) => void; onEdit: (id: string) => void };
-export function CompareTable({ columns, elements, limit, busy, onOpen, onEdit }: TableProps) {
+type TableProps = { columns: Column[]; elements: DocElement[]; limit: number | null; busy: boolean; onOpen: (id: string) => void; onEdit: (id: string) => void; onEmbed?: () => void };
+export function CompareTable({ columns, elements, limit, busy, onOpen, onEdit, onEmbed }: TableProps) {
   const kinds = KIND_COLUMNS.filter(col => elements.some(el => el.kind === col.kind));
-  const ok = columns.filter(c => !c.result.error);
+  const ok = columns.filter(c => !c.result.error && !c.result.pending);
   const tallies = new Map(columns.map(c => [c.id, new Map(kinds.map(k => [k.kind, tallyKind(c.result, k.kind, elements)]))]));
   /* 칸마다 최고 비율. 모두 같으면 굵게 하지 않는다. */
   const best = new Map(kinds.map(k => {
@@ -97,10 +97,13 @@ export function CompareTable({ columns, elements, limit, busy, onOpen, onEdit }:
         return <tr key={c.id} className="cb-cmp-row" onClick={event => { event.currentTarget.querySelector<HTMLElement>('.cb-rowbtn')?.focus(); onOpen(c.id); }}>
           <th scope="row" className="cb-cmp-name">
             <button type="button" className="cb-rowbtn"><ChevronRight size={15} aria-hidden="true" />{c.name}</button>{baseline && <span className="cb-base">기준선</span>}
-            <button type="button" className="cb-rowedit" aria-label={c.name + ' 설정 편집'} title="이 전략 편집" onClick={event => { event.stopPropagation(); onEdit(c.id); }}><Pencil size={14}/></button>
+            <button type="button" className="cb-rowedit" aria-label={c.name + ' 설정 편집'} data-tip="이 전략 편집" onClick={event => { event.stopPropagation(); onEdit(c.id); }}><Pencil size={14}/></button>
             {c.params && <span className="cb-sub">{describeParams(c.params)}</span>}
           </th>
-          {c.result.error ? <td colSpan={span - 1} className="cb-cmp-error" role="alert">{c.result.error}</td> : <>
+          {c.result.error ? <td colSpan={span - 1} className="cb-cmp-error" role="alert">{c.result.error}</td>
+          : c.result.pending ? <td colSpan={span - 1} className="cb-cmp-pending"><span><Brain size={15} aria-hidden="true" />
+            문장 창 {fmtInt(c.result.pending.missing)}개의 임베딩이 필요합니다 · {c.result.pending.model}</span>
+            {onEmbed && <button type="button" className="button-secondary cb-btn" disabled={busy} onClick={event => { event.stopPropagation(); onEmbed(); }}>지금 계산</button>}</td> : <>
             <td className="num">{fmtInt(s?.count ?? c.result.chunks.length)}{c.result.parents?.length ? <span className="cb-sub">맥락 {fmtInt(c.result.parents.length)}</span> : null}</td>
             <td className="num">{fmtInt(s?.chars.median)}</td>
             {kinds.map(k => {

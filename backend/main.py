@@ -8,6 +8,8 @@ from fastapi import FastAPI
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from app.config import Settings
+from app import connection_store
+from app.connection_store import ConnectionStore
 from app.middleware import LocalRequestGuard
 from app.routers.live import router as live_router, summary_router as live_summary_router
 from app.routers.models import router as models_router
@@ -21,18 +23,25 @@ DATA = Path(__file__).resolve().parent.parent / "mock-data" / "data.json"
 def create_app(settings: Settings | None = None) -> FastAPI:
     settings = settings or Settings.from_env()
     service = DocumentService(settings)
+    # 설정 화면에서 저장한 모델 연결. 임베딩 연결 코드도 같은 값을 읽도록 전역으로 켠다.
+    store = ConnectionStore(settings.runtime_dir)
+    connection_store.activate(store)
     @asynccontextmanager
     async def lifespan(app: FastAPI):
         service.start()
         app.state.documents = service
+        connection_store.activate(store)
         try:
             with ThreadPoolExecutor(max_workers=MAX_PARALLEL_STRATEGIES, thread_name_prefix="chunk-bench") as pool:
                 app.state.chunk_pool = pool
                 yield
         finally:
             service.stop()
+            if connection_store.active() is store:
+                connection_store.activate(None)
     app = FastAPI(title="Unstructured Data Console Local API", version="0.4.0", lifespan=lifespan)
     app.state.settings = settings
+    app.state.connection_store = store
     app.add_middleware(LocalRequestGuard, max_upload_bytes=settings.max_upload_bytes)
     app.include_router(live_summary_router)
     app.include_router(live_router)

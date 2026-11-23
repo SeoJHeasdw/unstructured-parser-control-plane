@@ -123,7 +123,13 @@ export function paramLines(kind: Column['kind'], p: StrategyParams | undefined):
   const lines: [string, string][] = [['방식', STRATEGY_LABEL[kind]]];
   if (kind === 'parent_child') lines.push(['크기', `찾을 때 ${n(p.size)} · 답할 때 ${n(p.parent_size)} 맥락`]);
   else if (kind === 'page') lines.push(['크기', `쪽마다 하나, ${n(p.size)}를 넘으면 요소 경계에서 나눔`]);
-  else lines.push(['크기', `${n(p.size)}까지`]);
+  else if (kind === 'semantic') {
+    lines.push(['크기', `${n(p.size)}까지, ${n(p.min_size)} 미만 묶음은 다음 묶음과 합침`]);
+    lines.push(['경계', `이웃 문장 거리가 문서에서 상위 ${100 - (p.breakpoint ?? 90)}%인 곳 · 앞뒤 ${p.buffer ?? 1}문장을 함께 비교`]);
+    lines.push(['임베딩 모델', p.model || '임베딩 연결의 첫 모델']);
+    lines.push(['표·코드', '통째로 두고 위 제목과 함께']);
+    return lines;
+  } else lines.push(['크기', `${n(p.size)}까지`]);
   if (p.overlap) lines.push(['겹침', `앞 청크와 ${n(p.overlap)}`]);
   if (p.overlap_sentences) lines.push(['겹침', `앞 묶음과 ${p.overlap_sentences}문장`]);
   if (p.merge_small) lines.push(['작은 절', `${n(p.min_size)} 미만이면 이웃 절과 합침`]);

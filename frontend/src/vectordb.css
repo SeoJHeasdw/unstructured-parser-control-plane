@@ -417,3 +417,7 @@ button.vdb-tile.is-muted:hover{background:var(--surface-2)}
 @media (prefers-reduced-motion: reduce) {
   .vdb-spin, .vdb-ti-chev svg, .vdb-tile { animation: none; transition: none; }
 }
+
+.vdb-options, .vdb-disc-body, .vdb-doc-pick { animation: ui-enter-down .18s var(--ease-out); }
+.vdb-float { animation: ui-fade .12s ease-out; }
+.vdb-source-details summary::before { transition: transform var(--dur-2) var(--ease-out); }

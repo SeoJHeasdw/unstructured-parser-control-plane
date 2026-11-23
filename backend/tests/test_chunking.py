@@ -1,7 +1,7 @@
 import pytest
 
-from app.chunking import (MAX_CHUNKS, SAMPLE_MARKDOWN, ChunkingError, Source, estimate_tokens, normalize_params, parse_blocks,
-                          run_strategy, sentence_bounds, token_weights)
+from app.chunking import (MAX_CHUNKS, SAMPLE_MARKDOWN, ChunkingError, NeedsEmbedding, Source, estimate_tokens, normalize_params, parse_blocks,
+                          run_strategy, semantic_units, sentence_bounds, token_weights)
 
 STRATEGIES = [
     {"kind": "fixed", "params": {"unit": "chars", "size": 300, "overlap": 40}},
@@ -147,7 +147,9 @@ def test_parameters_are_clamped_and_invalid_input_rejected():
     assert normalize_params("sentence", {"unit": "tokens", "size": 100000, "overlap_sentences": 9}) == {"unit": "tokens", "size": 8000, "overlap_sentences": 5}
     assert normalize_params("markdown", {})["merge_small"] is True
     with pytest.raises(ChunkingError):
-        normalize_params("semantic", {})
+        normalize_params("llm_guess", {})
+    semantic = normalize_params("semantic", {"unit": "chars", "size": 600, "breakpoint": 10, "buffer": 9, "min_size": 9999})
+    assert semantic == {"unit": "chars", "size": 600, "min_size": 600, "breakpoint": 50, "buffer": 3, "connection": "embed", "model": ""}
     with pytest.raises(ChunkingError):
         normalize_params("fixed", {"unit": "words"})
     with pytest.raises(ChunkingError):
@@ -170,3 +172,92 @@ def test_crlf_text_keeps_offsets():
         for c in result["chunks"]:
             if "table-split" not in c["flags"]:
                 assert c["text"] == text[c["start"]:c["end"]]
+
+
+# ---------------------------------------------------------------- 의미 기반
+
+TOPIC = {"펌프": [1.0, 0.0, 0.0], "배관": [0.0, 1.0, 0.0], "표": [0.0, 0.0, 1.0]}
+
+
+def topic_embed(calls=None):
+    """창 글에서 가장 많이 나온 주제어 방향의 벡터. 어떤 글을 임베딩했는지 calls에 남긴다."""
+    def embed(texts):
+        if calls is not None:
+            calls.extend(texts)
+        out = []
+        for text in texts:
+            counts = [text.count(word) for word in ("펌프", "배관")]
+            out.append([counts[0] + 0.01, counts[1] + 0.01, 0.01])
+        return out
+    return embed
+
+
+SEMANTIC_DOC = """# 점검 보고
+
+펌프 진동을 측정했다. 펌프 베어링 온도도 확인했다. 펌프 소음은 정상이었다. 펌프 정렬을 다시 맞췄다.
+배관 누설을 점검했다. 배관 보온재가 일부 손상되었다. 배관 지지대는 양호했다. 배관 플랜지를 다시 조였다.
+
+## 측정값
+
+| 항목 | 값 |
+|---|---|
+| 진동 | 2.1 |
+
+## 다음 조치
+### 일정
+다음 점검은 3개월 뒤다.
+"""
+
+
+def test_semantic_chunking_breaks_where_meaning_changes_and_respects_structure():
+    calls = []
+    result = run_strategy(Source(SEMANTIC_DOC), {"kind": "semantic", "params": {"unit": "chars", "size": 400, "min_size": 0, "buffer": 0, "breakpoint": 90}}, embed=topic_embed(calls))
+    texts = [c["text"] for c in result["chunks"]]
+    pump = next(t for t in texts if "펌프 진동" in t)
+    assert "배관" not in pump and pump.startswith("# 점검 보고")          # 제목은 첫 문장에 붙고, 주제가 바뀌는 곳에서 끊는다
+    assert any(t.startswith("배관 누설") and "플랜지" in t for t in texts)
+    table = next(t for t in texts if "| 진동 |" in t)
+    assert table.startswith("## 측정값") and "배관" not in table and "다음 점검" not in table  # 표는 위 제목과 함께, 앞뒤 문장과는 섞지 않는다
+    assert any(t.startswith("## 다음 조치\n### 일정") for t in texts)    # 연달아 나온 제목은 함께 다음 문장에 붙는다
+    assert not any(c["flags"] and "heading-only" in c["flags"] for c in result["chunks"])
+    assert result["semantic"]["breakpoints"] >= 1 and result["stats"]["coverage"] == 1.0
+    assert not any("| 진동 |" in text for text in calls)                  # 표는 임베딩하지 않는다
+
+
+def test_semantic_chunking_needs_an_embedder_and_caps_size():
+    with pytest.raises(ChunkingError, match="임베딩"):
+        run_strategy(Source(SEMANTIC_DOC), {"kind": "semantic", "params": {}})
+
+    def refuse(texts):
+        raise NeedsEmbedding(len(texts), len(texts))
+    with pytest.raises(NeedsEmbedding):
+        run_strategy(Source(SEMANTIC_DOC), {"kind": "semantic", "params": {}}, embed=refuse)
+    long = "펌프 점검 문장이다. " * 200
+    result = run_strategy(Source(long), {"kind": "semantic", "params": {"unit": "chars", "size": 300}}, embed=topic_embed())
+    assert all(c["chars"] <= 300 for c in result["chunks"]) and result["semantic"]["size_cuts"] > 0
+
+
+def test_semantic_units_window_does_not_cross_sections():
+    units = semantic_units(Source(SEMANTIC_DOC))
+    assert sum(u.atomic for u in units) == 1 and units[0].hard
+
+
+def test_semantic_chunking_keeps_figures_and_table_captions_with_their_targets():
+    from app.chunking import sample_source
+    import zlib
+
+    def hashed(texts):
+        out = []
+        for text in texts:
+            vec = [0.0] * 64
+            for a, b in zip(text, text[1:]):
+                vec[zlib.crc32((a + b).encode()) % 64] += 1.0
+            out.append(vec)
+        return out
+    for sample in ("report", "sop", "coa"):
+        src = sample_source(sample)
+        semantic = run_strategy(src, {"kind": "semantic", "params": {"unit": "chars", "size": 800}}, embed=hashed)
+        element = run_strategy(src, {"kind": "element", "params": {"unit": "chars", "size": 800}})
+        assert semantic["by_kind"].get("caption") == element["by_kind"].get("caption")   # 캡션은 대상과 같은 청크
+        assert set(semantic["by_kind"].get("table", {})) <= {"whole"}                      # 표는 통째
+        assert semantic["stats"]["coverage"] == 1.0

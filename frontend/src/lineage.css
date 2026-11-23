@@ -284,3 +284,6 @@
 @media (prefers-reduced-motion: reduce) {
   .ln-root *, .ln-root *::before, .ln-root *::after { animation-duration:0s; transition-duration:0s }
 }
+
+.ln-tip { animation: ui-fade .12s ease-out; }
+.ln-trow, .ln-ref { animation: ui-fade .16s ease-out; }

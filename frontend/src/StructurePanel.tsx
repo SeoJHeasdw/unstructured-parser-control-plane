@@ -32,12 +32,12 @@ function TreeRow({ node, depth, open, toggle, onSelect, selected }: { node: Stru
       <button className="st-caret" onClick={() => toggle(node)} disabled={!node.children.length} aria-label={expanded ? `${node.name} 접기` : `${node.name} 펼치기`}>{node.children.length ? (expanded ? <ChevronDown size={13} /> : <ChevronRight size={13} />) : null}</button>
       <button className="st-main" onClick={() => onSelect(node)}>
         <Icon size={14} />
-        <span className="st-name" title={node.location || node.name}>{node.name}</span>
+        <span className="st-name" data-tip={node.location || node.name} data-tip-overflow={node.location && node.location !== node.name ? undefined : true}>{node.name}</span>
         {depth > 0 && <span className="st-kind">{CHILD_KIND[node.kind] ?? node.kind}</span>}
         <span className="st-detected">{DETECTED[node.detected ?? 'unknown'] ?? node.detected}</span>
         <span className="st-size">{size(node.size)}</span>
-        {node.children.length > 0 && <span className="st-count" title="하위 문서">{node.children.length}</span>}
-        {node.links.length > 0 && <span className="st-count is-link" title="링크·참조 후보"><Link2 size={11} />{node.links.length}</span>}
+        {node.children.length > 0 && <span className="st-count" data-tip="하위 문서">{node.children.length}</span>}
+        {node.links.length > 0 && <span className="st-count is-link" data-tip="링크·참조 후보"><Link2 size={11} />{node.links.length}</span>}
         <Flags flags={node.flags} stats={node.stats} />
       </button>
     </li>
@@ -105,7 +105,7 @@ export function StructurePanel({ doc, onInspected }: { doc: LiveDoc; onInspected
       </ul> : <>
         <div className="st-kinds"><button className={linkKind === 'all' ? 'is-on' : ''} onClick={() => setLinkKind('all')}>전체 {scope.length}</button>{kinds.map(([kind, count]) => <button key={kind} className={linkKind === kind ? 'is-on' : ''} onClick={() => setLinkKind(kind)}>{LINK_KIND[kind] ?? kind} {count}</button>)}</div>
         {shown.length ? <table className="st-links"><thead><tr><th>종류</th><th>대상</th><th>위치</th><th>있는 문서</th></tr></thead><tbody>
-          {shown.slice(0, 300).map((link, index) => <tr key={index}><td><span className={`st-link-kind is-${link.kind}`}>{LINK_KIND[link.kind] ?? link.kind}</span></td><td className="st-target" title={link.evidence || link.target}>{link.target}</td><td>{link.location}</td><td className="st-owner" title={link.owner.location}>{link.owner.name}</td></tr>)}
+          {shown.slice(0, 300).map((link, index) => <tr key={index}><td><span className={`st-link-kind is-${link.kind}`}>{LINK_KIND[link.kind] ?? link.kind}</span></td><td className="st-target" data-tip={link.evidence || undefined}>{link.target}</td><td>{link.location}</td><td className="st-owner" data-tip={link.owner.location || undefined}>{link.owner.name}</td></tr>)}
         </tbody></table> : <div className="st-empty">찾은 링크·참조 후보가 없습니다.</div>}
         {shown.length > 300 && <div className="st-empty">상위 300건만 표시합니다.</div>}
       </>}

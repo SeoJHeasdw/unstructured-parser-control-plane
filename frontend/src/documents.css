@@ -315,3 +315,6 @@
   .inventory-drawer-file h3 { font-size: 18px; }
 }
 @media (prefers-reduced-motion: reduce) { .inventory-drawer { animation: none; } }
+
+.inventory-drawer-backdrop { animation: ui-fade .18s ease-out; }
+.inventory-drawer-feedback { animation: ui-enter .18s var(--ease-out); }

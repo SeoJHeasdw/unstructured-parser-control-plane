@@ -31,12 +31,14 @@ py -3.12 --version
 루트의 `run.sh`는 `start.cmd`와 같은 일을 bash로 합니다. Python 3.12~3.15(Docling은 3.12)와 소스 ZIP이면 Node.js도 필요합니다. 첫 실행에서 `backend/.venv`를 만들어 `requirements.lock.txt`를 설치하고(잠금 파일이 바뀌면 다시 설치), `frontend/dist`가 없으면 `npm ci`와 빌드를 한 뒤, `.env`가 없으면 `.env.example`에서 만들고 서버를 띄웁니다.
 
 ```bash
-./run.sh                 # http://127.0.0.1:8000/ 로 시작하고 브라우저를 엽니다
+./run.sh                 # 기본 8000번에서 시작하고 브라우저를 엽니다
 ./run.sh 8010 --no-browser
 ./run.sh --docling       # PDF·Office 파싱(Python 3.12 가상환경 backend/.venv-docling)
 ./run.sh --check         # 서버 없이 준비 상태만 확인
 ./run.sh --rebuild       # 화면 다시 빌드
 ```
+
+지정한 포트(기본 8000)부터 최대 20개를 확인해 첫 빈 포트에서 시작합니다. 예를 들어 다른 서비스가 8000번을 쓰면 8001번으로 시작하고 해당 주소를 엽니다. 같은 데이터 폴더를 쓰는 콘솔이 이미 실행 중이면 기존 주소를 사용합니다. 새 백엔드 코드나 Python 환경을 적용하려면 기존 실행 창에서 `Ctrl+C`로 종료한 뒤 다시 실행하세요.
 
 사내 인증서 때문에 `UNABLE_TO_VERIFY_LEAF_SIGNATURE`가 나면 `NODE_EXTRA_CA_CERTS=<사내 루트 CA 파일>`(또는 Node 22.15+에서 `NODE_OPTIONS=--use-system-ca`)을, pip는 `PIP_CERT=<같은 파일>`을 설정하고 다시 실행하세요.
 
@@ -63,7 +65,7 @@ py -3.12 scripts\prepare-offline.py --with-docling-models
 - 기본 결과는 `offline/unstructured-parser-control-plane-windows.zip`입니다.
 - `--with-docling`은 Windows x64용 Python 3.12 Docling 휠을 더한 `-docling.zip`을 만듭니다. `--with-docling-models`는 준비해 둔 레이아웃·표 모델까지 더한 `-docling-models.zip`을 만듭니다.
 - `--from-cache`는 설치된 프론트 의존성으로 빌드하고 기존 `offline/wheels` 및 `offline/wheels-docling`을 사용합니다. 준비된 ZIP 자체는 대상 PC의 npm이나 pip 인덱스에 의존하지 않습니다.
-- 외부 모델 게이트웨이는 프로젝트 루트 `.env`의 `MODEL_BASE_URL`, `MODEL_API_KEY`, `MODEL_ID`를 설정한 뒤 다시 시작합니다. 화면의 **모델 연결**에서 확인할 수 있습니다. 두 번째 연결은 `MODEL2_*`, 사내 인증서는 `MODEL_CA_BUNDLE`, 프록시는 `HTTPS_PROXY`를 사용합니다.
+- 외부 모델 게이트웨이는 화면의 **설정 › 모델 연결**에서 생성 모델·임베딩 모델별로 주소·모델 ID·API 키를 넣고 저장하면 다시 시작하지 않아도 바로 씁니다(값은 `runtime/settings/connections.json`, `.env`보다 우선). 여러 PC에 같은 값을 배포할 때는 프로젝트 루트 `.env`의 `MODEL_BASE_URL`, `MODEL_API_KEY`, `MODEL_ID`(임베딩은 `EMBED_*`)를 설정한 뒤 다시 시작합니다. 두 번째 연결은 `MODEL2_*`, 사내 인증서는 `MODEL_CA_BUNDLE`, 프록시는 `HTTPS_PROXY`를 사용합니다.
 
 ## 개발 실행
 

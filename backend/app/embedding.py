@@ -1,6 +1,7 @@
 """임베딩 후보 비교에 필요한 연결·호출·캐시·검색 지표. 표준 라이브러리만 사용한다.
 
-연결 설정은 호출할 때마다 환경변수에서 읽는다(테스트에서 바꿀 수 있도록).
+연결 설정은 호출할 때마다 환경변수에서 읽는다(테스트에서 바꿀 수 있도록). 설정 화면에서 저장한 값이 있으면 그 위에 덮는다
+(app.connection_store).
   EMBED_LABEL, EMBED_BASE_URL, EMBED_API_KEY, EMBED_MODELS(쉼표로 구분한 모델 ID)
   기존 MODEL_*/MODEL2_* 연결도 같은 게이트웨이의 /embeddings 로 쓸 수 있다(app.llm.load_connections).
 API 키는 응답·로그·오류 메시지에 내보내지 않는다(app.llm._scrub).
@@ -13,7 +14,6 @@ import heapq
 import json
 import math
 import operator
-import os
 from pathlib import Path
 import re
 import sqlite3
@@ -21,6 +21,7 @@ import time
 import unicodedata
 from urllib import error, request
 
+from app.connection_store import effective_environ
 from app.llm import ModelConnection, _context, _scrub, _timeout, load_connections
 
 MAX_RESPONSE_BYTES = 256 * 1024 * 1024
@@ -77,7 +78,7 @@ class EmbedConnection:
 
 def embed_connections(environ=None) -> list[EmbedConnection]:
     """EMBED_* 연결(설정 여부와 상관없이 항상 첫 항목)과 주소가 있는 MODEL_*/MODEL2_* 연결."""
-    env = os.environ if environ is None else environ
+    env = effective_environ() if environ is None else environ
     models = tuple(dict.fromkeys(m.strip() for m in env.get("EMBED_MODELS", "").split(",") if m.strip()))
     out = [EmbedConnection("embed", env.get("EMBED_LABEL", "").strip() or "임베딩 게이트웨이", env.get("EMBED_BASE_URL", "").strip().rstrip("/"),
                            env.get("EMBED_API_KEY", "").strip(), models, "embed")]
@@ -165,6 +166,17 @@ def embed_batch(conn: ModelConnection, inputs: list[str]) -> EmbedResponse:
     return EmbedResponse(vectors, tokens if isinstance(tokens, int) and tokens >= 0 else None, seconds)
 
 
+def check_embedding(conn: ModelConnection) -> dict:
+    """짧은 문장 하나를 임베딩해 주소·키·모델 ID를 함께 확인한다(사용자가 누른 경우에만)."""
+    started = time.monotonic()
+    try:
+        response = embed_batch(conn, ["연결 확인용 문장입니다."])
+    except EmbedError as exc:
+        return {"ok": False, "status": exc.status, "latency_ms": round((time.monotonic() - started) * 1000), "error": str(exc), "model": conn.model_id}
+    return {"ok": True, "status": 200, "latency_ms": round(response.seconds * 1000), "model": conn.model_id,
+            "dims": len(response.vectors[0]), "tokens": response.prompt_tokens}
+
+
 # ---------------------------------------------------------------- 캐시
 
 def model_key(conn: ModelConnection) -> str:
@@ -238,6 +250,47 @@ class VectorCache:
         except OSError:
             size = 0
         return {"entries": count, "bytes": size}
+
+
+# ---------------------------------------------------------------- 의미 기반 청킹용 임베더
+
+def semantic_embedder(conn: ModelConnection, cache: VectorCache | None, allow_calls: bool):
+    """texts → 벡터 목록. 캐시에 없는 글이 있고 allow_calls가 아니면 NeedsEmbedding을 낸다(화면 자동 갱신에서 모델을 부르지 않게)."""
+    from app.chunking import ChunkingError, NeedsEmbedding
+    mkey = model_key(conn)
+
+    def embed(texts: list[str]) -> list:
+        shas = [text_hash(t) for t in texts]
+        found = cache.get_many(mkey, "", shas) if cache else {}
+        todo = list(dict.fromkeys(t for t, sha in zip(texts, shas) if sha not in found))
+        if todo and not allow_calls:
+            raise NeedsEmbedding(len(todo), len(set(shas)))
+        batch: list[str] = []
+        size = 0
+
+        def flush():
+            nonlocal batch, size
+            if not batch:
+                return
+            try:
+                response = embed_batch(conn, batch)
+            except EmbedError as exc:
+                raise ChunkingError(f"문장 임베딩에 실패했습니다: {exc}") from None
+            done = [(text_hash(text), vec) for text, vec in zip(batch, response.vectors)]
+            found.update(done)
+            if cache:  # 중간에 실패해도 이미 받은 벡터는 다음에 다시 쓴다
+                cache.put_many(mkey, "", done)
+            batch, size = [], 0
+
+        for text in todo:
+            if batch and (len(batch) >= MAX_BATCH or size + len(text) > MAX_BATCH_CHARS):
+                flush()
+            batch.append(text)
+            size += len(text)
+        flush()
+        return [found[sha] for sha in shas]
+
+    return embed
 
 
 # ---------------------------------------------------------------- 점수·지표

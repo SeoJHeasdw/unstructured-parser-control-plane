@@ -169,7 +169,12 @@ describe('설계 모드', () => {
     expect(screen.getByRole('heading', { name: 'PDF 문서' })).toBeTruthy();
     expect(screen.getByText('OCR 인식')).toBeTruthy();
     await user.click(screen.getByRole('button', { name: '설계' }));
-    await user.click(screen.getByRole('button', { name: '가로 자동 정렬' }));
+    const layoutMenu = screen.getByRole('button', { name: '자동 정렬' });
+    expect(layoutMenu.getAttribute('aria-haspopup')).toBe('menu');
+    await user.click(layoutMenu);
+    expect(screen.getByRole('menuitemradio', { name: '세로 자동 정렬', checked: true })).toBeTruthy();
+    await user.click(screen.getByRole('menuitemradio', { name: '가로 자동 정렬' }));
+    expect(screen.queryByRole('menu', { name: '자동 정렬' })).toBeNull();
     await waitFor(() => expect(JSON.parse(store.get('document-ops:flows:v3')!).flows.pdf.direction).toBe('LR'));
   });
 });

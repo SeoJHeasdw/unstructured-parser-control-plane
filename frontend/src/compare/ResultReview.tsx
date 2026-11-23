@@ -120,7 +120,7 @@ export function ResultReview({ baseline, candidate, onEvidence }: {
         return <div key={index} ref={index === selected && isBaseline ? target : undefined}
           className={`compare-line${isChanged ? ` is-different is-${row.kind}` : ''}${index === selected ? ' is-selected' : ''}${!entry ? ' is-gap' : ''}`}>
           {entry && <>{isChanged ? <button className="compare-line-no is-jump" tabIndex={-1}
-            onClick={() => select(index)} aria-label={`${entry.line}줄 차이 검수`} title="이 줄의 차이 검수">
+            onClick={() => select(index)} aria-label={`${entry.line}줄 차이 검수`} data-tip="이 줄의 차이 검수" data-tip-side="right">
             {isBaseline ? <Minus size={11} aria-hidden="true" /> : <Plus size={11} aria-hidden="true" />}{entry.line}
           </button> : <span className="compare-line-no" aria-hidden="true">{entry.line}</span>}<span className="compare-line-text">
             {parts ? parts.map((part, i) => part.changed ? <mark key={i}>{part.text}</mark> : part.text) : entry.text}
@@ -138,9 +138,9 @@ export function ResultReview({ baseline, candidate, onEvidence }: {
           <strong>{!canCompare ? '파싱 결과' : changes.length ? `차이 ${changes.length.toLocaleString()}곳` : '표시된 결과에 차이 없음'}</strong>
         </div>
         {canCompare && changes.length > 0 && <div className="compare-review-nav" role="group" aria-label="차이 이동">
-          <button type="button" title="이전 차이" aria-label="이전 차이" disabled={currentIndex < 1} onClick={() => select(filtered[currentIndex - 1])}><ArrowUp size={16} aria-hidden="true" /></button>
+          <button type="button" data-tip="이전 차이" aria-label="이전 차이" disabled={currentIndex < 1} onClick={() => select(filtered[currentIndex - 1])}><ArrowUp size={16} aria-hidden="true" /></button>
           <span aria-live="polite">{currentIndex < 0 ? '—' : currentIndex + 1} / {filtered.length}</span>
-          <button type="button" title="다음 차이" aria-label="다음 차이" disabled={currentIndex >= filtered.length - 1} onClick={() => select(filtered[currentIndex + 1])}><ArrowDown size={16} aria-hidden="true" /></button>
+          <button type="button" data-tip="다음 차이" aria-label="다음 차이" disabled={currentIndex >= filtered.length - 1} onClick={() => select(filtered[currentIndex + 1])}><ArrowDown size={16} aria-hidden="true" /></button>
         </div>}
       </div>
       {canCompare && Object.values(categories).some(count => count > 0) && <div className="compare-review-filters" role="group" aria-label="검수 유형">
@@ -173,9 +173,9 @@ export function ResultReview({ baseline, candidate, onEvidence }: {
       </div>
     </div>
     {pages > 1 && <div className="compare-pages" role="group" aria-label="결과 페이지">
-      <button type="button" title="이전 결과 페이지" aria-label="이전 결과 페이지" disabled={!page} onClick={() => turnPage(page - 1)}><ArrowLeft size={15} /></button>
+      <button type="button" data-tip="이전 결과 페이지" aria-label="이전 결과 페이지" disabled={!page} onClick={() => turnPage(page - 1)}><ArrowLeft size={15} /></button>
       <span>{page + 1} / {pages}</span>
-      <button type="button" title="다음 결과 페이지" aria-label="다음 결과 페이지" disabled={page >= pages - 1} onClick={() => turnPage(page + 1)}><ArrowRight size={15} /></button>
+      <button type="button" data-tip="다음 결과 페이지" aria-label="다음 결과 페이지" disabled={page >= pages - 1} onClick={() => turnPage(page + 1)}><ArrowRight size={15} /></button>
     </div>}
   </>;
 }

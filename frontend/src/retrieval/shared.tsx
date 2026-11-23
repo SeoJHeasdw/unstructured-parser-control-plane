@@ -22,8 +22,13 @@ export function usePersistent<T extends object>(key: string, initial: T): [T, (u
 
 /* ---------- 청킹 프리셋: 청킹 벤치에서 저장하고 임베딩 평가에서 다시 쓴다. ---------- */
 export const STRATEGY_LABEL: Record<StrategyKind, string> = {
-  element: '요소 인지', parent_child: '부모-자식', page: '페이지 단위',
+  element: '요소 인지', parent_child: '부모-자식', page: '페이지 단위', semantic: '의미 기반',
   fixed: '고정 길이', recursive: '재귀 분할', sentence: '문장 묶음', markdown: '제목 구조',
+};
+/** 방식 고르기 카드의 한 줄 설명. */
+export const STRATEGY_SHORT: Record<StrategyKind, string> = {
+  element: '표·그림·캡션을 따로 다룸', parent_child: '작게 찾고 넓게 읽기', page: '쪽마다 한 청크', semantic: '뜻이 바뀌는 곳에서 나눔',
+  fixed: '정한 길이마다 자름', recursive: '문단→줄→문장 순서로 쪼갬', sentence: '문장을 크기만큼 묶음', markdown: '제목 단위로 나눔',
 };
 export const STRATEGY_HINT: Record<StrategyKind, string> = {
   element: '본문·목록은 크기만큼 묶고, 표·그림·캡션은 정한 방식대로 따로 다룹니다. 반복 머리말은 뺄 수 있습니다.',
@@ -33,9 +38,14 @@ export const STRATEGY_HINT: Record<StrategyKind, string> = {
   recursive: '문단 → 줄 → 문장 → 띄어쓰기 순서로, 크기 안에 들 때까지 나눕니다. 표·그림을 구분하지 않습니다.',
   markdown: '제목 단위로 나누고 제목 경로를 남깁니다. 표는 크기를 넘을 때만 행 단위로 나눕니다.',
   sentence: '문장 끝을 찾아 크기만큼 묶고 앞 묶음과 문장 몇 개를 겹칩니다. 표·그림을 구분하지 않습니다.',
+  semantic: '이웃 문장의 임베딩을 비교해 뜻이 크게 바뀌는 곳에서 나눕니다. 제목에서 끊고 표·코드는 통째로 둡니다. 임베딩 모델이 필요합니다.',
 };
-/** 요소 인지 계열(표·그림·캡션·머리말을 구분)과 텍스트만 보는 기준선. */
+/** 요소 인지 계열(표·그림·캡션·머리말을 구분), 의미 기반, 텍스트만 보는 기준선. */
 export const ELEMENT_KINDS: StrategyKind[] = ['element', 'parent_child', 'page'];
+export const SEMANTIC_KINDS: StrategyKind[] = ['semantic'];
+export const familyOf = (kind: StrategyKind) => ELEMENT_KINDS.includes(kind) ? '요소 인지' : SEMANTIC_KINDS.includes(kind) ? '의미 기반' : '기준선';
+/** 경계 민감도: 문서 안 이웃 문장 거리의 몇 번째 백분위부터 나눌지. 낮을수록 자주 나눈다. */
+export const BREAKPOINTS = [{ value: 95, label: '적게 나눔' }, { value: 90, label: '보통' }, { value: 80, label: '자주 나눔' }] as const;
 export const BASELINE_KINDS: StrategyKind[] = ['fixed', 'recursive', 'sentence', 'markdown'];
 export const isBaseline = (kind: StrategyKind | undefined) => !!kind && BASELINE_KINDS.includes(kind);
 export const TABLE_POLICY: Record<TablePolicy, string> = { whole: '통째로', rows: '행 묶음마다 머리행 반복', row_text: '행을 문장으로' };
@@ -57,6 +67,7 @@ export function defaultParams(kind: StrategyKind, unit: 'chars' | 'tokens' = 'ch
   if (kind === 'fixed' || kind === 'recursive') return { unit, size, overlap: Math.round(size / 10) };
   if (kind === 'markdown') return { unit, size, merge_small: true, min_size: Math.round(size / 4) };
   if (kind === 'sentence') return { unit, size, overlap_sentences: 1 };
+  if (kind === 'semantic') return { unit, size: unit === 'chars' ? 800 : 400, min_size: unit === 'chars' ? 200 : 100, breakpoint: 90, buffer: 1, connection: 'embed', model: '' };
   if (kind === 'parent_child') return { unit, size: Math.round(size * 0.6), parent_size: size * 3, ...ELEMENT_DEFAULTS };
   if (kind === 'page') return { unit, size: size * 6, ...ELEMENT_DEFAULTS };
   return { unit, size, ...ELEMENT_DEFAULTS };
@@ -77,6 +88,12 @@ export function describeParams(p: StrategyParams): string {
   const parts: string[] = [];
   if (p.parent_size !== undefined) parts.push(`검색 ${n(p.size)}${unit}`, `맥락 ${n(p.parent_size)}${unit}`);
   else parts.push(`${n(p.size)}${unit}`);
+  if (p.breakpoint !== undefined) {
+    parts[0] = `최대 ${n(p.size)}${unit}`;
+    parts.push(`경계 ${BREAKPOINTS.find(b => b.value === p.breakpoint)?.label ?? `상위 ${100 - p.breakpoint}%`}`);
+    if (p.model) parts.push(p.model.split('/').pop()!);
+    return parts.join(' · ');
+  }
   if (p.overlap !== undefined) parts.push(`겹침 ${n(p.overlap)}${unit}`);
   else if (p.overlap_sentences !== undefined) parts.push(`${p.overlap_sentences}문장 겹침`);
   else if (p.merge_small) parts.push(`${n(p.min_size ?? 0)}${unit} 미만 절 합침`);
@@ -169,7 +186,7 @@ export function SidePanel({ label, title, subtitle, onClose, actions, children }
     return () => { document.removeEventListener('keydown', onKey); if (previous && document.contains(previous)) previous.focus(); };
   }, []);
   return <aside className="rb-panel" role="dialog" aria-label={label} tabIndex={-1} ref={ref}>
-    <header className="rb-panel-head"><div><strong>{title}</strong>{subtitle && <span>{subtitle}</span>}</div>{actions}<button type="button" className="rb-icon" onClick={onClose} aria-label="상세 닫기" title="닫기 (Esc)"><X size={16} /></button></header>
+    <header className="rb-panel-head"><div><strong>{title}</strong>{subtitle && <span>{subtitle}</span>}</div>{actions}<button type="button" className="rb-icon" onClick={onClose} aria-label="상세 닫기" data-tip="닫기" data-tip-key="Esc"><X size={16} /></button></header>
     <div className="rb-panel-body">{children}</div>
   </aside>;
 }

@@ -105,9 +105,15 @@
 .ps-dock-toggle:hover, .ps-dock-toggle.is-on { color: var(--brand-ink); background: var(--brand-weak); }
 .ps-dock-toggle em { font-style: normal; font-size: 11px; font-weight: 700; color: var(--err); background: var(--err-weak); border-radius: 5px; padding: 2px 5px; }
 .ps-inspector { width: 334px; flex: none; border-left: 1px solid var(--line); background: var(--surface); overflow-y: auto; }
+/* 상세 패널: 자리를 넓히며 오른쪽에서 밀려 들어온다. 닫을 때도 같은 길로 빠진다. */
+.ps-inspector-slot { flex: none; width: 0; overflow: hidden; transition: width .26s var(--ease-out); }
+.ps-inspector-slot.is-open { width: 334px; }
+.ps-inspector-slot > .ps-inspector { height: 100%; opacity: .35; translate: 28px 0; transition: translate .3s var(--ease-out), opacity .2s ease; }
+.ps-inspector-slot.is-open > .ps-inspector { opacity: 1; translate: none; }
 .ps-inspector-head { position: sticky; top: 0; z-index: 1; display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 12px 6px 16px; min-height: 45px; background: var(--surface); border-bottom: 1px solid var(--line); font-size: var(--fs-xs); font-weight: 700; color: var(--ink3); }
 .ps-inspector-head .ps-icon { border-color: transparent; width: 30px; min-height: 30px; }
-.ps-toast { position: absolute; left: 50%; bottom: 16px; transform: translateX(-50%); width: max-content; max-width: calc(100% - 32px); z-index: 6; padding: 10px 13px; border-radius: 8px; background: #182947; color: #f8fbff; font-size: var(--fs-xs); box-shadow: 0 8px 24px #17243a33; }
+.ps-toast { position: absolute; left: 50%; bottom: 16px; transform: translateX(-50%); width: max-content; max-width: calc(100% - 32px); z-index: 6; padding: 10px 13px; border-radius: 8px; background: #182947; color: #f8fbff; font-size: var(--fs-xs); box-shadow: 0 8px 24px #17243a33; animation: ps-toast-in .22s var(--ease-out); }
+@keyframes ps-toast-in { from { opacity: 0; translate: 0 8px; } }
 .ps-empty { position: absolute; inset: 0; display: grid; place-content: center; padding: 20px; text-align: center; gap: 6px; pointer-events: none; color: var(--ink3); }
 .ps-empty b { color: var(--ink); font-size: var(--fs-lg); }
 .ps-zoom { display: flex; align-items: center; gap: 1px; background: var(--surface); border: 1px solid var(--line2); border-radius: 9px; padding: 3px; box-shadow: var(--shadow-1); }
@@ -115,10 +121,12 @@
 .ps-zoom button:hover { background: var(--surface-3); color: var(--brand); }
 .ps-zoom span { min-width: 42px; text-align: center; color: var(--ink2); font-size: var(--fs-xs); font-variant-numeric: tabular-nums; }
 .ps-minimap { width: 145px; height: 90px; border: 1px solid var(--line2); border-radius: 9px; overflow: hidden; box-shadow: var(--shadow-1); }
-.ps-insert-menu { --ink: var(--ink-1); --ink3: var(--ink-3); --line2: var(--rule-strong); --brand-ink: var(--accent); --brand-weak: var(--accent-soft); position: fixed; z-index: 60; display: flex; flex-direction: column; min-width: 156px; padding: 6px; background: var(--surface); border: 1px solid var(--line2); border-radius: 10px; box-shadow: var(--shadow-pop); }
+.ps-insert-menu { --ink: var(--ink-1); --ink3: var(--ink-3); --line2: var(--rule-strong); --brand-ink: var(--accent); --brand-weak: var(--accent-soft); position: fixed; z-index: 60; display: flex; flex-direction: column; min-width: 156px; padding: 6px; background: var(--surface); border: 1px solid var(--line2); border-radius: 10px; box-shadow: var(--shadow-pop); transform-origin: top left; animation: ps-pop .14s var(--ease-out); }
+@keyframes ps-pop { from { opacity: 0; scale: .97; translate: 0 -3px; } }
 .ps-insert-menu > span { padding: 4px 8px 6px; color: var(--ink3); font-size: var(--fs-xs); font-weight: 700; }
 .ps-insert-menu button { display: flex; align-items: center; gap: 8px; min-height: 34px; padding: 6px 8px; border: 0; border-radius: 6px; background: none; color: var(--ink); text-align: left; }
-.ps-insert-menu button:hover { background: var(--brand-weak); color: var(--brand-ink); }
+.ps-insert-menu button { transition: background-color var(--dur-1), color var(--dur-1); }
+.ps-insert-menu button:hover, .ps-insert-menu button:focus-visible { background: var(--brand-weak); color: var(--brand-ink); }
 .fx-defs { position: absolute; width: 0; height: 0; overflow: hidden; }
 /* ===== React Flow 노드 ===== */
 .ps-root .react-flow__node{font-family:inherit}
@@ -493,7 +501,10 @@
 .ps-guide-scope { padding: 3px 2px 0; color: var(--ink-3); }
 
 @container (max-width: 1040px) {
-  .ps-inspector { position: absolute; z-index: 15; inset: 0 0 0 auto; max-width: 100%; box-shadow: -12px 0 36px #17243a20; }
+  /* 좁을 때는 캔버스 위로 떠서 미끄러진다. */
+  .ps-inspector-slot { position: absolute; z-index: 15; inset: 0 0 0 auto; width: 334px; max-width: 100%; overflow: visible; translate: calc(100% + 40px) 0; transition: translate .28s var(--ease-out); }
+  .ps-inspector-slot.is-open { width: 334px; translate: none; }
+  .ps-inspector-slot > .ps-inspector, .ps-inspector-slot.is-open > .ps-inspector { width: 100%; opacity: 1; translate: none; box-shadow: -12px 0 36px #17243a20; }
 }
 @container (max-width: 710px) {
   .ps-toolbar { align-items: flex-start; flex-direction: column; gap: 10px; padding: 11px 12px; }
@@ -513,7 +524,7 @@
   .ps-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .ps-metric { min-height: 33px; }
   .ps-metric strong { font-size: var(--fs-md); }
-  .ps-inspector { width: 100%; }
+  .ps-inspector-slot, .ps-inspector-slot.is-open { width: 100%; }
   .ps-palette { width: 63px; }
   .ps-footer-context { gap: 5px; }
   .ps-footer-context > span + span::before { padding-inline-end: 5px; }
@@ -630,4 +641,25 @@
 @media(pointer:coarse) {
   .ps-toolbar :is(.ps-btn,.ps-icon,.ps-mode button),.ps-tools-mode :is(.ps-btn,.ps-icon,.ps-pill),.ps-pages button,.ps-shape,.ps-palette-toggle { min-height:44px; }
   .ps-palette:not(.is-expanded) .ps-shape { min-height:44px; }
+}
+
+/* ---------- 질감: 호버·누름·전환 ---------- */
+.ps-icon, .ps-btn, .ps-pill, .ps-mode button, .ps-pages button, .ps-zoom button, .ps-shape, .ps-palette-toggle, .ps-dock-toggle, .ps-metric, .ps-back, .ps-view-choice .ps-btn {
+  transition: background-color var(--dur-1) ease, border-color var(--dur-1) ease, color var(--dur-1) ease, box-shadow var(--dur-2) ease, scale var(--dur-1) var(--ease-out);
+}
+:is(.ps-icon, .ps-zoom button, .ps-back, .ps-palette-toggle):active:not(:disabled) { scale: .92; }
+:is(.ps-btn, .ps-pill, .ps-mode button, .ps-dock-toggle, .ps-shape):active:not(:disabled) { scale: .97; }
+/* 비활성 버튼도 툴팁으로 이유를 읽을 수 있게 포인터는 받는다(클릭은 disabled가 막는다). */
+.ps-history .ps-icon:disabled { cursor: default; }
+.ps-history .ps-icon:not(:disabled):hover { background: var(--surface-3); }
+.ps-pages button.is-on { transition: color var(--dur-1), border-color var(--dur-2) var(--ease-out), background-color var(--dur-1); }
+.ps-palette { transition: width .22s var(--ease-out); }
+.ps-shape svg { transition: translate .18s var(--ease-out); }
+.ps-shape:hover svg { translate: 0 -1px; }
+.ps-layout-menu .ui-hover-trigger { gap: 5px; }
+.ps-layout-menu .ui-hover-trigger.is-open { color: var(--brand-ink); background: var(--brand-weak); border-color: #d8defb; }
+.fd-root { animation: fd-rise .24s var(--ease-out); }
+@keyframes fd-rise { from { opacity: 0; translate: 0 10px; } }
+@media (prefers-reduced-motion: reduce) {
+  .ps-inspector-slot, .ps-inspector-slot > .ps-inspector, .ps-insert-menu, .ps-toast, .fd-root, .ps-palette { transition: none !important; animation: none !important; }
 }

@@ -132,7 +132,7 @@ Mock 모델과 로컬 API 상태명은 프로토타입 계약이다. 운영 계�
 | `backend/app/routers/live.py`, `models.py` | 로컬 문서 API와 응답 모델 | 인증·인가, 페이징, 버전·오류 계약은 운영 요구에 맞춰 확장 |
 | `backend/app/service.py`, `repository.py`, `config.py` | 업로드·단일 워커와 대기열·종료/복구, SQLite 상태·이력, 런타임 설정 | 서비스·저장소 경계를 유지하고 내구성 있는 작업 실행은 별도 설계 |
 | `backend/app/structure.py`, `cfb.py` | 실제 파일 구조 분석: 시그니처 기반 형식 판별, 압축·메일·OLE/Office/HWP 내장 개체·PDF 첨부 펼치기, 링크·문서번호 후보, 암호화·DRM 의심·불일치·매크로 표시. `cfb.py`는 표준 라이브러리만 쓰는 OLE 복합 문서 읽기 | 링크 대상 해석(업로드 문서와 매칭)·순환 탐지, 형식 판별 결과를 파서 선택에 연결 |
-| `backend/app/llm.py`, `routers/models.py`, `filelock.py` | `.env` 모델 연결과 연결 확인, OS 독립 실행 잠금 | 용도별 모델 어댑터, 비밀 관리 |
+| `backend/app/llm.py`, `connection_store.py`, `routers/models.py`, `filelock.py` | `.env`와 화면에서 저장한 모델 연결(저장값 우선), 연결 확인, OS 독립 실행 잠금 | 용도별 모델 어댑터, 비밀 관리 |
 | `backend/app/lineage.py`, `routers/lineage.py` | 업로드 목록과 저장된 구조 분석으로 문서군·판·최신 판단·참조 연결 상태 계산 | 링크 대상 확인을 실제 원천·버전 체계와 연결 |
 | `backend/app/chunking.py`, `embedding.py`, `retrieval_jobs.py`, `routers/retrieval.py` | 청킹 전략, 임베딩 연결(`EMBED_*`)·호출, 질문 세트 저장, 단일 평가 작업·벡터 캐시 | 평가 이력 보존, 실제 색인 파이프라인과 분리 유지 |
 | `backend/app/vectordb.py`, `routers/vectordb.py` | Milvus REST v2 읽기 전용 조회(`MILVUS_*`)와 예시 데이터 | 쓰기·삭제는 범위 밖 |

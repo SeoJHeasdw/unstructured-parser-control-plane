@@ -1,7 +1,8 @@
 /** 청킹 벤치·임베딩 평가 API. 외부 모델 호출(토큰 측정·평가 실행)은 사용자가 누를 때만 보낸다. */
 export type Unit = 'chars' | 'tokens';
-/** fixed·recursive·markdown·sentence는 텍스트만 보는 기준선. element·parent_child·page는 비정형 요소(표·그림·캡션·반복 머리말)를 구분한다. */
-export type StrategyKind = 'fixed' | 'recursive' | 'markdown' | 'sentence' | 'element' | 'parent_child' | 'page';
+/** fixed·recursive·markdown·sentence는 텍스트만 보는 기준선. element·parent_child·page는 비정형 요소(표·그림·캡션·반복 머리말)를 구분한다.
+ * semantic은 문장 임베딩으로 의미가 바뀌는 곳에서 나눈다(임베딩 연결 필요). */
+export type StrategyKind = 'fixed' | 'recursive' | 'markdown' | 'sentence' | 'element' | 'parent_child' | 'page' | 'semantic';
 export type TablePolicy = 'whole' | 'rows' | 'row_text';
 export type ImagePolicy = 'drop' | 'caption';
 export type StrategyParams = {
@@ -12,6 +13,8 @@ export type StrategyParams = {
   image?: ImagePolicy; attach_caption?: boolean; drop_furniture?: boolean;
   /** parent_child: 검색은 size(자식), 답변 맥락은 parent_size(부모) */
   parent_size?: number;
+  /** semantic: 이웃 문장 거리가 상위 (100-breakpoint)%면 경계. buffer는 창에 함께 넣는 앞뒤 문장 수. 모델을 비우면 연결의 첫 모델 */
+  breakpoint?: number; buffer?: number; connection?: string; model?: string;
 };
 export type Preset = { id: string; name: string; kind: StrategyKind; params: StrategyParams };
 export type ChunkKind = 'text' | 'table' | 'mixed';
@@ -47,6 +50,9 @@ export type ChunkStats = { count: number; chars: Dist; tokens: Dist; over_limit:
 export type StrategyResult = {
   id: string; name?: string; kind?: StrategyKind; params?: StrategyParams; chunks: Chunk[]; stats: ChunkStats | null; error?: string;
   parents?: ParentChunk[]; outcomes: Record<string, ElementOutcome>; by_kind: KindTally;
+  /** semantic: 캐시에 없는 문장 임베딩이 남아 아직 나누지 않음(사용자가 '나누기'를 누르면 계산) */
+  pending?: { missing: number; total: number; model: string };
+  semantic?: { sentences: number; breakpoints: number; size_cuts: number; threshold: number | null; model?: string };
 };
 export type ChunkSource = {
   doc_id: string | null; sample: string | null; name: string; is_stale: boolean; chars: number; est_tokens: number; tables: number; headings: number; sections: number; text: string;
@@ -111,8 +117,9 @@ export const listDocuments = async (): Promise<RetrievalDoc[]> => (await read<{ 
 export const getSamples = async (): Promise<Sample[]> => (await read<{ samples: Sample[] }>(await fetch(`${BASE}/samples`))).samples;
 /** 평가 문서 id: 실제 문서는 그대로, 합성 예시는 'sample:<id>' */
 export const sampleDocId = (id: string) => `sample:${id}`;
-export async function chunkSource(source: { doc_id?: string; sample?: string; text?: string; name?: string }, strategies: Preset[], limitTokens: number | null, signal?: AbortSignal, parallelism = 1): Promise<ChunkResponse> {
-  return read(await fetch(`${BASE}/chunk`, json('POST', { source, strategies, limit_tokens: limitTokens, parallelism }, signal)));
+/** embed: 의미 기반 전략의 문장 임베딩을 지금 계산해도 되는지(사용자가 '나누기'를 누른 요청만 true). */
+export async function chunkSource(source: { doc_id?: string; sample?: string; text?: string; name?: string }, strategies: Preset[], limitTokens: number | null, signal?: AbortSignal, parallelism = 1, embed = false): Promise<ChunkResponse> {
+  return read(await fetch(`${BASE}/chunk`, json('POST', { source, strategies, limit_tokens: limitTokens, parallelism, ...(embed ? { embed: true } : {}) }, signal)));
 }
 export async function measureTokens(connection: string, model: string, texts: string[]): Promise<TokenMeasure> {
   return read(await fetch(`${BASE}/tokens`, json('POST', { connection, model, texts })));

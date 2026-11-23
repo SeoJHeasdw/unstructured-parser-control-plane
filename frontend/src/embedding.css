@@ -237,3 +237,5 @@
 .ee-pin[aria-pressed="true"] svg { color: inherit; }
 @media (hover:hover) { .ee-pin:hover b { text-decoration: underline; } }
 @media (pointer:coarse) { .ee-pin { min-height: 44px; } }
+
+.ee-menu[open] > div { transform-origin: top right; animation: ui-pop .14s var(--ease-out); }

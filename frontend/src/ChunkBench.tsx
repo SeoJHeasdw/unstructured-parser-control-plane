@@ -1,18 +1,17 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { AlertCircle, Check, Circle, ChevronDown, FileText, Info, LoaderCircle, RefreshCw, Ruler, Scissors, SlidersHorizontal } from 'lucide-react';
+import { AlertCircle, Brain, Check, ChevronDown, FileText, Info, LoaderCircle, Pencil, Plus, RefreshCw, Ruler, Scissors, SlidersHorizontal } from 'lucide-react';
 import { chunkSource, getConfig, getSamples, listDocuments } from './api/retrieval';
 import type { ChunkResponse, Preset, RetrievalConfig, RetrievalDoc, Sample } from './api/retrieval';
 import { Tabs } from './ui';
-import { ChunkSizingFields } from './retrieval/ChunkSizingFields';
 import type { Column } from './retrieval/chunk-board';
 import { CompareTable, CompositionBar } from './retrieval/chunk-compare';
 import { StrategyModal, TokenModal } from './retrieval/chunk-detail';
 import type { StrategyTab } from './retrieval/chunk-detail';
 import { ElementsView } from './retrieval/chunk-elements';
-import { MAX_SELECTED, PresetModal } from './retrieval/chunk-presets';
+import { MAX_PRESETS, MAX_SELECTED, PresetModal, newPresetId } from './retrieval/chunk-presets';
 import { SourceModal } from './retrieval/chunk-source';
 import type { SourceKey } from './retrieval/chunk-source';
-import { DEFAULT_PRESETS, DEFAULT_SELECTED, STORE, errorText, loadPresets, savePresets, usePersistent } from './retrieval/shared';
+import { DEFAULT_PRESETS, DEFAULT_SELECTED, STORE, defaultParams, describeParams, errorText, familyOf, fmtInt, loadPresets, savePresets, usePersistent } from './retrieval/shared';
 import './retrieval.css';
 
 /**
@@ -29,7 +28,6 @@ export default function ChunkBench({ active, requestedSource, onSourceChange }: 
 }) {
   const [bench, setBench] = usePersistent<Bench>(STORE.bench, { source: 'sample:report', selected: DEFAULT_SELECTED, conn: '', model: '', parallelism: 1 });
   const [ui, setUi] = usePersistent<{ view: View }>(STORE.benchUi, { view: 'compare' });
-  const [editingPreset, setEditingPreset] = useState('');
   const [presets, setPresets] = useState<Preset[]>(loadPresets);
   const [config, setConfig] = useState<RetrievalConfig | null>(null);
   const [docs, setDocs] = useState<RetrievalDoc[]>([]);
@@ -38,7 +36,9 @@ export default function ChunkBench({ active, requestedSource, onSourceChange }: 
   const [loadError, setLoadError] = useState('');
   const [result, setResult] = useState<BenchResult | null>(null);
   const [loadAttempt, setLoadAttempt] = useState(0);
-  const [nonce, setNonce] = useState(0);
+  /* 사용자가 '나누기'를 누를 때만 의미 기반 전략의 문장 임베딩을 계산한다(key: 누른 시점의 비교 조건). */
+  const [trigger, setTrigger] = useState<{ n: number; embed: boolean; key: string }>({ n: 0, embed: false, key: '' });
+  const nonce = trigger.n;
   const [open, setOpen] = useState<Open | null>(null);
   const [sourceOpen, setSourceOpen] = useState(false);
   const [presetOpen, setPresetOpen] = useState<string | null | false>(false);
@@ -78,7 +78,6 @@ export default function ChunkBench({ active, requestedSource, onSourceChange }: 
   const doc = !isSample ? docs.find(d => d.id === sourceId) : undefined;
 
   const chosen = useMemo(() => presets.filter(p => bench.selected.includes(p.id)).slice(0, MAX_SELECTED), [bench.selected, presets]);
-  const quickPreset = presets.find(p => p.id === editingPreset) ?? chosen[0] ?? presets[0];
   const maxParallel = config?.caps?.max_parallel_strategies ?? 1;
   const parallelism = Number.isInteger(bench.parallelism) ? Math.max(1, Math.min(maxParallel, bench.parallelism)) : 1;
   /* 한도 초과는 알려진 모델 가운데 가장 작은 입력 한도로 센다. */
@@ -103,9 +102,10 @@ export default function ChunkBench({ active, requestedSource, onSourceChange }: 
     if (!active || !ready || !runKey) return;
     const { sourceKey: key, chosen: strategies, limit: cap, parallelism: workers } = JSON.parse(runKey) as { sourceKey: SourceKey; chosen: Preset[]; limit: number | null; parallelism: number };
     const id = key.slice(key.indexOf(':') + 1);
+    const embed = trigger.embed && trigger.key === runKey;
     const controller = new AbortController();
     const timer = window.setTimeout(() => {
-      void chunkSource(key.startsWith('sample:') ? { sample: id } : { doc_id: id }, strategies, cap, controller.signal, workers)
+      void chunkSource(key.startsWith('sample:') ? { sample: id } : { doc_id: id }, strategies, cap, controller.signal, workers, embed)
         .then(response => { if (!controller.signal.aborted) setResult({ key: runKey, attempt: nonce, response, error: '' }); })
         .catch(error => {
           if (!controller.signal.aborted) setResult(previous => ({ key: runKey, attempt: nonce,
@@ -113,7 +113,7 @@ export default function ChunkBench({ active, requestedSource, onSourceChange }: 
         });
     }, 250);
     return () => { window.clearTimeout(timer); controller.abort(); };
-  }, [active, ready, runKey, nonce]);
+  }, [active, ready, runKey, nonce, trigger]);
 
   const changePresets = (next: Preset[]) => {
     setPresets(next); savePresets(next);
@@ -133,9 +133,17 @@ export default function ChunkBench({ active, requestedSource, onSourceChange }: 
 
   const src = response?.source;
   const composition = src?.composition ?? sample?.composition ?? {};
-  const refresh = () => setNonce(n => n + 1);
+  const refresh = () => setTrigger(t => ({ n: t.n + 1, embed: true, key: runKey }));
+  const addPreset = () => {
+    const next: Preset = { id: newPresetId(), name: `요소 인지 ${presets.length + 1}`, kind: 'element', params: defaultParams('element') };
+    changePresets([...presets, next]);
+    setBench(prev => prev.selected.length >= MAX_SELECTED ? prev : { ...prev, selected: [...prev.selected, next.id] });
+    setPresetOpen(next.id);
+  };
   const sourceName = src?.name ?? sample?.name ?? doc?.name ?? '원문 없음';
   const connections = (config?.connections ?? []).filter(c => c.configured);
+  const pending = (response?.results ?? []).filter(r => r.pending);
+  const pendingWindows = pending.reduce((sum, r) => sum + (r.pending?.missing ?? 0), 0);
   const emptyImages = (src?.elements ?? []).filter(el => el.kind === 'image' && el.empty);
 
   useEffect(() => {
@@ -181,34 +189,31 @@ export default function ChunkBench({ active, requestedSource, onSourceChange }: 
       </div>
       <div className="cb-bar-actions">
         <button type="button" className="button-primary cb-btn" disabled={!runKey || running} onClick={refresh}>
-          <RefreshCw size={16} className={running ? 'cb-spin' : ''} aria-hidden="true" /> {running ? '나누는 중' : '나누기'}
+          <RefreshCw size={16} className={running ? 'cb-spin' : ''} aria-hidden="true" /> {running ? '나누는 중' : pending.length ? '임베딩 계산하고 나누기' : '나누기'}
         </button>
       </div>
       {Object.values(composition).some(count => count > 0) && <div className="cb-composition"><CompositionBar composition={composition} /></div>}
     </section>
 
     <section className="cb-strategies" aria-labelledby="cb-settings-heading">
-      <header><h2 id="cb-settings-heading">청킹 설정</h2><div className="cb-run-options">
-        {ready && maxParallel === 1 && <small id="cb-parallel-info">{config ? '현재 서버는 순차 실행만 지원' : '서버 설정을 확인할 수 없어 순차 실행'}</small>}
-        <label className="cb-parallel">전략 동시 실행
-        <select aria-describedby={ready && maxParallel === 1 ? 'cb-parallel-info' : undefined} value={parallelism} disabled={maxParallel <= 1} onChange={e => setBench(prev => ({...prev, parallelism:Number(e.target.value)}))}>
-          {Array.from({length:maxParallel}, (_, i) => <option key={i} value={i + 1}>{i === 0 ? '1개 · 순차' : '최대 ' + (i + 1) + '개 · 병렬'}</option>)}
-        </select></label></div></header>
-      {quickPreset && <fieldset className="cb-sizing cb-quick-sizing" aria-label="전략별 분할 설정">
-        <label className="cb-edit-target"><span>편집할 전략</span><select value={quickPreset.id} onChange={e => setEditingPreset(e.target.value)}>
-          {presets.map(p => <option value={p.id} key={p.id}>{p.name || '이름 없는 전략'}</option>)}</select></label>
-        <ChunkSizingFields key={quickPreset.id} preset={quickPreset} onChange={params => changePresets(presets.map(p => p.id === quickPreset.id ? {...p, params} : p))}/>
-        <button ref={presetSettingsButton} type="button" className="button-secondary cb-btn cb-advanced" title="표·그림·캡션 처리 및 전략 관리"
-          onClick={() => setPresetOpen(quickPreset.id)}><SlidersHorizontal size={15} aria-hidden="true"/>전략 설정</button>
-      </fieldset>}
-      <p className="cb-choice-label">비교할 전략 <span>{chosen.length} / {MAX_SELECTED}개 선택</span></p>
-      <div>{presets.map(preset => {
+      <header><h2 id="cb-settings-heading">비교할 전략 <span>{chosen.length} / {MAX_SELECTED}개 선택</span></h2>
+        <button ref={presetSettingsButton} type="button" className="button-secondary cb-btn cb-advanced" onClick={() => setPresetOpen(chosen[0]?.id ?? presets[0]?.id ?? null)}>
+          <SlidersHorizontal size={15} aria-hidden="true"/>전략 설정</button></header>
+      <ul className="cb-picks">{presets.map(preset => {
         const selected = bench.selected.includes(preset.id);
-        const Icon = selected ? Check : Circle;
-        return <button key={preset.id} type="button" aria-label={preset.name + ' 비교 선택'} aria-pressed={selected}
-          disabled={!selected && chosen.length >= MAX_SELECTED} onClick={() => toggleChosen(preset.id)}>
-          <Icon size={14} aria-hidden="true"/>{preset.name || '이름 없는 전략'}</button>;
-      })}</div>
+        return <li key={preset.id} className={selected ? 'is-on' : ''}>
+          <button type="button" className="cb-pick" aria-label={preset.name + ' 비교 선택'} aria-pressed={selected}
+            disabled={!selected && chosen.length >= MAX_SELECTED} onClick={() => toggleChosen(preset.id)}>
+            <span className="cb-pick-check" aria-hidden="true"><Check size={12} strokeWidth={3}/></span>
+            <span className="cb-pick-text"><b>{preset.name || '이름 없는 전략'}</b><small>{familyOf(preset.kind)} · {describeParams(preset.params)}</small></span>
+          </button>
+          <button type="button" className="cb-pick-edit" aria-label={preset.name + ' 전략 편집'} data-tip="설정 편집" onClick={() => setPresetOpen(preset.id)}><Pencil size={13}/></button>
+        </li>;
+      })}
+        {presets.length < MAX_PRESETS && <li><button type="button" className="cb-pick-add" onClick={addPreset}><Plus size={15} aria-hidden="true"/>전략 추가</button></li>}
+      </ul>
+      {pending.length > 0 && !running && <div className="cb-embed-note" role="status"><Brain size={17} aria-hidden="true"/>
+        <span><b>의미 기반 전략 {pending.length}개가 문장 임베딩을 기다립니다.</b> {pending[0].pending?.model} 모델로 문장 창 {fmtInt(pendingWindows)}개를 계산합니다. 위의 '임베딩 계산하고 나누기'를 누르면 계산하고, 이 PC에 저장해 다음부터는 바로 나눕니다.</span></div>}
     </section>
 
     <section className="cb-main" aria-label="청킹 벤치" aria-busy={running || !ready || undefined}>
@@ -218,7 +223,7 @@ export default function ChunkBench({ active, requestedSource, onSourceChange }: 
           {columns.length > 0 && view === 'compare' && <>
             {runError ? <p className="cb-error" role="alert">이전 청킹 결과를 표시합니다. {runError}</p> : <p className="cb-table-note">전략을 선택하면 청크 내용과 원문에서 나뉜 위치를 볼 수 있습니다.</p>}
             <CompareTable columns={columns} elements={src?.elements ?? []} limit={limit} busy={running}
-              onEdit={setPresetOpen} onOpen={id => { strategyTrigger.current = document.activeElement as HTMLElement; setOpen({ id, tab:'chunks', index:0 }); }} />
+              onEdit={setPresetOpen} onEmbed={refresh} onOpen={id => { strategyTrigger.current = document.activeElement as HTMLElement; setOpen({ id, tab:'chunks', index:0 }); }} />
             {emptyImages.length > 0 && <p className="cb-foot"><Info size={16} aria-hidden="true" /><span>
               {emptyImages.map(el => el.page ? `${el.page}쪽` : el.label).join(', ')} 그림은 글자가 없어 어느 전략에도 담기지 않습니다(시각 모델 필요). 그림 칸에서는 문제로 세지 않았습니다.</span></p>}
           </>}
@@ -231,12 +236,13 @@ export default function ChunkBench({ active, requestedSource, onSourceChange }: 
     {active && open && openColumn && src && !measureOpen && presetOpen === false && <StrategyModal source={src} column={openColumn} tab={open.tab} index={open.index}
       onTab={tab => setOpen(prev => prev && { ...prev, tab })} onIndex={index => setOpen(prev => prev && { ...prev, index })}
       onClose={() => { setOpen(null); requestAnimationFrame(() => strategyTrigger.current?.focus()); }} onEdit={() => { returnAction.current = 'edit'; setPresetOpen(openColumn.id); }}
-      measure={<span title={connections.length ? undefined : '연결된 임베딩 모델이 없습니다'}>
+      measure={<span data-tip={connections.length ? undefined : '연결된 임베딩 모델이 없습니다'}>
         <button type="button" className="button-secondary cb-btn" disabled={!connections.length || !openColumn.result.chunks.length} data-strategy-action="measure" onClick={() => { returnAction.current = 'measure'; setMeasureOpen(true); }}><Ruler size={14} /> 토큰 실측</button>
       </span>} />}
     {active && measureOpen && openColumn && <TokenModal column={openColumn} connections={connections} specs={config?.specs ?? []} conn={bench.conn} model={bench.model}
       onPick={(conn, model) => setBench(prev => ({ ...prev, conn, model }))} onClose={() => setMeasureOpen(false)} />}
     {active && presetOpen !== false && <PresetModal returnToDetail={!!open} presets={presets} selected={bench.selected} initial={presetOpen} onChange={changePresets} onToggle={toggleChosen}
+      connections={config?.connections ?? []} parallel={{ value: parallelism, max: maxParallel, info: ready && maxParallel === 1 ? (config ? '현재 서버는 순차 실행만 지원' : '서버 설정을 확인할 수 없어 순차 실행') : '', onChange: value => setBench(prev => ({ ...prev, parallelism: value })) }}
       onReset={() => { changePresets(DEFAULT_PRESETS); setBench(prev => ({ ...prev, selected: DEFAULT_SELECTED })); }} onClose={() => {
         const directEdit = !!presetOpen && !open;
         setPresetOpen(false);

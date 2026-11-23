@@ -89,9 +89,9 @@ export default function LiveFlowPanel({ simulator, active, onOpen }: Props) {
   const kpi = (key: MetricKey | null, label: string, value: string, unit = '', hint?: string, tone = '') => {
     const content = <><span>{label}</span><b>{value}{unit && <small>{unit}</small>}</b></>;
     const className = `lf-kpi${tone}${key && focusKey === key ? ' is-focus' : ''}`;
-    if (!key || Number(value) === 0) return <div className={className} title={key ? undefined : hint}>{content}</div>;
+    if (!key || Number(value) === 0) return <div className={className} data-tip={key ? undefined : hint} data-tip-side="top">{content}</div>;
     const destination = key === 'held' || key === 'failed' ? attention.find(item => item.metric[key] > 0) : undefined;
-    return <button type="button" className={className} title={hint}
+    return <button type="button" className={className} data-tip={hint} data-tip-side="top"
       aria-pressed={destination ? undefined : pinnedKey === key}
       onMouseEnter={() => setPreviewKey(key)} onMouseLeave={() => setPreviewKey(null)}
       onFocus={() => setPreviewKey(key)} onBlur={() => setPreviewKey(null)}
@@ -107,7 +107,7 @@ export default function LiveFlowPanel({ simulator, active, onOpen }: Props) {
 
   return <section className={`lf-root${focusKey ? ' has-focus' : ''}`} aria-label="처리 흐름 현황">
     <header className="lf-head">
-      <div className="lf-head-title"><span className="lf-head-icon"><Workflow size={19} strokeWidth={1.8} aria-hidden="true" /></span><h2>처리 흐름</h2><span className="lf-mock" title="브라우저 안에서 시뮬레이션한 운영 수치입니다.">모의 운영</span><span className={`lf-state ${snapshot.running ? 'is-on' : ''}`}>{snapshot.running ? <><i /> 진행 중</> : <><CirclePause size={13} /> 전체 일시정지</>}</span><time title="시뮬레이션 시각">{snapshot.clock}</time></div>
+      <div className="lf-head-title"><span className="lf-head-icon"><Workflow size={19} strokeWidth={1.8} aria-hidden="true" /></span><h2>처리 흐름</h2><span className="lf-mock" data-tip="브라우저 안에서 시뮬레이션한 운영 수치입니다.">모의 운영</span><span className={`lf-state ${snapshot.running ? 'is-on' : ''}`}>{snapshot.running ? <><i /> 진행 중</> : <><CirclePause size={13} /> 전체 일시정지</>}</span><time data-tip="시뮬레이션 시각">{snapshot.clock}</time></div>
       <div className="lf-actions">
         <button type="button" className={`lf-attn-toggle${attention.length ? ' has-items' : ''}`} aria-expanded={saved.attention} onClick={() => update({ ...saved, attention: !saved.attention })}>
           <TriangleAlert size={14} /> 주의 <b>{attention.length}</b><ChevronDown size={13} className={saved.attention ? '' : 'lf-rot'} />
