@@ -24,7 +24,7 @@ pip install -r requirements-docling.lock.txt   # Windows 포함 정확한 버전
 export DOCOPS_DOCLING_ARTIFACTS=/path/to/prepared/models
 ```
 
-실행 중 Hugging Face 오프라인 모드를 활성화하며 원격 Docling 서비스와 외부 플러그인은 사용하지 않습니다. PDF OCR은 기본 비활성입니다. 텍스트 없는 스캔 문서는 OCR 연결 후 처리해야 합니다. Docling 2.150.0으로 시험했으며, 테스트한 문서는 합성 PDF와 DOCX입니다. PPTX와 XLSX는 어댑터에 연결만 되어 있어 추가 검증이 필요합니다. HWP, ZIP, 이미지, 메일 등은 처리 미지원입니다.
+로컬 EasyOCR 한국어·영어 모델이 준비되면 PDF의 이미지 영역, Office에서 참조한 그림, PNG·JPEG·BMP·TIFF·GIF·WebP 및 SVG 내부 그림을 읽습니다. 모델 설치 방법과 경로 설정은 프로젝트 README의 PDF·Office 실제 파싱 절을 참고하세요.
 
 ## API
 
@@ -34,7 +34,7 @@ export DOCOPS_DOCLING_ARTIFACTS=/path/to/prepared/models
 - `POST /api/live/documents`: `multipart/form-data`의 `file` 필드로 업로드. 업로드는 저장만 수행합니다.
 - `GET /api/live/documents/{id}`: 처리 상태
 - `POST /api/live/documents/{id}/process`: 처리 요청 접수. 응답은 `202`와 `processing` 상태입니다. `processing`은 실제 처리 중 또는 대기 중을 뜻합니다. 중복 요청은 `409`, 대기열 만석은 `503`입니다.
-- `GET /api/live/documents/{id}/result`: 마지막 성공 결과와 파서 정보, `is_stale`, `warnings`를 반환합니다. 재처리 중이거나 실패한 경우에도 이전 성공 결과가 있으면 `is_stale: true`로 반환하고, 성공 이력이 없으면 `409`입니다. PDF 결과에는 OCR 미적용 경고가 항상 포함됩니다.
+- `GET /api/live/documents/{id}/result`: 마지막 성공 결과와 파서 정보, `is_stale`, `warnings`를 반환합니다. 재처리 중이거나 실패한 경우에도 이전 성공 결과가 있으면 `is_stale: true`로 반환하고, 성공 이력이 없으면 `409`입니다. OCR 없이 처리한 PDF에는 미적용 경고를 남깁니다.
 - `GET /api/live/documents/{id}/history`: 로컬 처리 이력
 
 ### 파싱 전 판별과 원문 충실도 (2026-11-19)
@@ -44,7 +44,7 @@ export DOCOPS_DOCLING_ARTIFACTS=/path/to/prepared/models
 - 파싱 뒤 원본 XML을 직접 읽어 결과와 대조한다: 특수기호 손실 수, 병합 셀, 흰색에 가까운 글자·숨김 글자, OCR 없이 읽지 않은 그림 수. 결과에 없던 글상자·SVG 글자는 결과 끝 `## 보충 추출`에 원문 위치와 함께 덧붙인다. 보고서는 `result`·`runs/{run_id}` 응답의 `fidelity`, 요약은 `warnings`.
 - 엣지 케이스 회귀 테스트는 `tests/test_edge_cases.py`. Docling 실측 테스트 1개는 Docling이 설치된 가상환경에서만 돈다.
 
-원본, SQLite DB, 결과는 프로젝트의 `runtime/`에 남으며 Git 대상에서 제외됩니다. 파일명은 메타데이터로만 사용하고 실제 경로는 서버가 생성한 ID를 사용합니다. 기본 업로드 한도는 100 MiB이며 표준 텍스트 파서는 10 MiB, CSV는 최대 10,000행입니다. 단일 서버와 전용 단일 파싱 워커를 전제로 하며, 최대 64건의 요청을 추가로 대기합니다. 서버 종료 시 대기 작업은 실패 상태로 기록되며, 갑작스러운 종료로 남은 진행 중 상태는 다음 시작 시 실패 상태로 복구됩니다. 마지막 성공 결과는 재처리 실패나 중단 이후에도 보존합니다. 이 서비스는 운영용 인증·권한 시스템을 포함하지 않습니다.
+원본, SQLite DB, 결과는 프로젝트의 `runtime/`에 남으며 Git 대상에서 제외됩니다. 파일명은 메타데이터로만 사용하고 실제 경로는 서버가 생성한 ID를 사용합니다. 기본 업로드 한도는 100 MiB이며 표준 텍스트 파서는 100 MiB, CSV는 최대 100만 행입니다. 단일 서버와 전용 단일 파싱 워커를 전제로 하며, 최대 64건의 요청을 추가로 대기합니다. 서버 종료 시 대기 작업은 실패 상태로 기록되며, 갑작스러운 종료로 남은 진행 중 상태는 다음 시작 시 실패 상태로 복구됩니다. 마지막 성공 결과는 재처리 실패나 중단 이후에도 보존합니다. 이 서비스는 운영용 인증·권한 시스템을 포함하지 않습니다.
 
 ## 테스트
 

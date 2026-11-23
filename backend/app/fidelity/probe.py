@@ -7,11 +7,15 @@
 한계(현재): 스타일에서 상속한 글자색·테마 색은 보지 않는다(직접 서식만). 머리말·꼬리말·각주의 그림은 세지 않는다.
 PPTX는 배경색을 알 수 없어 저대비 판정을 하지 않는다. 그림 '속' 글자는 OCR 없이는 알 수 없다.
 """
+import base64
+import binascii
 import posixpath
 import re
 import xml.etree.ElementTree as ET
 import zipfile
+from urllib.parse import unquote_to_bytes
 
+from app.fidelity.pictures import PictureOcr
 from app.format_gate import main_part
 from app.textnorm import (LOW_CONTRAST, contrast_ratio, map_symbol_font_text, parse_hex_color, special_counts,
                           symbol_font_char, to_script)
@@ -42,12 +46,18 @@ MAX_PART = 64 * 1024 * 1024
 
 
 class Inventory:
-    def __init__(self, fmt: str):
+    def __init__(self, fmt: str, ocr: PictureOcr | None = None):
+        self.ocr = ocr
+        self.media_bytes = 0
+        self.media_visits = 0
         self.format = fmt
         self.symbols: dict[str, int] = {}
         self.symbol_font = {"converted": 0, "unmapped": 0, "examples": []}
         self.scripts = {"converted": 0, "flattened": 0, "examples": []}
         self.items: list[dict] = []
+        self.item_chars = 0
+        self.omitted_items = 0
+        self.uncached_formulas = 0
         self.low_contrast: list[dict] = []
         self.hidden: list[dict] = []
         self.hidden_sheets: list[str] = []
@@ -64,10 +74,18 @@ class Inventory:
         if len(bucket["examples"]) < EXAMPLES:
             bucket["examples"].append(entry)
 
+    def add_item(self, item):
+        size = len(item["text"])
+        if len(self.items) >= 20_000 or self.item_chars + size > 16 * 1024**2:
+            self.omitted_items += 1
+            return
+        self.item_chars += size
+        self.items.append(item)
+
     def as_dict(self) -> dict:
         return {"format": self.format, "symbols": dict(sorted(self.symbols.items(), key=lambda kv: (-kv[1], kv[0]))),
                 "symbol_total": sum(self.symbols.values()), "symbol_font": self.symbol_font, "scripts": self.scripts,
-                "items": self.items[:500], "low_contrast": self.low_contrast[:EXAMPLES], "low_contrast_total": len(self.low_contrast),
+                "items": self.items, "ocr": self.ocr.stats if self.ocr else None, "low_contrast": self.low_contrast[:EXAMPLES], "low_contrast_total": len(self.low_contrast),
                 "hidden": self.hidden[:EXAMPLES], "hidden_total": len(self.hidden), "hidden_sheets": self.hidden_sheets,
                 "merged": self.merged[:EXAMPLES], "merged_total": len(self.merged), "images": self.images, "notes": self.notes}
 
@@ -113,29 +131,103 @@ def _rels(archive: zipfile.ZipFile, part: str) -> dict[str, str]:
     return result
 
 
-def _svg(data: bytes) -> tuple[list[str], int]:
-    """SVG 안의 벡터 글자와 래스터 그림 수. 글자는 OCR 없이 정확히 읽을 수 있다."""
-    if len(data) > 10 * 1024 * 1024 or b"<!ENTITY" in data:
-        return [], 0
-    text = re.sub(rb"<!DOCTYPE[^>\[]*>", b"", data)
-    if b"<!DOCTYPE" in text:
-        return [], 0
+def _picture_bytes(inv, archive, name, limit):
+    if archive is None:
+        return None
     try:
-        root = ET.fromstring(text)
-    except ET.ParseError:
-        return [], 0
-    texts, rasters = [], 0
-    for el in root.iter():
-        local = el.tag.rsplit("}", 1)[-1] if isinstance(el.tag, str) else ""
+        info = archive.getinfo(name)
+    except KeyError:
+        return None
+    if info.file_size > limit or inv.media_bytes + info.file_size > 256 * 1024**2:
+        return None
+    inv.media_bytes += info.file_size
+    return archive.read(info)
+
+
+def _ocr_item(inv, data, location, ctx):
+    if inv.ocr and data:
+        text = inv.ocr.read(data, location)
+        if text:
+            item = {k: ctx[k] for k in ("sheet", "row", "column", "columns") if k in ctx}
+            inv.add_item({**item, "kind": "image_ocr", "text": text, "location": location})
+
+
+def _svg_elements(inv, root):
+    ids = {el.get("id"): el for el in root.iter() if el.get("id")}
+    stack = [(root, ())]
+    remaining = 100_000
+    while stack and remaining:
+        el, refs = stack.pop()
+        remaining -= 1
+        local = el.tag.rsplit("}", 1)[-1]
+        if local in {"metadata", "defs", "clipPath", "mask", "pattern", "style", "script"}:
+            continue
+        if el.get("display") == "none" or el.get("visibility") == "hidden":
+            continue
+        if local == "use":
+            href = el.get("href") or el.get("{http://www.w3.org/1999/xlink}href") or ""
+            ident = href[1:] if href.startswith("#") else None
+            if ident in ids and ident not in refs and len(refs) < 8:
+                stack.append((ids[ident], refs + (ident,)))
+            continue
+        if local == "symbol" and not refs:
+            continue
+        yield el
+        stack.extend((child, refs) for child in reversed(el))
+    if stack:
+        inv.notes.append("SVG 도형 수 한도로 일부 요소의 점검을 생략했습니다.")
+
+
+def read_svg_picture(inv, archive, name, data, location, ctx, depth=0):
+    if depth > 4 or not data or len(data) > 10 * 1024**2 or inv.media_visits >= 512:
+        if "일부 SVG 그림은 크기·중첩 한도 또는 원본 참조를 확인해야 합니다." not in inv.notes:
+            inv.notes.append("일부 SVG 그림은 크기·중첩 한도 또는 원본 참조를 확인해야 합니다.")
+        return
+    inv.media_visits += 1
+    root = _xml(re.sub(rb"<!DOCTYPE[^>\[]*>", b"", data))
+    if root is None or root.tag.rsplit("}", 1)[-1] != "svg":
+        inv.notes.append(f"{location}: SVG를 읽을 수 없습니다.")
+        return
+    has_text = False
+    for el in _svg_elements(inv, root):
+        local = el.tag.rsplit("}", 1)[-1]
         if local == "text":
             value = " ".join("".join(el.itertext()).split())
             if value:
-                texts.append(value)
-        elif local == "image":
-            href = el.get("href") or el.get("{http://www.w3.org/1999/xlink}href") or ""
-            if href.startswith("data:image/") and not href.startswith("data:image/svg") or re.search(r"\.(png|jpe?g|gif|bmp|webp)$", href, re.I):
-                rasters += 1
-    return texts, rasters
+                has_text = True
+                inv.add_item({"kind": "svg_text", "text": value, "location": f"{location} SVG 그림"})
+        if local != "image":
+            continue
+        href = el.get("href") or el.get("{http://www.w3.org/1999/xlink}href") or ""
+        meta, _, payload = href.partition(",") if href.startswith("data:") else ("", "", "")
+        nested = meta.lower().startswith("data:image/svg") or href.lower().endswith(".svg")
+        if not nested:
+            inv.images["raster_in_svg"] += 1
+        if not nested and not inv.ocr:
+            continue
+        if inv.media_visits >= 512 or inv.media_bytes > 256 * 1024**2:
+            continue
+        member, child = name, None
+        if meta.lower().startswith("data:image/") and meta.lower().endswith(";base64"):
+            try:
+                child = base64.b64decode(b"".join(payload.encode("ascii").split()), validate=True)
+                inv.media_bytes += len(child)
+            except (UnicodeError, binascii.Error):
+                pass
+        elif meta.lower().startswith("data:image/svg+xml"):
+            child = unquote_to_bytes(payload)
+            inv.media_bytes += len(child)
+        elif href and not meta and ":" not in href and not href.startswith(("/", "#")):
+            member = posixpath.normpath(posixpath.join(posixpath.dirname(name), href))
+            if not member.startswith("../"):
+                child = _picture_bytes(inv, archive, member, 10 * 1024**2)
+        if nested:
+            read_svg_picture(inv, archive, member, child, location, ctx, depth + 1)
+        else:
+            inv.media_visits += 1
+            _ocr_item(inv, child, location + " SVG 내부 그림", ctx)
+    inv.images["svg_with_text"] += int(has_text)
+    return True
 
 
 def _image(inv: Inventory, archive: zipfile.ZipFile, target: str | None, svg_target: str | None, location: str, ctx: dict) -> None:
@@ -143,24 +235,22 @@ def _image(inv: Inventory, archive: zipfile.ZipFile, target: str | None, svg_tar
     for flag, key in (("group", "in_groups"), ("textbox", "in_text_boxes"), ("object", "in_objects")):
         if ctx.get(flag):
             inv.images[key] += 1
-    if svg_target:
-        inv.images["svg"] += 1
-        try:
-            texts, rasters = _svg(archive.read(svg_target))
-        except KeyError:
-            texts, rasters = [], 0
-        inv.images["raster_in_svg"] += rasters
-        if texts:
-            inv.images["svg_with_text"] += 1
-            for value in texts:
-                inv.items.append({"kind": "svg_text", "text": value, "location": f"{location} SVG 그림"})
-        return
     ext = (target or "").rsplit(".", 1)[-1].lower()
-    if ext == "svg" and target:
-        _image(inv, archive, None, target, location, {})
-        inv.images["total"] -= 1
-        return
-    inv.images["metafile" if ext in METAFILE else "raster"] += 1
+    svg = svg_target or (target if ext == "svg" else None)
+    if svg:
+        inv.images["svg"] += 1
+        ok = read_svg_picture(inv, archive, svg, _picture_bytes(inv, archive, svg, 10 * 1024**2), location, ctx)
+        if not ok and inv.ocr and target and ext in RASTER and inv.media_visits < 512:
+            inv.images["raster"] += 1
+            inv.media_visits += 1
+            _ocr_item(inv, _picture_bytes(inv, archive, target, 32 * 1024**2), location + " 대체 그림", ctx)
+    elif ext in METAFILE:
+        inv.images["metafile"] += 1
+    else:
+        inv.images["raster"] += 1
+        if inv.ocr and target and inv.media_visits < 512:
+            inv.media_visits += 1
+            _ocr_item(inv, _picture_bytes(inv, archive, target, 32 * 1024**2), location, ctx)
 
 
 def _blip_targets(blip: ET.Element, rels: dict) -> tuple[str | None, str | None]:
@@ -195,8 +285,10 @@ class _Docx:
             return
         if tag == q("mc", "AlternateContent"):
             choice = el.find(q("mc", "Choice"))
-            for child in (choice if choice is not None else []):
-                self.walk(child, st)
+            branch = choice if choice is not None else el.find(q("mc", "Fallback"))
+            if branch is not None:
+                for child in branch:
+                    self.walk(child, st)
             return
         handler = {q("w", "p"): self.paragraph, q("w", "tbl"): self.table, q("w", "r"): self.run,
                    q("w", "txbxContent"): self.textbox, q("a", "blip"): self.blip, q("v", "imagedata"): self.vml_image}.get(tag)
@@ -213,7 +305,7 @@ class _Docx:
     def paragraph(self, el: ET.Element, st: dict) -> None:
         if not st.get("inside"):
             self.paragraphs += 1
-            st = {**st, "loc": f"문단 {self.paragraphs}"}
+            st = {**st, "loc": f"{st.get('prefix', '')}문단 {self.paragraphs}"}
         collector = {"text": [], "low": []}
         bg = _shd(el.find(q("w", "pPr"))) or st.get("bg")
         for child in el:
@@ -223,6 +315,8 @@ class _Docx:
             low_text = "".join(t for t, _, _ in collector["low"])
             color, ratio = collector["low"][0][1], min(r for _, _, r in collector["low"])
             self.inv.low_contrast.append({"text": low_text[:200], "color": color, "ratio": ratio, "location": st.get("loc", "")})
+        if st.get("section") and not st.get("textbox") and text.strip():
+            self.inv.add_item({"kind": "section_text", "text": text, "location": st.get("loc", st["section"])})
         if st.get("out") is not None:
             st["out"].append(text)
 
@@ -279,7 +373,7 @@ class _Docx:
                 text = converted
             else:
                 self.inv.scripts["flattened"] += 1
-                before = "".join(para["text"])[-12:] if para else ""
+                before = "".join(t[-12:] for t in para["text"][-12:])[-12:] if para else ""
                 self.inv.example(self.inv.scripts, {"kind": script, "text": text, "context": before, "location": st.get("loc", "")})
         if vanish:
             self.inv.hidden.append({"text": text[:200], "location": st.get("loc", "")})
@@ -294,7 +388,7 @@ class _Docx:
 
     def table(self, el: ET.Element, st: dict) -> None:
         self.tables += 1
-        name = f"표 {self.tables}"
+        name = f"{st.get('prefix', '')}표 {self.tables}"
         open_vertical: dict[int, dict] = {}
         for row_index, tr in enumerate(el.findall(q("w", "tr")), start=1):
             col = 0
@@ -331,7 +425,7 @@ class _Docx:
             self.walk(child, {**st, "inside": True, "textbox": True, "loc": loc, "out": out, "para": None})
         text = "\n".join(t for t in out if t.strip())
         if text:
-            self.inv.items.append({"kind": "floating_text", "text": text, "location": loc})
+            self.inv.add_item({"kind": "floating_text", "text": text, "location": loc})
 
     def blip(self, el: ET.Element, st: dict) -> None:
         target, svg_target = _blip_targets(el, self.rels)
@@ -349,7 +443,20 @@ def _probe_docx(archive: zipfile.ZipFile, inv: Inventory) -> None:
         return
     body = root.find(q("w", "body"))
     if body is not None:
-        _Docx(archive, inv, part).walk(body, {})
+        parser = _Docx(archive, inv, part)
+        parser.walk(body, {})
+        visited = set()
+        for tag, label in (("headerReference", "머리말"), ("footerReference", "꼬리말")):
+            for ref in body.iter(q("w", tag)):
+                target = parser.rels.get(ref.get(q("r", "id")))
+                if not target or target in visited:
+                    continue
+                visited.add(target)
+                section = _part(archive, target, inv)
+                if section is not None:
+                    prefix = f"{label} {posixpath.basename(target)} "
+                    _Docx(archive, inv, target).walk(section, {"prefix": prefix, "section": label})
+
 
 
 # ---------------------------------------------------------------- XLSX
@@ -397,7 +504,7 @@ def _rich(inv: Inventory, node: ET.Element, ns: str) -> tuple[str, list[dict]]:
                 inv.scripts["converted"] += 1
                 text = converted
             else:
-                flattened.append({"kind": script, "text": text, "context": "".join(out)[-12:]})
+                flattened.append({"kind": script, "text": text, "context": "".join(t[-12:] for t in out[-12:])[-12:]})
         out.append(text)
     return "".join(out), flattened
 
@@ -446,8 +553,31 @@ def _probe_xlsx(archive: zipfile.ZipFile, inv: Inventory) -> None:
         if root is None:
             continue
         values: dict[str, str] = {}
+        shared_formulas = {}
         for c in root.iter(q("x", "c")):
             ref, kind = c.get("r", ""), c.get("t")
+            formula = c.find(q("x", "f"))
+            if formula is not None and sheet.get("state") not in {"hidden", "veryHidden"}:
+                expression = formula.text or ""
+                shared_id = formula.get("si") if formula.get("t") == "shared" else None
+                if shared_id is not None and expression:
+                    shared_formulas[shared_id] = (ref, expression)
+                cached = c.findtext(q("x", "v"))
+                if not cached:
+                    inv.uncached_formulas += 1
+                    if not expression and shared_id in shared_formulas:
+                        from openpyxl.formula.translate import Translator, TranslatorError
+                        origin, base = shared_formulas[shared_id]
+                        try:
+                            expression = Translator("=" + base, origin=origin).translate_formula(ref).removeprefix("=")
+                        except (TranslatorError, ValueError, IndexError):
+                            pass
+                    if expression:
+                        item = {"kind": "formula", "text": "=" + expression, "location": f"{name}!{ref}", "sheet": name}
+                        anchor = re.fullmatch(r"([A-Z]{1,3})([1-9][0-9]{0,6})", ref)
+                        if anchor:
+                            item.update(row=int(anchor[2]), column=_col_index(anchor[1]) + 1, columns=1)
+                        inv.add_item(item)
             text, flattened = "", []
             if kind == "s":
                 v = c.find(q("x", "v"))
@@ -475,7 +605,7 @@ def _probe_xlsx(archive: zipfile.ZipFile, inv: Inventory) -> None:
                 inv.example(inv.scripts, {**entry, "location": location})
             inv.text(text)
             style = int(c.get("s", "0") or 0)
-            if style < len(styles) and styles[style][0] and text.strip():
+            if 0 <= style < len(styles) and styles[style][0] and text.strip():
                 color, fill = styles[style]
                 ratio = contrast_ratio(color, fill or "FFFFFF")
                 if ratio < LOW_CONTRAST:
@@ -507,7 +637,8 @@ def _marker(anchor: ET.Element, tag: str) -> tuple[int, int] | None:
     if node is None:
         return None
     try:
-        return int(node.findtext(q("xdr", "col"), "0")), int(node.findtext(q("xdr", "row"), "0"))
+        col, row = int(node.findtext(q("xdr", "col"), "0")), int(node.findtext(q("xdr", "row"), "0"))
+        return (col, row) if 0 <= col < 16384 and 0 <= row < 1048576 else None
     except ValueError:
         return None
 
@@ -545,12 +676,15 @@ def _probe_drawing(archive: zipfile.ZipFile, inv: Inventory, part: str, sheet: s
                         item = {"kind": "floating_text", "text": text, "location": location, "sheet": sheet}
                         if start:
                             item.update(row=start[1] + 1, column=start[0] + 1, columns=max(1, end[0] - start[0] + 1))
-                        inv.items.append(item)
+                        inv.add_item(item)
                 elif child.tag == q("xdr", "pic"):
                     blip = child.find(f".//{q('a', 'blip')}")
                     if blip is not None:
                         target, svg_target = _blip_targets(blip, rels)
-                        _image(inv, archive, target, svg_target, location, {"group": group})
+                        ctx = {"group": group, "sheet": sheet}
+                        if start:
+                            ctx.update(row=start[1] + 1, column=start[0] + 1, columns=max(1, end[0] - start[0] + 1))
+                        _image(inv, archive, target, svg_target, location, ctx)
                 elif child.tag == q("xdr", "graphicFrame"):
                     inv.images["charts"] += 1
         visit(anchor, False)
@@ -559,13 +693,22 @@ def _probe_drawing(archive: zipfile.ZipFile, inv: Inventory, part: str, sheet: s
 # ---------------------------------------------------------------- PPTX
 
 def _probe_pptx(archive: zipfile.ZipFile, inv: Inventory) -> None:
-    slides = sorted((n for n in archive.namelist() if re.fullmatch(r"ppt/slides/slide\d+\.xml", n)),
-                    key=lambda n: int(re.search(r"(\d+)\.xml$", n).group(1)))
-    for slide in slides:
+    main = main_part(archive, set(archive.namelist())) or "ppt/presentation.xml"
+    presentation = _part(archive, main, inv)
+    rels = _rels(archive, main)
+    ordered = presentation.find(q("p", "sldIdLst")) if presentation is not None else None
+    if ordered is not None:
+        slides = [rels.get(slide.get(q("r", "id"))) for slide in ordered.findall(q("p", "sldId"))]
+    else:
+        slides = sorted((n for n in archive.namelist() if re.fullmatch(r"ppt/slides/slide\d+\.xml", n)),
+                        key=lambda n: int(re.search(r"(\d+)\.xml$", n).group(1)))
+    for number, slide in enumerate(slides, start=1):
+        if not slide:
+            inv.notes.append(f"슬라이드 {number}의 원본 참조를 찾을 수 없습니다.")
+            continue
         root = _part(archive, slide, inv)
         if root is None:
             continue
-        number = int(re.search(r"(\d+)\.xml$", slide).group(1))
         location = f"슬라이드 {number}"
         rels = _rels(archive, slide)
         for paragraph in root.iter(q("a", "p")):
@@ -589,8 +732,8 @@ def _probe_pptx(archive: zipfile.ZipFile, inv: Inventory) -> None:
         visit(root, False)
 
 
-def probe(path, extension: str) -> dict:
-    inv = Inventory(extension)
+def probe(path, extension: str, ocr: PictureOcr | None = None) -> dict:
+    inv = Inventory(extension, ocr)
     with zipfile.ZipFile(path) as archive:
         if extension in ("DOCX", "DOCM"):
             _probe_docx(archive, inv)
@@ -598,4 +741,10 @@ def probe(path, extension: str) -> dict:
             _probe_xlsx(archive, inv)
         elif extension in ("PPTX", "PPTM"):
             _probe_pptx(archive, inv)
+    if ocr:
+        inv.notes.extend(ocr.errors)
+    if inv.uncached_formulas:
+        inv.notes.append(f"계산 결과가 저장되지 않은 수식 셀 {inv.uncached_formulas}개가 있습니다. 읽을 수 있는 수식 원문을 보충했습니다.")
+    if inv.omitted_items:
+        inv.notes.append(f"보충 텍스트 한도로 원본 요소 {inv.omitted_items}건을 결과에 넣지 못했습니다.")
     return inv.as_dict()

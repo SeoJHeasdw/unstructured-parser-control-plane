@@ -1,7 +1,7 @@
 /** API boundary for explicit local file operations. No request runs until called. */
 export type LiveStatus = 'uploaded' | 'processing' | 'completed' | 'failed' | 'unsupported';
-export type LiveDoc = { id: string; name: string; format: string; size_bytes: number; status: LiveStatus; created_at: string; updated_at: string; parser: string | null; error: string | null };
-export type LiveResult = { id: string; markdown: string; parser: string; parser_version: string; is_stale: boolean; warnings: string[] };
+export type LiveDoc = { id: string; name: string; format: string; size_bytes: number; status: LiveStatus; created_at: string; updated_at: string; parser: string | null; error: string | null; error_code?: string | null };
+export type LiveResult = { id: string; markdown: string; parser: string; parser_version: string; is_stale: boolean; fidelity?: {findings?: {message: string}[]} | null; warnings: string[] };
 export type ResultLocation = { start_line: number; end_line: number; page: number | null; start_offset?: number | null; end_offset?: number | null; sheet: string | null; row: number | null; column: number | null; columns: number | null };
 export type ParseRun = { run_id: string; completed_at: string | null; parser: string | null; parser_version: string | null; ocr_enabled: boolean | null; is_latest: boolean; duration_ms?: number | null };
 export type StoredParseRun = ParseRun & { markdown: string; warnings: string[]; locations: ResultLocation[] };
@@ -13,11 +13,15 @@ const DOCUMENTS_URL = '/api/live/documents';
 const documentUrl = (id:string) => `${DOCUMENTS_URL}/${encodeURIComponent(id)}`;
 export const liveSourceUrl = (id: string) => `${documentUrl(id)}/source`;
 
+export class LiveRequestError extends Error {
+ constructor(message: string, readonly status: number) { super(message); }
+}
+
 async function readResponse<T>(response:Response):Promise<T> {
  if (!response.ok) {
   let message = `요청을 처리하지 못했습니다. (HTTP ${response.status})`;
   try { const body = await response.json() as {detail?:unknown;message?:unknown}; const detail = body.detail ?? body.message; if(typeof detail === 'string')message = detail; } catch { /* Keep the status-only message. */ }
-  throw new Error(message);
+  throw new LiveRequestError(message, response.status);
  }
  return await response.json() as T;
 }
@@ -30,6 +34,7 @@ export async function listLiveDocuments(signal?: AbortSignal):Promise<LiveDoc[]>
 
 export async function listParseRuns(id: string, signal: AbortSignal): Promise<ParseRun[]> {
  const body = await readResponse<{runs: ParseRun[]}>(await fetch(`${documentUrl(id)}/runs`, {signal}));
+ if (!Array.isArray(body.runs)) throw new Error('성공 실행 목록을 확인할 수 없습니다.');
  return body.runs;
 }
 
@@ -46,6 +51,12 @@ export async function getSourcePreview(id: string, signal: AbortSignal, sheet?: 
 
 export async function getLiveDocument(id:string, signal:AbortSignal):Promise<LiveDoc> {
  return readResponse<LiveDoc>(await fetch(documentUrl(id),{signal}));
+}
+
+export type HistoryEntry = { created_at: string; status: string; message: string };
+export async function getDocumentHistory(id: string, signal: AbortSignal): Promise<HistoryEntry[]> {
+ const body = await readResponse<{history: HistoryEntry[]}>(await fetch(`${documentUrl(id)}/history`, {signal}));
+ return body.history;
 }
 
 export async function uploadLiveDocument(file:File):Promise<LiveDoc> {

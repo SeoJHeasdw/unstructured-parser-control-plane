@@ -1,15 +1,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
-import { AlertCircle, ArrowDownWideNarrow, CheckCircle2, ChevronRight, CircleHelp, ClipboardList, FileText, Layers3, Play, ScanLine, Square } from 'lucide-react';
+import { AlertCircle, ArrowDownWideNarrow, CheckCircle2, ChevronRight, CircleHelp, Pin, SlidersHorizontal, Play, Square } from 'lucide-react';
 import { cancelRun, getConfig, getQuestions, getRun, getSamples, listDocuments, planRun, sampleDocId, startRun } from './api/retrieval';
 import type { Candidate, Combo, PlanResult, Preset, Question, QuestionKind, RetrievalConfig, RetrievalDoc, Run, Sample } from './api/retrieval';
 import { Modal, Segmented } from './ui';
 import { QUESTION_KIND_META, QUESTION_KINDS } from './retrieval/elements';
-import { STORE, describeParams, errorText, fmtBytes, fmtInt, loadPresets, usePersistent, useTip } from './retrieval/shared';
-import { BASIS_LABEL, DEFAULT_MODELS, KIND_SHORT, METRICS, defaultCandidates, fmtMetric, isCandidate, metricLabel, metricsOf, modelName, normalizeCandidate, samePreset, specFor } from './retrieval/eval-common';
+import { STORE, describeParams, errorText, fmtBytes, fmtInt, loadPresets, usePersistent } from './retrieval/shared';
+import { BASIS_LABEL, KIND_SHORT, METRICS, defaultCandidates, fmtMetric, isCandidate, metricLabel, metricsOf, modelName, normalizeCandidate, samePreset, specFor } from './retrieval/eval-common';
 import type { Basis, KindKey, MetricKey } from './retrieval/eval-common';
-import { DocsModal, ModelFacts, ModelsModal } from './retrieval/eval-setup';
-import { QuestionsModal } from './retrieval/eval-questions';
+import { ModelFacts } from './retrieval/eval-setup';
+import { EvalConditions, type EvalSetup } from './retrieval/EvalConditions';
 import { ResultModal } from './retrieval/eval-result';
 import './retrieval.css';
 import './embedding.css';
@@ -19,11 +19,11 @@ import './embedding.css';
  * 청킹은 청킹 벤치의 방식 하나로 고정한다. 입력 한도 초과·벡터 용량 열은 실행 전에도 실제 계산값이다.
  * 문서·질문·모델 설정과 질문별 결과는 팝업으로 연다.
  */
-type Ui = { metric: MetricKey; basis: Basis; sort?: 'setup' | 'score' };
-type Setup = { candidates: Candidate[] | null; docIds: string[] | null; presetId: string | null };
+type Ui = { metric: MetricKey; basis: Basis; sort?: 'setup' | 'score'; pinnedModel?: string };
+type Setup = EvalSetup;
 type Pick = { candidateId: string; kind: KindKey };
 type PlanState = { key: string; data: PlanResult | null; error: string | null };
-type Dialog = 'docs' | 'questions' | 'models' | 'connection' | null;
+type Dialog = 'conditions' | 'connection' | null;
 
 /** 기본 모델이 다섯으로 바뀌어 저장 키를 올렸다. 이전 구성은 읽지 않는다. */
 const SETUP_KEY = `${STORE.candidates}:v3`;
@@ -34,7 +34,7 @@ const COLS: KindKey[] = [...QUESTION_KINDS, 'all'];
 
 export default function EmbeddingEval({ active }: { active: boolean }) {
   const [rawUi, setUi] = usePersistent<Ui>(STORE.evalUi, { metric: 'hit@5', basis: 'doc' });
-  const ui: Ui = { metric: METRICS.some(m => m.key === rawUi.metric) ? rawUi.metric : 'hit@5', basis: rawUi.basis === 'span' ? 'span' : 'doc', sort: rawUi.sort === 'score' ? 'score' : 'setup' };
+  const ui: Ui = { metric: METRICS.some(m => m.key === rawUi.metric) ? rawUi.metric : 'hit@5', basis: rawUi.basis === 'span' ? 'span' : 'doc', sort: rawUi.sort === 'score' ? 'score' : 'setup', pinnedModel: rawUi.pinnedModel };
   const [setup, setSetup] = usePersistent<Setup>(SETUP_KEY, { candidates: null, docIds: null, presetId: null });
   const [config, setConfig] = useState<RetrievalConfig | null>(null);
   const [docs, setDocs] = useState<RetrievalDoc[]>([]);
@@ -49,7 +49,6 @@ export default function EmbeddingEval({ active }: { active: boolean }) {
   const [actionError, setActionError] = useState<string | null>(null);
   const [dialog, setDialog] = useState<Dialog>(null);
   const [pick, setPick] = useState<Pick | null>(null);
-  const tip = useTip();
   const loaded = useRef(false);
 
   const load = useCallback(async () => {
@@ -89,7 +88,6 @@ export default function EmbeddingEval({ active }: { active: boolean }) {
   /* ---------- 현재 구성 ---------- */
   const caps = config?.caps ?? run?.caps ?? null;
   const candidates = useMemo<Candidate[]>(() => Array.isArray(setup.candidates) ? setup.candidates.filter(isCandidate).map(normalizeCandidate) : defaultCandidates(config), [setup.candidates, config]);
-  const isDefault = setup.candidates === null || (candidates.length === DEFAULT_MODELS.length && candidates.every((c, i) => (specFor(config?.specs, c.model)?.id ?? c.model) === DEFAULT_MODELS[i]));
   const preset = presets.find(p => p.id === setup.presetId) ?? presets.find(p => p.kind === 'element') ?? presets[0] ?? null;
   const docIds = useMemo(() => {
     const sampleIds = samples.map(s => sampleDocId(s.id));
@@ -180,7 +178,8 @@ export default function EmbeddingEval({ active }: { active: boolean }) {
   const hasScores = candidates.some(c => valueOf(comboOf(c), 'all') !== null);
   const kindCount = (kind: QuestionKind) => hasScores && shown
     ? shown.questions.filter(question => question.kind === kind).length : planData?.questions.by_kind[kind] ?? null;
-  const rows = ui.sort === 'score' && hasScores ? [...candidates].sort((a, b) => (valueOf(comboOf(b), 'all') ?? -1) - (valueOf(comboOf(a), 'all') ?? -1)) : candidates;
+  const sortedRows = ui.sort === 'score' && hasScores ? [...candidates].sort((a, b) => (valueOf(comboOf(b), 'all') ?? -1) - (valueOf(comboOf(a), 'all') ?? -1)) : candidates;
+  const rows = [...sortedRows.filter(c => c.id === ui.pinnedModel), ...sortedRows.filter(c => c.id !== ui.pinnedModel)];
   const runPresetLocal = runPreset ? presets.find(p => samePreset(p, runPreset)) ?? null : null;
 
   /* 상태는 한 자리에 하나만. */
@@ -197,37 +196,18 @@ export default function EmbeddingEval({ active }: { active: boolean }) {
   </> };
   else if (run && !shown && runPreset) status = { tone: '', body: runPresetLocal
     ? <>이전 결과는 {runPreset.name} 기준<button type="button" className="ee-link" onClick={() => setSetup(prev => ({ ...prev, presetId: runPresetLocal.id }))}>그 청킹으로 보기</button></>
-    : '이전 결과는 바꾸기 전 청킹 기준입니다' };
+    : `이전 결과 · ${runPreset.name} 기준` };
   else if (planError) status = { tone: 'warn', body: `청크를 계산하지 못했습니다 · ${planError}` };
   else if (shown) status = { tone: shown.status === 'cancelled' ? '' : 'ok', body: `${shown.status === 'cancelled' ? '평가 취소' : '최근 측정'} · ${fmtTime(shown.finished_at ?? shown.created_at)}` };
   else status = { tone: '', body: ready ? '평가 실행 준비 완료' : '평가 구성을 불러오는 중입니다' };
 
   const docsLabel = [sampleCount ? `예시 ${sampleCount}` : '', docIds.length - sampleCount ? `실제 ${docIds.length - sampleCount}` : ''].filter(Boolean).join(' · ') || '없음';
-  const openDialog = (d: Dialog) => { tip.hide(); setDialog(d); };
+  const openDialog = setDialog;
 
   return <div className="ee-root">
     <section className="ee-bar" aria-label="평가 설정과 실행">
-      <div className="ee-config-grid">
-        <div className="ee-chunk">
-          <span className="ee-field-icon"><Layers3 size={18} strokeWidth={1.75} aria-hidden="true" /></span>
-          <div className="ee-chunk-content">
-            <label className="ee-chunk-field"><span>청킹</span>
-              <select value={preset?.id ?? ''} onChange={e => setSetup(prev => ({ ...prev, presetId: e.target.value }))} disabled={!presets.length}>
-                {presets.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-              </select>
-            </label>
-            {preset && <span className="ee-chunk-desc">{describeParams(preset.params)}</span>}
-          </div>
-        </div>
-        {([
-          { id: 'docs', label: '문서', value: docsLabel, icon: FileText },
-          { id: 'questions', label: '질문', value: fmtInt(questionTotal), icon: ClipboardList },
-          { id: 'models', label: '모델', value: fmtInt(candidates.length), icon: ScanLine },
-        ] as const).map(({ id, label, value, icon: Icon }) => <button key={id} type="button" className="ee-pick" aria-haspopup="dialog" onClick={() => openDialog(id)}>
-          <span className="ee-field-icon"><Icon size={18} strokeWidth={1.75} aria-hidden="true" /></span>
-          <span className="ee-pick-text"><span>{label}</span><b>{value}</b></span><ChevronRight size={16} className="ee-pick-arrow" aria-hidden="true" />
-        </button>)}
-      </div>
+      <div className="conditions-summary"><div><h2>{preset?.name ?? '청킹 전략 미선택'}</h2><p>문서 {docsLabel} · 질문 {fmtInt(questionTotal)}개 · 모델 {fmtInt(candidates.length)}개</p>
+        {preset && <small>{describeParams(preset.params)}</small>}</div><button className="ee-btn" disabled={!ready} aria-haspopup="dialog" onClick={() => openDialog('conditions')}><SlidersHorizontal size={17}/>평가 조건</button></div>
       <div className="ee-run">
         <span className={`ee-status${status.tone ? ` is-${status.tone}` : ''}`} role="status">
           {!running && <span className="ee-status-glyph">{status.tone === 'ok' ? <CheckCircle2 size={17} aria-hidden="true" /> : status.tone ? <AlertCircle size={17} aria-hidden="true" /> : <CircleHelp size={17} aria-hidden="true" />}</span>}
@@ -243,7 +223,7 @@ export default function EmbeddingEval({ active }: { active: boolean }) {
       <div className="ee-board-head"><div><h2>모델 비교</h2><p>{hasScores ? '정확도를 선택하면 질문별 순위와 근거 청크를 볼 수 있습니다.' : '평가를 실행하면 본문·표·그림 질문의 정확도를 비교할 수 있습니다.'}</p></div>
         {hasScores && <button type="button" className="ee-btn" aria-pressed={ui.sort === 'score'} onClick={() => setUi(prev => ({ ...prev, sort: ui.sort === 'score' ? 'setup' : 'score' }))}><ArrowDownWideNarrow size={16} aria-hidden="true" />전체 점수순</button>}
       </div>
-      {(otherDocs || otherQuestions) && <p className="ee-board-note"><CircleHelp size={16} aria-hidden="true" />정확도는 이전 {otherDocs && otherQuestions ? '문서와 질문' : otherDocs ? '문서' : '질문'} 구성으로 측정한 결과입니다.</p>}
+      {shown && (otherDocs || otherQuestions) && <p className="ee-board-note"><CircleHelp size={16} aria-hidden="true" />정확도는 이전 {otherDocs && otherQuestions ? '문서와 질문' : otherDocs ? '문서' : '질문'} 구성으로 측정한 결과입니다. {shown.request.documents.map(d => d.name).join(', ')} · 질문 {fmtInt(shown.questions.length)}개</p>}
       <div className="ee-board-bar">
         <div className="ee-control"><span>정확도 지표</span><Segmented label="지표" value={ui.metric} onChange={metric => setUi(prev => ({ ...prev, metric }))} options={METRICS.map(m => ({ id: m.key, label: m.label }))} /></div>
         <div className="ee-control"><span>채점 기준</span><Segmented label="기준" value={ui.basis} onChange={basis => setUi(prev => ({ ...prev, basis }))} options={(['doc', 'span'] as Basis[]).map(b => ({ id: b, label: BASIS_LABEL[b] }))} /></div>
@@ -267,7 +247,8 @@ export default function EmbeddingEval({ active }: { active: boolean }) {
             const storage = pm?.storage_bytes ?? null;
             const customLimit = c.max_tokens !== null && c.max_tokens !== pm?.max_tokens;
             return <tr key={c.id}>
-              <th scope="row"><div className="ee-model"><b>{modelName(c.model)}</b><ModelFacts spec={spec} dims={pm?.dims} limit={c.max_tokens ?? pm?.max_tokens} /></div></th>
+              <th scope="row"><div className="ee-model"><button className="ee-pin" aria-pressed={ui.pinnedModel === c.id} aria-label={`${modelName(c.model)} 상단 고정`}
+                  onClick={() => setUi(prev => ({...prev, pinnedModel:prev.pinnedModel === c.id ? undefined : c.id}))}><b>{modelName(c.model)}</b><Pin size={13}/></button><ModelFacts spec={spec} dims={pm?.dims} limit={c.max_tokens ?? pm?.max_tokens} /></div></th>
               {combo?.status === 'failed' ? <td colSpan={COLS.length} className="ee-failed">평가하지 못했습니다{combo.error ? ` · ${combo.error}` : ''}</td>
                 : COLS.map(k => {
                   const m = metricsOf(combo, k, ui.basis);
@@ -277,9 +258,8 @@ export default function EmbeddingEval({ active }: { active: boolean }) {
                   const label = `${modelName(c.model)} · ${k === 'all' ? '전체' : KIND_SHORT[k]} · ${metricLabel(ui.metric)} ${fmtMetric(ui.metric, v)}`;
                   return <td key={k} className="is-num ee-hit">
                     <button type="button" className={`ee-cell${best[k] !== null && v === best[k] ? ' is-best' : ''}`} aria-label={label}
-                      onClick={() => { tip.hide(); setPick({ candidateId: c.id, kind: k }); }} {...tip.bind(() => <CellTip combo={combo!} kind={k} metric={ui.metric} basis={ui.basis} />)}>
-                      <span className="ee-track" aria-hidden><i style={{ width: `${Math.max(2, v * 100)}%`, background: k === 'all' ? 'var(--ink-3)' : QUESTION_KIND_META[k].color }} /></span>
-                      <span className="ee-val">{fmtMetric(ui.metric, v)}</span>
+                      onClick={() => setPick({ candidateId: c.id, kind: k })}>
+                      {best[k] !== null && v === best[k] && <small>최고</small>}<span className="ee-val">{fmtMetric(ui.metric, v)}</span>
                     </button>
                   </td>;
                 })}
@@ -290,13 +270,13 @@ export default function EmbeddingEval({ active }: { active: boolean }) {
             </tr>;
           })}</tbody>
         </table>
-        {!candidates.length && <div className="ee-none"><p>비교할 모델이 없습니다.</p><button type="button" className="ee-btn" onClick={() => openDialog('models')}>비교 대상 고르기</button></div>}
+        {!candidates.length && <div className="ee-none"><p>비교할 모델이 없습니다.</p><button type="button" className="ee-btn" onClick={() => openDialog('conditions')}>비교 대상 고르기</button></div>}
       </div>
       {planPending && <p className="ee-foot">현재 구성으로 청크 수와 예상 벡터 용량을 계산하고 있습니다.</p>}
       {planData && planData.chunks > 0 && <p className="ee-foot">청크 {fmtInt(planData.chunks)}개 · 중앙값 {fmtInt(planData.median_chunk_tokens)}토큰 · 가장 긴 청크 {fmtInt(planData.max_chunk_tokens)}토큰</p>}
     </section>
 
-    {active && tip.node}
+
     {dialog === 'connection' && <Modal open title="임베딩 연결 설정" size="sm" onClose={() => setDialog(null)}
       subtitle="서버의 .env에서 임베딩 게이트웨이를 지정하세요."
       footer={<button type="button" className="ee-btn is-primary" onClick={() => { setDialog(null); void load(); }}>설정 다시 읽기</button>}>
@@ -308,17 +288,14 @@ export default function EmbeddingEval({ active }: { active: boolean }) {
       <p className="ee-quiet">설정을 저장하고 앱 서버를 다시 시작한 뒤 설정을 다시 읽으세요.</p>
     </Modal>}
     {shown && pick && pickedCombo && <ResultModal key={`${pickedCombo.key}:${pick.kind}`} run={shown} combo={pickedCombo} kind={pick.kind} metric={ui.metric} basis={ui.basis} onClose={() => setPick(null)} />}
-    <DocsModal open={dialog === 'docs'} onClose={() => setDialog(null)} samples={samples} docs={docs} questions={questions ?? []} docIds={docIds}
-      max={caps?.max_documents ?? 200} onChange={ids => setSetup(prev => ({ ...prev, docIds: ids }))} />
-    <QuestionsModal open={dialog === 'questions'} onClose={() => setDialog(null)} questions={questions ?? []} onSaved={setQuestions} samples={samples} docs={docs}
-      maxRows={caps?.max_question_rows ?? 2000} />
-    <ModelsModal open={dialog === 'models'} onClose={() => setDialog(null)} config={config} candidates={candidates} isDefault={isDefault}
-      onChange={list => setSetup(prev => ({ ...prev, candidates: list }))} onReset={() => setSetup(prev => ({ ...prev, candidates: null }))} />
+    {active && dialog === 'conditions' && <EvalConditions setup={setup} docIds={docIds} candidates={candidates} questions={questions} docs={docs}
+      samples={samples} config={config} presets={presets} preset={preset} onClose={() => setDialog(null)}
+      onApply={(next, updated) => { setSetup(next); setQuestions(updated); setDialog(null); }}/>}
   </div>;
 }
 
 /** 아직 값이 없는 칸. 글자보다 옅게 둬서 값이 있는 칸이 먼저 읽히게 한다. */
-const Dash = () => <span className="ee-dash">—</span>;
+const Dash = () => <span className="ee-dash">미측정</span>;
 
 function fmtTime(iso: string | null | undefined) {
   if (!iso) return '';
@@ -326,14 +303,4 @@ function fmtTime(iso: string | null | undefined) {
   if (Number.isNaN(d.getTime())) return '';
   const p = (n: number) => String(n).padStart(2, '0');
   return `${p(d.getMonth() + 1)}.${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
-}
-
-/** 칸에 보이지 않는 것만: 나머지 지표, 질문 수, 실패. */
-function CellTip({ combo, kind, metric, basis }: { combo: Combo; kind: KindKey; metric: MetricKey; basis: Basis }) {
-  const { questions, metrics } = metricsOf(combo, kind, basis);
-  const failures = (combo.failures ?? 0) + (combo.query_failures ?? 0);
-  return <div className="ee-tip">
-    <dl>{METRICS.filter(m => m.key !== metric).map(m => <div key={m.key}><dt>{m.label}</dt><dd>{fmtMetric(m.key, metrics?.[m.key])}</dd></div>)}</dl>
-    <p>질문 {fmtInt(questions)}개{failures > 0 ? ` · 임베딩 실패 ${fmtInt(failures)}건` : ''}{combo.over_limit_failed ? ` · 한도 초과로 실패 ${fmtInt(combo.over_limit_failed)}건` : ''}</p>
-  </div>;
 }

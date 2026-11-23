@@ -10,6 +10,7 @@ import { TipProvider, useHoverProps } from './lineage/Tip';
 import { STATE_META, familyMatches, loadPrefs, relatedFamilies, savePrefs, timeText } from './lineage/model';
 import type { Filter, Tone, UiPrefs } from './lineage/model';
 import './lineage.css';
+import { StructureOverviewStrip } from './StructurePanel';
 
 const SOURCE_KEY = 'document-ops:lineage-source:v1';
 const SOURCES: { id: LineageSource; label: string; tip: string }[] = [
@@ -26,8 +27,8 @@ function saveSource(source: LineageSource) {
 type Load = { status: 'idle' | 'loading' | 'ready' | 'error'; data: LineageData | null; error: string };
 
 /** 문서 계보: 문서군 목록 · 선택한 문서군의 판과 포함·참조 관계 · 클릭으로 고정하는 상세. */
-export default function LineageView({ active, onOpenLive }: { active: boolean; onOpenLive?: () => void }) {
-  return <TipProvider><LineageScreen active={active} onOpenLive={onOpenLive} /></TipProvider>;
+export default function LineageView({ active, onOpenLive, documentId }: { active: boolean; documentId?: string; onOpenLive?: (doc?: string) => void }) {
+  return <TipProvider><LineageScreen documentId={documentId} active={active} onOpenLive={onOpenLive} /></TipProvider>;
 }
 
 function familyText(data: LineageData, family: LnFamily) {
@@ -35,9 +36,11 @@ function familyText(data: LineageData, family: LnFamily) {
   return [family.title, family.docno ?? '', ...names].join('\n').toLowerCase();
 }
 
-function LineageScreen({ active, onOpenLive }: { active: boolean; onOpenLive?: () => void }) {
+function LineageScreen({ active, onOpenLive, documentId }: { active: boolean; documentId?: string; onOpenLive?: (doc?: string) => void }) {
   const [started, setStarted] = useState(active);
   const [source, setSource] = useState<LineageSource>(loadSource);
+  const [bulkOpen, setBulkOpen] = useState(false);
+  useEffect(() => { if (documentId) { setSource('live'); setQuery(''); setFilter('all'); } }, [documentId]);
   const [reload, setReload] = useState(0);
   const [load, setLoad] = useState<Load>({ status: 'idle', data: null, error: '' });
   const [prefs, setPrefs] = useState<UiPrefs>(loadPrefs);
@@ -62,6 +65,12 @@ function LineageScreen({ active, onOpenLive }: { active: boolean; onOpenLive?: (
 
   const data = load.data && load.data.source === source ? load.data : null;
   useEffect(() => { setPin(null); setHoverFamily(null); }, [data]);
+  const linkedDocument = useMemo(() => documentId && data?.source === 'live'
+    ? Object.values(data.instances).find(item => item.doc_id === documentId && item.depth === 0) : undefined, [documentId, data]);
+  useEffect(() => {
+    if (!documentId || !linkedDocument) return;
+    setSelected(linkedDocument.family); setEntry(linkedDocument.entry);
+  }, [documentId, linkedDocument?.family, linkedDocument?.entry]);
   const closeDetail = useCallback(() => {
     setPin(null);
     detailTrigger.current?.focus({ preventScroll: true });
@@ -79,7 +88,8 @@ function LineageScreen({ active, onOpenLive }: { active: boolean; onOpenLive?: (
     const q = query.trim().toLowerCase();
     return data.families.filter(family => familyMatches(family, filter) && (!q || searchable.get(family.id)?.includes(q)));
   }, [data, filter, query, searchable]);
-  const family = shown.find(item => item.id === selected) ?? shown[0] ?? null;
+  const missingFamily = !!documentId && data?.source === 'live' && !linkedDocument;
+  const family = shown.find(item => item.id === selected) ?? (missingFamily ? null : shown[0]);
   const entryId = family && entry && data?.entries[entry]?.family === family.id ? entry : family?.latest.entry ?? '';
   const related = useMemo(() => data && hoverFamily ? relatedFamilies(data, hoverFamily) : null, [data, hoverFamily]);
 
@@ -123,7 +133,7 @@ function LineageScreen({ active, onOpenLive }: { active: boolean; onOpenLive?: (
       <span className="ln-state-icon"><FolderOpen size={22} aria-hidden="true" /></span>
       <div><h2>{source === 'live' ? '아직 올린 파일이 없습니다' : '표시할 문서가 없습니다'}</h2><p>{source === 'live' ? '파일을 올리고 구조 분석을 실행하면 문서에 포함된 파일과 다른 문서를 가리키는 참조를 확인할 수 있어요.' : '예시 데이터가 비어 있습니다.'}</p></div>
       {source === 'live' && <div className="ln-state-actions">
-        {onOpenLive && <button type="button" className="button-primary" onClick={onOpenLive}>실제 파일 처리 열기 <ArrowRight size={15} aria-hidden="true" /></button>}
+        {onOpenLive && <button type="button" className="button-primary" onClick={() => onOpenLive()}>실제 파일 처리 열기 <ArrowRight size={15} aria-hidden="true" /></button>}
         <button type="button" className="button-secondary" onClick={() => changeSource('example')}>예시 데이터 보기</button>
       </div>}
     </div>;
@@ -134,7 +144,7 @@ function LineageScreen({ active, onOpenLive }: { active: boolean; onOpenLive?: (
       {family ? <FamilyView key={family.id} data={data} family={family} entryId={entryId} onEntry={setEntry} view={prefs.view} onView={view => updatePrefs({ view })}
         refTab={prefs.refTab} onRefTab={refTab => updatePrefs({ refTab })} pin={pin} onPin={togglePin} onFamily={id => selectFamily(id)} onOpenLive={onOpenLive} /> : <div className="panel ln-state-panel">
         <span className="ln-state-icon"><ListFilter size={22} aria-hidden="true" /></span>
-        <div><h2>조건에 맞는 문서군이 없습니다</h2><p>검색어를 바꾸거나 필터를 해제하면 다른 문서군을 확인할 수 있어요.</p></div>
+        <div><h2>{missingFamily ? '이 문서의 문서군을 찾을 수 없습니다' : '조건에 맞는 문서군이 없습니다'}</h2><p>{missingFamily ? '목록에서 다른 문서군을 선택할 수 있습니다.' : '검색어를 바꾸거나 필터를 해제하면 다른 문서군을 확인할 수 있어요.'}</p></div>
       </div>}
       {pin && <DetailPanel data={data} pin={pin} current={family} onClose={closeDetail} onFamily={selectFamily} />}
     </div>;
@@ -159,6 +169,8 @@ function LineageScreen({ active, onOpenLive }: { active: boolean; onOpenLive?: (
     </div>
     {data && data.families.length > 0 && prefs.summaryOpen && <Summary data={data} filter={filter} onFilter={pickFilter} />}
     {body}
+    <details hidden={source !== 'live'} className="lw-disclosure" onToggle={e => { if (e.currentTarget.open) setBulkOpen(true); }}><summary>전체 구조 분석</summary>
+      {bulkOpen && <StructureOverviewStrip onInspected={() => setReload(n => n + 1)}/>}</details>
   </div>;
 }
 

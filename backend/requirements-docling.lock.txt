@@ -1,6 +1,13 @@
 # 선택: Docling(PDF·DOCX·PPTX·XLSX 파싱). Windows x64 · Python 3.12 기준으로 해석한 정확한 버전.
 # 기본 실행에는 필요 없다. requirements.lock.txt와 함께 설치한다.
 -r requirements.lock.txt
+easyocr==1.7.2
+imageio==2.37.3
+lazy-loader==0.6
+ninja==1.13.2
+python-bidi==0.6.12
+scikit-image==0.26.0
+tifffile==2026.10.15
 accelerate==1.15.0
 attrs==26.1.0
 beautifulsoup4==4.15.0

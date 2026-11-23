@@ -1,7 +1,7 @@
 import { useId, useMemo, useRef, useState } from 'react';
 import {
-  ArrowDownUp, ArrowRight, CheckCircle2, ChevronDown, ChevronRight, FileText, FolderOpen,
-  Layers3, RotateCcw, Search, TriangleAlert, UploadCloud, Workflow, X,
+  ArrowDownUp, ArrowRight, ChevronDown, ChevronRight, FolderOpen,
+  RotateCcw, Search, Workflow, X,
 } from 'lucide-react';
 import type { DocumentFilter, DocumentItem } from './types';
 import { FileIcon, Status, attention } from './DocumentCommon';
@@ -12,8 +12,6 @@ type Props = {
   filter: DocumentFilter;
   onFilterChange: (filter: DocumentFilter) => void;
   onOpenDoc: (id: string) => void;
-  onFiles: (files: File[]) => void;
-  onPickFiles: () => void;
   onPipeline: (format: string) => void;
 };
 
@@ -27,16 +25,13 @@ const ORDER: { value: Sort; label: string }[] = [
   { value: 'attention', label: '확인 필요 우선' },
 ];
 
-export function DocumentBrowser({ docs, filter, onFilterChange, onOpenDoc, onFiles, onPickFiles, onPipeline }: Props) {
+export function DocumentBrowser({ docs, filter, onFilterChange, onOpenDoc, onPipeline }: Props) {
   const query = filter.query ?? '';
   const status = filter.status === '전체 상태' ? '' : filter.status ?? '';
   const format = filter.format === '전체 형식' ? '' : filter.format ?? '';
   const source = filter.source === '전체 원천' ? '' : filter.source ?? '';
   const [sort, setSort] = useState<Sort>('latest');
-  const [showDrop, setShowDrop] = useState(true);
-  const [dragActive, setDragActive] = useState(false);
   const listHeading = useId();
-  const dropBodyId = useId();
   const formatSelect = useRef<HTMLSelectElement>(null);
   const searchInput = useRef<HTMLInputElement>(null);
 
@@ -70,60 +65,6 @@ export function DocumentBrowser({ docs, filter, onFilterChange, onOpenDoc, onFil
 
   return (
     <div className="doc-space">
-      <div className="inventory-metrics" role="group" aria-label="목록 빠른 필터">
-        <button type="button" className="inventory-metric" aria-pressed={!filtered} onClick={() => onFilterChange({})}>
-          <span className="inventory-metric-icon"><FileText size={19} strokeWidth={1.8} aria-hidden="true" /></span>
-          <span><b>전체 문서</b><strong>{docs.length.toLocaleString('ko-KR')}<small>건</small></strong></span>
-          <ChevronRight className="inventory-metric-arrow" size={16} aria-hidden="true" />
-        </button>
-        <button type="button" className="inventory-metric is-ok" aria-pressed={status === '처리 완료'}
-          onClick={() => changeStatus(status === '처리 완료' ? undefined : '처리 완료')}>
-          <span className="inventory-metric-icon"><CheckCircle2 size={19} strokeWidth={1.8} aria-hidden="true" /></span>
-          <span><b>처리 완료</b><strong>{inventory.complete.toLocaleString('ko-KR')}<small>건</small></strong></span>
-          <ChevronRight className="inventory-metric-arrow" size={16} aria-hidden="true" />
-        </button>
-        <button type="button" className="inventory-metric is-warning" aria-pressed={status === ATTENTION_FILTER}
-          onClick={() => changeStatus(status === ATTENTION_FILTER ? undefined : ATTENTION_FILTER)}>
-          <span className="inventory-metric-icon"><TriangleAlert size={19} strokeWidth={1.8} aria-hidden="true" /></span>
-          <span><b>확인 필요</b><strong>{inventory.attention.toLocaleString('ko-KR')}<small>건</small></strong></span>
-          <ChevronRight className="inventory-metric-arrow" size={16} aria-hidden="true" />
-        </button>
-        <button type="button" className="inventory-metric" aria-label={`파일 형식 ${inventory.formats.length}종, 형식 필터로 이동`}
-          onClick={() => formatSelect.current?.focus()}>
-          <span className="inventory-metric-icon"><Layers3 size={19} strokeWidth={1.8} aria-hidden="true" /></span>
-          <span><b>파일 형식</b><strong>{inventory.formats.length.toLocaleString('ko-KR')}<small>종</small></strong></span>
-          <ChevronRight className="inventory-metric-arrow" size={16} aria-hidden="true" />
-        </button>
-      </div>
-
-      <section className={`inventory-drop doc-drop${dragActive ? ' is-active' : ''}`} aria-label="예시 파일 정보 추가"
-        onDragOver={event => {
-          if (!event.dataTransfer.types.includes('Files')) return;
-          event.preventDefault();
-          event.dataTransfer.dropEffect = 'copy';
-          setDragActive(true);
-        }}
-        onDragLeave={event => {
-          const next = event.relatedTarget;
-          if (!(next instanceof Node) || !event.currentTarget.contains(next)) setDragActive(false);
-        }}
-        onDrop={event => {
-          event.preventDefault();
-          setDragActive(false);
-          onFiles(Array.from(event.dataTransfer.files));
-        }}>
-        <span className="inventory-drop-icon"><UploadCloud size={22} strokeWidth={1.7} aria-hidden="true" /></span>
-        <div className="inventory-drop-content" id={dropBodyId}>
-          <h2>{showDrop ? '파일을 여기에 놓거나 파일을 선택하세요' : '예시 파일 정보 추가'}</h2>
-          {showDrop && <p>브라우저의 예시 목록에 파일명·확장자·크기만 표시합니다.</p>}
-        </div>
-        <button type="button" className="inventory-secondary inventory-picker" onClick={onPickFiles}>파일 선택</button>
-        <button type="button" className="inventory-icon-button inventory-drop-toggle" onClick={() => setShowDrop(!showDrop)}
-          aria-controls={dropBodyId} aria-expanded={showDrop} aria-label={showDrop ? '문서 추가 영역 접기' : '문서 추가 영역 펼치기'}>
-          <ChevronDown size={18} aria-hidden="true" />
-        </button>
-      </section>
-
       <section className="doc-list-panel inventory-panel" aria-labelledby={listHeading}>
         <header className="inventory-panel-heading">
           <div>
@@ -236,10 +177,8 @@ export function DocumentBrowser({ docs, filter, onFilterChange, onOpenDoc, onFil
               {docs.length ? <Search size={24} strokeWidth={1.6} aria-hidden="true" /> : <FolderOpen size={24} strokeWidth={1.6} aria-hidden="true" />}
             </span>
             <strong>{docs.length ? '조건에 맞는 문서가 없습니다' : '표시할 문서가 없습니다'}</strong>
-            <p>{docs.length ? '다른 검색어를 입력하거나 필터를 초기화하세요.' : '파일 정보를 추가해 문서 목록을 살펴보세요.'}</p>
-            <button type="button" className="inventory-secondary" onClick={docs.length ? clear : onPickFiles}>
-              {docs.length ? '필터 초기화' : '파일 정보 추가'}
-            </button>
+            <p>{docs.length ? '다른 검색어를 입력하거나 필터를 초기화하세요.' : '준비된 예시 문서가 없습니다.'}</p>
+            {!!docs.length && <button type="button" className="inventory-secondary" onClick={clear}>필터 초기화</button>}
           </div>
         )}
         <footer className="inventory-panel-footer" aria-live="polite" aria-atomic="true">

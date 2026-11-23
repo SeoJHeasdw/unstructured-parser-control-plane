@@ -296,21 +296,27 @@ describe('Milvus가 연결되지 않았을 때', () => {
     });
   };
 
-  it('자동으로 연 Milvus가 실패하면 한 번만 시도하고 예시 데이터로 연다', async () => {
+  it('자동으로 연 Milvus가 실패하면 오류를 표시하고 사용자가 예시 보기를 선택한다', async () => {
     useMilvusDown(configured);
     render(<VectorDbWorkspace active />);
+    expect(await screen.findByRole('alert')).toBeTruthy();
+    expect(calls('/api/vectordb/example/tree')).toBe(0);
+    await userEvent.setup().click(screen.getByRole('button', {name:'예시 보기'}));
     expect(await screen.findByRole('heading', { name: 'demo_chunks' })).toBeTruthy();
-    expect(screen.getByText('예시 데이터 · Milvus 연결 실패')).toBeTruthy();
+    expect(screen.getByRole('heading',{name:'예시 데이터'})).toBeTruthy();
     expect(screen.queryByRole('alert')).toBeNull();
     expect(calls('/api/vectordb/milvus/tree')).toBe(1);
     expect(calls('/api/vectordb/example/tree')).toBe(1);
   });
 
-  it('최근 연결 실패로 서버가 쉬는 중이면 Milvus를 부르지 않고 예시 데이터로 연다', async () => {
+  it('최근 연결 실패로 서버가 쉬는 중이면 Milvus를 부르지 않고 선택을 기다린다', async () => {
     useMilvusDown({ ...configured, default: 'example', milvus: { ...configured.milvus, unreachable: { retry_in: 20, error: 'Milvus HTTP 404: 404 page not found' } } });
     render(<VectorDbWorkspace active />);
+    expect(await screen.findByRole('alert')).toBeTruthy();
+    expect(calls('/api/vectordb/example/tree')).toBe(0);
+    await userEvent.setup().click(screen.getByRole('button', {name:'예시 보기'}));
     expect(await screen.findByRole('heading', { name: 'demo_chunks' })).toBeTruthy();
-    expect(screen.getByText('예시 데이터 · Milvus 연결 실패')).toBeTruthy();
+    expect(screen.getByRole('heading',{name:'예시 데이터'})).toBeTruthy();
     expect(calls('/api/vectordb/milvus')).toBe(0);
   });
 

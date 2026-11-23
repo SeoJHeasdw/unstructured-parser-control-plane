@@ -326,3 +326,45 @@ button.compare-line-no:hover { background: var(--pane-mark); }
 .rs-gold-bar button{flex:none;height:32px;padding:0 12px;border-radius:8px;font-size:var(--fs-sm);font-weight:600}
 .rs-error{margin:0 0 12px;font-size:var(--fs-sm);color:var(--bad)}
 @media(max-width:760px){.rs-lists{grid-template-columns:1fr}.rs-gold-bar{align-items:flex-start;flex-direction:column}}
+
+.review-desk { container-type: inline-size; min-width: 0; color: var(--ink-1); }
+.review-desk [hidden] { display: none !important; }
+.review-mode-bar { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 16px; margin-bottom: 16px; border-bottom: 1px solid var(--rule); }
+.review-mode-bar small,.reader-foot { font-size: 13px; color: var(--ink-3); }
+.review-modes,.review-mobile-switch { display: flex; gap: 8px; }
+.review-modes button,.review-mobile-switch button { display: inline-flex; align-items: center; gap: 8px; padding: 8px 12px; min-height: 38px; border: 0; border-bottom: 2px solid transparent; background: transparent; color: var(--ink-3); font: inherit; font-size: 14px; }
+.review-modes button[aria-pressed=true],.review-mobile-switch button[aria-pressed=true] { color: var(--accent); border-color: currentColor; font-weight: 650; }
+.review-modes button:disabled { color: var(--ink-3); opacity: .6; }
+.source-pair { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 20px; align-items: start; }
+.source-original,.source-output { min-width: 0; }
+.source-output { border: 1px solid var(--rule); border-radius: 10px; background: white; overflow: clip; }
+.source-output > header { padding: 14px 16px; border-bottom: 1px solid var(--rule); }
+.source-output h2 { margin-bottom: 8px; font-size: 17px; }
+.source-output header p,.reader-select { color: var(--ink-3); font-size: 13px; }
+.reader-select { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 6px; }
+.reader-select select,.pair-pickers select { min-height: 36px; max-width: 100%; }
+.source-lines { max-height: 65dvh; overflow: auto; }
+.source-line { display: grid; grid-template-columns: 30px minmax(0,1fr); gap: 10px; padding: 6px 12px; font-size: 16px; line-height: 1.65; }
+.source-line.is-evidence { background: var(--evidence-surface); box-shadow: inset 3px 0 var(--evidence-ink); }
+.source-line > small { text-align: right; font-size: 12px; color: var(--ink-3); font-variant-numeric: tabular-nums; }
+.source-line > div { white-space: pre-wrap; overflow-wrap: anywhere; }
+.evidence-link { display: inline-flex; align-items: center; gap: 5px; min-height: 32px; margin-inline-start: 8px; border: 0; border-radius: 5px; padding-inline: 7px; color: var(--evidence-ink); background: var(--evidence-surface); text-decoration: underline; text-underline-offset: 3px; }
+.reader-foot { padding: 12px 16px; border-top: 1px solid var(--rule); }
+.review-options { margin: 12px 0; color: var(--ink-2); font-size: 14px; }
+.pair-pickers { display: flex; flex-wrap: wrap; gap: 16px; padding: 12px; background: var(--surface); border: 1px solid var(--rule); }
+.compare-line.is-selected { box-shadow: inset 3px 0 var(--comparison-ink); outline: 0; background-color: var(--comparison-surface); }
+.compare-result.is-baseline mark,.diff-mobile section:first-child mark { text-decoration: line-through; }
+.compare-result.is-candidate mark,.diff-mobile section:nth-child(2) mark { text-decoration: underline; }
+.compare-review-detail .button-quiet { color: var(--evidence-ink); background: var(--evidence-surface); }
+.review-mobile-switch,.diff-mobile { display: none; }
+@container (max-width:859px) {
+  .source-pair { display: block; }
+  .review-mobile-switch { display: flex; width: fit-content; margin-bottom: 12px; background: var(--surface); border: 1px solid var(--rule); border-radius: 6px; }
+  .source-pair[data-pane=original] .source-output,.source-pair[data-pane=output] .source-original { display: none; }
+  .review-desk .compare-review-surface,.review-desk .compare-pages[aria-label="결과 페이지"] { display: none; }
+  .diff-mobile { display: grid; gap: 8px; }
+  .diff-mobile section { background: white; border: 1px solid var(--rule); border-left: 3px solid var(--comparison-ink); border-radius: 6px; padding: 14px; }
+  .diff-mobile h3 { font-size: 14px; color: var(--ink-3); }
+  .diff-mobile p { margin: 6px 0; line-height: 1.7; white-space: pre-wrap; overflow-wrap: anywhere; }
+  .diff-mobile mark { background: var(--comparison-surface); }
+}

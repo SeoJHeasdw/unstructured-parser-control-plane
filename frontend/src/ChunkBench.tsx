@@ -39,6 +39,8 @@ export default function ChunkBench({ active }: { active: boolean }) {
   const [sourceOpen, setSourceOpen] = useState(false);
   const [presetOpen, setPresetOpen] = useState<string | null | false>(false);
   const [measureOpen, setMeasureOpen] = useState(false);
+  const strategyTrigger = useRef<HTMLElement | null>(null);
+  const returnAction = useRef<'measure' | 'edit' | null>(null);
 
   const lastLoadAttempt = useRef<number | null>(null);
   useEffect(() => {
@@ -117,6 +119,12 @@ export default function ChunkBench({ active }: { active: boolean }) {
   const connections = (config?.connections ?? []).filter(c => c.configured);
   const emptyImages = (src?.elements ?? []).filter(el => el.kind === 'image' && el.empty);
 
+  useEffect(() => {
+    if (measureOpen || presetOpen !== false || !returnAction.current) return;
+    const action = document.querySelector<HTMLElement>(`[aria-modal="true"] [data-strategy-action="${returnAction.current}"]`);
+    (action ?? strategyTrigger.current)?.focus({ preventScroll: true });
+    returnAction.current = null;
+  }, [measureOpen, presetOpen, openColumn]);
   const empty = () => {
     if (!ready) return <div className="cb-empty" role="status"><LoaderCircle className="cb-spin" size={24} aria-hidden="true" /><b>문서를 불러오는 중입니다</b></div>;
     if (!sourceKey) return <div className="cb-empty" role={loadError ? 'alert' : undefined}>
@@ -161,7 +169,7 @@ export default function ChunkBench({ active }: { active: boolean }) {
           {columns.length > 0 && view === 'compare' && <>
             {runError ? <p className="cb-error" role="alert">이전 청킹 결과를 표시합니다. {runError}</p> : <p className="cb-table-note">전략을 선택하면 청크 내용과 원문에서 나뉜 위치를 볼 수 있습니다.</p>}
             <CompareTable columns={columns} elements={src?.elements ?? []} limit={limit} busy={running}
-              onOpen={id => setOpen({ id, tab: 'chunks', index: 0 })} />
+              onOpen={id => { strategyTrigger.current = document.activeElement as HTMLElement; setOpen({ id, tab:'chunks', index:0 }); }} />
             {emptyImages.length > 0 && <p className="cb-foot"><Info size={16} aria-hidden="true" /><span>
               {emptyImages.map(el => el.page ? `${el.page}쪽` : el.label).join(', ')} 그림은 글자가 없어 어느 전략에도 담기지 않습니다(시각 모델 필요). 그림 칸에서는 문제로 세지 않았습니다.</span></p>}
           </>}
@@ -171,11 +179,11 @@ export default function ChunkBench({ active }: { active: boolean }) {
       </Tabs>
     </section>
 
-    {open && openColumn && src && <StrategyModal source={src} column={openColumn} tab={open.tab} index={open.index}
+    {open && openColumn && src && !measureOpen && presetOpen === false && <StrategyModal source={src} column={openColumn} tab={open.tab} index={open.index}
       onTab={tab => setOpen(prev => prev && { ...prev, tab })} onIndex={index => setOpen(prev => prev && { ...prev, index })}
-      onClose={() => setOpen(null)} onEdit={() => setPresetOpen(openColumn.id)}
+      onClose={() => { setOpen(null); requestAnimationFrame(() => strategyTrigger.current?.focus()); }} onEdit={() => { returnAction.current = 'edit'; setPresetOpen(openColumn.id); }}
       measure={<span title={connections.length ? undefined : '연결된 임베딩 모델이 없습니다'}>
-        <button type="button" className="button-secondary cb-btn" disabled={!connections.length || !openColumn.result.chunks.length} onClick={() => setMeasureOpen(true)}><Ruler size={14} /> 토큰 실측</button>
+        <button type="button" className="button-secondary cb-btn" disabled={!connections.length || !openColumn.result.chunks.length} data-strategy-action="measure" onClick={() => { returnAction.current = 'measure'; setMeasureOpen(true); }}><Ruler size={14} /> 토큰 실측</button>
       </span>} />}
     {measureOpen && openColumn && <TokenModal column={openColumn} connections={connections} specs={config?.specs ?? []} conn={bench.conn} model={bench.model}
       onPick={(conn, model) => setBench(prev => ({ ...prev, conn, model }))} onClose={() => setMeasureOpen(false)} />}

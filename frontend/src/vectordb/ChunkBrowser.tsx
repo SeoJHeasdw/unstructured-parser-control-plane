@@ -1,7 +1,7 @@
 import { useEffect, useId, useMemo, useState, type FormEvent } from 'react';
 import { ChevronLeft, ChevronRight, ChevronsLeft, Info, LoaderCircle, RefreshCw, SlidersHorizontal, TriangleAlert, X } from 'lucide-react';
 import { browseChunks, type BrowseResult, type ChunkRow, type CollectionDetail, type SourceKey } from '../api/vectordb';
-import { escapeHides, fmtCount, fmtValue, oneLine, PALETTE, ROLE_LABEL, shortPk, useFloating, useStored, VectorStrip } from './ui';
+import { fmtCount, fmtValue, oneLine, PALETTE, ROLE_LABEL, shortPk, useStored, VectorStrip } from './ui';
 
 type Props = {
   source: SourceKey; detail: CollectionDetail; textField: string | null; onTextField: (value: string | null) => void;
@@ -20,7 +20,7 @@ export default function ChunkBrowser({ source, detail, textField, onTextField, p
   const [error, setError] = useState('');
   const [retry, setRetry] = useState(0);
   const [hoverDoc, setHoverDoc] = useState<string | null>(null);
-  const peek = useFloating();
+
   const optionsId = useId();
   const roles = useMemo(() => {
     const map: Record<string, string> = {};
@@ -71,16 +71,6 @@ export default function ChunkBrowser({ source, detail, textField, onTextField, p
   const docField = detail.detected.doc;
   const docOf = (row: ChunkRow) => docField && row.fields[docField] !== undefined && row.fields[docField] !== null ? String(row.fields[docField]) : null;
   const partColor = (name: string | null) => { const i = name ? detail.partitions.findIndex(p => p.name === name) : -1; return i < 0 ? '#c4cad6' : PALETTE[i % PALETTE.length]; };
-
-  const preview = (row: ChunkRow) => <>
-    <div className="vdb-peek-text">{row.text ? oneLine(row.text, 640) : '저장된 텍스트 없음'}</div>
-    <dl className="vdb-peek-meta">
-      <div><dt>pk</dt><dd>{row.pk}</dd></div>
-      {Object.entries(row.fields).filter(([k]) => k !== pk).slice(0, 6).map(([k, v]) => <div key={k}><dt>{k}</dt><dd>{fmtValue(v, 70)}</dd></div>)}
-      {row.partition && <div><dt>파티션</dt><dd>{row.partition}</dd></div>}
-      {row.vector && <div><dt>벡터</dt><dd>{row.vector.dim ?? '—'}차원{row.vector.norm !== undefined ? ` · 노름 ${row.vector.norm.toFixed(3)}` : ''}</dd></div>}
-    </dl>
-  </>;
 
   return <div className="vdb-browser">
     <div className="vdb-toolbar" role="group" aria-label="청크 목록 도구">
@@ -147,14 +137,12 @@ export default function ChunkBrowser({ source, detail, textField, onTextField, p
         <tbody>
           {rows.map(row => {
             const doc = docOf(row);
-            const binding = peek.bind(row.pk, () => preview(row), 'peek', 220);
             return <tr key={row.pk} className={`${row.pk === activePk ? 'is-active' : ''} ${hoverDoc !== null && doc === hoverDoc ? 'is-lit' : ''}`}
               onMouseEnter={() => setHoverDoc(doc)} onMouseLeave={() => setHoverDoc(null)}>
             <td className="is-pk" title={row.pk}><code>{shortPk(row.pk)}</code></td>
             <td className="is-text">
-              <button type="button" className="vdb-open" aria-label={`청크 ${shortPk(row.pk)} 열기`} onClick={() => { peek.hide(); onOpen(row.pk); }}
-                onKeyDown={escapeHides(peek)} {...binding}
-                onFocus={event => { setHoverDoc(doc); binding.onFocus(event); }} onBlur={() => { setHoverDoc(null); binding.onBlur(); }}>
+              <button type="button" className="vdb-open" aria-label={`청크 ${shortPk(row.pk)} 열기`} onClick={() => onOpen(row.pk)}
+                onFocus={() => setHoverDoc(doc)} onBlur={() => setHoverDoc(null)}>
                 {row.text ? oneLine(row.text, 150) : <i>텍스트 없음</i>}
               </button>
             </td>
@@ -169,7 +157,6 @@ export default function ChunkBrowser({ source, detail, textField, onTextField, p
     </div>
     {data?.total_basis === 'stats' && <p className="vdb-foot">전체 건수는 Milvus 통계값입니다. 삭제 직후에는 실제 조회 건수와 다를 수 있습니다.</p>}
     {offset + pageSize * 2 >= maxWindow && <p className="vdb-foot">Milvus 조회는 앞에서 {fmtCount(maxWindow)}건 안쪽만 넘겨 볼 수 있습니다. 조건식으로 범위를 좁혀 주세요.</p>}
-    {peek.layer}
   </div>;
 }
 

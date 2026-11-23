@@ -10,7 +10,7 @@ from app.models import ResultLocation
 from app.textnorm import compatibility_form, special_counts
 
 SUPPLEMENT_MARK = "<!-- docops:supplement -->"
-_KIND_LABEL = {"floating_text": "글상자", "svg_text": "SVG 글자"}
+_KIND_LABEL = {"floating_text": "글상자", "svg_text": "SVG 글자", "image_ocr": "그림 OCR", "section_text": "머리말·꼬리말", "formula": "수식 원문"}
 
 
 def _compact(text: str) -> str:
@@ -26,20 +26,25 @@ def assess(inventory: dict, markdown: str, prepared: dict | None = None) -> tupl
     """(보충한 결과, 보충 줄 위치, 경고, 보고서)"""
     compact_output = _compact(markdown)
     missing_items = []
-    seen = set()
+    next_offset = {}
     for item in inventory.get("items", []):
-        key = _compact(item["text"])
-        if not key or key in seen:
+        if item["kind"] in {"image_ocr", "formula"}:
+            missing_items.append(item)
             continue
-        seen.add(key)
-        if key not in compact_output:
+        key = _compact(item["text"])
+        if not key:
+            continue
+        start = next_offset.get(key, 0)
+        match = compact_output.find(key, start) if start >= 0 else -1
+        next_offset[key] = match + len(key) if match >= 0 else -1
+        if match < 0:
             missing_items.append(item)
 
     final, locations = markdown, []
     if missing_items:
         base = markdown.rstrip("\n")
         lines = [SUPPLEMENT_MARK, "## 보충 추출: 파서 결과에 없던 원본 글자", ""]
-        first = (base.count("\n") + 1 if base else 0) + 2  # 빈 줄 하나 뒤에 시작
+        first = base.count("\n") + 3 if base else 1  # 빈 줄 하나 뒤에 시작
         for item in missing_items:
             text = " / ".join(part.strip() for part in item["text"].splitlines() if part.strip())
             line_no = first + len(lines)
@@ -53,7 +58,7 @@ def assess(inventory: dict, markdown: str, prepared: dict | None = None) -> tupl
     expected = inventory.get("symbols", {})
     found = special_counts(markdown)
     for item in missing_items:
-        if item["kind"] == "floating_text":
+        if item["kind"] in {"floating_text", "section_text"}:
             for ch, count in special_counts(item["text"]).items():
                 found[ch] = found.get(ch, 0) + count
     lost, normalized = {}, {}
@@ -106,7 +111,7 @@ def assess(inventory: dict, markdown: str, prepared: dict | None = None) -> tupl
     compact_final = _compact(final)
     low = [entry for entry in inventory.get("low_contrast", []) if _compact(entry["text"]) and _compact(entry["text"]) in compact_final]
     if low:
-        total_low = inventory.get("low_contrast_total", len(low))
+        total_low = len(low)
         finding("low_contrast_text", "warning", total_low,
                 f"흰색에 가까운 글자 {total_low}건이 본문에 포함됨(숨은 메모·워터마크일 수 있음): {low[0]['text'][:30]}",
                 examples=low[:10])
@@ -126,9 +131,18 @@ def assess(inventory: dict, markdown: str, prepared: dict | None = None) -> tupl
                 examples=inventory.get("merged", [])[:20])
     if missing_items:
         finding("supplemented", "warning", len(missing_items),
-                f"파서 결과에 없던 글상자·SVG 글자 {len(missing_items)}건을 끝의 '보충 추출'에 덧붙임(원래 위치 아님)")
+                f"원문에서 읽은 보충 항목 {len(missing_items)}건을 끝의 '보충 추출'에 덧붙임(원래 위치 아님)")
     images = inventory.get("images", {})
     raster = images.get("raster", 0) + images.get("raster_in_svg", 0)
+    ocr = inventory.get("ocr") or {}
+    attempted = ocr.get("attempted", 0)
+    if attempted:
+        finding("image_ocr", "info", attempted,
+                f"그림 OCR {attempted}건 중 글자 인식 {ocr['recognized']}건, 미검출 {ocr['empty']}건, 실패 {ocr['failed']}건. 내장 원본 그림을 읽어 잘림·겹침이 적용된 화면과 범위가 다를 수 있음", ocr=ocr)
+        if ocr["empty"] or ocr["failed"] or ocr["low_confidence"]:
+            finding("image_ocr_review", "warning", attempted,
+                    f"그림 OCR 검토 필요: 미검출 {ocr['empty']}건, 실패 {ocr['failed']}건, 낮은 신뢰도 영역 {ocr['low_confidence']}건")
+    raster -= attempted
     if raster:
         nested = images.get("in_groups", 0) + images.get("in_text_boxes", 0) + images.get("in_objects", 0) + images.get("raster_in_svg", 0)
         finding("images_not_read", "warning", raster,
@@ -145,4 +159,5 @@ def assess(inventory: dict, markdown: str, prepared: dict | None = None) -> tupl
         "supplemented": len(missing_items),
         "notes": inventory.get("notes", []),
     }
+    warnings.extend(inventory.get("notes", [])[:10])
     return final, locations, warnings, report

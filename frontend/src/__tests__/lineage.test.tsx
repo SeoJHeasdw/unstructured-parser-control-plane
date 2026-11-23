@@ -85,16 +85,18 @@ describe('문서 계보', () => {
 
     const version = within(lane()).getAllByRole('button')[0];
     await user.hover(version);
-    expect(screen.getByRole('tooltip').textContent).toContain('설비 점검표.xlsx');
+    expect((await screen.findByRole('tooltip')).textContent).toContain('설비 점검표.xlsx');
     expect(version.getAttribute('aria-describedby')).toBe('ln-tip');
     await user.unhover(version);
-    expect(screen.queryByRole('tooltip')).toBeNull();
+    await user.hover(screen.getByRole('tooltip'));
+    await user.keyboard('{Escape}');
+    await waitFor(() => expect(screen.queryByRole('tooltip')).toBeNull());
 
     const sop = within(list()).getByRole('button', { name: /SOP-QC-0040 세척 밸리데이션 절차/ });
     await user.hover(sop);
     expect(sop.className).toContain('is-hl');
     expect(list().querySelectorAll('.ln-fam.is-dim').length).toBeGreaterThan(0);
-    expect(screen.getByRole('tooltip').textContent).toContain('최신 확정');
+    expect((await screen.findByRole('tooltip')).textContent).toContain('최신 확정');
     await user.unhover(sop);
     expect(list().querySelectorAll('.ln-fam.is-dim')).toHaveLength(0);
   });
@@ -133,7 +135,7 @@ describe('문서 계보', () => {
 
     const center = document.querySelector('.ln-gnode.is-center') as HTMLElement;
     await user.hover(center);
-    expect(screen.getByRole('tooltip').textContent).toContain('Rev5');
+    expect((await screen.findByRole('tooltip')).textContent).toContain('Rev5');
     await user.click(center);
     expect(screen.getByRole('complementary', { name: '상세' })).toBeTruthy();
   });

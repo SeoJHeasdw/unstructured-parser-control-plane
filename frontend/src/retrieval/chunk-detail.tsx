@@ -139,7 +139,7 @@ function Settings({ column, onEdit }: { column: Column; onEdit: () => void }) {
   return <div className="cb-settings">
     {column.kind && <p className="cb-settings-hint">{STRATEGY_HINT[column.kind]}</p>}
     <dl className="cb-dl">{paramLines(column.kind, column.params).map(([k, v], i) => <div key={`${k}${i}`}><dt>{k}</dt><dd>{v}</dd></div>)}</dl>
-    <button type="button" className="button-secondary cb-btn" onClick={onEdit}><Pencil size={14} /> 수정</button>
+    <button type="button" data-strategy-action="edit" className="button-secondary cb-btn" onClick={onEdit}><Pencil size={14} /> 수정</button>
   </div>;
 }
 
@@ -171,7 +171,7 @@ export function TokenModal({ column, connections, specs, conn: connKey, model: m
     finally { setBusy(false); }
   };
   return <Modal open onClose={onClose} size="md" title="토큰 실측" subtitle={`${column.name} · 표본 청크 ${fmtInt(picks.length)}개`}
-    footer={<><span className="ui-foot-note">표본을 연결된 임베딩 모델에 보냅니다.</span>
+    footer={<><button type="button" className="button-quiet cb-btn" onClick={onClose}>전략 상세로</button><span className="ui-foot-note">표본을 연결된 임베딩 모델에 보냅니다.</span>
       <button type="button" className="button-primary cb-btn" disabled={busy || !model || !picks.length} onClick={() => void run()}><Ruler size={14} /> {busy ? '재는 중…' : '재기'}</button></>}>
     <div className="cb-measure-bar">
       <label className="cb-field"><span>연결</span><select aria-label="임베딩 연결" value={conn?.key ?? ''} onChange={e => onPick(e.target.value, '')}>{connections.map(c => <option key={c.key} value={c.key}>{c.label}</option>)}</select></label>

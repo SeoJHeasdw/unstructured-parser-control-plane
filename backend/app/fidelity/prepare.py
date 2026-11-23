@@ -7,10 +7,12 @@ Docling(python-docx·openpyxl·python-pptx)은 다음을 잃는다(2.150.0, 합�
 사본의 해당 XML 조각만 정규식으로 바꾼다(나머지 바이트·네임스페이스 접두어는 그대로). 첨자는
 모든 글자를 유니코드 첨자로 바꿀 수 있을 때만 바꾸고, 나머지는 원문대로 두고 보고한다.
 """
+from copy import copy
 from dataclasses import dataclass, field
 import html
 from pathlib import Path
 import re
+import shutil
 import zipfile
 
 from app.textnorm import is_symbol_font, map_symbol_font_text, symbol_font_char, to_script
@@ -162,26 +164,30 @@ def _targets(extension: str, names: list[str]) -> dict[str, tuple[re.Pattern, ob
     return result
 
 
-def prepare_copy(source: Path, target: Path, extension: str, max_part_bytes: int = 64 * 1024 * 1024) -> PrepareStats:
-    """원본 OOXML을 target에 복사하면서 기호 글꼴·첨자만 바꾼다. 바뀐 것이 없어도 사본을 만든다."""
+def prepare_copy(source: Path, target: Path, extension: str, max_part_bytes: int = 64 * 1024 * 1024,
+                 *, only_if_changed: bool = False) -> PrepareStats:
+    """Write corrected XML first. The service needs a complete copy only when a correction was made."""
     stats = PrepareStats()
-    with zipfile.ZipFile(source) as archive:
+    with zipfile.ZipFile(source) as archive, zipfile.ZipFile(target, "w") as out:
         infos = archive.infolist()
-        targets = _targets(extension, [info.filename for info in infos])
-        with zipfile.ZipFile(target, "w") as out:
+        targets = _targets(extension, archive.namelist())
+        for info in infos:
+            if info.filename not in targets or info.file_size > max_part_bytes:
+                continue
+            try:
+                text = archive.read(info).decode("utf-8")
+            except UnicodeDecodeError:
+                continue
+            pattern, handler = targets[info.filename]
+            before = (stats.symbol_font_converted, stats.scripts_converted)
+            updated = pattern.sub(lambda m: handler(m, stats), text)
+            if before != (stats.symbol_font_converted, stats.scripts_converted):
+                stats.parts_changed.append(info.filename)
+                out.writestr(copy(info), updated.encode("utf-8"))
+        if stats.changed or not only_if_changed:
+            written = set(stats.parts_changed)
             for info in infos:
-                data = archive.read(info)
-                if info.filename in targets and info.file_size <= max_part_bytes:
-                    pattern, handler = targets[info.filename]
-                    try:
-                        text = data.decode("utf-8")
-                    except UnicodeDecodeError:
-                        text = None
-                    if text is not None:
-                        before = (stats.symbol_font_converted, stats.scripts_converted)
-                        updated = pattern.sub(lambda m: handler(m, stats), text)
-                        if (stats.symbol_font_converted, stats.scripts_converted) != before:
-                            data = updated.encode("utf-8")
-                            stats.parts_changed.append(info.filename)
-                out.writestr(info, data, compress_type=info.compress_type)
+                if info.filename not in written:
+                    with archive.open(info) as original, out.open(copy(info), "w") as destination:
+                        shutil.copyfileobj(original, destination, length=256 * 1024)
     return stats

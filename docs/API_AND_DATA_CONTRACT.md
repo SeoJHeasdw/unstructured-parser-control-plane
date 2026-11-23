@@ -122,7 +122,7 @@ Content-Type: text/plain
 - `fidelity`(2026-11-19 추가)는 DOCX·XLSX·PPTX 성공 결과의 원문 충실도 보고서다. 다른 형식이나 이전 결과는 `null`이다. 아래 '원문 충실도 보고서'를 본다.
 - `parser`, `parser_version`은 이 **성공 결과를 만든 파서와 버전**이다. 현재/최신 시도의 파서값인 `LiveDocument.parser`와 별도로 취급한다.
 - `is_stale: false`는 문서의 현재 상태가 `completed`임을 뜻한다. `true`는 현재 상태가 완료가 아닌데도 **과거 성공 결과**가 있어서 반환했다는 뜻이다. 예를 들어 재처리 대기·실행 중이나 재처리 실패 후 이전 결과를 보여준다. `is_stale`은 결과 품질 평가나 원천 최신성 검증이 아니다.
-- `warnings`는 결과 관련 문자열 배열이다. **PDF 모든 성공 결과**에는 `"OCR 미적용: 스캔·이미지 페이지 내용 누락 가능"`이 포함된다. 특정 페이지를 검사해 스캔을 발견했다는 뜻이 아닌 예방 경고다. 텍스트와 스캔이 섞인 PDF는 일부 텍스트만 추출되어도 완료될 수 있다.
+- `warnings`는 결과 관련 문자열 배열이다. OCR 없이 처리한 PDF는 미적용 경고를 유지한다. 본문·표가 추출되지 않은 PDF 페이지 번호를 별도로 기록한다. `ocr_enabled`는 PDF 변환 설정, 이미지·Office 그림은 OCR 적용 여부다.
 - DOCX·XLSX·PPTX 결과의 `warnings`에는 원문 대조 경고가 붙는다: 특수기호 손실(`특수기호 N건이 결과에서 빠짐(원문 M건): ≥×2…`), 바꿀 수 없는 첨자·기호 글꼴, 흰색에 가까운 글자 포함, 숨김 글자 포함, 병합 셀 값 반복 가능, 보충 추출, OCR 없이 읽지 않은 래스터 그림 수. 사본 보정이나 점검이 실패하면 그 사실도 경고로 남는다.
 - 현재 응답에는 결과 생성 시각, 결과별 실행 ID, 결과 원본 버전, 구조화 위치, 페이지별 품질이나 이전 결과 목록이 없다. 여러 번 성공했을 때 공개 API는 마지막 성공 결과만 가리킨다.
 
@@ -148,7 +148,7 @@ Content-Type: text/plain
 | `prepared` | 파서에 넣기 전 사본에서 바꾼 수. 보정을 끄거나 실패하면 `null` |
 | `findings[].code` | `symbol_lost`, `symbol_normalized`, `symbol_font_converted`, `symbol_font_unmapped`, `script_converted`, `script_flattened`, `script_unconvertible`, `low_contrast_text`, `hidden_text`, `hidden_text_included`, `hidden_sheets`, `merged_cells`, `supplemented`, `images_not_read`, `metafiles_not_read`. `severity: warning`이면 `warnings`에도 문구가 들어간다 |
 
-한계: 스타일·테마에서 상속한 글자색은 보지 않는다(직접 서식만), 머리말·꼬리말·각주의 그림은 세지 않는다, PPTX는 배경색을 몰라 저대비를 판정하지 않는다, 병합 셀 값의 반복은 결과 표에서 지우지 않고 보고만 한다, 그림 속 글자는 OCR 없이는 알 수 없다.
+한계: 스타일·테마에서 상속한 글자색은 보지 않는다(직접 서식만), Word 본문에서 참조한 머리말·꼬리말은 점검하며 각주는 제외한다, PPTX는 배경색을 몰라 저대비를 판정하지 않는다, 병합 셀 값의 반복은 결과 표에서 지우지 않고 보고만 한다, 그림 속 글자는 OCR 없이는 알 수 없다.
 
 ### `DocumentHistory`
 
@@ -253,18 +253,20 @@ stateDiagram-v2
 
 | 파일 형식 | 현재 실제 어댑터 | 한계·검증 상태 |
 |---|---|---|
-| `.txt`, `.md`, `.log` | Python 텍스트 | UTF-8 BOM 포함 또는 CP949 순으로 디코딩. 10 MiB 초과, NUL 포함, 디코딩 실패 시 `failed` |
-| `.csv` | Python `csv` → Markdown 표 | 위 텍스트 제한 외 최대 10,000행·1,000열. 헤더/표 변환은 범용 구조이며 업무 스키마 검증이 아님 |
-| `.pdf` | 선택 설치 Docling | 미리 준비된 로컬 모델 필요, OCR 꺼짐. Docling 2.150.0의 합성 텍스트 PDF 검증 및 텍스트+이미지 혼합 PDF의 누락·경고 확인. 결과마다 예방 경고 |
+| `.txt`, `.md`, `.log` | Python 텍스트 | UTF-8(선택 BOM), CP949, BOM이 있는 UTF-16/32. 100 MiB. 디코딩 실패·NUL은 `encoding_unknown`, 빈 본문은 `no_text` |
+| `.csv` | Python CSV → Markdown | 텍스트 입력은 파일당 100 MiB, CSV는 100만 행·1,000열, 셀당 4,194,304자, 물리적 한 줄당 8,388,608자, UTF-8 Markdown 결과 100 MiB까지 처리합니다. 큰 파일은 두 차례 순회하여 열 너비를 확인한 뒤 행 단위로 출력한다. |
+| `.pdf` | Docling + 선택적 EasyOCR | 텍스트·스캔 혼합, OCR 설정과 페이지 위치를 기록한다. 최대 500쪽, 렌더링 페이지당 3,200만 픽셀. |
+| PNG·JPEG·BMP·TIFF·GIF·WebP | EasyOCR | 다중 프레임·EXIF 회전·투명 배경을 처리한다. 프레임당 3,200만, 문서당 누적 1억 6천만 픽셀, 최대 128프레임·256타일. |
+| SVG | XML 텍스트 + 선택적 EasyOCR | 최대 10 MiB. 벡터 글자와 인라인 그림을 읽는다. 원격 참조는 가져오지 않는다. |
 | `.docx` | 사본 보정 → 선택 설치 Docling → 원문 대조 | Docling 2.150.0의 합성 DOCX 검증. 엣지 케이스 실측(아래)은 합성 문서 기준이며 복잡한 실제 문서 품질은 별도 검증 필요 |
-| `.xlsx`, `.pptx` | 사본 보정 → 선택 설치 Docling 경로 → 원문 대조 | XLSX는 합성 문서로 첨자·병합 셀·글상자·흰회색 글자를 실측. PPTX는 보정·대조 단위 테스트만. 수식·외부 문서 참조 보존은 미검증이며 참조 추출 구현 아님 |
-| HWP/HWPX, 이미지, ZIP, 메일 및 그 밖의 형식 | 현재 미지원 | 업로드 후 처리 요청 시 `unsupported`. Mock 파이프라인의 예시 구성과 실제 지원은 별개 |
+| `.xlsx`, `.pptx` | 사본 보정 → 선택 설치 Docling 경로 → 원문 대조 | XLSX는 합성 문서로 첨자·병합 셀·글상자·흰회색 글자를 실측. PPTX는 합성 그림 슬라이드에서 OCR을 확인했다. 캐시 값이 없는 보이는 시트의 셀은 수식 원문·셀 위치를 보충한다. 외부 문서 참조와 수식 재계산은 별도 범위 |
+| HWP/HWPX, ZIP, 메일 및 그 밖의 형식 | 현재 미지원 | 업로드 후 처리 요청 시 `unsupported`. Mock 파이프라인의 예시 구성과 실제 지원은 별개 |
 
 **Docling 2.150.0 엣지 케이스 실측(합성 DOCX·XLSX, `backend/tests/edge_case_files.py`):** 유니코드로 저장된 `℃ ≥ ± ∓ ≤ −`는 보존된다. Word '기호 삽입'(Symbol 글꼴 `w:sym`)은 글자가 빠지고(`압력 ≥ 10`→`압력  10`), 위·아래첨자 서식은 평탄화된다(`m²`→`m2`, `10⁻³`→`10-3`, `CO₂`→`CO2`). 병합 셀 값은 칸마다 반복되고, XLSX 도형 글상자와 SVG 안 글자는 빠지며, 흰색에 가까운 글자는 표시 없이 본문에 들어간다. 사본 보정 후에는 앞의 두 손실이 사라지고(특수기호 215건 문서 208→215건), 글상자·SVG 글자는 보충 추출로, 나머지는 경고로 드러난다.
 
-공통 업로드는 파일당 기본 100 MiB, multipart 본문 제한은 파일 한도 + 1 MiB이다. 각 파일을 스트리밍하면서도 실제 파일 크기를 확인한다. Docling 변환에는 최대 500페이지 제한이 전달되고, Office 컨테이너는 내부 항목 수·크기·경로·암호·일부 압축 비율을 검사한다. 이 검사는 악성코드 검사나 모든 파일 안전성 보장이 아니다.
+공통 업로드는 파일당 기본 100 MiB, multipart 본문 제한은 파일 한도 + 1 MiB이다. 각 파일을 스트리밍하면서도 실제 파일 크기를 확인한다. PDF·DOCX·PPTX 변환에는 최대 500페이지 제한을 전달한다. XLSX는 시트당 한 페이지로 세므로 별도의 한도를 전달한다. Office 컨테이너는 ZIP 내부 항목 최대 10,000개, 압축 해제 합계 최대 250 MiB이며 내부 경로·암호화 여부·압축 비율도 검사한다. XLSX에서 내부 항목 수는 시트 XML뿐 아니라 스타일·그림·관계 파일까지 포함한다. 이 검사는 악성코드 검사나 모든 파일 안전성 보장이 아니다.
 
-Docling 실행 시 `HF_HUB_OFFLINE=1`, `TRANSFORMERS_OFFLINE=1`을 설정하며 PDF에서 원격 서비스·외부 플러그인·OCR을 비활성화한다. PDF 모델 경로 우선순위는 `DOCOPS_DOCLING_ARTIFACTS` → `DOCLING_ARTIFACTS_PATH` → 존재 시 `~/.cache/docling/models`다. Docling 패키지 설치는 선택 사항이며 미설치·모델 미준비는 명시적 실패로 처리한다. 패키지 설치 자체와 미리 모델을 준비하는 절차에는 별도의 네트워크가 필요할 수 있다.
+Docling 실행 시 `HF_HUB_OFFLINE=1`, `TRANSFORMERS_OFFLINE=1`을 설정하며 PDF에서 원격 서비스·외부 플러그인을 비활성화한다. PDF 모델 경로 우선순위는 `DOCOPS_DOCLING_ARTIFACTS` → `DOCLING_ARTIFACTS_PATH` → 존재 시 `~/.cache/docling/models`다. Docling 패키지 설치는 선택 사항이며 미설치·모델 미준비는 명시적 실패로 처리한다. 패키지 설치 자체와 미리 모델을 준비하는 절차에는 별도의 네트워크가 필요할 수 있다.
 
 ## 8. 로컬 요청 보호와 한계
 

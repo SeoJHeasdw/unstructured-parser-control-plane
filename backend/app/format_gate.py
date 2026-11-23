@@ -12,15 +12,17 @@ import math
 from pathlib import Path
 import re
 import zipfile
+import xml.etree.ElementTree as ET
+
+from app.formats import IMAGE_FORMATS, TEXT_FORMATS, raster_format
+from app.text_encoding import text_sample
 
 from app.cfb import SIGNATURE as CFB_SIGNATURE, CfbError, CompoundFile
 from app.structure import sniff
 
 OOXML_KIND = {"DOCX": "docx", "DOCM": "docx", "XLSX": "xlsx", "XLSM": "xlsx", "PPTX": "pptx", "PPTM": "pptx"}
-TEXT_EXTENSIONS = {"TXT", "CSV", "MD", "LOG"}
 _FOLDER_KIND = {"word": "docx", "xl": "xlsx", "ppt": "pptx"}
 _FALLBACK_MAIN = {"word/document.xml": "docx", "xl/workbook.xml": "xlsx", "ppt/presentation.xml": "pptx"}
-_OFFICE_DOCUMENT = re.compile(r"<Relationship\b[^>]*Type=\"[^\"]*/officeDocument\"[^>]*>")
 LABEL = {
     "zip": "일반 ZIP 압축", "cfb": "OLE 복합 문서", "pdf": "PDF", "image": "이미지", "text": "텍스트", "html": "HTML",
     "xml": "XML", "mime": "메일(MIME)", "docx": "Word(DOCX)", "xlsx": "Excel(XLSX)", "pptx": "PowerPoint(PPTX)",
@@ -97,28 +99,17 @@ def main_part(archive: zipfile.ZipFile, names: set[str]) -> str | None:
     """패키지 관계(_rels/.rels)가 가리키는 본문 부분. 'word/document2.xml'처럼 이름이 달라도 찾는다."""
     if "_rels/.rels" in names:
         info = archive.getinfo("_rels/.rels")
-        if info.file_size <= 1024 * 1024:
-            for tag in _OFFICE_DOCUMENT.findall(archive.read(info).decode("utf-8", "replace")):
-                target = re.search(r'Target="([^"]+)"', tag)
-                if target:
-                    part = target.group(1).lstrip("/")
+        if not info.flag_bits & 1 and info.file_size <= 1024 * 1024:
+            try:
+                root = ET.fromstring(archive.read(info))
+            except ET.ParseError:
+                root = ()
+            for rel in root:
+                if rel.get("Type", "").endswith("/officeDocument") and rel.get("TargetMode") != "External":
+                    part = rel.get("Target", "").lstrip("/")
                     if part in names:
                         return part
     return next((part for part in _FALLBACK_MAIN if part in names), None)
-
-
-def _decodes_as_text(head: bytes) -> bool:
-    """텍스트 어댑터가 읽을 수 있는 글자인지(UTF-8 BOM 포함·CP949). 표본 끝의 잘린 다중 바이트 글자는 허용한다."""
-    if b"\x00" in head:
-        return False
-    for encoding in ("utf-8-sig", "cp949"):
-        for sample in (head, head[:-1], head[:-2], head[:-3]):
-            try:
-                sample.decode(encoding)
-                return True
-            except UnicodeDecodeError:
-                continue
-    return False
 
 
 def _header_evidence(head: bytes) -> dict:
@@ -180,7 +171,7 @@ def check(path: Path, extension: str, signatures: tuple[DrmSignature, ...] = (),
     if vendor:
         return GateResult("drm_protected", "drm", f"{vendor} DRM으로 보호된 파일입니다. 표준 파서로 열 수 없으므로 DRM을 해제한 사본이 필요합니다.",
                           vendor=vendor, evidence=evidence)
-    if extension in TEXT_EXTENSIONS and _decodes_as_text(head):
+    if extension in TEXT_FORMATS and text_sample(head, final=len(head) < _SAMPLE) is not None:
         # 글자로 읽히는 파일은 내용이 'BMR-…'·'%PDF-' 같은 서명 문자열로 시작해도 텍스트다.
         return GateResult(None, "text", evidence=evidence)
     detected = sniff(head)
@@ -190,7 +181,7 @@ def check(path: Path, extension: str, signatures: tuple[DrmSignature, ...] = (),
                 with zipfile.ZipFile(path) as archive:
                     names = set(archive.namelist())
                     main = main_part(archive, names) if "[Content_Types].xml" in names else None
-            except (zipfile.BadZipFile, OSError, KeyError):
+            except (zipfile.BadZipFile, OSError, KeyError, NotImplementedError):
                 return GateResult("format_unrecognized", "zip", "ZIP 서명은 있지만 목차를 읽을 수 없습니다. 파일이 손상되었을 수 있습니다.", evidence=evidence)
             if "[Content_Types].xml" not in names:
                 return _mismatch(extension, "zip", evidence)
@@ -212,6 +203,13 @@ def check(path: Path, extension: str, signatures: tuple[DrmSignature, ...] = (),
         if detected == "unknown":
             return _opaque(extension, head, evidence)
         return _mismatch(extension, detected, evidence)
+    if extension == "SVG" and detected in {"xml", "text", "unknown"}:
+        return GateResult(None, "xml", evidence=evidence)
+    if extension in IMAGE_FORMATS:
+        actual = raster_format(head)
+        if IMAGE_FORMATS[extension] != actual:
+            return _mismatch(extension, actual or detected, evidence)
+        return GateResult(None, "image", evidence=evidence)
     if extension == "PDF":
         if detected == "pdf":
             return GateResult(None, "pdf", evidence=evidence)

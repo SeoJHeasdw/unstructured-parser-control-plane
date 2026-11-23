@@ -121,9 +121,21 @@ describe('임베딩 평가', () => {
     expect(within(rows[0]).queryByText('입력 512')).toBeNull();
     expect(screen.queryByText('Slate 125M')).toBeNull();
     expect(screen.queryByRole('dialog')).toBeNull();
-    expect((screen.getByRole('combobox', { name: '청킹' }) as HTMLSelectElement).value).toBe('p-el');
+    expect(screen.getByRole('button', {name:'평가 조건'})).toBeTruthy();
     expect(screen.getByText('800자 · 표 통째 · 그림 캡션')).toBeTruthy();
     expect(within(board()).getAllByRole('columnheader').map(h => h.textContent!.replace(/\d+$/, ''))).toEqual(['모델', '본문 질문', '표 질문', '그림 질문', '전체', '입력 한도 초과 청크', '벡터 용량', '지연']);
+  });
+
+  it('모델을 고정하면 이름을 표시하고 표의 첫 행으로 이동한다', async () => {
+    const user = userEvent.setup();
+    render(<EmbeddingEval active />);
+    const pins = await screen.findAllByRole('button', {name:/상단 고정/});
+    const target = pins[pins.length - 1];
+    await user.click(target);
+    expect(target.getAttribute('aria-pressed')).toBe('true');
+    expect(screen.getAllByRole('button', {name:/상단 고정/})[0]).toBe(target);
+    await user.click(target);
+    expect(target.getAttribute('aria-pressed')).toBe('false');
   });
 
   it('머리글·모델 이름·구성 버튼에는 말풍선이 없다', async () => {
@@ -133,8 +145,7 @@ describe('임베딩 평가', () => {
     const hover = (el: HTMLElement) => { fireEvent.mouseEnter(el); fireEvent.focus(el); expect(screen.queryByRole('tooltip')).toBeNull(); expect(el.getAttribute('title')).toBeNull(); };
     within(board()).getAllByRole('columnheader').forEach(hover);
     within(board()).getAllByRole('rowheader').forEach(hover);
-    [/^문서/, /^질문/, /^모델/, /평가 실행/].forEach(name => hover(screen.getByRole('button', { name })));
-    hover(screen.getByRole('combobox', { name: '청킹' }));
+    [/평가 조건/, /평가 실행/].forEach(name => hover(screen.getByRole('button', { name })));
   });
 
   it('실행 전에도 계획으로 입력 한도 초과·벡터 용량을 채우고 정확도는 비워 둔다', async () => {
@@ -145,12 +156,10 @@ describe('임베딩 평가', () => {
     expect(body.preset.id).toBe('p-el');
     expect(body.models).toEqual(MODELS);
     expect(body.doc_ids).toEqual(['sample:sop', 'sample:spec', 'sample:deck']);
-    expect(cells(rowOf('Harrier-OSS-v1 0.6B'))).toEqual(['—', '—', '—', '—', '0', '124 KB', '—']);
+    expect(cells(rowOf('Harrier-OSS-v1 0.6B'))).toEqual(['미측정', '미측정', '미측정', '미측정', '0', '124 KB', '미측정']);
     expect(screen.queryByRole('button', { name: /Hit@5/ })).toBeNull();
     expect(screen.getByRole('columnheader', { name: /표 질문/ }).textContent).toBe('표 질문2');
-    expect(screen.getByRole('button', { name: /^질문/ }).textContent).toBe('질문4');
-    expect(screen.getByRole('button', { name: /^문서/ }).textContent).toBe('문서예시 3');
-    expect(screen.getByRole('button', { name: /^모델/ }).textContent).toBe('모델5');
+    expect(screen.getByText('문서 예시 3 · 질문 4개 · 모델 5개')).toBeTruthy();
     expect(screen.getByText('청크 31개 · 중앙값 210토큰 · 가장 긴 청크 1,240토큰')).toBeTruthy();
   });
 
@@ -159,7 +168,9 @@ describe('임베딩 평가', () => {
     const user = userEvent.setup();
     render(<EmbeddingEval active />);
     await waitFor(() => expect(planCalls(fetchMock)).toHaveLength(1));
-    await user.selectOptions(screen.getByRole('combobox', { name: '청킹' }), 'p-fx');
+    await user.click(screen.getByRole('button', {name:'평가 조건'}));
+    await user.selectOptions(screen.getByRole('combobox', {name:/청킹 전략/}), 'p-fx');
+    await user.click(screen.getByRole('button', {name:'적용'}));
     expect(((planCalls(fetchMock)[0][1] as RequestInit).signal as AbortSignal).aborted).toBe(true);
     expect(screen.getByText('500자 · 겹침 50자')).toBeTruthy();
     await waitFor(() => expect(planCalls(fetchMock)).toHaveLength(2));
@@ -183,16 +194,11 @@ describe('임베딩 평가', () => {
     expect(cells(rowOf('Qwen3-Embedding 0.6B'))[6]).toBe('38 ms');
   });
 
-  it('칸 말풍선은 칸에 없는 지표·질문 수·실패만 보여 준다', async () => {
-    mockApi();
-    render(<EmbeddingEval active />);
-    fireEvent.mouseEnter(await screen.findByRole('button', { name: 'multilingual-e5-large · 표 · Hit@5 50%' }));
-    const tip = screen.getByRole('tooltip');
-    for (const label of ['Hit@1', 'Hit@3', 'Hit@10', 'MRR@10', 'nDCG@10']) expect(within(tip).getByText(label)).toBeTruthy();
-    expect(within(tip).queryByText('Hit@5')).toBeNull();
-    expect(tip.textContent).toContain('질문 2개');
-    expect(tip.textContent).toContain('한도 초과로 실패 2건');
-    expect(tip.textContent).not.toContain('multilingual-e5-large');
+  it('지표 위에 포인터만 놓으면 상세가 열리지 않는다', async () => {
+    mockApi(); render(<EmbeddingEval active/>);
+    fireEvent.mouseEnter(await screen.findByRole('button',{name:'multilingual-e5-large · 표 · Hit@5 50%'}));
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(screen.queryByRole('tooltip')).toBeNull();
   });
 
   it('칸을 누르면 모델 · 질문 유형 팝업이 열리고, 질문을 고르면 검색된 청크를 보여 주며, Escape로 닫으면 칸으로 초점이 돌아온다', async () => {
@@ -240,7 +246,7 @@ describe('임베딩 평가', () => {
     expect(screen.getAllByRole('status')).toHaveLength(1);
     expect(within(board()).getAllByRole('rowheader')).toHaveLength(5);
     await waitFor(() => expect(cells(rowOf('Granite Embedding 278M'))[4]).toBe('7'));
-    expect(cells(rowOf('Granite Embedding 278M')).slice(0, 4)).toEqual(['—', '—', '—', '—']);
+    expect(cells(rowOf('Granite Embedding 278M')).slice(0, 4)).toEqual(['미측정', '미측정', '미측정', '미측정']);
   });
 
   it('모델 팝업에서 모델을 더하고 빼며, Escape로 닫으면 모델 버튼으로 초점이 돌아온다', async () => {
@@ -248,16 +254,18 @@ describe('임베딩 평가', () => {
     const user = userEvent.setup();
     render(<EmbeddingEval active />);
     await screen.findByText('Harrier-OSS-v1 0.6B');
-    const opener = screen.getByRole('button', { name: /^모델/ });
+    const opener = screen.getByRole('button', {name:'평가 조건'});
     await user.click(opener);
-    const dialog = screen.getByRole('dialog', { name: '모델' });
+    await user.click(screen.getByRole('radio', {name:'모델'}));
+    const dialog = screen.getByRole('dialog', {name:'평가 조건'});
     expect(within(within(dialog).getByRole('listbox', { name: '비교할 모델' })).getAllByRole('option')).toHaveLength(5);
     await user.click(within(dialog).getByRole('button', { name: /Slate 125M/ }));
-    expect(within(board()).getAllByRole('rowheader')).toHaveLength(6);
+    expect(within(dialog).getAllByRole('option').filter(option => option.getAttribute('role') === 'option')).toHaveLength(6);
+    expect(within(board()).getAllByRole('rowheader')).toHaveLength(5);
     expect((within(dialog).getByRole('combobox', { name: '모델 ID' }) as HTMLInputElement).value).toBe('ibm/slate-125m-english-rtrvr');
     await user.click(within(dialog).getByRole('option', { name: /BGE-M3/ }));
     await user.click(within(dialog).getByRole('button', { name: 'BGE-M3 빼기' }));
-    expect(within(board()).queryByText('BGE-M3')).toBeNull();
+    expect(within(board()).getByText('BGE-M3')).toBeTruthy();
     await user.click(within(dialog).getByRole('option', { name: /multilingual-e5-large/ }));
     expect((within(dialog).getByRole('textbox', { name: '질의 접두어' }) as HTMLInputElement).value).toBe('');
     await user.clear(within(dialog).getByRole('textbox', { name: '질의 접두어' }));
@@ -274,14 +282,14 @@ describe('임베딩 평가', () => {
     const user = userEvent.setup();
     render(<EmbeddingEval active />);
     await waitFor(() => expect(planCalls(fetchMock)).toHaveLength(1));
-    await user.click(screen.getByRole('button', { name: /^문서/ }));
-    const dialog = screen.getByRole('dialog', { name: '문서' });
+    await user.click(screen.getByRole('button', { name: '평가 조건' }));
+    const dialog = screen.getByRole('dialog', { name: '평가 조건' });
     expect(within(dialog).getByRole('region', { name: '예시 문서' })).toBeTruthy();
     await user.click(within(dialog).getByRole('checkbox', { name: /합성 발표 자료/ }));
     await user.click(within(dialog).getByRole('checkbox', { name: /합성 절차서 A\.md/ }));
-    await user.click(within(dialog).getByRole('button', { name: '완료' }));
+    await user.click(within(dialog).getByRole('button', { name: '적용' }));
     expect(screen.queryByRole('dialog')).toBeNull();
-    expect(screen.getByRole('button', { name: /^문서/ }).textContent).toBe('문서예시 2 · 실제 1');
+    expect(screen.getByText(/문서 예시 2 · 실제 1/)).toBeTruthy();
     await waitFor(() => expect(planCalls(fetchMock)).toHaveLength(2));
     expect(JSON.parse(String((planCalls(fetchMock)[1][1] as RequestInit).body)).doc_ids).toEqual(['sample:sop', 'sample:spec', DOC_A]);
   });
@@ -291,9 +299,9 @@ describe('임베딩 평가', () => {
     const user = userEvent.setup();
     render(<EmbeddingEval active />);
     await screen.findByText('Harrier-OSS-v1 0.6B');
-    await user.click(screen.getByRole('button', { name: /^질문/ }));
-    const dialog = screen.getByRole('dialog', { name: '질문' });
-    expect(dialog.className).toContain('is-xl');
+    await user.click(screen.getByRole('button', {name:'평가 조건'}));
+    await user.click(screen.getByRole('radio', {name:'질문'}));
+    const dialog = screen.getByRole('dialog', {name:'평가 조건'});
     const list = within(dialog).getByRole('listbox', { name: '질문 목록' });
     expect(within(list).getAllByRole('option')).toHaveLength(4);
     await user.click(within(list).getByRole('option', { name: /보관 온도 범위는/ }));
@@ -307,13 +315,14 @@ describe('임베딩 평가', () => {
     expect(within(dialog).getByText('저장하지 않은 변경이 있습니다.')).toBeTruthy();
     expect(fetchMock.mock.calls.some(([, init]) => (init as RequestInit | undefined)?.method === 'PUT')).toBe(false);
     await user.keyboard('{Escape}');
-    await user.click(screen.getByRole('button', { name: /^질문/ }));
-    expect(within(screen.getByRole('listbox', { name: '질문 목록' })).getAllByRole('option')).toHaveLength(8);
-    await user.click(screen.getByRole('button', { name: '저장' }));
-    expect(await screen.findByText('8개 저장했습니다.')).toBeTruthy();
+    await user.click(screen.getByRole('button', {name:'평가 조건'}));
+    await user.click(screen.getByRole('radio', {name:'질문'}));
+    expect(within(screen.getByRole('listbox', {name:'질문 목록'})).getAllByRole('option')).toHaveLength(4);
+    await user.click(screen.getByRole('button', {name:'예시 질문 불러오기'}));
+    await user.click(await screen.findByRole('button', {name:'기존에 추가'}));
+    await user.click(screen.getByRole('button', {name:'적용'}));
+    await screen.findByText(/질문 8개 · 모델 5개/);
     expect(fetchMock.mock.calls.filter(([, init]) => (init as RequestInit | undefined)?.method === 'PUT')).toHaveLength(1);
-    await user.keyboard('{Escape}');
-    expect(screen.getByRole('button', { name: /^질문/ }).textContent).toBe('질문8');
   });
 
   it('다른 청킹의 결과는 칸에 채우지 않고 그 청킹으로 돌아가는 길만 준다', async () => {
@@ -321,7 +330,9 @@ describe('임베딩 평가', () => {
     const user = userEvent.setup();
     render(<EmbeddingEval active />);
     await screen.findByRole('button', { name: /Harrier-OSS-v1 0\.6B · 표 · Hit@5/ });
-    await user.selectOptions(screen.getByRole('combobox', { name: '청킹' }), 'p-fx');
+    await user.click(screen.getByRole('button', {name:'평가 조건'}));
+    await user.selectOptions(screen.getByRole('combobox', {name:/청킹 전략/}), 'p-fx');
+    await user.click(screen.getByRole('button', {name:'적용'}));
     expect(screen.queryByRole('button', { name: /· Hit@5/ })).toBeNull();
     await user.click(screen.getByRole('button', { name: '그 청킹으로 보기' }));
     expect(screen.getByRole('button', { name: /Harrier-OSS-v1 0\.6B · 표 · Hit@5/ })).toBeTruthy();

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { ChevronDown, ChevronRight, FileArchive, FileText, GitFork, Link2, LoaderCircle, Mail, Paperclip, ScanSearch, TriangleAlert } from 'lucide-react';
-import { getLiveStructure, getStructureOverview, inspectLiveDocument } from './api/live';
+import { getLiveStructure, listLiveDocuments, getStructureOverview, inspectLiveDocument } from './api/live';
 import type { LiveDoc, LiveStructure, StructNode, StructureOverview } from './api/live';
 
 export const CHILD_KIND: Record<string, string> = { file: '원본', 'archive-entry': '압축 항목', attachment: '첨부', embedded: '내장 개체' };
@@ -114,18 +114,31 @@ export function StructurePanel({ doc, onInspected }: { doc: LiveDoc; onInspected
   </section>;
 }
 
-export function StructureOverviewStrip({ documents, refreshKey, onInspected }: { documents: LiveDoc[]; refreshKey: number; onInspected: () => void }) {
+export function StructureOverviewStrip({ onInspected }: { onInspected: () => void }) {
+  const [documents, setDocuments] = useState<LiveDoc[]>([]);
+  const [outcome, setOutcome] = useState('');
   const [overview, setOverview] = useState<StructureOverview | null>(null);
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
-  useEffect(() => { let alive = true; getStructureOverview().then(value => { if (alive) setOverview(value); }).catch(() => { if (alive) setOverview(null); }); return () => { alive = false; }; }, [refreshKey, documents.length]);
-  if (!overview || !documents.length) return null;
+  const [loadError, setLoadError] = useState(false);
+  const [revision, setRevision] = useState(0);
+  useEffect(() => {
+    let alive = true;
+    setLoadError(false);
+    Promise.all([getStructureOverview(), listLiveDocuments()]).then(([value, docs]) => { if (alive) { setOverview(value); setDocuments(docs); } })
+      .catch(() => { if (alive) setLoadError(true); });
+    return () => { alive = false; };
+  }, [revision]);
+  if (loadError) return <div className="lw-message is-warning" role="alert">구조 분석 요약을 불러오지 못했습니다.<button onClick={() => setRevision(value => value + 1)}>다시 시도</button></div>;
+  if (!overview) return <p className="lw-placeholder" role="status">구조 분석 요약을 불러오는 중입니다.</p>;
   const runAll = async () => {
     setProgress({ done: 0, total: documents.length });
+    const failures: string[] = []; setOutcome('');
     for (const [index, doc] of documents.entries()) {
-      try { await inspectLiveDocument(doc.id); } catch { /* 개별 실패는 해당 문서에서 다시 확인한다. */ }
+      try { await inspectLiveDocument(doc.id); } catch { failures.push(doc.name); }
       setProgress({ done: index + 1, total: documents.length });
     }
-    setProgress(null);
+    setOutcome(`성공 ${documents.length - failures.length}건 · 실패 ${failures.length}건${failures.length ? " · " + failures.join(", ") : ""}`);
+    setProgress(null); setRevision(n => n + 1);
     onInspected();
   };
   const warn = (overview.flags.encrypted ?? 0) + (overview.flags['drm-suspect'] ?? 0) + (overview.flags['format-mismatch'] ?? 0) + (overview.flags.unreadable ?? 0);
@@ -135,6 +148,7 @@ export function StructureOverviewStrip({ documents, refreshKey, onInspected }: {
     <div><span>최대 깊이</span><b>{overview.max_depth}</b></div>
     <div><span>링크·참조 후보</span><b>{overview.links}</b></div>
     <div className={warn ? 'is-warn' : ''}><span>암호화·불일치·실패</span><b>{warn}</b></div>
-    <button className="live-secondary" onClick={() => void runAll()} disabled={!!progress}>{progress ? <><LoaderCircle size={14} className="live-spin" /> {progress.done}/{progress.total}</> : <><ScanSearch size={14} /> 전체 구조 분석</>}</button>
+    <button className="live-secondary" onClick={() => void runAll()} disabled={!!progress || !documents.length}>{progress ? <><LoaderCircle size={14} className="live-spin" /> {progress.done}/{progress.total}</> : <><ScanSearch size={14} /> {documents.length}개 문서 구조 분석</>}</button>
+    {outcome && <p role="status">{outcome}</p>}
   </div>;
 }

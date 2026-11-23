@@ -37,7 +37,7 @@ export function PresetModal({ presets, selected, initial, onChange, onToggle, on
       <span className="ui-foot-note">비교에 {selected.length}개 포함 · 최대 {MAX_SELECTED}개</span>
       <button type="button" className="button-quiet cb-btn" onClick={onReset}><RotateCcw size={14} /> 기본값으로</button>
       <button type="button" className="button-secondary cb-btn" disabled={presets.length >= MAX_PRESETS} onClick={add}><Plus size={14} /> 전략 추가</button>
-      <button type="button" className="button-primary cb-btn" onClick={onClose}>완료</button>
+      <button type="button" className="button-primary cb-btn" onClick={onClose}>{initial ? '전략 상세로' : '완료'}</button>
     </>}>
     <div className="ui-split cb-preset-split">
       <div className="cb-listcol" onKeyDown={event => {

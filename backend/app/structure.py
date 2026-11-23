@@ -20,7 +20,11 @@ import zlib
 
 from app.cfb import SIGNATURE as CFB_SIGNATURE, CompoundFile, CfbError
 
+from app.formats import raster_format
+from app.text_encoding import text_sample
+
 # ---------------------------------------------------------------- limits
+
 
 @dataclass
 class Budget:
@@ -55,12 +59,10 @@ def sniff(data: bytes) -> str:
         return "zip"
     if head.startswith(CFB_SIGNATURE):
         return "cfb"
+    if raster_format(head) or head[4:12] in (b"ftypheic", b"ftypheix", b"ftypmif1"):
+        return "image"
     if b"%PDF-" in head[:1024]:
         return "pdf"
-    # BMP는 'BM' 두 글자뿐이라 'BMR-2026-…' 같은 텍스트와 겹친다. 정보 머리말 크기까지 맞아야 그림으로 본다.
-    bmp = head[:2] == b"BM" and len(head) >= 18 and int.from_bytes(head[14:18], "little") in (12, 40, 52, 56, 64, 108, 124)
-    if head.startswith(b"\x89PNG") or head.startswith(b"\xff\xd8\xff") or head.startswith((b"GIF87a", b"GIF89a")) or head.startswith((b"II*\x00", b"MM\x00*")) or bmp or head[4:12] in (b"ftypheic", b"ftypheix", b"ftypmif1"):
-        return "image"
     lower = head.lower()
     text = _decode(head)
     if text is None:
@@ -75,22 +77,10 @@ def sniff(data: bytes) -> str:
 
 
 def _decode(data: bytes) -> str | None:
-    if data.startswith((b"\xff\xfe", b"\xfe\xff")):
-        try:
-            return data.decode("utf-16")
-        except UnicodeDecodeError:
-            return None
-    for encoding in ("utf-8-sig", "cp949"):
-        try:
-            text = data.decode(encoding)
-        except UnicodeDecodeError:
-            # 잘린 다중 바이트 문자 때문일 수 있다.
-            try:
-                text = data[:-3].decode(encoding)
-            except UnicodeDecodeError:
-                continue
-        printable = sum(ch.isprintable() or ch in "\r\n\t" for ch in text[:4000])
-        if not text or printable / max(1, len(text[:4000])) > 0.9:
+    text = text_sample(data)
+    if text is not None:
+        sample = text[:4000]
+        if not sample or sum(ch.isprintable() or ch in "\r\n\t" for ch in sample) / len(sample) > 0.9:
             return text
     return None
 
@@ -128,18 +118,22 @@ def _scan(node: dict, budget: Budget, segments) -> None:
     for location, text in segments:
         if not text:
             continue
-        scanned += len(text)
-        if scanned > budget.max_scan:
+        remaining = budget.max_scan - scanned
+        if len(text) > remaining:
             if "truncated" not in node["flags"]:
                 node["flags"].append("truncated")
-            break
+            if remaining <= 0:
+                break
+            text = text[:remaining]
+        scanned += len(text)
         for match in URL.finditer(text):
             _add_link(node, budget, "url", match.group(0), location, _around(text, match))
-        files = [match for match in UNC_FILE.finditer(text)]
-        for match in files:
+        file_starts = set()
+        for match in UNC_FILE.finditer(text):
+            file_starts.add(match.start())
             _add_link(node, budget, "unc-path", match.group(0), location, _around(text, match))
         for match in UNC.finditer(text):
-            if not any(f.start() == match.start() for f in files):
+            if match.start() not in file_starts:
                 _add_link(node, budget, "unc-path", match.group(0), location, _around(text, match))
         for match in WINPATH.finditer(text):
             _add_link(node, budget, "file-path", match.group(0), location, _around(text, match))
@@ -785,6 +779,8 @@ def _html(node: dict, data: bytes, depth: int, budget: Budget) -> None:
 
 
 def _text(node: dict, data: bytes, depth: int, budget: Budget) -> None:
+    if len(data) > budget.max_scan:
+        _flag(node, "truncated")
     text = _decode(data[: budget.max_scan]) or ""
     node["stats"]["lines"] = text.count("\n") + (1 if text else 0)
     _scan(node, budget, ((f"{index}행", line) for index, line in enumerate(text.splitlines(), start=1)))

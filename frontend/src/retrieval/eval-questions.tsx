@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import type { ChangeEvent } from 'react';
 import { Plus } from 'lucide-react';
-import { exportUrl, getExampleQuestions, parseQuestions, sampleDocId, saveQuestions } from '../api/retrieval';
+import { exportUrl, getExampleQuestions, parseQuestions, sampleDocId } from '../api/retrieval';
 import type { Question, QuestionKind, RetrievalDoc, Sample } from '../api/retrieval';
-import { ListBox, Modal, Segmented } from '../ui';
+import { ListBox, Segmented } from '../ui';
 import { QUESTION_KIND_META, QUESTION_KINDS } from './elements';
 import { errorText, fmtInt } from './shared';
 import { KIND_SHORT } from './eval-common';
@@ -16,8 +16,8 @@ let seq = 0;
 const toRows = (questions: Question[]): Row[] => questions.map(q => ({ key: q.id ?? `n${++seq}`, q }));
 
 /** 질문 목록 + 편집. 저장을 누르기 전에는 서버에 쓰지 않는다. 닫았다 열어도 고치던 내용은 남는다. */
-export function QuestionsModal({ open, onClose, questions, onSaved, samples, docs, maxRows }: {
-  open: boolean; onClose: () => void; questions: Question[]; onSaved: (q: Question[]) => void; samples: Sample[]; docs: RetrievalDoc[]; maxRows: number;
+export function QuestionChoices({ questions, onChange, samples, docs, maxRows }: {
+  questions: Question[]; onChange: (q: Question[]) => void; samples: Sample[]; docs: RetrievalDoc[]; maxRows: number;
 }) {
   const [rows, setRows] = useState<Row[]>(() => toRows(questions));
   const [dirty, setDirty] = useState(false);
@@ -25,7 +25,6 @@ export function QuestionsModal({ open, onClose, questions, onSaved, samples, doc
   const [filter, setFilter] = useState<Filter>('all');
   const [pending, setPending] = useState<Pending | null>(null);
   const [note, setNote] = useState<{ tone: 'ok' | 'bad'; text: string } | null>(null);
-  const [saving, setSaving] = useState(false);
   const file = useRef<HTMLInputElement>(null);
   const side = useRef<HTMLDivElement>(null);
   const [fresh, setFresh] = useState<string | null>(null);
@@ -38,21 +37,11 @@ export function QuestionsModal({ open, onClose, questions, onSaved, samples, doc
   const shown = filter === 'all' ? rows : rows.filter(r => r.q.kind === filter);
   const current = shown.find(r => r.key === sel) ?? shown[0] ?? null;
   const names = new Map<string, string>([...samples.map(s => [sampleDocId(s.id), s.name] as const), ...docs.map(d => [d.id, d.name] as const)]);
-  const edit = (next: Row[]) => { setRows(next.slice(0, maxRows)); setDirty(true); setNote(null); };
+  const edit = (next: Row[]) => { const limited = next.slice(0, maxRows); setRows(limited); onChange(limited.map(r => r.q)); setDirty(true); setNote(null); };
   const patch = (key: string, change: Partial<Question>) => edit(rows.map(r => r.key === key ? { ...r, q: { ...r.q, ...change } } : r));
   const add = () => { const row = toRows([{ question: '', doc_id: '', answer: '', kind: filter === 'all' ? null : filter }])[0]; edit([...rows, row]); setSel(row.key); setFresh(row.key); };
   const remove = (key: string) => { const i = shown.findIndex(r => r.key === key); edit(rows.filter(r => r.key !== key)); setSel(shown[i + 1]?.key ?? shown[i - 1]?.key ?? null); focusList(); };
 
-  const save = async () => {
-    setSaving(true); setNote(null);
-    try {
-      const saved = await saveQuestions(rows.map(r => r.q).filter(q => q.question.trim()));
-      setDirty(false); onSaved(saved.questions);
-      setNote({ tone: 'ok', text: `${fmtInt(saved.questions.length)}개 저장했습니다.` });
-      focusList();
-    } catch (error) { setNote({ tone: 'bad', text: errorText(error) }); }
-    finally { setSaving(false); }
-  };
   const onFile = async (event: ChangeEvent<HTMLInputElement>) => {
     const picked = event.target.files?.[0];
     event.target.value = '';
@@ -82,8 +71,7 @@ export function QuestionsModal({ open, onClose, questions, onSaved, samples, doc
     : note ? <span className={`ui-foot-note ee-note is-${note.tone}`} role="status">{note.text}</span>
     : dirty ? <span className="ui-foot-note">저장하지 않은 변경이 있습니다.</span> : null;
 
-  return <Modal open={open} onClose={onClose} size="xl" flush title="질문" footer={footer}
-    extra={<>
+  return <><div className="conditions-actions">
       <button type="button" className="ee-btn is-quiet" onClick={loadExamples}>예시 질문 불러오기</button>
       <button type="button" className="ee-btn is-quiet" onClick={() => file.current?.click()}>가져오기</button>
       <input ref={file} type="file" accept=".csv,.jsonl,.json,.ndjson,.txt" hidden onChange={onFile} aria-label="질문 파일" />
@@ -91,8 +79,7 @@ export function QuestionsModal({ open, onClose, questions, onSaved, samples, doc
         <summary className="ee-btn is-quiet">내보내기</summary>
         <div role="menu"><a role="menuitem" href={exportUrl('csv')} download>CSV</a><a role="menuitem" href={exportUrl('jsonl')} download>JSONL</a></div>
       </details>
-      <button type="button" className="ee-btn is-primary" onClick={save} disabled={!dirty || saving}>{saving ? '저장 중' : '저장'}</button>
-    </>}>
+    </div>{footer && <div className="conditions-actions">{footer}</div>}
     <div className="ui-split ee-split">
       <div ref={side}>
         <div className="ee-split-tools">
@@ -114,7 +101,7 @@ export function QuestionsModal({ open, onClose, questions, onSaved, samples, doc
       <div>{current ? <QuestionForm key={current.key} row={current} autoFocus={current.key === fresh} samples={samples} docs={docs} known={names} onPatch={change => patch(current.key, change)} onRemove={() => remove(current.key)} />
         : <div className="ui-empty"><b>질문이 없습니다</b><p className="ee-empty-actions"><button type="button" className="ee-btn" onClick={loadExamples}>예시 질문 불러오기</button><button type="button" className="ee-btn is-quiet" onClick={add} disabled={rows.length >= maxRows}>질문 추가</button></p></div>}</div>
     </div>
-  </Modal>;
+  </>;
 }
 
 type KindChoice = 'auto' | QuestionKind;

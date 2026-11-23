@@ -7,6 +7,7 @@ import { Modal } from './ui';
 export type WorkspaceDestination = {
   id: Page;
   label: string;
+  alias?: string;
   description: string;
   group: string;
   icon: LucideIcon;
@@ -24,7 +25,7 @@ export function WorkspaceFinder({ destinations, current, onClose, onNavigate }: 
   const listId = useId();
   const terms = query.trim().toLocaleLowerCase().split(/\s+/);
   const matches = destinations.filter(page => {
-    const text = `${page.label} ${page.group} ${page.description}`.toLocaleLowerCase();
+    const text = `${page.label} ${page.group} ${page.description} ${page.alias ?? ''}`.toLocaleLowerCase();
     return terms.every(term => text.includes(term));
   });
   const highlighted = matches[index];

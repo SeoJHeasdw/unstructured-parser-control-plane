@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Plus } from 'lucide-react';
 import { sampleDocId } from '../api/retrieval';
 import type { Candidate, ModelSpec, Question, RetrievalConfig, RetrievalDoc, Sample } from '../api/retrieval';
-import { ListBox, Modal } from '../ui';
+import { ListBox } from '../ui';
 import { fmtInt } from './shared';
 import { SHORT_INPUT, candidateFor, fmtTokens, modelName, nextId, shortLang, specFor } from './eval-common';
 
@@ -31,8 +31,8 @@ function GroupCheck({ label, ids, selected, onSet }: { label: string; ids: strin
   </label>;
 }
 
-export function DocsModal({ open, onClose, samples, docs, questions, docIds, max, onChange }: {
-  open: boolean; onClose: () => void; samples: Sample[]; docs: RetrievalDoc[]; questions: Question[]; docIds: string[]; max: number; onChange: (ids: string[]) => void;
+export function DocChoices({ samples, docs, questions, docIds, max, onChange }: {
+  samples: Sample[]; docs: RetrievalDoc[]; questions: Question[]; docIds: string[]; max: number; onChange: (ids: string[]) => void;
 }) {
   const selected = new Set(docIds);
   const perDoc = new Map<string, number>();
@@ -42,10 +42,8 @@ export function DocsModal({ open, onClose, samples, docs, questions, docIds, max
   const set = (ids: string[]) => onChange([...new Set(ids)].slice(0, max));
   const toggle = (id: string, on: boolean) => set(on ? [...docIds, id] : docIds.filter(x => x !== id));
   const setGroup = (ids: string[], on: boolean) => set(on ? [...docIds, ...ids] : docIds.filter(x => !ids.includes(x)));
-  const asked = docIds.reduce((n, id) => n + (perDoc.get(id) ?? 0), 0);
   const full = docIds.length >= max;
-  return <Modal open={open} onClose={onClose} size="md" title="문서"
-    footer={<><span className="ui-foot-note">{fmtInt(docIds.length)}개 · 질문 {fmtInt(asked)}</span><button type="button" className="ee-btn is-primary" onClick={onClose}>완료</button></>}>
+  return <>
     <section className="ee-checks" aria-label="예시 문서">
       <GroupCheck label="예시 문서" ids={sampleIds} selected={selected} onSet={on => setGroup(sampleIds, on)} />
       {samples.length === 0 ? <p className="ee-quiet">예시 문서를 불러오지 못했습니다.</p>
@@ -66,12 +64,12 @@ export function DocsModal({ open, onClose, samples, docs, questions, docIds, max
           <span className="ee-check-q ee-num">질문 {fmtInt(perDoc.get(d.id) ?? 0)}</span>
         </label>)}
     </section>
-  </Modal>;
+  </>;
 }
 
 /* ---------- 모델 ---------- */
-export function ModelsModal({ open, onClose, config, candidates, isDefault, onChange, onReset }: {
-  open: boolean; onClose: () => void; config: RetrievalConfig | null; candidates: Candidate[]; isDefault: boolean; onChange: (list: Candidate[]) => void; onReset: () => void;
+export function ModelChoices({ config, candidates, isDefault, onChange, onReset }: {
+  config: RetrievalConfig | null; candidates: Candidate[]; isDefault: boolean; onChange: (list: Candidate[]) => void; onReset: () => void;
 }) {
   const [sel, setSel] = useState<string | null>(null);
   const side = useRef<HTMLDivElement>(null);
@@ -89,12 +87,9 @@ export function ModelsModal({ open, onClose, config, candidates, isDefault, onCh
   const remove = (id: string) => { const i = candidates.findIndex(c => c.id === id); const next = candidates.filter(c => c.id !== id); onChange(next); setSel(next[Math.min(i, next.length - 1)]?.id ?? null);
  focusList(); };
   const patch = (id: string, change: Partial<Candidate>) => onChange(candidates.map(c => c.id === id ? { ...c, ...change } : c));
-  return <Modal open={open} onClose={onClose} size="lg" flush title="모델"
-    footer={<>
-      <span className="ui-foot-note">{fmtInt(candidates.length)} / 최대 {fmtInt(max)}</span>
-      {!isDefault && <button type="button" className="ee-btn is-quiet" onClick={() => { onReset(); setSel(null); focusList(); }}>기본 모델로 되돌리기</button>}
-      <button type="button" className="ee-btn is-primary" onClick={onClose}>완료</button>
-    </>}>
+  return <>
+    <div className="conditions-actions"><span>{fmtInt(candidates.length)} / 최대 {fmtInt(max)}개</span>
+      {!isDefault && <button type="button" className="ee-btn" onClick={() => { onReset(); setSel(null); focusList(); }}>기본 모델로 되돌리기</button>}</div>
     <div className="ui-split ee-split">
       <div ref={side}>
         <ListBox items={candidates} getKey={c => c.id} value={current?.id ?? null} onChange={setSel} label="비교할 모델" className="ee-list"
@@ -110,7 +105,7 @@ export function ModelsModal({ open, onClose, config, candidates, isDefault, onCh
       <div>{current ? <ModelForm key={current.id} config={config} candidate={current} onPatch={change => patch(current.id, change)} onRemove={() => remove(current.id)} />
         : <div className="ui-empty"><b>비교할 모델이 없습니다</b></div>}</div>
     </div>
-  </Modal>;
+  </>;
 }
 
 function ModelForm({ config, candidate: c, onPatch, onRemove }: { config: RetrievalConfig | null; candidate: Candidate; onPatch: (change: Partial<Candidate>) => void; onRemove: () => void }) {

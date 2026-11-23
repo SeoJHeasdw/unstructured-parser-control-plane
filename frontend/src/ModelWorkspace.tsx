@@ -161,11 +161,12 @@ export default function ModelWorkspace() {
             <div><h2>{conn.label}</h2><p>{conn.key === 'primary' ? '기본 연결' : '보조 연결'}</p></div>
             <GatewayStatus conn={conn} pending={running} result={result?.test} />
           </header>
-          <dl className="mw-properties">
+          <p className="gateway-last">{conn.configured ? '설정됨' : '미설정'} · {result?.test ? '마지막 확인 ' + timeFormat.format(result.test.checkedAt) : '연결 확인 전'}</p>
+          <details className="gateway-details"><summary>연결 정보</summary><dl className="mw-properties">
             <div><dt>Base URL</dt><dd>{conn.base_url ? <code>{conn.base_url}</code> : '미설정'}</dd></div>
             <div><dt>Model ID</dt><dd>{conn.model_id ? <code>{conn.model_id}</code> : '미설정'}</dd></div>
             <div><dt><KeyRound size={14} aria-hidden="true" /> API 키</dt><dd>{conn.api_key_set ? '서버에 설정됨' : '미설정'}</dd></div>
-          </dl>
+          </dl></details>
           <div className="mw-gateway-actions">
             <button className="button-primary" disabled={!canRun} onClick={() => void run(conn.key, 'test')}>
               {running === 'test' ? <LoaderCircle size={16} className="mw-spin" aria-hidden="true" /> : <PlugZap size={16} aria-hidden="true" />}

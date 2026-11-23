@@ -206,7 +206,7 @@
 .ln-gnode.is-ghost,.ln-gnode.is-more{border-style:dashed;background:#fbfcfd}
 .ln-gnode.is-more{color:#6b7686}
 .ln-gnode:hover,.ln-gnode.is-hl{border-color:#becaf6;box-shadow:0 3px 10px #17243a12}
-.ln-gnode.is-dim{opacity:.3}
+.ln-gnode.is-dim{opacity:.72}
 .ln-gnode:focus-visible{outline:2px solid var(--ln-accent);outline-offset:2px}
 
 /* 고정한 상세: X 또는 Esc로 닫는다 */
@@ -248,7 +248,7 @@
 .ln-table q{color:#544f72}
 
 /* hover·초점 설명 */
-.ln-tip{position:fixed;z-index:60;display:flex;flex-direction:column;gap:3px;min-width:min(180px,calc(100vw - 24px));max-width:min(320px,calc(100vw - 24px));padding:10px 12px;border-radius:9px;background:#1b2234;color:#dfe3ef;box-shadow:0 10px 30px #0f142333;font-size:12px;line-height:1.55;pointer-events:none;transform:translate(-50%,-100%)}
+.ln-tip{position:fixed;z-index:60;display:flex;flex-direction:column;gap:3px;min-width:min(180px,calc(100vw - 24px));max-width:min(320px,calc(100vw - 24px));padding:10px 12px;border-radius:9px;background:#1b2234;color:#dfe3ef;box-shadow:0 10px 30px #0f142333;font-size:12px;line-height:1.55;pointer-events:auto;transform:translate(-50%,-100%)}
 .ln-tip.is-below{transform:translateX(-50%)}
 .ln-tip strong{color:#fff;font-size:12.5px;overflow-wrap:anywhere}
 .ln-tip q{color:#c9c3ff}

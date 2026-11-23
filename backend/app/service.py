@@ -15,6 +15,8 @@ from fastapi import UploadFile
 from app.adapters.base import ParserError, UnsupportedFormat
 from app.adapters.registry import ParserRegistry, TEXT_FORMATS
 from app.config import Settings
+from app.adapters.ocr import model_dir
+from app.fidelity.pictures import PictureOcr
 from app.fidelity import OOXML_FORMATS, assess, prepare_copy, prepared_copy_path, probe
 from app.filelock import try_lock, unlock
 from app.format_gate import check as check_format
@@ -232,29 +234,48 @@ class DocumentService:
             if not gate.passed:
                 raise ParserError(gate.message or "파일 형식을 확인할 수 없습니다.", code=gate.code)
             started = time.perf_counter()
-            parsed, prepared, warnings = self._parse(path, extension)
-            markdown, locations, fidelity = parsed.markdown, list(parsed.locations), None
-            if extension in OOXML_FORMATS:
-                try:
-                    markdown, extra, notes, fidelity = assess(probe(path, extension), markdown, prepared)
-                    locations += extra
-                    warnings += notes
-                except Exception as exc:
-                    logger.warning("Fidelity check skipped (%s)", type(exc).__name__)
-                    warnings.append(FIDELITY_FAILED_WARNING)
-            duration_ms = round((time.perf_counter() - started) * 1000)
             result_name = f"{doc_id}-{run_id}.md"
             result_path = self.settings.results / result_name
             temp_path = self.settings.results / f"{doc_id}-{run_id}.tmp"
             fd = os.open(temp_path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
-            with os.fdopen(fd, "w", encoding="utf-8") as output:
-                output.write(markdown)
+            with os.fdopen(fd, "w", encoding="utf-8", newline="") as output:
+                if extension in TEXT_FORMATS and path.stat().st_size >= 1024 * 1024:
+                    parsed = self.parsers.text.write_to(path, extension, output)
+                    warnings, locations, fidelity, ocr_enabled = [], [], None, None
+                else:
+                    parsed, prepared, warnings = self._parse(path, extension)
+                    markdown, locations, fidelity = parsed.markdown, list(parsed.locations), None
+                    warnings.extend(parsed.warnings)
+                    ocr_enabled = parsed.ocr_enabled
+                    if extension in OOXML_FORMATS:
+                        directory = model_dir(self.settings)
+                        pictures = PictureOcr(directory) if directory else None
+                        try:
+                            inventory = probe(path, extension, pictures)
+                            markdown, extra, notes, fidelity = assess(inventory, markdown, prepared)
+                            locations += extra
+                            warnings += notes
+                            if inventory["images"]["total"]:
+                                ocr_enabled = bool(pictures and pictures.applied)
+                        except Exception as exc:
+                            logger.warning("Fidelity check skipped (%s)", type(exc).__name__)
+                            warnings.append(FIDELITY_FAILED_WARNING)
+                        if not markdown.strip():
+                            raise ParserError("Office 본문·그림에서 글자를 추출하지 못했습니다. " + " ".join(warnings[:2]), code="no_text")
+                    output.write(markdown)
+            duration_ms = round((time.perf_counter() - started) * 1000)
             os.replace(temp_path, result_path)
-            if extension == "PDF":
+            if extension == "PDF" and not ocr_enabled:
                 warnings.insert(0, PDF_OCR_WARNING)
-            if not self.repo.finish(doc_id, run_id, status="completed", parser=parsed.parser, parser_version=parsed.parser_version, result_file=result_name, error=None, warnings=warnings,
-                                    ocr_enabled=parsed.ocr_enabled, locations=[location.model_dump() for location in locations], duration_ms=duration_ms, fidelity=fidelity):
-                result_path.unlink(missing_ok=True)
+            committed = False
+            try:
+                committed = self.repo.finish(doc_id, run_id, status="completed", parser=parsed.parser,
+                                             parser_version=parsed.parser_version, result_file=result_name, error=None,
+                                             warnings=warnings, ocr_enabled=ocr_enabled, duration_ms=duration_ms,
+                                             locations=[location.model_dump() for location in locations], fidelity=fidelity)
+            finally:
+                if not committed:
+                    result_path.unlink(missing_ok=True)
         except UnsupportedFormat as exc:
             self.repo.finish(doc_id, run_id, status="unsupported", parser=None, parser_version=None, result_file=None, error=str(exc), error_code=exc.code)
         except ParserError as exc:
@@ -280,7 +301,7 @@ class DocumentService:
         with tempfile.TemporaryDirectory(prefix=_WORK_PREFIX, dir=self.settings.work, ignore_cleanup_errors=True) as workdir:
             target = prepared_copy_path(Path(workdir), extension)
             try:
-                stats = prepare_copy(path, target, extension)
+                stats = prepare_copy(path, target, extension, only_if_changed=True)
             except Exception as exc:
                 logger.warning("OOXML preparation skipped (%s)", type(exc).__name__)
                 return self.parsers.parse(path, extension), None, [PREPARE_FALLBACK_WARNING]
@@ -314,7 +335,7 @@ class DocumentService:
                 self.parsers.docling.check_office_archive(path)
                 return worksheet_preview(path, sheet, cell)
             if doc["format"] in TEXT_FORMATS:
-                text = self.parsers.text.read_source(path)
+                text = self.parsers.text.read_source(path, limit=60_001)
                 return {"kind": "text", "text": text[:60_000], "truncated": len(text) > 60_000}
         except ImportError as exc:
             raise Conflict("워크시트 미리보기에 필요한 선택 의존성이 설치되어 있지 않습니다.") from exc
@@ -401,8 +422,6 @@ class DocumentService:
                 warnings = []
         except (ValueError, TypeError):
             warnings = []
-        if doc["format"] == "PDF" and PDF_OCR_WARNING not in warnings:
-            warnings.append(PDF_OCR_WARNING)
         fidelity = None
         run = self.repo.parse_run(doc_id, name[33:65])
         if run and run.get("fidelity"):

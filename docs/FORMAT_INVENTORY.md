@@ -36,8 +36,8 @@ png, msg, xls, doc, jpg, ppt, htm, docm, log
 - `실험_Cline_vs_OpenCode/dataset/README.md`는 해당 데이터가 생성기로 만든 **가상 데이터**이며, 실험의 `input/B_docs/`가 **36개 파일·18개 형식**이라고 명시한다. 이 샘플은 고객 원천 분포가 아니다.
 - 같은 가상 데이터 안내서는 `.msg`를 샘플에 생성하지 못했다고 적는다. 따라서 샘플의 18개 형식을 사용자 발언의 19개로 대체하거나 `.msg`가 대상에 없다고 판단하면 안 된다.
 - 앱의 Mock 문서와 가상 파일 추가도 실제 원천 인벤토리가 아니다. 예시 코드에 등장하는 `hwp`, `hwpx`, `heic`, `tiff`, `md` 등을 사용자 제공 19개 목록의 일부로 표시하지 않는다. 다만 이후 실제로 발견되거나 사용자가 추가한 형식은 **새 발견/미확인 항목**으로 기록하고 처리 경로를 열어 둔다.
-- 사용자 제공 범위는 현재 파서 지원 목록이 아니다. 2026-11-12 코드 `backend/app/adapters/registry.py` 기준으로 실제 로컬 파서 후보는 텍스트 `txt`, `csv`, `md`, `log`와 선택적 Docling `pdf`, `docx`, `pptx`, `xlsx`다. `md`는 실제 어댑터에 있지만 사용자 제공 19개에는 없다. 나머지 형식은 현재 실제 처리 요청 시 `unsupported`로 표시된다. 이 정보는 코드 변경 시 재확인한다.
-- Docling 경로에 들어간다는 사실만으로 파싱 품질을 보증하지 않는다. 합성 DOCX와 텍스트 PDF는 시험했으며 PPTX·XLSX의 실제 품질은 미검증이다. OCR은 꺼져 있고 모든 PDF 결과의 경고는 스캔 페이지를 실제로 감지했다는 뜻이 아니다.
+- 실제 로컬 파서는 텍스트·CSV, Docling PDF·Office, SVG와 래스터 OCR 경로를 제공한다. 각 확장자의 현재 처리는 `backend/app/adapters/registry.py`에서 확인할 수 있다.
+- PDF·Office 파싱 품질은 문서 구성에 따라 달라진다. 로컬 EasyOCR 한국어·영어 모델이 준비되면 PDF의 이미지 영역, Office에서 참조한 그림, PNG·JPEG·BMP·TIFF·GIF·WebP 및 SVG 내부 그림을 읽습니다. 최신 지원 범위와 처리 한도는 API·데이터 계약 7절을 참고한다.
 
 ## 4. 향후 화면·계약 변경 시 확인할 것
 

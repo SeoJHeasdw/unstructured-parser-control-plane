@@ -1,3 +1,4 @@
 -r requirements.txt
 # Optional: place already downloaded model artifacts on disk before running PDF conversion.
 docling>=2.150.0,<3
+easyocr==1.7.2

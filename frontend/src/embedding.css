@@ -230,3 +230,10 @@
 .ee-connection-guide > div { display: grid; gap: 4px; padding: 8px 10px; border: 1px solid var(--rule); border-radius: 7px; background: var(--surface-2); }
 .ee-connection-guide dt { color: var(--ink-1); font-size: 12px; font-weight: 650; }
 .ee-connection-guide dd { margin: 0; color: var(--ink-3); font-size: 13px; line-height: 1.5; }
+
+.ee-pin { display: inline-flex; align-items: center; gap: 6px; align-self: flex-start; text-align: left; min-height: 32px; border: 0; padding: 0 4px; background: transparent; color: var(--ink-1); }
+.ee-pin svg { flex: none; color: var(--ink-3); }
+.ee-pin[aria-pressed="true"] { color: var(--comparison-ink); background: var(--comparison-surface); border-radius: 4px; }
+.ee-pin[aria-pressed="true"] svg { color: inherit; }
+@media (hover:hover) { .ee-pin:hover b { text-decoration: underline; } }
+@media (pointer:coarse) { .ee-pin { min-height: 44px; } }

@@ -12,7 +12,7 @@ export type Pin = { type: 'entry' | 'instance' | 'family'; id: string } | { type
 
 type Props = {
   data: LineageData; family: LnFamily; entryId: string; onEntry: (id: string) => void; view: 'tree' | 'graph'; onView: (view: 'tree' | 'graph') => void;
-  refTab: 'out' | 'in'; onRefTab: (tab: 'out' | 'in') => void; pin: Pin | null; onPin: (pin: Pin) => void; onFamily: (id: string) => void; onOpenLive?: () => void;
+  refTab: 'out' | 'in'; onRefTab: (tab: 'out' | 'in') => void; pin: Pin | null; onPin: (pin: Pin) => void; onFamily: (id: string) => void; onOpenLive?: (doc?: string) => void;
 };
 
 export const entryTone = (family: LnFamily, entry: LnEntry) => entry.candidate && family.latest.status === 'hold' ? 'warn' : entry.is_latest || entry.co_latest ? 'ok' : 'muted';
@@ -138,7 +138,7 @@ export function EntryTip({ data, family, entry }: { data: LineageData; family: L
   </>;
 }
 
-function TreeOrState({ data, root, hl, pinnedId, onPin, onHover, onOpenLive }: { data: LineageData; root: LnInstance; hl: ReturnType<typeof computeHighlight>; pinnedId?: string; onPin: (pin: Pin) => void; onHover: (hover: Hover) => void; onOpenLive?: () => void }) {
+function TreeOrState({ data, root, hl, pinnedId, onPin, onHover, onOpenLive }: { data: LineageData; root: LnInstance; hl: ReturnType<typeof computeHighlight>; pinnedId?: string; onPin: (pin: Pin) => void; onHover: (hover: Hover) => void; onOpenLive?: (doc?: string) => void }) {
   const [open, setOpen] = useState<Set<string>>(() => new Set([root.id]));
   useEffect(() => { setOpen(new Set([root.id])); }, [root.id]);
   if (!root.analysed) {
@@ -146,7 +146,7 @@ function TreeOrState({ data, root, hl, pinnedId, onPin, onHover, onOpenLive }: {
     return <div className="ln-state-box">
       <strong>{sourceRoot?.structure_state === 'error' ? '저장된 구조 분석 결과를 읽을 수 없습니다' : '구조 분석 전'}</strong>
       <p>{data.source === 'example' ? '예시에서 구조 분석을 하지 않은 파일로 둔 문서입니다. 이름으로만 판을 묶었습니다.' : '이름으로 판을 묶었습니다. 포함 파일과 참조를 보려면 실제 파일 처리에서 이 파일의 구조 분석을 실행하세요.'}</p>
-      {data.source === 'live' && onOpenLive && <button type="button" className="button-secondary" onClick={onOpenLive}>실제 파일 처리 열기 <ArrowRight size={15} aria-hidden="true" /></button>}
+      {data.source === 'live' && onOpenLive && <button type="button" className="button-secondary" onClick={() => onOpenLive(root.doc_id)}>문서 구조 열기 <ArrowRight size={15} aria-hidden="true" /></button>}
     </div>;
   }
   const toggle = (id: string) => setOpen(prev => { const next = new Set(prev); if (next.has(id)) next.delete(id); else next.add(id); return next; });

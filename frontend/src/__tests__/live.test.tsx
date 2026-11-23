@@ -1,4 +1,3 @@
-import React from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -22,7 +21,7 @@ function jsonResponse(body:unknown,status=200):Response {
 }
 
 afterEach(()=>{cleanup();vi.unstubAllGlobals();vi.restoreAllMocks()});
-beforeEach(()=>{vi.stubGlobal('fetch',vi.fn(async()=>{throw new Error('예상하지 못한 네트워크 호출')}))});
+beforeEach(()=>{history.replaceState(null, '', '/');vi.stubGlobal('fetch',vi.fn(async()=>{throw new Error('예상하지 못한 네트워크 호출')}))});
 
 describe('실제 문서 로컬 작업 공간',()=>{
   it('앞서 시작한 목록 조회가 늦게 끝나도 방금 저장한 파일을 유지한다', async () => {
@@ -39,10 +38,11 @@ describe('실제 문서 로컬 작업 공간',()=>{
     await user.upload(screen.getByLabelText('로컬에 업로드할 파일 선택'), new File(['테스트'], uploaded.name));
     await screen.findByText(/1개 파일을 이 컴퓨터의 로컬 저장소에 저장했습니다/);
     await act(async () => { resolveList(jsonResponse({ documents: [] })); });
+    await user.click(screen.getByRole('button', { name: '문서함으로' }));
     expect(within(document.querySelector('.live-list') as HTMLElement).getByText(uploaded.name)).toBeTruthy();
   });
 
-  it('여러 파일을 저장할 때 탭을 왕복해도 저장이 이어지고 진행 중에는 탭 닫기가 비활성화된다', async () => {
+  it('여러 파일을 저장할 때 메뉴를 왕복해도 각 파일을 한 번씩 끝까지 저장한다', async () => {
     let resolveUpload!: (response: Response) => void;
     const firstUpload = new Promise<Response>(resolve => { resolveUpload = resolve; });
     const second = { ...uploaded, id: 'test-002', name: '다른 문서.txt' };
@@ -56,16 +56,15 @@ describe('실제 문서 로컬 작업 공간',()=>{
     }));
     const user = userEvent.setup();
     render(<App />);
-    await user.click(screen.getByRole('button', { name: '파일 처리 시작' }));
     await screen.findByText('업로드된 문서가 없습니다');
     await user.upload(screen.getByLabelText('로컬에 업로드할 파일 선택'), [new File(['첫 파일'], uploaded.name), new File(['둘째 파일'], second.name)]);
     const nav = within(screen.getByRole('navigation'));
-    await user.click(nav.getByRole('button', { name: '운영 대시보드' }));
-    expect(screen.getByRole('button', { name: '실제 파일 처리 탭 닫기' })).toHaveProperty('disabled', true);
+    await user.click(nav.getByRole('link', { name: '분석 도구' }));
+    expect(screen.getByRole('link', { name: '파일 저장 중' })).toBeTruthy();
     await act(async () => { resolveUpload(jsonResponse(uploaded, 201)); });
-    await user.click(nav.getByRole('button', { name: '실제 파일 처리' }));
+    await user.click(nav.getByRole('link', { name: '문서함' }));
     expect(await screen.findByText(/2개 파일을 이 컴퓨터의 로컬 저장소에 저장했습니다/)).toBeTruthy();
-    expect(screen.getByRole('button', { name: '실제 파일 처리 탭 닫기' })).toHaveProperty('disabled', false);
+    expect(uploadCount).toBe(2);
   });
 
   it('목록을 조회하고 선택한 문서의 상세를 불러오며 자동으로 업로드하거나 파싱하지 않는다',async()=>{
@@ -80,12 +79,90 @@ describe('실제 문서 로컬 작업 공간',()=>{
     expect(await within(list).findByText(uploaded.name)).toBeTruthy();
     expect(fetchMock).toHaveBeenCalledWith(url);
     expect(fetchMock.mock.calls.some(([,init])=>init?.method==='POST')).toBe(false);
-    await user.click(within(list).getByRole('button',{name:/예시\.txt/}));
+    await user.click(within(list).getByRole('link',{name:/예시\.txt/}));
     await waitFor(()=>expect(fetchMock.mock.calls.some(([path,init])=>String(path)===detailUrl&&(!init?.method||init.method==='GET'))).toBe(true));
     expect(screen.getByText('test-001')).toBeTruthy();
     expect(screen.getByRole('button',{name:'파싱 실행'})).toBeTruthy();
     expect(fetchMock.mock.calls.some(([,init])=>init?.method==='POST')).toBe(false);
   });
+  it('검색과 상태 필터를 유지하고, 이력 탭을 열 때 조회한 뒤 키보드로 원래 행에 돌아온다', async () => {
+    const waiting = { ...uploaded, id: 'pending', name: '다른예시.txt' };
+    const historyUrl = detailUrl + '/history';
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      switch (String(input)) {
+        case url: return jsonResponse({ documents: [waiting, completed] });
+        case detailUrl: return jsonResponse(completed);
+        case detailUrl + '/result': return jsonResponse({ id: completed.id, markdown: resultText, parser: 'text', parser_version: '1', warnings: [], is_stale: false });
+        case historyUrl: return jsonResponse({ history: [{ created_at: completed.updated_at, status: 'completed', message: '텍스트 추출 완료' }] });
+        default: throw new Error('예상하지 못한 조회');
+      }
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const user = userEvent.setup();
+    render(<LiveWorkspace />);
+    await screen.findByText(waiting.name);
+    await user.type(screen.getByRole('textbox', { name: '실제 문서 검색' }), '예시');
+    await user.selectOptions(screen.getByRole('combobox', { name: '처리 상태 필터' }), 'completed');
+    expect(screen.queryByText(waiting.name)).toBeNull();
+    const row = screen.getByRole('link', { name: /예시\.txt/ });
+    row.focus();
+    await user.keyboard('{Enter}');
+    expect(screen.getByRole('heading', { name: completed.name })).toBe(document.activeElement);
+    expect(fetchMock.mock.calls.some(([path]) => path === historyUrl)).toBe(false);
+    await user.click(screen.getByRole('tab', { name: '추출 결과' }));
+    await user.keyboard('{ArrowRight}');
+    expect(await screen.findByText('텍스트 추출 완료')).toBeTruthy();
+    await user.click(screen.getByRole('button', { name: '문서함으로' }));
+    expect(screen.getByRole('link', { name: /예시\.txt/ })).toBe(document.activeElement);
+    expect(screen.getByRole('textbox', { name: '실제 문서 검색' })).toHaveProperty('value', '예시');
+    expect(screen.getByRole('combobox', { name: '처리 상태 필터' })).toHaveProperty('value', 'completed');
+  });
+  it('여러 파일 중 실패한 파일만 원래 이름으로 다시 저장한다', async () => {
+    const names: string[] = [];
+    vi.stubGlobal('fetch', vi.fn(async (path:string, init?:RequestInit) => {
+      if (path === url && init?.method === 'POST') {
+        const file = (init.body as FormData).get('file') as File;
+        names.push(file.name);
+        if (file.name === '재시도.txt' && names.length === 2) return jsonResponse({detail:'일시 오류'}, 503);
+        return jsonResponse({...uploaded, id:file.name, name:file.name}, 201);
+      }
+      if (path === url) return jsonResponse({documents:[]});
+      return jsonResponse({...uploaded,id:'재시도.txt',name:'재시도.txt'});
+    }));
+    const user = userEvent.setup(); render(<App/>);
+    await screen.findByText('업로드된 문서가 없습니다');
+    await user.upload(screen.getByLabelText('로컬에 업로드할 파일 선택'), ['완료.txt','재시도.txt'].map(name => new File([name], name)));
+    expect((await screen.findByRole('alert')).textContent).toContain('재시도.txt');
+    expect(screen.getByRole('heading', {level:1}).textContent).toBe('문서함');
+    await user.click(screen.getByRole('button', {name:'실패한 파일만 다시 저장'}));
+    await waitFor(() => expect(screen.queryByText('1개 파일 저장 실패')).toBeNull());
+    expect(names).toEqual(['완료.txt','재시도.txt','재시도.txt']);
+  });
+
+  it('브라우저 뒤로가면 검색어·상태·선택한 행의 초점을 복원한다', async () => {
+    vi.stubGlobal('fetch', vi.fn(async (path:string) => jsonResponse(path === url ? {documents:[uploaded]} : uploaded)));
+    const user = userEvent.setup(); render(<App/>);
+    await screen.findByRole('link', {name:/예시\.txt/});
+    await user.type(screen.getByRole('textbox',{name:'실제 문서 검색'}), '예시');
+    await user.selectOptions(screen.getByRole('combobox',{name:'처리 상태 필터'}),'uploaded');
+    await user.click(screen.getByRole('link', {name:/예시\.txt/}));
+    expect(location.search).toContain('doc=test-001');
+    history.back();
+    const row = await screen.findByRole('link', {name:/예시\.txt/});
+    expect(screen.getByRole('textbox',{name:'실제 문서 검색'})).toHaveProperty('value','예시');
+    expect(screen.getByRole('combobox',{name:'처리 상태 필터'})).toHaveProperty('value','uploaded');
+    expect(document.activeElement).toBe(row);
+  });
+
+  it('잘못된 문서 주소에는 찾을 수 없음과 문서함 복귀를 제공한다', async () => {
+    history.replaceState(null, '', '?view=live&doc=missing&tab=history');
+    vi.stubGlobal('fetch', vi.fn(async (path:string) => path === url ? jsonResponse({documents:[]}) : jsonResponse({detail:'문서 없음'},404)));
+    const user = userEvent.setup(); render(<App/>);
+    expect(await screen.findByRole('heading',{name:'문서를 찾을 수 없습니다'})).toBeTruthy();
+    await user.click(screen.getByRole('button', {name:'문서함으로'}));
+    expect(screen.getByRole('heading',{name:'문서함'})).toBeTruthy();
+  });
+
   it('사용자가 고른 파일을 multipart POST로 저장하고, 업로드만으로 파싱을 실행하지 않는다',async()=>{
     const fetchMock=vi.fn(async(input:RequestInfo|URL,init?:RequestInit)=>{
       const path=String(input);const method=init?.method||'GET';
@@ -120,7 +197,7 @@ describe('실제 문서 로컬 작업 공간',()=>{
     vi.stubGlobal('fetch',fetchMock);const user=userEvent.setup();render(<LiveWorkspace/>);
     const list=document.querySelector('.live-list') as HTMLElement;
     await within(list).findByText(uploaded.name);
-    await user.click(within(list).getByRole('button',{name:/예시\.txt/}));
+    await user.click(within(list).getByRole('link',{name:/예시\.txt/}));
     expect(fetchMock.mock.calls.some(([path])=>String(path).endsWith('/process'))).toBe(false);
     await user.click(screen.getByRole('button',{name:'파싱 실행'}));
     await waitFor(()=>expect(fetchMock.mock.calls.some(([path,init])=>String(path)===`${detailUrl}/process`&&init?.method==='POST')).toBe(true));
@@ -141,7 +218,7 @@ describe('실제 문서 로컬 작업 공간',()=>{
     vi.stubGlobal('fetch',fetchMock);const user=userEvent.setup();render(<LiveWorkspace/>);
     const list=document.querySelector('.live-list') as HTMLElement;
     await within(list).findByText(uploaded.name);
-    await user.click(within(list).getByRole('button',{name:/예시\.txt/}));
+    await user.click(within(list).getByRole('link',{name:/예시\.txt/}));
     await user.click(screen.getByRole('button',{name:'파싱 실행'}));
     expect(await screen.findByRole('alert')).toHaveProperty('textContent','파서 모델을 찾을 수 없습니다.×');
     expect(fetchMock.mock.calls.some(([path])=>String(path)===`${detailUrl}/result`)).toBe(false);
@@ -172,22 +249,17 @@ describe('Mock 데이터와 실제 파일 작업의 독립성',()=>{
       throw new Error(`예상하지 못한 호출 ${method} ${path}`);
     });
     vi.stubGlobal('fetch',fetchMock);const user=userEvent.setup();render(<App/>);
-    expect(await screen.findByRole('alert')).toHaveProperty('textContent',expect.stringContaining('예시 데이터를 불러오지 못했어요'));
-    expect(document.querySelector('.dash-kpis')).toBeNull();
-    const nav=screen.getByRole('navigation');
-    await user.click(within(nav).getByRole('button',{name:'실제 파일 처리'}));
-    expect(screen.getByRole('heading',{name:'실제 파일 처리'})).toBeTruthy();
-    const list=document.querySelector('.live-list') as HTMLElement;
-    expect(await within(list).findByText(uploaded.name)).toBeTruthy();
-    expect(fetchMock.mock.calls.some(([path])=>String(path)===url)).toBe(true);
-    expect(fetchMock.mock.calls.some(([,init])=>init?.method==='POST')).toBe(false);
-    await user.click(within(nav).getByRole('button',{name:'운영 대시보드'}));
-    expect(screen.getByRole('alert').textContent).toContain('실제 파일 처리 화면은 별도로 이용할 수 있습니다');
-    await user.click(screen.getByRole('button',{name:'다시 시도'}));
-    await waitFor(()=>expect(document.querySelector('.dash-kpis')).not.toBeNull());
+    await screen.findByText(uploaded.name);
+    expect(mockAttempts).toBe(0);
+    const nav = within(screen.getByRole('navigation', {name:'업무 메뉴'}));
+    await user.click(nav.getByRole('link', {name:'예시 둘러보기'}));
+    expect(await screen.findByRole('alert')).toHaveProperty('textContent', expect.stringContaining('예시 데이터를 불러오지 못했습니다'));
+    await user.click(screen.getByRole('button', {name:'다시 시도'}));
+    await screen.findByRole('heading', {name:'확인이 필요한 문서'});
+    await user.click(nav.getByRole('link', {name:'문서함'}));
+    expect(screen.getByText(uploaded.name)).toBeTruthy();
     expect(mockAttempts).toBe(2);
-    expect(screen.getByRole('button',{name:'실제 파일 처리 탭 닫기'})).toBeTruthy();
-    expect(screen.getByRole('heading',{name:'운영 대시보드'})).toBeTruthy();
+    expect(fetchMock.mock.calls.some(([,init])=>init?.method==='POST')).toBe(false);
   });
   it('Mock 응답을 기다리는 동안에도 실제 파일 처리 화면을 사용할 수 있다',async()=>{
     const neverResolved=new Promise<Response>(()=>{});
@@ -197,9 +269,10 @@ describe('Mock 데이터와 실제 파일 작업의 독립성',()=>{
       return Promise.reject(new Error('예상하지 못한 호출'));
     });
     vi.stubGlobal('fetch',fetchMock);const user=userEvent.setup();render(<App/>);
-    expect(screen.getByRole('status').textContent).toContain('예시 데이터를 불러오는 중입니다');
-    expect(document.querySelector('.dash-kpis')).toBeNull();
-    await user.click(within(screen.getByRole('navigation')).getByRole('button',{name:'실제 파일 처리'}));
+    const nav = within(screen.getByRole('navigation', {name:'업무 메뉴'}));
+    await user.click(nav.getByRole('link',{name:'예시 둘러보기'}));
+    await screen.findByText('예시 데이터를 불러오는 중입니다.');
+    await user.click(nav.getByRole('link',{name:'문서함'}));
     expect(await within(document.querySelector('.live-list') as HTMLElement).findByText(uploaded.name)).toBeTruthy();
     expect(fetchMock.mock.calls.some(([path])=>String(path)===url)).toBe(true);
   });
@@ -225,7 +298,7 @@ describe('비동기 처리 알림',()=>{
     vi.stubGlobal('fetch',fetchMock);const user=userEvent.setup();render(<LiveWorkspace/>);
     const list=document.querySelector('.live-list') as HTMLElement;
     await within(list).findByText(uploaded.name);
-    await user.click(within(list).getByRole('button',{name:/예시\.txt/}));
+    await user.click(within(list).getByRole('link',{name:/예시\.txt/}));
     await user.click(screen.getByRole('button',{name:'파싱 실행'}));
     expect(await screen.findByText('파싱 작업이 접수되었습니다. 대기 또는 처리 상태를 자동으로 확인합니다.')).toBeTruthy();
     expect(await screen.findByText(new RegExp(expected.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')),{}, {timeout:4000})).toBeTruthy();
@@ -246,7 +319,7 @@ describe('마지막 성공 결과 및 파싱 경고',()=>{
     vi.stubGlobal('fetch',fetchMock);const user=userEvent.setup();render(<LiveWorkspace/>);
     const list=document.querySelector('.live-list') as HTMLElement;
     await within(list).findByText(uploaded.name);
-    await user.click(within(list).getByRole('button',{name:/예시\.txt/}));
+    await user.click(within(list).getByRole('link',{name:/예시\.txt/}));
     expect(await screen.findByText('이전 성공 결과 · 현재 작업 결과 아님')).toBeTruthy();
     expect(screen.getByText('이전 파싱 본문')).toBeTruthy();
     expect(screen.getByText('이전 결과의 경고')).toBeTruthy();
@@ -263,7 +336,7 @@ describe('마지막 성공 결과 및 파싱 경고',()=>{
     vi.stubGlobal('fetch',fetchMock);const user=userEvent.setup();render(<LiveWorkspace/>);
     const list=document.querySelector('.live-list') as HTMLElement;
     await within(list).findByText(pdf.name);
-    await user.click(within(list).getByRole('button',{name:/스캔\.pdf/}));
+    await user.click(within(list).getByRole('link',{name:/스캔\.pdf/}));
     expect(await screen.findByText('스캔 페이지가 OCR 없이 누락되었을 수 있습니다.')).toBeTruthy();
     expect(screen.getByText('파싱 경고').closest('[role="alert"]')).toBeTruthy();
     expect(screen.queryByText('이전 성공 결과 · 현재 작업 결과 아님')).toBeNull();
@@ -281,7 +354,7 @@ describe('마지막 성공 결과 및 파싱 경고',()=>{
     vi.stubGlobal('fetch',fetchMock);const user=userEvent.setup();render(<LiveWorkspace/>);
     const list=document.querySelector('.live-list') as HTMLElement;
     await within(list).findByText(uploaded.name);
-    await user.click(within(list).getByRole('button',{name:/예시\.txt/}));
+    await user.click(within(list).getByRole('link',{name:/예시\.txt/}));
     expect(await screen.findByText('이전에 성공한 파싱 결과가 없습니다.')).toBeTruthy();
     expect(document.querySelector('.live-result-error')).toBeNull();
     unavailable=true;
@@ -289,7 +362,7 @@ describe('마지막 성공 결과 및 파싱 경고',()=>{
     cleanup();render(<LiveWorkspace/>);
     const refreshedList=document.querySelector('.live-list') as HTMLElement;
     await within(refreshedList).findByText(uploaded.name);
-    await user.click(within(refreshedList).getByRole('button',{name:/예시\.txt/}));
+    await user.click(within(refreshedList).getByRole('link',{name:/예시\.txt/}));
     expect(await screen.findByText(/결과 저장소가 응답하지 않습니다/)).toBeTruthy();
     expect(document.querySelector('.live-result-error')).toBeTruthy();
   });
@@ -304,7 +377,7 @@ describe('마지막 성공 결과 및 파싱 경고',()=>{
     vi.stubGlobal('fetch',fetchMock);const user=userEvent.setup();render(<LiveWorkspace/>);
     const list=document.querySelector('.live-list') as HTMLElement;
     await within(list).findByText(completed.name);
-    await user.click(within(list).getByRole('button',{name:/예시\.txt/}));
+    await user.click(within(list).getByRole('link',{name:/예시\.txt/}));
     expect(await screen.findByText('저장된 결과 파일을 찾을 수 없습니다.')).toBeTruthy();
     expect(document.querySelector('.live-result-error')).toBeTruthy();
     expect(screen.queryByText('이전에 성공한 파싱 결과가 없습니다.')).toBeNull();
@@ -325,9 +398,11 @@ describe('마지막 성공 결과 및 파싱 경고',()=>{
     vi.stubGlobal('fetch',fetchMock);const user=userEvent.setup();render(<LiveWorkspace/>);
     const list=document.querySelector('.live-list') as HTMLElement;
     await within(list).findByText(completed.name);
-    await user.click(within(list).getByRole('button',{name:/예시\.txt/}));
+    await user.click(within(list).getByRole('link',{name:/예시\.txt/}));
     await waitFor(()=>expect(fetchMock.mock.calls.some(([path])=>String(path)===`${detailUrl}/result`)).toBe(true));
-    await user.click(within(list).getByRole('button',{name:/다른 문서\.txt/}));
+    await user.click(screen.getByRole('button',{name:'문서함으로'}));
+    expect(document.activeElement?.textContent).toContain(uploaded.name);
+    await user.click(screen.getByRole('link',{name:/다른 문서\.txt/}));
     expect(await screen.findByText('다른 문서의 현재 결과')).toBeTruthy();
     resolveOld(jsonResponse({id:completed.id,markdown:'늦게 도착한 이전 문서 결과',parser:'text',parser_version:'1',is_stale:false,warnings:[]}));
     await new Promise(resolve=>setTimeout(resolve,0));

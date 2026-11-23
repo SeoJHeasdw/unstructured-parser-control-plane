@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
-import { ArrowRight, ArrowRightLeft, FileSearch, RefreshCw, TriangleAlert } from 'lucide-react';
+import { ArrowRightLeft, FileSearch, TriangleAlert } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
-import { getParseRun, getSourcePreview, listLiveDocuments, listParseRuns, liveSourceUrl } from '../api/live';
+import { getParseRun, getSourcePreview, listParseRuns, liveSourceUrl } from '../api/live';
 import type { LiveDoc, ParseRun, StoredParseRun } from '../api/live';
-import { ResultReview } from './ResultReview';
+import { ReviewDesk } from './ReviewDesk';
+import type { ReviewMode } from '../navigation';
 import { RunSummary } from './RunSummary';
 import { OriginalPane, PdfSource, TextSource, WorksheetSource } from './SourceViewer';
 import type { RunSide } from './RunSummary';
@@ -32,12 +33,6 @@ function runLabel(run: ParseRun) {
   return `${date && Number.isFinite(+date) ? dateFormat.format(date) : '시간 미기록'} · ${run.run_id.slice(0, 6)}`;
 }
 
-type CompareOptions = { showOriginal: boolean; showAlternative: boolean; highlight: boolean };
-type Props = {
-  active: boolean; selectedId: string; onChange: (id: string) => void; sourceTabs: ReactNode; switches: ReactNode;
-  options: CompareOptions; onShowOriginal: () => void; onOpenLive?: () => void; onOpenExample?: () => void;
-};
-
 export function CompareState({ icon: Icon = FileSearch, title, message, actions, tone = 'neutral' }: {
   icon?: LucideIcon; title: string; message?: string; actions?: ReactNode; tone?: 'neutral' | 'error' | 'loading';
 }) {
@@ -48,59 +43,30 @@ export function CompareState({ icon: Icon = FileSearch, title, message, actions,
   </section>;
 }
 
-export function LiveCompare({ active, selectedId, onChange, sourceTabs, switches, options, onShowOriginal, onOpenLive, onOpenExample }: Props) {
-  const [refresh, setRefresh] = useState(0);
-  const reload = () => setRefresh(value => value + 1);
-  const docs = useLoad(listLiveDocuments, active, refresh);
-  const doc = docs?.data?.find(item => item.id === selectedId) ?? docs?.data?.[0];
-  const loading = !docs || docs.pending;
-
-  return <>
-    <section className="panel compare-controls" aria-label="비교 설정">
-      <div className="compare-controls-start">{sourceTabs}
-        <div className="compare-document">
-          <label className="compare-control-label" htmlFor="compare-live-document">비교 문서</label>
-          <select id="compare-live-document" value={doc?.id ?? ''} title={doc?.name} disabled={!doc} onChange={event => onChange(event.target.value)}>
-            {!doc && <option value="">{loading ? '불러오는 중…' : '문서 없음'}</option>}
-            {docs?.data?.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}
-          </select>
-        </div>
-      </div>
-      <div className="compare-controls-end">
-        <button type="button" className="button-secondary compare-refresh" disabled={loading} onClick={reload}><RefreshCw size={16} aria-hidden="true" />실행 목록 새로고침</button>
-      </div>
-    </section>
-    {!loading && docs?.error && <CompareState icon={TriangleAlert} tone="error" title="실제 문서 목록을 불러오지 못했어요" message={docs.error}
-      actions={<button type="button" className="button-secondary" onClick={reload}>다시 시도</button>} />}
-    {doc ? <DocumentRuns key={doc.id} doc={doc} active={active} refresh={refresh} options={options} switches={switches}
-      onShowOriginal={onShowOriginal} onOpenLive={onOpenLive} onOpenExample={onOpenExample} />
-      : loading ? <CompareState title="실제 문서를 불러오는 중" tone="loading" />
-      : !docs.error && <CompareState title="비교할 실제 문서가 없습니다" message="실제 파일을 올리고 같은 문서의 파싱 실행을 두 번 완료하면 결과를 비교할 수 있어요."
-        actions={<>
-          {onOpenLive && <button type="button" className="button-primary" onClick={onOpenLive}>실제 파일 처리 열기 <ArrowRight size={15} aria-hidden="true" /></button>}
-          {onOpenExample && <button type="button" className="button-secondary" onClick={onOpenExample}>예시로 비교해 보기</button>}
-        </>} />}
-  </>;
-}
-
-function DocumentRuns({ doc, active, refresh, options, switches, onShowOriginal, onOpenLive, onOpenExample }: {
-  doc: LiveDoc; active: boolean; refresh: number; options: CompareOptions; switches: ReactNode;
-  onShowOriginal: () => void; onOpenLive?: () => void; onOpenExample?: () => void;
+export function DocumentRuns({ doc, active, mode, onMode }: {
+  doc: LiveDoc; active: boolean; mode: ReviewMode; onMode: (mode: ReviewMode) => void;
 }) {
+  const [sourceRun, setSourceRun] = useState('');
   const [selection, setSelection] = useState<{ left: string; right: string }>();
   const [location, setLocation] = useState<ReviewLocation>();
   const [retry, setRetry] = useState(0);
   const { id } = doc;
-  const revision = refresh + retry;
+  const revision = retry;
   const loadRuns = useCallback((signal: AbortSignal) => listParseRuns(id, signal), [id]);
   const available = useLoad(loadRuns, active, revision);
   const runs = available?.data ?? [];
   const left = selection?.left ?? runs[runs.length > 1 ? 1 : 0]?.run_id ?? '';
-  const right = selection?.right ?? (runs.length > 1 ? runs[0].run_id : '');
+  const right = selection?.right ?? runs[0]?.run_id ?? '';
+  const sourceId = sourceRun || right;
+  const needsPair = active && mode === 'runs' && runs.length > 1;
   const loadLeft = useCallback((signal: AbortSignal) => getParseRun(id, left, signal), [id, left]);
   const loadRight = useCallback((signal: AbortSignal) => getParseRun(id, right, signal), [id, right]);
-  const baseline = useLoad(loadLeft, active && !!left, retry);
-  const candidate = useLoad(loadRight, active && !!right, retry);
+  const baseline = useLoad(loadLeft, active && !!left && left !== right && (needsPair || sourceId === left), retry);
+  const candidate = useLoad(loadRight, active && !!right && (needsPair || sourceId === right), retry);
+
+  const loadOther = useCallback((signal: AbortSignal) => getParseRun(id, sourceId, signal), [id, sourceId]);
+  const other = useLoad(loadOther, active && !!sourceId && sourceId !== left && sourceId !== right, retry);
+  const sourceResult = sourceId === right ? candidate : sourceId === left ? baseline : other;
 
   function change(next: { left: string; right: string }) {
     setSelection(next);
@@ -115,7 +81,7 @@ function DocumentRuns({ doc, active, refresh, options, switches, onShowOriginal,
       <label className="compare-sr" htmlFor={`compare-run-${side}`}>{name}</label>
       <select id={`compare-run-${side}`} value={value} disabled={!runs.length}
         onChange={event => change({ left, right, [side]: event.target.value })}>
-        <option value="">{runs.length ? '실행 선택' : '성공한 실행 없음'}</option>
+
         {runs.map(run => <option key={run.run_id} value={run.run_id} disabled={run.run_id === other}>{runLabel(run)}</option>)}
       </select>
       {side === 'right' && left && right && <button className="button-quiet" title="이전과 현재 바꾸기" aria-label="이전과 현재 바꾸기"
@@ -123,27 +89,24 @@ function DocumentRuns({ doc, active, refresh, options, switches, onShowOriginal,
     </div>;
   }
 
-  const loading = !available || available.pending || (!!left && (!baseline || baseline.pending)) || (!!right && (!candidate || candidate.pending));
-  const error = !loading && (available?.error ?? baseline?.error ?? candidate?.error);
-  if (error) return <CompareState icon={TriangleAlert} tone="error" title="파싱 실행 결과를 불러오지 못했어요"
-    message={error === 'Not Found' ? '로컬 백엔드의 실행 이력 주소를 찾지 못했어요.' : error}
-    actions={<button type="button" className="button-secondary" onClick={() => setRetry(value => value + 1)}>다시 시도</button>} />;
-  return <>
-    {loading && !baseline?.data ? <CompareState title="실행 결과를 불러오는 중" tone="loading" /> :
-    !loading && runs.length < 2 && <CompareState title={runs.length ? '파싱 실행이 한 번 더 필요합니다' : '성공한 파싱 실행이 없습니다'}
-      message={runs.length ? '같은 문서를 다시 파싱하면 이전 결과와 나란히 비교할 수 있어요.' : doc.error || '실제 파일 처리에서 이 문서의 파싱을 완료해 주세요.'}
-      actions={<>
-        {onOpenLive && <button type="button" className="button-secondary" onClick={onOpenLive}>실제 파일 처리 열기 <ArrowRight size={15} aria-hidden="true" /></button>}
-        {onOpenExample && <button type="button" className="button-secondary" onClick={onOpenExample}>예시로 비교해 보기</button>}
-      </>} />}
-    <RunSummary before={runSide(baseline?.data)} after={runSide(candidate?.data)} />
-    {runs.length > 0 && <ResultReview key={`${left}/${right}`} {...options} controls={switches}
-      baseline={runPane(baseline?.data, doc)} candidate={runPane(candidate?.data, doc)}
-      baselineControl={picker('left')} candidateControl={picker('right')}
-      onLocation={(value, reveal) => { if (value) setLocation(value); if (reveal) onShowOriginal(); }}
-      original={<SourceOriginal doc={doc} active={active && options.showOriginal} location={location} onLocation={setLocation} />} />}
-    {!loading && !runs.length && <SourceOriginal doc={doc} active={active} location={location} onLocation={setLocation} />}
-  </>;
+  const errorPanel = (message: string) => <CompareState icon={TriangleAlert} tone="error" title="실행 결과를 읽을 수 없습니다" message={message}
+    actions={<button className="button-secondary" onClick={() => setRetry(n => n + 1)}>다시 시도</button>}/>;
+  const pending = <CompareState title="실행 결과를 불러오는 중" tone="loading"/>;
+  if (available?.error) return errorPanel(available.error);
+  if (!available) return pending;
+  const pairError = baseline?.error || candidate?.error;
+  if (!runs.length) return <CompareState title="성공한 파싱 실행이 없습니다" message="문서 상세에서 처리 상태와 이력을 확인하세요."/>;
+  return <ReviewDesk key={left + '/' + right} mode={mode} onMode={onMode} canCompare={runs.length > 1}
+    baseline={runPane(baseline?.data, doc)} candidate={runPane(candidate?.data, doc)}
+    pairStatus={pairError ? errorPanel(pairError) : !baseline?.data || !candidate?.data ? pending : undefined}
+    sourceStatus={sourceResult?.error ? errorPanel(sourceResult.error) : !sourceResult?.data ? pending : undefined}
+    sourceKey={sourceId} onEvidenceSide={side => setSourceRun(side === 'left' ? left : right)}
+    sourcePane={runPane(sourceResult?.data, doc)} onLocation={setLocation}
+    original={<SourceOriginal doc={doc} active={active && (mode === 'source' || runs.length < 2)} location={location} onLocation={setLocation}/>}
+    sourceControl={<label className="reader-select">성공 실행<select value={sourceId} onChange={e => { setSourceRun(e.target.value); setLocation(undefined); }}>
+      {runs.map(r => <option key={r.run_id} value={r.run_id}>{runLabel(r)}</option>)}</select></label>}
+    pairControls={<div className="pair-pickers"><div>이전 실행{picker('left')}</div><div>현재 실행{picker('right')}</div></div>}
+    summary={<RunSummary before={runSide(baseline?.data)} after={runSide(candidate?.data)}/>}/>;
 }
 
 function runSide(run: StoredParseRun | undefined): RunSide | undefined {

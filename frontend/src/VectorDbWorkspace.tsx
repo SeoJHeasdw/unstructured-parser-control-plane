@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { ArrowRight, BookOpenText, Database, Layers, LayoutGrid, LoaderCircle, LockKeyhole, PlugZap, RefreshCw, TriangleAlert } from 'lucide-react';
 import { checkMilvus, getCollection, getSources, getTree, type CheckResult, type CollectionDetail, type SourceKey, type SourcesInfo, type Tree } from './api/vectordb';
 import { Tabs, type TabItem } from './ui';
@@ -46,7 +46,7 @@ function VectorDbScreen({ active }: { active: boolean }) {
   const [infoTry, setInfoTry] = useState(0);
   const [source, setSource] = useState<SourceKey | null>(null);
   const [fallback, setFallback] = useState('');
-  const autoPicked = useRef(false);
+  const [paused, setPaused] = useState(false);
   const [tree, setTree] = useState<Tree | null>(null);
   const [treeError, setTreeError] = useState('');
   const [treeBusy, setTreeBusy] = useState(false);
@@ -69,21 +69,20 @@ function VectorDbScreen({ active }: { active: boolean }) {
       if (!alive) return;
       setInfo(result);
       const pick: SourceKey = result.sources.some(s => s.key === result.default && s.available) ? result.default : 'example';
-      autoPicked.current = pick === 'milvus';
+      setPaused(!!result.milvus.unreachable);
       setFallback(result.milvus.unreachable ? result.milvus.unreachable.error : '');
-      setSource(pick);
+      setSource(result.milvus.unreachable ? 'milvus' : pick);
     }).catch((err: Error) => { if (alive) setInfoError(err.message); });
     return () => { alive = false; };
   }, [infoTry]);
 
   useEffect(() => {
-    if (!source) return;
+    if (!source || paused) return;
     let alive = true;
     setTreeError('');
     setTreeBusy(true);
     getTree(source).then(result => {
       if (!alive) return;
-      if (source === 'milvus') autoPicked.current = false;
       setTree(result);
       setSelection(current => {
         const keep = current && result.databases.some(db => db.name === current.db && db.collections.some(c => c.name === current.collection));
@@ -91,12 +90,10 @@ function VectorDbScreen({ active }: { active: boolean }) {
       });
     }).catch((err: Error) => {
       if (!alive) return;
-      // 사용자가 고르지 않고 자동으로 열린 Milvus가 연결되지 않으면 오류 화면에서 멈추지 않고 예시 데이터로 연다.
-      if (source === 'milvus' && autoPicked.current) { autoPicked.current = false; setFallback(err.message); setSource('example'); return; }
       setTreeError(err.message);
     }).finally(() => { if (alive) setTreeBusy(false); });
     return () => { alive = false; };
-  }, [source, reload]);
+  }, [source, reload, paused]);
 
   useEffect(() => {
     if (!source || !selection) return;
@@ -121,7 +118,7 @@ function VectorDbScreen({ active }: { active: boolean }) {
   };
   const switchSource = (next: SourceKey) => {
     if (next === source) return;
-    autoPicked.current = false; setFallback('');
+    setPaused(false); setTreeError(''); setFallback('');
     setSource(next); setTree(null); setSelection(null); setPartition(null); setDetail(null); setTextField(null); setHistory([]); setOpenPart(null);
   };
   const navigate = useCallback((next: PanelState) => setHistory(current => [...current, next]), []);
@@ -161,7 +158,8 @@ function VectorDbScreen({ active }: { active: boolean }) {
     <SourcePanel info={info} source={source} fallback={fallback} tree={tree} busy={treeBusy} stale={!!treeError} tip={tip} onSource={switchSource} onRefresh={retry} />
     <div className="vdb-shell">
       <Tabs<Page> items={PAGES} value={page} onChange={setPage} label="벡터 DB 보기" className="vdb-pages">
-        {current => treeError ? <Problem title="컬렉션 목록을 읽을 수 없습니다" message={treeError} onRetry={retry} />
+        {current => (treeError || paused) ? <div><Problem title="컬렉션 목록을 읽을 수 없습니다" message={treeError || fallback} onRetry={() => { setPaused(false); retry(); }} />
+          {source === 'milvus' && <button className="button-secondary" onClick={() => switchSource('example')}>예시 보기</button>}</div>
           : !tree ? <Loading label="컬렉션 목록을 불러오는 중" />
             : current === 'overview' ? <Overview tree={tree} onOpen={setOpenPart} onBrowse={() => setPage('collections')} /> : collections(tree)}
       </Tabs>
