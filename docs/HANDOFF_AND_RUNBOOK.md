@@ -12,9 +12,11 @@
 - **서버 변경:** 저장소 표식 헤더 `x-docops-runtime`을 실행기가 아니라 앱(`app/middleware.RuntimeHeader`)이 붙인다. `start.cmd`로 띄운 서버도 찾을 수 있다. `Settings.runtime_id` 추가.
 - **고객사 PC 실행기:** Git Bash에서 `run.sh`를 계속 써도 된다(이미 떠 있는 콘솔 감지·빈 포트 찾기가 `start.cmd`보다 낫다). `start.cmd`의 장점은 오프라인 설치뿐이다. 두 실행기 통합은 미루었다. WSL은 현재 보안 정책으로 막혀 있다(사용자 확인).
 - **OpenCode 확인 사항:** 1.18.31 스키마 기준 MCP 요청 시간 제한 기본값이 5초라 `init-workspace`가 `timeout: 120000`과 `DOCOPS_AGENT_WAIT_SECONDS=40`을 함께 넣는다. 설정 없이 띄우면 도구 대기는 4초다.
-- **검증:** 백엔드 테스트 182개 통과(새 `tests/test_agent_tools.py` 10개: 실제 HTTP 서버·합성 파일·MCP 프로토콜). 임시 저장소 서버와 `samples/generated/corpus`로 CLI 전 도구·스캔 PDF OCR·재파싱 비교를 돌렸고, OpenCode 1.18.31에서 `opencode mcp list`가 `docops connected`였다. **OpenCode + Ollama(qwen3:4b) 도구 호출 시나리오는 OpenCode `run`이 모델 요청 전에 멈춰 확인하지 못했다.** 고객사 Windows·게이트웨이 모델로는 아직 돌려보지 않았다.
-- **남은 것:** 약한 모델로 도구 호출 시나리오 평가(OpenCode 제공자 문제 해결 또는 Ollama 직접 호출 평가기), 2단계 청킹·임베딩 평가 도구, 3단계 Milvus 적재(계획→실행 분리, 실행만 승인), 4단계 검색(읽기 전용 묶음). 고객사에 Milvus가 아직 없고 OCR·임베딩 모델 제공도 고객과 논의가 필요하다(사용자 확인). 이 Mac에서 OCR 모델을 먼저 시험할 예정.
-- 이 Mac의 Ollama에 시험용 변형 모델 `docops-qwen3-4b-32k`(qwen3:4b, 컨텍스트 32K)를 만들었다. 필요 없으면 `ollama rm docops-qwen3-4b-32k`.
+- **검증:** 백엔드 테스트 182개 통과(새 `tests/test_agent_tools.py` 10개: 실제 HTTP 서버·합성 파일·MCP 프로토콜). 임시 저장소 서버와 `samples/generated/corpus`로 CLI 전 도구를 돌렸다. OpenCode 1.18.31 + Ollama `qwen3.6:35b-a3b`로 실제 문장 6개를 시켜 도구 호출 15회·잘못된 인자 0·반복 0을 확인했다([작업 에이전트 도구](AGENT_TOOLS.md) §7). 고객사 Windows·게이트웨이 모델로는 아직 돌려보지 않았다.
+- **시험 모델 하한(사용자 확인):** 35B-A3B. 고객사 메인은 몇백B급이고 4B 같은 소형은 쓰지 않는다.
+- **시험에서 드러난 파서 문제(미해결):** 스캔 PDF가 OCR 오인이 많은데도 경고 없이 `ok`(PDF OCR 경로에 신뢰도·OCR 적용 쪽 경고 없음), 글자 없는 사진이 `fail no-text`로 집계.
+- **남은 것:** 위 파서 문제 두 건, 2단계 청킹·임베딩 평가 도구, 3단계 Milvus 적재(계획→실행 분리, 실행만 승인), 4단계 검색(읽기 전용 묶음). 고객사에 Milvus가 아직 없고 OCR·임베딩 모델 제공도 고객과 논의가 필요하다(사용자 확인). 이 Mac에서 OCR 모델을 먼저 시험할 예정.
+- 이 Mac의 Ollama에 시험용 변형 모델 `docops-qwen36-35b-a3b-32k`(qwen3.6:35b-a3b, 컨텍스트 32K만 바꿈)를 만들었다. 필요 없으면 `ollama rm docops-qwen36-35b-a3b-32k`. OpenCode에서 쓸 때는 작업 폴더 `opencode.json`에 `provider.ollama`(`npm: @ai-sdk/openai-compatible`, `baseURL: http://127.0.0.1:11434/v1`, 모델은 `name`만)를 넣는다.
 
 ## 2026-11-23 파서 플로우와 청킹 탐색
 

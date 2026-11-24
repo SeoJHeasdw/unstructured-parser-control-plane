@@ -95,3 +95,45 @@ def verdict(status: str, warnings: list[tuple[str, str]] | None) -> str:
     if status == "completed":
         return "warn" if warnings else "ok"
     return {"failed": "fail", "unsupported": "unsup", "processing": "run", "uploaded": "new"}.get(status, status)
+
+
+# 모델이 짧은 코드를 추측해 잘못 풀지 않도록 도구 결과에 함께 넣는 한 줄 설명(사람용 코드표는 docs/AGENT_TOOLS.md).
+MEANINGS = {
+    # 실패
+    "drm": "DRM 보호 문서라 파싱하지 않음. 해제본이 필요함",
+    "drm-sus": "DRM으로 의심됨(내용이 암호문처럼 보임). 파싱하지 않음",
+    "crypt": "암호가 걸린 Office 문서. 암호를 푼 파일이 필요함",
+    "fmt-mis": "확장자와 실제 파일 형식이 다름",
+    "fmt-unk": "파일 형식을 알아볼 수 없음(손상 가능)",
+    "unsup": "처리 경로가 없는 형식",
+    "no-parser": "콘솔에 Docling 또는 PDF 모델이 없어 파싱할 수 없음(콘솔 설치 문제)",
+    "no-text": "추출된 글자가 없음",
+    "limit": "크기·행 수·압축 한도를 넘음",
+    "unsafe-zip": "압축 안에 위험한 경로가 있어 열지 않음",
+    "charset": "텍스트 인코딩을 판별하지 못함",
+    "parse-err": "파서 오류. doc 으로 원인 문장을 확인해야 함",
+    "stopped": "서버 종료·재시작으로 중단됨. 다시 파싱하면 됨",
+    "queue-full": "서버 대기열이 가득 차 거절됨. 다시 파싱하면 됨",
+    "internal": "예상하지 못한 서버 오류",
+    "unknown": "실패 코드가 없는 이전 기록. doc 으로 원인 확인",
+    # 경고
+    "ocr-off": "PDF에 OCR이 적용되지 않아 스캔·그림 쪽의 글자가 빠졌을 수 있음",
+    "empty-pg": "글자·표가 하나도 나오지 않은 PDF 쪽이 있음",
+    "ocr-fallback": "OCR을 포함한 변환이 실패해 PDF 텍스트 층만 읽음",
+    "ocr-empty": "그림에서 글자를 찾지 못한 프레임이 있음",
+    "ocr-low": "OCR 신뢰도가 낮은 영역이 있어 원본과 대조가 필요함",
+    "fid-skip": "원문 충실도 점검을 하지 못함(파싱 결과는 저장됨)",
+    "prep-fallback": "기호·첨자 보정 없이 원본으로 파싱함. 기호·첨자가 빠지거나 붙었을 수 있음",
+    "sym-lost": "특수기호 일부가 결과에서 빠짐",
+    "sym-font": "기호 글꼴 문자 일부가 결과에서 빠졌을 수 있음",
+    "sub-flat": "위·아래첨자가 일반 글자로 붙었을 수 있음(예: m² → m2)",
+    "sub-bad": "유니코드로 바꿀 수 없는 첨자가 앞 글자에 붙어 나옴",
+    "low-contrast": "흰색에 가까운 글자(숨은 메모·워터마크일 수 있음)가 본문에 들어감",
+    "hidden-in": "숨김 서식 글자가 본문에 들어감",
+    "merged": "병합 셀이 있어 결과 표에서 같은 값이 칸마다 반복될 수 있음",
+    "supplement": "파서가 놓친 글자(글상자 등)를 원문에서 찾아 문서 끝에 덧붙임(원래 위치가 아님)",
+    "img-ocr": "그림 OCR은 실행됐지만 글자 미검출·낮은 신뢰도 영역이 있어 원본 대조가 필요함(OCR은 켜져 있음)",
+    "img-skip": "OCR하지 않은 그림이 있어 그림 속 글자가 결과에 없음",
+    "svg": "SVG 처리 중 경고가 있음",
+    "other": "분류되지 않은 경고. doc 으로 원문 경고를 확인해야 함",
+}

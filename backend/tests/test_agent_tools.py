@@ -78,6 +78,9 @@ def test_code_tables_are_documented():
         assert f"`{short}`" in guide, short
     for short in [*codes.FIDELITY_CODES.values(), *(s for _, s in codes._WARNING_PREFIXES), *codes.SKIP_CODES]:
         assert f"`{short}`" in guide, short
+    # 모델이 코드를 추측해 풀지 않도록 모든 실패·경고 코드에 한 줄 설명이 있어야 한다
+    for short in [*codes.ERROR_CODES.values(), "unknown", *codes.FIDELITY_CODES.values(), *(s for _, s in codes._WARNING_PREFIXES), "svg", "other"]:
+        assert short in codes.MEANINGS, short
     # 사람이 옮겨 치는 코드: ASCII 소문자·숫자·하이픈만
     for short in [*codes.ERROR_CODES.values(), *codes.FIDELITY_CODES.values(), *codes.SKIP_CODES]:
         assert re.fullmatch(r"[a-z][a-z0-9-]*", short), short

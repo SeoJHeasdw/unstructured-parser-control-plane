@@ -762,7 +762,8 @@ class Ops:
         path.write_text("\n".join(block) + "\n", encoding="utf-8")
         head = [summary,
                 ("참고: 이미 끝난 묶음입니다. 같은 결과를 다시 보여 줍니다.\n" if again else "") +
-                "다음: 아래 '타이핑용' 블록을 고치지 말고 사용자에게 그대로 보여 주세요. 실패·경고 문서는 doc 으로 자세히 볼 수 있습니다.",
+                "다음: 응답에 아래 '타이핑용' 블록을 ```text 코드 블록으로 한 글자도 바꾸지 말고 복사하세요. "
+                "코드를 스스로 풀이하지 말고, 설명이 필요하면 위 '설명' 줄을 그대로 쓰세요. 도구 결과에 없는 조언은 하지 마세요.",
                 "----- 타이핑용 -----", *block, "-----", f"파일: {path}"]
         return "\n".join(head)
 
@@ -801,6 +802,7 @@ class Ops:
         for view in views:
             if view["verdict"] in ("fail", "unsup"):
                 fails.setdefault(codes.error_code(view["doc"].get("error_code")), []).append(view["doc"]["n"])
+        notes: list[str] = []
         if fails:
             block += self._code_lines("fail", fails)
         warns: dict[str, list[int]] = {}
@@ -809,6 +811,9 @@ class Ops:
                 warns.setdefault(code, []).append(view["doc"]["n"])
         if warns:
             block += self._code_lines("warn", warns)
+        for prefix, grouped in (("실패", fails), ("경고", warns)):
+            for code, numbers in sorted(grouped.items(), key=lambda pair: (-len(pair[1]), pair[0])):
+                notes.append(f"설명({prefix}): {code} {len(numbers)}건 {_refs(numbers)} — {codes.MEANINGS.get(code, '코드표 참고')}")
         if skips:
             block.append("skip " + " ".join(f"{code}{count}" for code, count in skips.most_common()))
         diff = self._diff_line(views)
@@ -829,7 +834,7 @@ class Ops:
             summary = f"결과: 경고 있음 — 전체 {len(views)}건 중 경고 {verdicts['warn']} (경고는 품질 확인이 필요하다는 뜻입니다)"
         else:
             summary = f"결과: 경고 없이 끝남 — {len(views)}건 (파싱 성공이 품질 보증은 아닙니다)"
-        return block, summary
+        return block, "\n".join([summary, *notes])
 
     @staticmethod
     def _code_lines(prefix: str, grouped: dict[str, list[int]]) -> list[str]:
@@ -893,10 +898,14 @@ class Ops:
             return f"결과: '{state}' 문서가 없습니다.\n다음: parse 로 파싱하거나 state=all 로 전체를 보세요."
         lines = [f"결과: 문서 {len(views)}건 표시 (최근 것부터" + (", 최대 40건)" if len(views) >= 40 else ")"),
                  "다음: 자세히 볼 문서는 doc 에 D번호를 넣으세요."]
+        seen: dict[str, None] = {}
         for view in views:
             doc = view["doc"]
-            code = codes.error_code(doc.get("error_code")) if view["verdict"] in ("fail", "unsup") else ",".join(dict.fromkeys(c for c, _ in view["warn"]))
+            found = [codes.error_code(doc.get("error_code"))] if view["verdict"] in ("fail", "unsup") else list(dict.fromkeys(c for c, _ in view["warn"]))
+            seen.update(dict.fromkeys(found))
+            code = ",".join(found)
             lines.append(f"D{doc['n']} {doc['format'].lower()} {view['verdict']}{(' ' + code) if code else ''}  {_size(doc['size_bytes'])}  {_clip(doc['name'], 40)}")
+        lines += [f"설명: {code} — {codes.MEANINGS.get(code, '코드표 참고')}" for code in seen]
         return "\n".join(lines)
 
     def doc(self, id: str) -> str:  # noqa: A002 — 도구 인자 이름
