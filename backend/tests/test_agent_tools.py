@@ -93,6 +93,9 @@ def test_runtime_marker_on_every_response(tmp_path):
         refused = client.get("/api/live/documents", headers={"Origin": "http://evil.example"})
         assert refused.status_code == 403
         assert refused.headers["x-docops-runtime"] == settings.runtime_id
+        # 작업 에이전트 기록도 로컬 화면에서만 읽는다
+        assert client.get("/api/agent/activity", headers={"Origin": "http://evil.example"}).status_code == 403
+        assert client.get("/api/agent/activity", headers={"Origin": "http://127.0.0.1:5173"}).status_code == 200
 
 
 def test_discovery_matches_runtime(live):

@@ -11,7 +11,8 @@ class LocalRequestGuard:
 
     async def __call__(self, scope, receive, send):
         # 실제 파일과 외부 모델 호출 경로는 로컬 화면에서 온 요청만 받는다.
-        if scope["type"] != "http" or not (scope["path"].startswith("/api/live/") or scope["path"].startswith("/api/models")):
+        # /api/agent: 작업 에이전트 기록(파일 경로·인자)이 들어 있어 같은 규칙을 적용한다.
+        if scope["type"] != "http" or not scope["path"].startswith(("/api/live/", "/api/models", "/api/agent")):
             return await self.app(scope, receive, send)
         headers = dict(scope.get("headers", []))
         origin = headers.get(b"origin", b"").decode("latin-1")
