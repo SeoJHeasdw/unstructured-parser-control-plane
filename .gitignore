@@ -13,3 +13,5 @@ runtime/
 frontend/*.tsbuildinfo
 offline/
 .pytest_cache/
+infra/milvus-dev/volumes/
+bench-data/
