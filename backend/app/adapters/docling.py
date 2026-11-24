@@ -17,6 +17,9 @@ logger = logging.getLogger(__name__)
 
 MAX_PDF_PAGES = 500
 RENDER_SCALE = 200 / 72  # 글자 층이 없는 쪽을 OCR 모델에 보낼 때의 렌더링 배율(200 dpi)
+PICTURE_SHARE = 0.10  # 디지털 쪽에서 이 비율 이상을 차지하는 그림만 OCR한다(로고·아이콘 제외)
+MAX_PICTURES = 40     # 문서 하나에서 OCR할 그림 수 상한(처리 시간)
+PICTURE_LABEL = "[그림 속 글자]"
 MAX_OFFICE_ENTRIES = 10_000
 
 
@@ -81,6 +84,20 @@ def _insert_pages(markdown: str, locations: list[ResultLocation], pages: dict[in
     while out and not out[-1].strip():
         out.pop()
     return "\n".join(out), sorted(added, key=lambda loc: (loc.start_line, loc.end_line))
+
+
+def _big_pictures(document, skip: set[int]) -> dict[int, list[tuple[float, float, float, float]]]:
+    """쪽 번호 → 큰 그림 상자(왼쪽 위 기준, PDF 포인트). 이미 쪽 전체를 OCR한 쪽은 뺀다."""
+    found: dict[int, list] = {}
+    for picture in getattr(document, "pictures", []):
+        for prov in picture.prov:
+            page = document.pages.get(prov.page_no)
+            if page is None or prov.page_no in skip:
+                continue
+            box = prov.bbox.to_top_left_origin(page.size.height)
+            if box.width * box.height >= PICTURE_SHARE * page.size.width * page.size.height:
+                found.setdefault(prov.page_no, []).append((box.l, box.t, box.r, box.b))
+    return found
 
 
 def _pages_with_content(document):
@@ -191,16 +208,43 @@ class DoclingAdapter:
                         if page_text.text.strip():
                             read[number] = page_text.text.strip()
                     empty = [number for number in empty if number not in read]
+                figures, skipped = {}, 0
+                if ocr.configured and markdown:
+                    pictures = _big_pictures(result.document, set(read) | set(empty))
+                    budget = MAX_PICTURES
+                    for number, image in _render(path, sorted(pictures)):
+                        texts = []
+                        for left, top, right, bottom in pictures[number]:
+                            if budget <= 0:
+                                skipped += 1
+                                continue
+                            budget -= 1
+                            crop = image.crop((int(left * RENDER_SCALE), int(top * RENDER_SCALE),
+                                               int(right * RENDER_SCALE), int(bottom * RENDER_SCALE)))
+                            picture_text = ocr.read(crop)
+                            if picture_text.repeated:
+                                repeated.append(number)
+                            if picture_text.text.strip():
+                                texts.append(f"{PICTURE_LABEL}\n{picture_text.text.strip()}")
+                        if texts:
+                            figures[number] = "\n\n".join(texts)
                 if not markdown and not read:
                     message = ("PDF에서 글자를 찾지 못했습니다(OCR 모델로도 읽지 못함)." if ocr.configured
                                else f"PDF 텍스트 층에서 글자를 찾지 못했습니다. {MODEL_HELP}")
                     raise ParserError(message, code="no_text")
+                if read or figures:
+                    markdown, locations = _insert_pages(markdown, locations, {**read, **figures})
                 if read:
-                    markdown, locations = _insert_pages(markdown, locations, read)
                     warnings.append("OCR 모델로 읽은 PDF 쪽: " + ", ".join(map(str, sorted(read))) + f" ({ocr.conn.model_id}). "
                                     + OCR_READ_WARNING.split(". ", 1)[1])
+                if figures:
+                    count = sum(text.count(PICTURE_LABEL) for text in figures.values())
+                    warnings.append("OCR 모델로 읽은 PDF 그림이 있는 쪽: " + ", ".join(map(str, sorted(figures)))
+                                    + f" (그림 {count}개, {ocr.conn.model_id}). 쪽 끝에 '{PICTURE_LABEL}'로 덧붙였고 원본과 대조가 필요합니다.")
+                if skipped:
+                    warnings.append(f"큰 그림 {skipped}개는 OCR 한도({MAX_PICTURES}개)를 넘어 읽지 않았습니다.")
                 if repeated:
-                    warnings.append(REPEAT_WARNING)
+                    warnings.append(REPEAT_WARNING)  # 같은 쪽이 여러 번 들어가도 경고는 한 번
                 if empty:
                     warnings.append("본문 글자나 표가 추출되지 않은 PDF 페이지: " + ", ".join(map(str, empty)))
             return ParsedDocument(markdown=markdown, parser="docling", parser_version=version,

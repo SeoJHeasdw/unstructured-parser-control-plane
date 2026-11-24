@@ -44,6 +44,7 @@ FIDELITY_CODES = {
 _WARNING_PREFIXES = (
     ("OCR 모델로 읽은", "ocr-read"),
     ("OCR 결과에서 같은 구절이", "ocr-repeat"),
+    ("큰 그림", "ocr-limit"),
     ("OCR 미적용", "ocr-off"),
     ("본문 글자나 표가 추출되지 않은 PDF 페이지", "empty-pg"),
     ("OCR을 포함한 변환이 실패", "ocr-fallback"),
@@ -128,6 +129,7 @@ MEANINGS = {
     # 경고
     "ocr-read": "OCR 모델로 읽은 쪽·그림이 있음. 모델이 읽은 글자라 원본 대조가 필요함(품질 보증 아님)",
     "ocr-repeat": "OCR 모델이 같은 구절을 되풀이해 잘라냄. 그 부분은 원본 대조가 필요함",
+    "ocr-limit": "PDF의 큰 그림이 많아 일부는 OCR 한도(문서당 40개)로 읽지 않음",
     "ocr-off": "OCR 모델이 연결되지 않아 스캔·그림 쪽의 글자를 읽지 않음(빠졌을 수 있음)",
     "empty-pg": "글자·표가 하나도 나오지 않은 PDF 쪽이 있음",
     "ocr-fallback": "OCR을 포함한 변환이 실패해 PDF 텍스트 층만 읽음",

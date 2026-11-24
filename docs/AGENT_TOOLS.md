@@ -144,6 +144,7 @@ agent call16 err4 not-found2 outside1 bad-arg1
 |---|---|---|
 | `ocr-read` | OCR 모델로 읽은 쪽·그림이 있음(PDF는 `doc`에서 쪽 번호). 모델이 읽은 글자라 원본 대조 필요 | `adapters/ocr.OCR_READ_WARNING`, PDF 어댑터 |
 | `ocr-repeat` | OCR 모델의 반복 폭주를 잘라냄 | `adapters/ocr.REPEAT_WARNING` |
+| `ocr-limit` | PDF 큰 그림이 OCR 한도(문서당 40개)를 넘어 일부는 읽지 않음 | PDF 어댑터 |
 | `ocr-off` | OCR 모델이 연결되지 않아 스캔·그림 쪽 글자를 읽지 않음 | `service.PDF_OCR_WARNING` |
 | `empty-pg` | 글자·표가 없는 PDF 쪽(`doc`에서 쪽 번호) | Docling 어댑터 |
 | `ocr-fallback` | (이전 기록) OCR 포함 변환 실패 → 텍스트 층으로 재처리 | 2026-11-24 이전 Docling 어댑터 |

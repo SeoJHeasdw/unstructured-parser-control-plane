@@ -283,3 +283,57 @@ def test_uncached_excel_formula_is_preserved_at_its_source_cell(tmp_path):
         assert "=SUM(10,32)" in result["markdown"]
         loc = next(loc for loc in result["locations"] if loc["column"] == 2)
         assert loc["row"] == 1 and "=SUM(10,32)" in result["markdown"].splitlines()[loc["start_line"] - 1]
+
+
+def _pdf_text_and_picture(jpeg: bytes) -> bytes:
+    """글자 층 한 줄과 쪽의 약 25%를 차지하는 그림이 있는 디지털 PDF(xref 포함)."""
+    content = (b"BT /F1 14 Tf 72 230 Td (BODY TEXT LINE about the cooling unit inspection results.) Tj "
+               b"0 -20 Td (The chart above shows vibration trends for the third quarter.) Tj ET\n"
+               b"q 400 0 0 300 100 300 cm /Im1 Do Q\n")  # 쪽 맨 위 글은 머리말로 빠지므로 본문 자리에 둔다
+    objects = [
+        b"<< /Type /Catalog /Pages 2 0 R >>",
+        b"<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+        b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R "
+        b"/Resources << /Font << /F1 5 0 R >> /XObject << /Im1 6 0 R >> >> >>",
+        b"<< /Length " + str(len(content)).encode() + b" >>\nstream\n" + content + b"endstream",
+        b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
+        b"<< /Type /XObject /Subtype /Image /Width 400 /Height 300 /ColorSpace /DeviceRGB /BitsPerComponent 8 "
+        b"/Filter /DCTDecode /Length " + str(len(jpeg)).encode() + b" >>\nstream\n" + jpeg + b"\nendstream",
+    ]
+    out, offsets = b"%PDF-1.7\n", []
+    for index, body in enumerate(objects, start=1):
+        offsets.append(len(out))
+        out += f"{index} 0 obj\n".encode() + body + b"\nendobj\n"
+    xref = len(out)
+    out += f"xref\n0 {len(objects) + 1}\n0000000000 65535 f \n".encode()
+    out += b"".join(f"{offset:010d} 00000 n \n".encode() for offset in offsets)
+    return out + f"trailer\n<< /Size {len(objects) + 1} /Root 1 0 R >>\nstartxref\n{xref}\n%%EOF\n".encode()
+
+
+def test_large_pictures_on_digital_pdf_pages_are_read_by_ocr_model(tmp_path, monkeypatch):
+    """디지털 쪽의 큰 그림(차트·스캔 삽입)은 잘라서 OCR 모델로 읽고 그 쪽 끝에 '[그림 속 글자]'로 붙인다."""
+    pil = pytest.importorskip("PIL.Image")
+    pytest.importorskip("pypdfium2")
+    pytest.importorskip("docling.document_converter")
+    from PIL import ImageDraw
+    settings = Settings(tmp_path, docling_artifacts=Settings.from_env().docling_artifacts)
+    if not settings.docling_artifacts:
+        pytest.skip("local Docling PDF layout models required")
+    chart = pil.new("RGB", (400, 300), "white")
+    draw = ImageDraw.Draw(chart)
+    draw.rectangle((40, 60, 120, 260), fill="black")
+    draw.rectangle((180, 120, 260, 260), fill="black")
+    draw.line((20, 270, 380, 270), fill="black", width=4)
+    jpeg = io.BytesIO()
+    chart.save(jpeg, "JPEG", quality=90)
+    fake = FakeOcr(lambda prompt, png: "CHART 77" if _ink(png) else "")
+    fake.env(monkeypatch, mode="page")
+    try:
+        with TestClient(create_app(settings)) as client:
+            result = process(client, "chart.pdf", _pdf_text_and_picture(jpeg.getvalue()), timeout=90)
+        assert "BODY TEXT LINE" in result["markdown"]
+        assert result["markdown"].index("BODY TEXT LINE") < result["markdown"].index("[그림 속 글자]\nCHART 77")
+        assert any(w.startswith("OCR 모델로 읽은 PDF 그림이 있는 쪽: 1 (그림 1개, fake-ocr)") for w in result["warnings"])
+        assert all(loc["page"] == 1 for loc in result["locations"])
+    finally:
+        fake.close()
