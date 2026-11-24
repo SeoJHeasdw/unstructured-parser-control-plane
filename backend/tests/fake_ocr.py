@@ -17,6 +17,18 @@ class FakeOcr:
             def log_message(self, *args):
                 pass
 
+            def do_GET(self):
+                if not self.path.rstrip("/").endswith("/models"):
+                    self.send_error(404)
+                    return
+                fake.requests.append({"model": None, "prompt": "GET /models", "auth": self.headers.get("Authorization")})
+                payload = json.dumps({"data": [{"id": "fake-ocr"}, {"id": "PaddleOCR-VL-1.6"}]}).encode()
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(payload)))
+                self.end_headers()
+                self.wfile.write(payload)
+
             def do_POST(self):
                 body = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
                 content = body["messages"][0]["content"]

@@ -174,7 +174,7 @@ describe('OCR 모델 연결', () => {
     const { user, card } = await openOcrTab();
     await user.click(within(card).getByRole('button', { name: '설정 편집' }));
     const dialog = screen.getByRole('dialog', { name: 'OCR 모델 연결 설정' });
-    expect(within(dialog).queryByRole('button', { name: /게이트웨이 모델 목록/ })).toBeNull();
+    expect(within(dialog).getByRole('button', { name: '게이트웨이 모델 목록 불러오기' })).toBeTruthy();  // OCR 모델 ID도 목록에서 고를 수 있다
     expect(within(dialog).getByRole('radio', { name: /영역 방식/ })).toHaveProperty('checked', true);
     expect(within(dialog).getByRole('textbox', { name: '글자 지시문' }).getAttribute('placeholder')).toBe('OCR:');
     await user.click(within(dialog).getByRole('radio', { name: /쪽 방식\(쪽 전체를 한 번 호출 · Schift·Unlimited-OCR 등\)/ }));
@@ -226,6 +226,18 @@ describe('OCR 모델 연결', () => {
     const reverted = screen.getByRole('region', { name: 'OCR 모델' });
     expect(within(reverted).getByText('http://env-host/v1')).toBeTruthy();
     expect(within(reverted).getByText('.env')).toBeTruthy();
+  });
+
+  it('OCR 연결 창에서 게이트웨이 모델 목록을 불러와 모델 ID를 고른다', async () => {
+    const calls = serveOcr(call => call.url === '/api/models/draft/models'
+      ? json({ ok: true, status: 200, latency_ms: 40, models: ['PaddleOCR-VL-1.6', 'schift-ocr-1-beta'] }) : undefined);
+    const { user, card } = await openOcrTab();
+    await user.click(within(card).getByRole('button', { name: '설정 편집' }));
+    const dialog = screen.getByRole('dialog', { name: 'OCR 모델 연결 설정' });
+    await user.click(within(dialog).getByRole('button', { name: '게이트웨이 모델 목록 불러오기' }));
+    expect(calls.find(call => call.url === '/api/models/draft/models')!.body).toMatchObject({ kind: 'ocr', base_url: ocr.base_url });
+    await user.click(await within(dialog).findByRole('button', { name: 'schift-ocr-1-beta' }));
+    expect((within(dialog).getByRole('textbox', { name: '모델 ID' }) as HTMLInputElement).value).toBe('schift-ocr-1-beta');
   });
 
   it('예전 서버처럼 OCR 정보가 없으면 탭에서 그 사실만 알린다', async () => {

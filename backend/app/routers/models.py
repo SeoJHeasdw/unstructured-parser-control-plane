@@ -112,6 +112,21 @@ def draft_test(request: Request, body: dict = Body(...)):
 
 @router.post("/draft/models")
 def draft_models(request: Request, body: dict = Body(...)):
+    if isinstance(body, dict) and body.get("kind") == "ocr":
+        # OCR 모델 ID를 고르기 위한 목록: 모델 ID는 아직 비어 있어도 된다.
+        try:
+            url = clean_url(body.get("base_url"))
+        except StoreError as exc:
+            raise HTTPException(400, str(exc)) from None
+        if not url:
+            raise HTTPException(400, "Base URL을 입력하세요.")
+        if body.get("clear_api_key") is True:
+            key = ""
+        elif isinstance(body.get("api_key"), str) and body["api_key"].strip():
+            key = body["api_key"].strip()
+        else:
+            key = load_ocr(_store(request).environ()).api_key
+        return list_models(ModelConnection("ocr", "확인", url, key, ""))
     return list_models(_draft(request, body)[1])
 
 

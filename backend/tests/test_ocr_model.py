@@ -91,6 +91,10 @@ def test_connection_check_and_settings_api(tmp_path, monkeypatch):
             assert good.requests[-1]["auth"] == "Bearer secret" and good.requests[-1]["prompt"] == "document parsing."
             draft = client.post("/api/models/draft/test", json={"kind": "ocr", "base_url": wrong.url, "model_id": "x", "mode": "region"}).json()
             assert draft["ok"] is False
+            # 모델 ID를 고르기 전에도 게이트웨이 모델 목록을 불러온다(저장된 키 사용)
+            listed = client.post("/api/models/draft/models", json={"kind": "ocr", "base_url": good.url, "model_id": ""}).json()
+            assert listed["ok"] and listed["models"] == ["PaddleOCR-VL-1.6", "fake-ocr"]
+            assert good.requests[-1]["prompt"] == "GET /models" and good.requests[-1]["auth"] == "Bearer secret"
             assert client.put("/api/models/ocr", json={"base_url": good.url, "model_id": "m", "mode": "both"}).status_code == 400
             catalog = client.get("/api/live/parsers").json()
             assert catalog["ocr_models_found"] is True and catalog["ocr_model"]["model_id"] == "paddle"

@@ -392,14 +392,14 @@ function ConnectionEditor({ value, onClose, onSaved }: { value: Editing; onClose
           <input value={draft[key] ?? ''} spellCheck={false} maxLength={500} placeholder={ocr.defaults[key]} onChange={event => set({ [key]: event.target.value } as Partial<Draft>)} /></label>)}
         <small>{mode === 'region' ? '영역 방식은 글자 영역과 표 영역에 다른 지시문을 씁니다.' : '쪽 방식은 쪽 전체에 지시문 하나를 씁니다.'} 모델 설명서의 지시문을 그대로 넣으세요.</small>
       </details>}
-      {!ocr && <div className="mw-pick">
+      <div className="mw-pick">
         <button type="button" className="button-quiet" disabled={!draft.base_url.trim() || !!busy} onClick={() => void list()}>
           {busy === 'list' ? <LoaderCircle size={15} className="mw-spin" aria-hidden="true" /> : <ListTree size={15} aria-hidden="true" />}게이트웨이 모델 목록 불러오기</button>
         {listed && (listed.ok ? (listed.models?.length ? <ul className="mw-pick-list" aria-label="불러온 모델">
           {listed.models.map(id => { const on = embed ? draft.models.includes(id) : draft.model_id === id; return <li key={id}>
             <button type="button" aria-pressed={on} onClick={() => toggleModel(id)}>{on ? <CheckIcon size={14} aria-hidden="true" /> : <Plus size={14} aria-hidden="true" />}<code>{id}</code></button></li>; })}
         </ul> : <p className="mw-list-empty">게이트웨이가 모델 ID를 반환하지 않았습니다. 직접 입력하세요.</p>) : <RequestError result={listed} kind="list" />)}
-      </div>}
+      </div>
       <label><span>API 키</span><input type="password" autoComplete="new-password" value={draft.api_key} disabled={draft.clear_api_key} spellCheck={false}
         placeholder={value.api_key_set ? '저장된 키 유지 · 바꿀 때만 입력' : '필요한 게이트웨이만 입력'} onChange={event => set({ api_key: event.target.value })} /></label>
       {value.api_key_set && <label className="mw-check"><input type="checkbox" checked={draft.clear_api_key} onChange={event => set({ clear_api_key: event.target.checked, api_key: '' })} />저장된 키 지우기</label>}
