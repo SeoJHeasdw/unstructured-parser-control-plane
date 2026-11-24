@@ -1,5 +1,6 @@
 """Configuration for the local-only processing service."""
 from dataclasses import dataclass
+import hashlib
 import os
 from pathlib import Path
 
@@ -64,6 +65,11 @@ class Settings:
                    drm_signatures=parse_signatures(os.environ.get("DOCOPS_DRM_SIGNATURES")), ooxml_prepare=prepare)
 
     @property
+    def runtime_id(self) -> str:
+        """같은 저장소를 쓰는 서버인지 알아보는 표식. 실행기와 작업 도구(MCP)가 포트를 찾을 때 비교한다."""
+        return runtime_id(self.runtime_dir)
+
+    @property
     def uploads(self) -> Path:
         return self.runtime_dir / "uploads"
 
@@ -83,3 +89,7 @@ class Settings:
     @property
     def database(self) -> Path:
         return self.runtime_dir / "documents.sqlite3"
+
+
+def runtime_id(runtime_dir: Path) -> str:
+    return hashlib.sha256(os.fsencode(os.path.normcase(runtime_dir))).hexdigest()

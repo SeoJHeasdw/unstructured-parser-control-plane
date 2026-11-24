@@ -42,3 +42,25 @@ class LocalRequestGuard:
                 return message
             return await self.app(scope, limited_receive, send)
         return await self.app(scope, receive, send)
+
+
+RUNTIME_HEADER = b"x-docops-runtime"
+
+
+class RuntimeHeader:
+    """모든 응답에 저장소 표식을 붙인다. run.sh·start.cmd 어느 쪽으로 띄워도 실행기와 작업 도구(MCP)가 같은 서버를 찾는다."""
+
+    def __init__(self, app, runtime_id: str):
+        self.app = app
+        self.header = (RUNTIME_HEADER, runtime_id.encode("ascii"))
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] != "http":
+            return await self.app(scope, receive, send)
+
+        async def send_with_header(message):
+            if message["type"] == "http.response.start":
+                message = {**message, "headers": [*message.get("headers", []), self.header]}
+            await send(message)
+
+        return await self.app(scope, receive, send_with_header)

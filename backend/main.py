@@ -10,7 +10,7 @@ from fastapi.staticfiles import StaticFiles
 from app.config import Settings
 from app import connection_store
 from app.connection_store import ConnectionStore
-from app.middleware import LocalRequestGuard
+from app.middleware import LocalRequestGuard, RuntimeHeader
 from app.routers.live import router as live_router, summary_router as live_summary_router
 from app.routers.models import router as models_router
 from app.routers.lineage import router as lineage_router
@@ -43,6 +43,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.settings = settings
     app.state.connection_store = store
     app.add_middleware(LocalRequestGuard, max_upload_bytes=settings.max_upload_bytes)
+    # 마지막에 더한 미들웨어가 가장 바깥이다. 403·413 응답에도 표식이 붙는다.
+    app.add_middleware(RuntimeHeader, runtime_id=settings.runtime_id)
     app.include_router(live_summary_router)
     app.include_router(live_router)
     app.include_router(models_router)

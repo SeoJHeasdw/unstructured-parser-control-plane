@@ -2,6 +2,20 @@
 
 > **기준 시점: 2026-11-12.** 이 문서는 인수인계 시점의 스냅샷이다. 코드·실행 상태·의존성·데이터는 바뀔 수 있으므로 새 세션에서는 아래 확인 순서부터 진행한다. 이 문서는 요구사항이나 고객 환경이 확정되었다는 뜻이 아니다.
 
+## 2026-11-24 작업 에이전트 도구 (MCP·CLI) 1단계
+
+구축팀(사용자와 비정형 파트 부장님)이 고객사 PC의 OpenCode Desktop + 사내 중형 모델에게 "이 폴더 파싱하고 보고서 보여줘"처럼 실험을 시키기 위한 도구를 추가했다. 설계·설치·보고서 형식은 [작업 에이전트 도구](AGENT_TOOLS.md)에 있다.
+
+- **역할 경계(사용자 확인):** 에이전트는 실험과 보고만 하고 코드를 고치지 않는다. 고객사 PC의 파일은 밖으로 가져갈 수 없어 사람이 `타이핑용` 블록을 손으로 옮겨 적어 전달한다. 그래서 보고서는 ASCII 짧은 코드와 검산 가능한 합계로 만든다. 문구 수정도 현장에서 하지 않는다.
+- **모델 전제(사용자 확인):** 고객사에서 쓸 수 있는 것은 사내 게이트웨이의 중형 오픈웨이트 모델뿐이다. 도구 호출이 불안정하다고 가정해 도구 9개·평평한 인자·짧은 평문 응답·관대한 인자 해석·반복 호출 감지로 만들었다.
+- **코드:** `backend/app/agent/`(`client.py` HTTP·서버 찾기, `ops.py` 도구·묶음 진행·요약, `codes.py` 짧은 코드, `mcp.py` stdio MCP), 진입점 `backend/docops.py`(`mcp`, `init-workspace`, CLI), 작업 폴더 안내 `opencode-workspace/AGENTS.md`. 표준 라이브러리만 써서 잠금 파일은 바뀌지 않았다.
+- **서버 변경:** 저장소 표식 헤더 `x-docops-runtime`을 실행기가 아니라 앱(`app/middleware.RuntimeHeader`)이 붙인다. `start.cmd`로 띄운 서버도 찾을 수 있다. `Settings.runtime_id` 추가.
+- **고객사 PC 실행기:** Git Bash에서 `run.sh`를 계속 써도 된다(이미 떠 있는 콘솔 감지·빈 포트 찾기가 `start.cmd`보다 낫다). `start.cmd`의 장점은 오프라인 설치뿐이다. 두 실행기 통합은 미루었다. WSL은 현재 보안 정책으로 막혀 있다(사용자 확인).
+- **OpenCode 확인 사항:** 1.18.31 스키마 기준 MCP 요청 시간 제한 기본값이 5초라 `init-workspace`가 `timeout: 120000`과 `DOCOPS_AGENT_WAIT_SECONDS=40`을 함께 넣는다. 설정 없이 띄우면 도구 대기는 4초다.
+- **검증:** 백엔드 테스트 182개 통과(새 `tests/test_agent_tools.py` 10개: 실제 HTTP 서버·합성 파일·MCP 프로토콜). 임시 저장소 서버와 `samples/generated/corpus`로 CLI 전 도구·스캔 PDF OCR·재파싱 비교를 돌렸고, OpenCode 1.18.31에서 `opencode mcp list`가 `docops connected`였다. **OpenCode + Ollama(qwen3:4b) 도구 호출 시나리오는 OpenCode `run`이 모델 요청 전에 멈춰 확인하지 못했다.** 고객사 Windows·게이트웨이 모델로는 아직 돌려보지 않았다.
+- **남은 것:** 약한 모델로 도구 호출 시나리오 평가(OpenCode 제공자 문제 해결 또는 Ollama 직접 호출 평가기), 2단계 청킹·임베딩 평가 도구, 3단계 Milvus 적재(계획→실행 분리, 실행만 승인), 4단계 검색(읽기 전용 묶음). 고객사에 Milvus가 아직 없고 OCR·임베딩 모델 제공도 고객과 논의가 필요하다(사용자 확인). 이 Mac에서 OCR 모델을 먼저 시험할 예정.
+- 이 Mac의 Ollama에 시험용 변형 모델 `docops-qwen3-4b-32k`(qwen3:4b, 컨텍스트 32K)를 만들었다. 필요 없으면 `ollama rm docops-qwen3-4b-32k`.
+
 ## 2026-11-23 파서 플로우와 청킹 탐색
 
 문서함과 주 메뉴에서 파서 플로우·청킹 비교를 바로 연다. 형식별 실제 파서 조회에는 `GET /api/live/parsers`가 필요하므로 서버와 프론트 빌드를 함께 갱신한다. 모의 설계와 실제 문서별 청킹 주소는 [프론트 화면 계약](FRONTEND_AND_INTERACTION_CONTRACT.md)에 있다.

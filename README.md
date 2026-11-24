@@ -121,6 +121,17 @@ npm run dev
 - 형식 선택은 현재 확장자 기반이며, ZIP/메일 첨부 분해·XLSX 외부 참조 추출·검색 인덱싱은 아직 구현하지 않았습니다. 모델은 연결 확인과 목록 조회만 하며 문서 처리 단계에서는 호출하지 않습니다.
 - `runtime/`은 Git에서 제외합니다. 실제 파일, 추출 결과, API 키를 저장소에 올리지 마세요. 현재는 **로컬 단일 사용자용 프로토타입**이며 인증·문서별 권한·파일 삭제 화면을 제공하지 않습니다.
 
+## 작업 에이전트 도구 (OpenCode MCP · CLI)
+
+콘솔을 띄운 뒤 OpenCode 같은 에이전트가 문서를 등록·파싱하고 짧은 보고서를 만들 수 있습니다. 표준 라이브러리만 쓰므로 추가 설치는 없습니다.
+
+```bash
+py -3.12 backend/docops.py init-workspace "C:/work/docops-agent" --roots "C:/work/samples"   # OpenCode 작업 폴더 만들기
+python backend/docops.py status                                                                # CLI로 직접 쓰기
+```
+
+도구 목록, 설정 이유, 보고서 코드표는 [작업 에이전트 도구](docs/AGENT_TOOLS.md)를 보세요.
+
 ## 구조와 확인
 
 다른 세션에서 이어갈 때는 [인수인계와 실행 안내](docs/HANDOFF_AND_RUNBOOK.md)부터 읽으세요. 화면·API 계약과 설계 문서는 [문서 안내](docs/README.md)에 모았습니다. [아키텍처 문서](docs/ARCHITECTURE.md)에는 전체 구조와 현재/향후 범위가 있습니다.

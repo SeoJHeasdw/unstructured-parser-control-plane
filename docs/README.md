@@ -9,6 +9,7 @@
 | [API·데이터 계약](API_AND_DATA_CONTRACT.md) | 실제 엔드포인트, 상태 전이, 결과·오류와 저장 경계를 변경하거나 연동할 때 |
 | [프론트·화면 계약](FRONTEND_AND_INTERACTION_CONTRACT.md) | 탭, 드래그·접기, 화면 상태, Mock과 실제 파일 조작을 변경할 때 |
 | [파이프라인·검색 설계](PIPELINE_AND_SEARCH_DESIGN.md) | 새 형식, 파서·OCR, XLSX 참조, 품질 검증과 검색 경계를 설계할 때 |
+| [작업 에이전트 도구](AGENT_TOOLS.md) (2026-11-24) | OpenCode용 MCP·CLI 설치, 도구 목록, 중형 모델용 설계, 사람이 옮겨 적는 보고서 코드표를 볼 때 |
 | [결정과 미결 사항](DECISIONS.md) | 사용자 의도, 현재 구현 선택과 아직 정해지지 않은 결정을 구분할 때 |
 | [watsonx.data 최소 연계안](reports/watsonx-minimal-plan/watsonx-minimal-plan.html) (2026-11-19, 제안) | 제품 연계 범위, 평가 중심 진행 방식, SI 단계별 평가 회차·산출물, 차원·메모리, A/B 분기와 3월 31일 오픈까지의 판단 시점을 볼 때. 브라우저로 연다 |
 | [프로젝트 README](../README.md) / [백엔드 README](../backend/README.md) | 빠른 실행법과 설치·제한을 확인할 때 |

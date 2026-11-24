@@ -1,9 +1,7 @@
 """Start the local console for run.sh, or open its existing instance."""
 
 import errno
-import hashlib
 from http.client import HTTPConnection, HTTPException
-import os
 import socket
 import subprocess
 import sys
@@ -92,8 +90,8 @@ def open_when_ready(server, url):
 
 
 def launch(requested_port, browser):
-    runtime_dir = Settings.from_env().runtime_dir
-    runtime_id = hashlib.sha256(os.fsencode(os.path.normcase(runtime_dir))).hexdigest()
+    settings = Settings.from_env()
+    runtime_dir, runtime_id = settings.runtime_dir, settings.runtime_id
     ports = range(requested_port, min(requested_port + PORT_COUNT, 65536))
     port = running_port(runtime_dir, ports, runtime_id)
     if port is not None:
@@ -109,9 +107,8 @@ def launch(requested_port, browser):
         if port != requested_port:
             print(f"[setup] {requested_port}번 포트가 사용 중이어서 {port}번 포트로 실행합니다.")
         print(f"\nUnstructured Data Console - {url}\nStop: Ctrl+C\n", flush=True)
-        server = uvicorn.Server(uvicorn.Config(
-            "main:app", host=HOST, port=port, headers=[(RUNTIME_HEADER, runtime_id)]
-        ))
+        # 저장소 표식(x-docops-runtime)은 앱이 모든 응답에 붙인다(app.middleware.RuntimeHeader).
+        server = uvicorn.Server(uvicorn.Config("main:app", host=HOST, port=port))
         if browser:
             threading.Thread(target=open_when_ready, args=(server, url), daemon=True).start()
         # Give Uvicorn the same socket so another process cannot claim the selected port.
