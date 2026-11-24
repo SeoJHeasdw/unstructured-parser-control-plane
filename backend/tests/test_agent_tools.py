@@ -271,3 +271,27 @@ def test_locked_state_write_reports_failure_and_unlocks(tmp_path, monkeypatch):
     with store.locked():
         store.save("batches", {"n": 3})
     assert store.load("batches", {}) == {"n": 3}
+
+
+def test_same_name_size_and_mtime_still_require_matching_bytes(live):
+    import os
+    ops, docs = live["ops"], live["docs"]
+    first = docs / "결과.txt"
+    second = docs / "sub" / first.name
+    first.write_bytes(b"sample A")
+    second.write_bytes(b"sample B")
+    # First source was uploaded via the UI, so the agent has no registry entry for it.
+    ops.api.upload(first, first.name)
+    call(ops, "parse", target=str(second))
+    rows = ops.documents()
+    assert len(rows) == 2
+    assert ops.api.get(f"/api/live/documents/{rows[1]['id']}/result")["markdown"] == "sample B"
+    call(ops, "parse", target=str(second))
+    assert len(ops.documents()) == 2
+    stamp = second.stat()
+    second.write_bytes(b"sample C")
+    os.utime(second, ns=(stamp.st_atime_ns, stamp.st_mtime_ns))
+    call(ops, "parse", target=str(second))
+    rows = ops.documents()
+    assert len(rows) == 3
+    assert ops.api.get(f"/api/live/documents/{rows[2]['id']}/result")["markdown"] == "sample C"

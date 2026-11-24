@@ -4,6 +4,7 @@
   응답 헤더 x-docops-runtime이 같은 저장소(runtime_id)인 서버를 고른다.
 - 사내 PC의 HTTP_PROXY 설정이 127.0.0.1 요청까지 가로채지 않도록 프록시를 쓰지 않는다.
 """
+import hashlib
 from http.client import HTTPException
 import json
 import os
@@ -36,11 +37,12 @@ class Api:
         self.note = ""
         self._opener = request.build_opener(request.ProxyHandler({}))
 
-    def _send(self, method: str, url: str, body: bytes | None = None, headers: dict | None = None, timeout: float | None = None):
+    def _send(self, method: str, url: str, body: bytes | None = None, headers: dict | None = None, timeout: float | None = None, digest: bool = False):
         req = request.Request(url, data=body, method=method, headers=headers or {})
         try:
             with self._opener.open(req, timeout=timeout or self.timeout) as response:
-                return response.status, response.headers, response.read()
+                content = hashlib.file_digest(response, "sha256").hexdigest() if digest else response.read()
+                return response.status, response.headers, content
         except error.HTTPError as exc:
             raw = exc.read()
             try:
@@ -75,12 +77,12 @@ class Api:
             return legacy
         raise ServerDown("콘솔 서버를 찾지 못했습니다(127.0.0.1:8000~8019). run.sh 또는 start.cmd로 콘솔을 먼저 띄워 주세요.")
 
-    def _call(self, method: str, path: str, body: bytes | None = None, headers: dict | None = None, timeout: float | None = None):
+    def _call(self, method: str, path: str, body: bytes | None = None, headers: dict | None = None, timeout: float | None = None, digest: bool = False):
         for attempt in (0, 1):
             if self.base is None:
                 self.base = self.discover()
             try:
-                return self._send(method, self.base + path, body, headers, timeout)
+                return self._send(method, self.base + path, body, headers, timeout, digest)
             except ApiError:
                 raise
             except (OSError, HTTPException) as exc:
@@ -94,6 +96,10 @@ class Api:
                     raise ServerDown(f"콘솔 서버에 연결하지 못했습니다({type(exc).__name__}). 콘솔이 켜져 있는지 확인해 주세요.") from None
                 self.base = None
         raise ServerDown("콘솔 서버에 연결하지 못했습니다.")
+
+    def source_digest(self, doc_id: str) -> str:
+        _, _, digest = self._call("GET", f"/api/live/documents/{doc_id}/source", digest=True)
+        return digest
 
     def get(self, path: str, **params):
         query = {key: value for key, value in params.items() if value is not None}

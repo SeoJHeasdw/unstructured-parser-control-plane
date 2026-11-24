@@ -688,6 +688,24 @@ class Ops:
                     batch["error"] = message
             self.store.save("batches", batches)
 
+    def _matching_source(self, path: Path, candidates: list[dict], entry: dict | None):
+        if not candidates:
+            return None, None
+        with path.open("rb") as handle:
+            digest = hashlib.file_digest(handle, "sha256").hexdigest()
+        if entry and entry.get("sha256") == digest:
+            known = next((d for d in candidates if d["id"] == entry.get("doc")), None)
+            if known:
+                return known, digest
+        for candidate in candidates:
+            try:
+                if self.api.source_digest(candidate["id"]) == digest:
+                    return candidate, digest
+            except ApiError as exc:
+                if exc.status not in (404, 409):
+                    raise
+        return None, None
+
     def _register_item(self, item: dict, batch: dict, docs: dict) -> None:
         path = Path(item["path"])
         try:
@@ -698,14 +716,20 @@ class Ops:
         key = os.path.normcase(str(path))
         registry = self.store.load("registry", {})
         entry = registry.get(key)
-        doc = None
-        if entry and entry.get("size") == stat.st_size and entry.get("mtime") == stat.st_mtime_ns:
-            doc = docs.get(entry.get("doc"))
-        if doc is None and entry is None:
-            # 화면에서 먼저 올린 같은 파일(이름·크기 같음)은 다시 올리지 않는다.
-            name = _nfc(path.name)
-            same = [d for d in docs.values() if _nfc(d["name"]) == name and d["size_bytes"] == stat.st_size]
-            doc = same[-1] if same else None
+        if stat.st_size > MAX_UPLOAD:
+            item["state"], item["note"] = "error", "too-big"
+            return
+        name = _nfc(path.name)
+        candidates = [d for d in reversed(docs.values())
+                      if _nfc(d["name"]) == name and d["size_bytes"] == stat.st_size]
+        try:
+            doc, digest = self._matching_source(path, candidates, entry)
+        except OSError:
+            item["state"], item["note"] = "error", "read-fail"
+            return
+        except (ServerDown, ApiError):
+            item["state"], item["note"] = "error", "source-check"
+            return
         reused = doc is not None
         if doc is None:
             try:
@@ -716,10 +740,13 @@ class Ops:
             except OSError:
                 item["state"], item["note"] = "error", "read-fail"
                 return
+            except ServerDown:
+                item["state"], item["note"] = "error", "upload-unknown"
+                return
             docs[doc["id"]] = doc
         with self.store.locked():
             registry = self.store.load("registry", {})
-            registry[key] = {"doc": doc["id"], "size": stat.st_size, "mtime": stat.st_mtime_ns}
+            registry[key] = {"doc": doc["id"], "sha256": digest}
             self.store.save("registry", registry)
         item["doc"], item["note"] = doc["id"], "reuse" if reused else "new"
         if reused and not batch["reparse"] and doc["status"] in ("completed", "failed", "unsupported"):
@@ -733,6 +760,9 @@ class Ops:
         """처리 요청. 대기열이 가득 차면 True(이번 회차에는 더 넣지 않는다)."""
         try:
             self.api.post(f"/api/live/documents/{item['doc']}/process")
+        except ServerDown:
+            item["state"], item["note"] = "error", "process-unknown"
+            return False
         except ApiError as exc:
             if exc.status == 409:
                 item["state"], item["q"] = "queued", loop
