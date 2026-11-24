@@ -17,6 +17,8 @@ from app.llm import ModelConnection
 
 CHAT_KEYS = {"primary": "MODEL", "secondary": "MODEL2"}
 EMBED_PREFIX = "EMBED"
+OCR_FIELDS = (("label", "LABEL"), ("base_url", "BASE_URL"), ("model_id", "MODEL"), ("api_key", "API_KEY"), ("mode", "MODE"),
+              ("text_prompt", "TEXT_PROMPT"), ("table_prompt", "TABLE_PROMPT"), ("page_prompt", "PAGE_PROMPT"))
 MAX_EMBED_MODELS = 8
 _FIELDS = ("label", "base_url", "model_id", "api_key")
 
@@ -76,6 +78,25 @@ def clean_patch(body: dict, embed: bool) -> dict:
         patch["models"] = clean_models(body.get("models"))
     else:
         patch["model_id"] = _text(body.get("model_id"), "Model ID", 200)
+    if body.get("clear_api_key") is True:
+        patch["api_key"] = ""
+    elif isinstance(body.get("api_key"), str) and body["api_key"].strip():
+        patch["api_key"] = _text(body["api_key"], "API 키", 4096)
+    return patch
+
+
+def clean_ocr_patch(body: dict) -> dict:
+    """OCR 모델 연결 저장값. 지시문은 비우면 기본값을 쓴다."""
+    if not isinstance(body, dict):
+        raise StoreError("설정 형식이 올바르지 않습니다.")
+    patch = {"label": _text(body.get("label"), "이름", 40), "base_url": clean_url(body.get("base_url")),
+             "model_id": _text(body.get("model_id"), "Model ID", 200)}
+    mode = str(body.get("mode") or "region").strip().lower()
+    if mode not in ("region", "page"):
+        raise StoreError("OCR 방식은 region(영역) 또는 page(쪽)여야 합니다.")
+    patch["mode"] = mode
+    for field, name in (("text_prompt", "글자 지시문"), ("table_prompt", "표 지시문"), ("page_prompt", "쪽 지시문")):
+        patch[field] = _text(body.get(field), name, 500)
     if body.get("clear_api_key") is True:
         patch["api_key"] = ""
     elif isinstance(body.get("api_key"), str) and body["api_key"].strip():
@@ -145,6 +166,11 @@ class ConnectionStore:
                     env[f"{EMBED_PREFIX}_{suffix}"] = entry[field]
             if "models" in entry and isinstance(entry["models"], list):
                 env[f"{EMBED_PREFIX}_MODELS"] = ",".join(entry["models"])
+        entry = data.get("ocr")
+        if isinstance(entry, dict):
+            for field, suffix in OCR_FIELDS:
+                if field in entry:
+                    env[f"OCR_{suffix}"] = entry[field]
         return env
 
     def chat_connections(self, startup: tuple[ModelConnection, ...]) -> list[ModelConnection]:

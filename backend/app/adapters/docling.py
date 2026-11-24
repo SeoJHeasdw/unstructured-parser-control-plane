@@ -9,12 +9,14 @@ import zipfile
 
 from app.adapters.base import ParsedDocument, ParserError
 from app.config import Settings
-from app.adapters.ocr import MAX_FRAME_PIXELS, MODEL_HELP, model_dir
+from app.adapters.ocr import MAX_FRAME_PIXELS, MODEL_HELP, OCR_READ_WARNING, REPEAT_WARNING, ModelOcr
+from app.models import ResultLocation
 from app.adapters.docling_locations import markdown_locations
 
 logger = logging.getLogger(__name__)
 
 MAX_PDF_PAGES = 500
+RENDER_SCALE = 200 / 72  # 글자 층이 없는 쪽을 OCR 모델에 보낼 때의 렌더링 배율(200 dpi)
 MAX_OFFICE_ENTRIES = 10_000
 
 
@@ -37,6 +39,48 @@ def _pdf_pages(path: Path, scale: float) -> int:
         if exc.err_code == FPDF_ERR_PASSWORD:
             raise ParserError("암호가 걸린 PDF입니다. 암호를 해제한 사본이 필요합니다.", code="encrypted") from exc
         raise ParserError("PDF의 페이지 정보를 읽을 수 없습니다.", code="format_unrecognized") from exc
+
+
+def _render(path: Path, pages: list[int]):
+    """쪽 번호(1부터) → PIL 그림. 쪽의 회전(/Rotate)은 pdfium이 적용한다."""
+    import pypdfium2 as pdfium
+    with pdfium.PdfDocument(path) as pdf:
+        for number in pages:
+            yield number, pdf[number - 1].render(scale=RENDER_SCALE).to_pil()
+
+
+def _insert_pages(markdown: str, locations: list[ResultLocation], pages: dict[int, str]):
+    """OCR로 읽은 쪽 글을 쪽 순서 자리에 끼운다. 뒤따르는 원래 위치 정보의 줄 번호는 그만큼 민다."""
+    lines = markdown.split("\n") if markdown.strip() else []
+
+    def anchor(page: int) -> int:
+        starts = [loc.start_line for loc in locations if loc.page and loc.page > page]
+        return min(starts) if starts else len(lines) + 1
+
+    inserts = sorted((anchor(page), page, text) for page, text in pages.items())
+    out: list[str] = []
+    added: list[ResultLocation] = []
+    moved: dict[int, int] = {}
+    index = 0
+    for line_no in range(1, len(lines) + 2):
+        while index < len(inserts) and inserts[index][0] == line_no:
+            _, page, text = inserts[index]
+            if out and out[-1].strip():
+                out.append("")
+            start = len(out) + 1
+            out.extend(text.split("\n"))
+            added.append(ResultLocation(start_line=start, end_line=len(out), page=page))
+            out.append("")
+            index += 1
+        if line_no <= len(lines):
+            moved[line_no] = len(out) + 1
+            out.append(lines[line_no - 1])
+    for loc in locations:
+        if loc.start_line in moved and loc.end_line in moved:
+            added.append(loc.model_copy(update={"start_line": moved[loc.start_line], "end_line": moved[loc.end_line]}))
+    while out and not out[-1].strip():
+        out.pop()
+    return "\n".join(out), sorted(added, key=lambda loc: (loc.start_line, loc.end_line))
 
 
 def _pages_with_content(document):
@@ -81,19 +125,17 @@ class DoclingAdapter:
             raise ParserError("Docling이 문서를 완전히 변환하지 못했습니다. 원본 상태를 확인해 주세요.")
         return result
 
-    def _pdf(self, directory):
+    def _pdf(self):
+        """PDF 글자 층·레이아웃·표만 읽는다. Docling 안의 OCR(라이브러리 OCR)은 쓰지 않는다(2026-11-24 결정).
+        글자 층이 없는 쪽은 parse()에서 OCR 모델로 따로 읽는다."""
         from docling.datamodel.base_models import InputFormat
-        from docling.datamodel.pipeline_options import EasyOcrOptions, PdfPipelineOptions
+        from docling.datamodel.pipeline_options import PdfPipelineOptions
         from docling.document_converter import DocumentConverter, PdfFormatOption
-        model_key = (self.settings.docling_artifacts, directory)
+        model_key = self.settings.docling_artifacts
         if self._pdf_converter is not None and self._pdf_models == model_key:
             return self._pdf_converter
-        options = PdfPipelineOptions(artifacts_path=self.settings.docling_artifacts, do_ocr=bool(directory),
+        options = PdfPipelineOptions(artifacts_path=self.settings.docling_artifacts, do_ocr=False,
                                      enable_remote_services=False, allow_external_plugins=False)
-        if directory:
-            options.accelerator_options.device = "cpu"
-            options.ocr_options = EasyOcrOptions(lang=["ko", "en"], model_storage_directory=str(directory),
-                                                 replace_broken_text_layer=True, download_enabled=False)
         self._pdf_converter = DocumentConverter(allowed_formats=[InputFormat.PDF], format_options={
             InputFormat.PDF: PdfFormatOption(pipeline_options=options)})
         self._pdf_models = model_key
@@ -117,44 +159,52 @@ class DoclingAdapter:
         if extension == "PDF":
             if not self.settings.docling_artifacts or not self.settings.docling_artifacts.is_dir():
                 raise ParserError("오프라인 Docling 모델 경로가 없습니다. 미리 준비된 모델 경로를 설정해 주세요.", code="parser_unavailable")
-            directory = model_dir(self.settings)
-            count = _pdf_pages(path, 3.0 if directory else 1.0)
-            converter = self._pdf(directory)
+            ocr = ModelOcr(self.settings)
+            count = _pdf_pages(path, RENDER_SCALE if ocr.configured else 1.0)
+            converter = self._pdf()
         else:
             fmt = {"DOCX": InputFormat.DOCX, "PPTX": InputFormat.PPTX, "XLSX": InputFormat.XLSX}[extension]
             converter = DocumentConverter(allowed_formats=[fmt])
         warnings = []
         try:
-            try:
-                result = self._convert(converter, path, extension)
-            except Exception:
-                if extension != "PDF" or not directory:
-                    raise
-                # An unavailable OCR checkpoint must not break a readable digital PDF.
-                result = self._convert(self._pdf(None), path, extension)
-                directory = None
-                warnings.append("OCR을 포함한 변환이 실패해 PDF 텍스트 층으로 재처리했습니다.")
+            result = self._convert(converter, path, extension)
             markdown = result.document.export_to_markdown()
             # Image-only PDF exports may contain a placeholder comment but no text.
             visible_text = re.sub(r"<!--.*?-->|!\[[^\]]*\]\([^)]*\)", "", markdown, flags=re.DOTALL)
             if not visible_text.strip():
-                if extension == "PDF":
-                    message = "PDF에서 글자를 인식하지 못했습니다." if directory else f"PDF 텍스트 층에서 글자를 찾지 못했습니다. {MODEL_HELP}"
-                    raise ParserError(message, code="no_text")
-                # Office picture-only documents may still have SVG text or raster OCR.
+                # 글자 층이 없는 PDF(전체 스캔)와 그림만 있는 Office 문서. PDF는 아래에서 OCR 모델로 읽는다.
                 markdown = ""
             locations = []
-            if extension in {"PDF", "XLSX"}:
+            if markdown and extension in {"PDF", "XLSX"}:
                 try:
                     locations = markdown_locations(result.document, markdown, extension)
                 except Exception as exc:
                     logger.warning("Source locations could not be exported (%s)", type(exc).__name__)
             if extension == "PDF":
                 empty = sorted(set(range(1, count + 1)) - _pages_with_content(result.document))
+                read, repeated = {}, []
+                if empty and ocr.configured:
+                    for number, image in _render(path, empty):
+                        page_text = ocr.read(image)
+                        if page_text.repeated:
+                            repeated.append(number)
+                        if page_text.text.strip():
+                            read[number] = page_text.text.strip()
+                    empty = [number for number in empty if number not in read]
+                if not markdown and not read:
+                    message = ("PDF에서 글자를 찾지 못했습니다(OCR 모델로도 읽지 못함)." if ocr.configured
+                               else f"PDF 텍스트 층에서 글자를 찾지 못했습니다. {MODEL_HELP}")
+                    raise ParserError(message, code="no_text")
+                if read:
+                    markdown, locations = _insert_pages(markdown, locations, read)
+                    warnings.append("OCR 모델로 읽은 PDF 쪽: " + ", ".join(map(str, sorted(read))) + f" ({ocr.conn.model_id}). "
+                                    + OCR_READ_WARNING.split(". ", 1)[1])
+                if repeated:
+                    warnings.append(REPEAT_WARNING)
                 if empty:
                     warnings.append("본문 글자나 표가 추출되지 않은 PDF 페이지: " + ", ".join(map(str, empty)))
             return ParsedDocument(markdown=markdown, parser="docling", parser_version=version,
-                                  ocr_enabled=bool(directory) if extension == "PDF" else None,
+                                  ocr_enabled=ocr.configured if extension == "PDF" else None,
                                   locations=locations, warnings=warnings)
         except ParserError:
             raise

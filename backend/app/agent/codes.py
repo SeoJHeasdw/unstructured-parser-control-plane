@@ -5,6 +5,8 @@
 """
 import re
 
+from app.formats import IMAGE_FORMATS
+
 # LiveDocument.error_code → 짧은 코드
 ERROR_CODES = {
     "drm_protected": "drm",
@@ -40,6 +42,8 @@ FIDELITY_CODES = {
 
 # 경고 문장의 앞부분 → 짧은 코드. 문장은 백엔드 상수와 어댑터에서 온다(테스트가 실제 상수로 대조).
 _WARNING_PREFIXES = (
+    ("OCR 모델로 읽은", "ocr-read"),
+    ("OCR 결과에서 같은 구절이", "ocr-repeat"),
     ("OCR 미적용", "ocr-off"),
     ("본문 글자나 표가 추출되지 않은 PDF 페이지", "empty-pg"),
     ("OCR을 포함한 변환이 실패", "ocr-fallback"),
@@ -61,7 +65,7 @@ SKIP_CODES = {
 # 에이전트 호출 오류 종류(서버 기록)
 CALL_ERRORS = ("bad-arg", "not-found", "outside", "server-down", "busy", "api", "internal")
 
-VERDICTS = ("ok", "warn", "fail", "unsup", "run", "new")
+VERDICTS = ("ok", "warn", "empty", "fail", "unsup", "run", "new")
 
 _PAGES = re.compile(r"\d+")
 
@@ -84,16 +88,20 @@ def warning_codes(warnings: list[str], fidelity: dict | None) -> list[tuple[str,
             code = next((short for prefix, short in _WARNING_PREFIXES if text.startswith(prefix)), None)
         if code is None:
             code = "svg" if "SVG" in text else "other"
-        if code == "empty-pg":
-            pages = _PAGES.findall(text.split(":", 1)[-1])
+        if code == "empty-pg" or (code == "ocr-read" and ":" in text):
+            # 쪽 번호만 옮긴다('…쪽: 1, 3 (모델 이름)'에서 괄호 앞까지).
+            pages = _PAGES.findall(text.split(":", 1)[-1].split("(", 1)[0])
             detail = " ".join("p" + page for page in pages[:6]) + (f" +{len(pages) - 6}" if len(pages) > 6 else "")
         result.append((code, detail))
     return result
 
 
-def verdict(status: str, warnings: list[tuple[str, str]] | None) -> str:
+def verdict(status: str, warnings: list[tuple[str, str]] | None, error_code: str | None = None, fmt: str | None = None) -> str:
     if status == "completed":
         return "warn" if warnings else "ok"
+    if status == "failed" and error_code == "no_text" and (fmt or "").upper() in IMAGE_FORMATS:
+        # 글자 없는 사진은 실패가 아니다. 다만 글자가 있는 이미지라면 OCR이 놓친 것이라 따로 센다.
+        return "empty"
     return {"failed": "fail", "unsupported": "unsup", "processing": "run", "uploaded": "new"}.get(status, status)
 
 
@@ -116,8 +124,11 @@ MEANINGS = {
     "queue-full": "서버 대기열이 가득 차 거절됨. 다시 파싱하면 됨",
     "internal": "예상하지 못한 서버 오류",
     "unknown": "실패 코드가 없는 이전 기록. doc 으로 원인 확인",
+    "empty": "이미지에서 글자를 찾지 못함. 글자 없는 사진이면 정상이고, 글자가 있는 이미지라면 OCR이 놓친 것",
     # 경고
-    "ocr-off": "PDF에 OCR이 적용되지 않아 스캔·그림 쪽의 글자가 빠졌을 수 있음",
+    "ocr-read": "OCR 모델로 읽은 쪽·그림이 있음. 모델이 읽은 글자라 원본 대조가 필요함(품질 보증 아님)",
+    "ocr-repeat": "OCR 모델이 같은 구절을 되풀이해 잘라냄. 그 부분은 원본 대조가 필요함",
+    "ocr-off": "OCR 모델이 연결되지 않아 스캔·그림 쪽의 글자를 읽지 않음(빠졌을 수 있음)",
     "empty-pg": "글자·표가 하나도 나오지 않은 PDF 쪽이 있음",
     "ocr-fallback": "OCR을 포함한 변환이 실패해 PDF 텍스트 층만 읽음",
     "ocr-empty": "그림에서 글자를 찾지 못한 프레임이 있음",

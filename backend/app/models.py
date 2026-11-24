@@ -14,6 +14,8 @@ class LiveDocument(BaseModel):
     error: str | None = None
     # 실패 사유 코드(drm_protected, drm_suspected, encrypted, format_mismatch, unsupported_format ...). 성공·대기 중이면 None.
     error_code: str | None = None
+    # 문서 번호. 화면과 작업 에이전트가 'D12'처럼 부른다. 올린 순서로 매기며 바뀌지 않는다.
+    seq: int | None = None
 
 class DocumentList(BaseModel):
     documents: list[LiveDocument]

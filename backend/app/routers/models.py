@@ -5,9 +5,10 @@ API 키는 받기만 하고 응답에는 설정 여부(api_key_set)만 넣는다
 """
 from fastapi import APIRouter, Body, HTTPException, Request
 
-from app.connection_store import CHAT_KEYS, ConnectionStore, StoreError, clean_models, clean_patch, clean_url
+from app.connection_store import CHAT_KEYS, ConnectionStore, StoreError, clean_models, clean_ocr_patch, clean_patch, clean_url
 from app.embedding import check_embedding, find_connection
 from app.llm import ModelConnection, check_chat, list_models
+from app.ocr_model import DEFAULTS as OCR_DEFAULTS, OcrConnection, check_ocr, load_ocr
 
 router = APIRouter(prefix="/api/models", tags=["model connections"])
 
@@ -44,7 +45,8 @@ def _listing(request: Request) -> dict:
     chat = [{**conn.public(), "saved": store.saved(conn.key) is not None} for conn in _chat(request)]
     embed = find_connection("embed")
     embedding = {**embed.public(), "saved": store.saved("embed") is not None} if embed else None
-    return {"connections": chat, "embedding": embedding}
+    ocr = {**load_ocr(store.environ()).public(), "saved": store.saved("ocr") is not None, "defaults": OCR_DEFAULTS}
+    return {"connections": chat, "embedding": embedding, "ocr": ocr}
 
 
 @router.get("")
@@ -83,8 +85,25 @@ def _draft(request: Request, body: dict) -> tuple[str, ModelConnection]:
     return kind, ModelConnection(str(body.get("key") or "embed"), "확인", url, key, model)
 
 
+def _ocr_draft(request: Request, body: dict) -> OcrConnection:
+    """저장 전 값으로 만든 OCR 연결. 키를 새로 넣지 않았으면 저장된 키를 쓴다."""
+    try:
+        patch = clean_ocr_patch(body)
+    except StoreError as exc:
+        raise HTTPException(400, str(exc)) from None
+    if not patch["base_url"] or not patch["model_id"]:
+        raise HTTPException(400, "Base URL과 모델 ID를 입력하세요.")
+    stored = load_ocr(_store(request).environ())
+    key = patch.get("api_key", stored.api_key)
+    return OcrConnection(patch["label"] or "OCR 모델", patch["base_url"], key, patch["model_id"], patch["mode"],
+                         patch["text_prompt"] or OCR_DEFAULTS["text_prompt"], patch["table_prompt"] or OCR_DEFAULTS["table_prompt"],
+                         patch["page_prompt"] or OCR_DEFAULTS["page_prompt"])
+
+
 @router.post("/draft/test")
 def draft_test(request: Request, body: dict = Body(...)):
+    if isinstance(body, dict) and body.get("kind") == "ocr":
+        return check_ocr(_ocr_draft(request, body))
     kind, conn = _draft(request, body)
     if not conn.model_id:
         raise HTTPException(400, "확인할 모델 ID를 입력하세요.")
@@ -121,6 +140,31 @@ def test_embedding(request: Request, body: dict | None = Body(None)):
 @router.post("/embedding/models")
 def embedding_models(request: Request):
     return list_models(_embed(request))
+
+
+# ---------------------------------------------------------------- OCR 모델 연결
+
+@router.put("/ocr")
+def save_ocr(request: Request, body: dict = Body(...)):
+    try:
+        _store(request).save("ocr", clean_ocr_patch(body))
+    except StoreError as exc:
+        raise HTTPException(400, str(exc)) from None
+    return _listing(request)
+
+
+@router.delete("/ocr/saved")
+def forget_ocr(request: Request):
+    _store(request).forget("ocr")
+    return _listing(request)
+
+
+@router.post("/ocr/test")
+def test_ocr(request: Request):
+    conn = load_ocr(_store(request).environ())
+    if not conn.configured:
+        raise HTTPException(409, "OCR 모델 주소와 모델 ID가 설정되지 않았습니다.")
+    return check_ocr(conn)
 
 
 # ---------------------------------------------------------------- 생성 모델 연결

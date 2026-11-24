@@ -121,7 +121,9 @@ agent call16 err4 not-found2 outside1 bad-arg1
 
 ### 판정
 
-`ok` 경고 없음 · `warn` 경고 있음 · `fail` 실패 · `unsup` 처리 경로 없는 형식 · `run` 처리 중 · `new` 등록만 함
+`ok` 경고 없음 · `warn` 경고 있음 · `empty` 글자 없는 이미지(실패로 세지 않음. 글자 없는 사진이면 정상, 글자가 보이는 이미지라면 OCR이 놓친 것) · `fail` 실패 · `unsup` 처리 경로 없는 형식 · `run` 처리 중 · `new` 등록만 함
+
+`empty` 줄은 `empty3 D20 D22 D23`처럼 쓴다. 문서 번호(D번호)는 서버가 매긴 `seq`이며 콘솔 화면과 같다.
 
 ### 실패 코드 (`LiveDocument.error_code`)
 
@@ -140,11 +142,13 @@ agent call16 err4 not-found2 outside1 bad-arg1
 
 | 짧은 코드 | 뜻 | 출처 |
 |---|---|---|
-| `ocr-off` | PDF인데 OCR 미적용(스캔 누락 가능) | `service.PDF_OCR_WARNING` |
+| `ocr-read` | OCR 모델로 읽은 쪽·그림이 있음(PDF는 `doc`에서 쪽 번호). 모델이 읽은 글자라 원본 대조 필요 | `adapters/ocr.OCR_READ_WARNING`, PDF 어댑터 |
+| `ocr-repeat` | OCR 모델의 반복 폭주를 잘라냄 | `adapters/ocr.REPEAT_WARNING` |
+| `ocr-off` | OCR 모델이 연결되지 않아 스캔·그림 쪽 글자를 읽지 않음 | `service.PDF_OCR_WARNING` |
 | `empty-pg` | 글자·표가 없는 PDF 쪽(`doc`에서 쪽 번호) | Docling 어댑터 |
-| `ocr-fallback` | OCR 포함 변환 실패 → 텍스트 층으로 재처리 | Docling 어댑터 |
+| `ocr-fallback` | (이전 기록) OCR 포함 변환 실패 → 텍스트 층으로 재처리 | 2026-11-24 이전 Docling 어댑터 |
 | `ocr-empty` | 이미지에서 글자를 못 찾은 프레임 | OCR 어댑터 |
-| `ocr-low` | OCR 신뢰도 낮은 영역 | OCR 어댑터 |
+| `ocr-low` | (이전 기록) EasyOCR 신뢰도 낮은 영역. 모델 OCR에는 믿을 만한 신뢰도가 없어 더 나오지 않음 | 2026-11-24 이전 OCR 어댑터 |
 | `fid-skip` | 원문 충실도 점검 실패 | `service.FIDELITY_FAILED_WARNING` |
 | `prep-fallback` | 기호·첨자 보정 사본 파싱 실패 → 원본으로 파싱 | `service.PREPARE_FALLBACK_WARNING` |
 | `sym-lost` | 특수기호 손실 | 충실도 `symbol_lost` |

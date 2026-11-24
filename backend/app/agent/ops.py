@@ -276,8 +276,13 @@ class Ops:
         return self._parsers
 
     def documents(self) -> list[dict]:
-        """D번호를 붙인 문서 목록(오래된 것부터). 번호는 한 번 붙으면 바뀌지 않는다."""
+        """D번호를 붙인 문서 목록(오래된 것부터). 번호는 서버가 매긴 문서 번호(seq)라 화면과 같다."""
         docs = list(reversed(self.api.get("/api/live/documents")["documents"]))
+        if docs and all(doc.get("seq") for doc in docs):
+            for doc in docs:
+                doc["n"] = doc["seq"]
+            return sorted(docs, key=lambda doc: doc["n"])
+        # 문서 번호가 없는 이전 버전 서버: 작업 도구가 따로 매긴 번호를 쓴다.
         with self.store.locked():
             aliases = self.store.load("aliases", {"next": 1, "ids": {}})
             changed = False
@@ -358,7 +363,7 @@ class Ops:
         previous = next((run for run in runs if latest and run["run_id"] != latest["run_id"]), None)
         warn = metrics["warn"] if metrics and doc["status"] == "completed" else []
         return {"doc": doc, "runs": runs, "latest": latest, "metrics": metrics, "previous": previous,
-                "warn": warn, "verdict": codes.verdict(doc["status"], warn)}
+                "warn": warn, "verdict": codes.verdict(doc["status"], warn, doc.get("error_code"), doc.get("format"))}
 
     # ------------------------------------------------------------------ 도구: status
     def status(self) -> str:
@@ -375,10 +380,8 @@ class Ops:
             problems.append("Docling 미설치: PDF·Office 파싱 불가(run.sh --docling 으로 띄워야 함)")
         elif not parsers["pdf_model_directory"]:
             problems.append("PDF 모델 폴더 없음: PDF 파싱 불가")
-        if not parsers["ocr_enabled"]:
-            problems.append("OCR 꺼짐(DOCOPS_OCR=0): 스캔·그림 글자 누락")
-        elif not parsers["ocr_models_found"]:
-            problems.append("OCR 모델 없음: 스캔·그림 글자 누락")
+        if not parsers["ocr_models_found"]:
+            problems.append("OCR 모델 미연결: 스캔 쪽·이미지·문서 속 그림의 글자를 읽지 않음(콘솔 '모델 연결'에서 OCR 모델 설정)")
         if not self.roots:
             problems.append("허용 폴더 없음: opencode.json의 DOCOPS_AGENT_ROOTS 설정 필요")
         lines.append("결과: " + ("준비됨" if not problems else f"주의 {len(problems)}건"))
@@ -780,7 +783,7 @@ class Ops:
         block = [f"DOCOPS {label} {_now().strftime('%m-%d %H:%M')} build {self.build}",
                  f"env {osname} py{sys.version_info[0]}.{sys.version_info[1]} docling{flag('docling_installed')} "
                  f"pdfm{flag('pdf_model_directory')} ocr{flag('ocr_enabled')} ocrm{flag('ocr_models_found')}"]
-        versions = sorted({f"{v['latest']['parser']}{v['latest'].get('parser_version') or ''}" for v in views if v["latest"] and v["latest"].get("parser")})
+        versions = sorted({f"{v['latest']['parser']}={(v['latest'].get('parser_version') or '').replace(' ', '')}" for v in views if v["latest"] and v["latest"].get("parser")})
         if versions:
             block.append("ver " + " ".join(versions))
         order = [key for key in codes.VERDICTS if verdicts[key]]
@@ -799,12 +802,16 @@ class Ops:
                 line += f" t{_seconds(round(average))}/{_seconds(slowest[0])}s(D{slowest[1]})"
             block.append(line)
         fails: dict[str, list[int]] = {}
+        empties = [view["doc"]["n"] for view in views if view["verdict"] == "empty"]
         for view in views:
             if view["verdict"] in ("fail", "unsup"):
                 fails.setdefault(codes.error_code(view["doc"].get("error_code")), []).append(view["doc"]["n"])
         notes: list[str] = []
         if fails:
             block += self._code_lines("fail", fails)
+        if empties:
+            block.append(f"empty{len(empties)} {_refs(empties)}")
+            notes.append(f"설명(글자 없음): {len(empties)}건 {_refs(empties)} — {codes.MEANINGS['empty']}")
         warns: dict[str, list[int]] = {}
         for view in views:
             for code in dict.fromkeys(code for code, _ in view["warn"]):
@@ -885,11 +892,11 @@ class Ops:
         aliases = {"성공": "ok", "경고": "warn", "실패": "fail", "전체": "all", "failed": "fail", "completed": "ok", "warning": "warn"}
         state = aliases.get(state, state)
         if state not in ("all", *codes.VERDICTS):
-            raise ToolError("bad-arg", f"state는 all, ok, warn, fail, unsup, run, new 중 하나입니다(받은 값: {state}).", "예: state=\"fail\"")
+            raise ToolError("bad-arg", f"state는 all, {', '.join(codes.VERDICTS)} 중 하나입니다(받은 값: {state}).", "예: state=\"fail\"")
         docs = list(reversed(self.documents()))
         views = []
         for doc in docs:
-            view = self.doc_view(doc) if doc["status"] == "completed" else {"doc": doc, "warn": [], "verdict": codes.verdict(doc["status"], None)}
+            view = self.doc_view(doc) if doc["status"] == "completed" else {"doc": doc, "warn": [], "verdict": codes.verdict(doc["status"], None, doc.get("error_code"), doc.get("format"))}
             if state == "all" or view["verdict"] == state:
                 views.append(view)
             if len(views) >= 40:
@@ -913,9 +920,10 @@ class Ops:
         view = self.doc_view(doc)
         latest, metrics = view["latest"], view["metrics"]
         verdict = view["verdict"]
-        title = {"ok": "경고 없음", "warn": "경고 있음", "fail": "실패", "unsup": "미지원 형식", "run": "처리 중", "new": "아직 파싱 안 함"}[verdict]
+        title = {"ok": "경고 없음", "warn": "경고 있음", "empty": "글자 없음", "fail": "실패", "unsup": "미지원 형식", "run": "처리 중", "new": "아직 파싱 안 함"}[verdict]
         lines = [f"결과: D{doc['n']} {title}" + (f" ({codes.error_code(doc.get('error_code'))})" if verdict in ("fail", "unsup") else ""),
-                 {"fail": "다음: 원인을 사용자에게 그대로 전하세요. 고칠 수 있는 원인이면 사용자가 파일을 바꾼 뒤 parse 로 다시 시도합니다.",
+                 {"empty": "다음: 글자 없는 사진인지 사용자에게 확인을 부탁하세요. 글자가 보이는 이미지라면 OCR이 놓친 것입니다.",
+                  "fail": "다음: 원인을 사용자에게 그대로 전하세요. 고칠 수 있는 원인이면 사용자가 파일을 바꾼 뒤 parse 로 다시 시도합니다.",
                   "unsup": "다음: 처리 경로가 없는 형식입니다. 사용자에게 알리세요.",
                   "warn": "다음: 경고 위치는 read 로 본문을 확인할 수 있습니다(page·sheet).",
                   "run": "다음: wait 로 끝날 때까지 기다리세요.",

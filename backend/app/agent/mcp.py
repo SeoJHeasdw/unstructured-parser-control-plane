@@ -43,9 +43,9 @@ TOOLS = [
      "description": "진행 중인 파싱 묶음을 잠시 기다린 뒤 진행 상황이나 최종 요약을 돌려줍니다. 끝날 때까지 반복해서 부르세요. 인자 없음.",
      "inputSchema": {"type": "object", "properties": {}}, "annotations": _READ},
     {"name": "docs", "title": "문서 목록",
-     "description": "등록된 문서를 D번호와 판정(ok·warn·fail·unsup·run·new)으로 보여 줍니다. state로 거를 수 있습니다.",
+     "description": "등록된 문서를 D번호와 판정(ok·warn·empty·fail·unsup·run·new)으로 보여 줍니다. state로 거를 수 있습니다.",
      "inputSchema": {"type": "object", "properties": {
-         "state": {"type": "string", "enum": ["all", "ok", "warn", "fail", "unsup", "run", "new"], "description": "기본 all"}}},
+         "state": {"type": "string", "enum": ["all", "ok", "warn", "empty", "fail", "unsup", "run", "new"], "description": "기본 all. empty는 글자 없는 이미지"}}},
      "annotations": _READ},
     {"name": "doc", "title": "문서 상세",
      "description": "문서 하나의 상태, 실패 원인, 경고, 처리 시간, 실행 이력을 보여 줍니다.",

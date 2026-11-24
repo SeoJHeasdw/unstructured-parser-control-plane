@@ -15,7 +15,7 @@ from fastapi import UploadFile
 from app.adapters.base import ParserError, UnsupportedFormat
 from app.adapters.registry import ParserRegistry, TEXT_FORMATS
 from app.config import Settings
-from app.adapters.ocr import model_dir
+from app.adapters.ocr import ModelOcr
 from app.fidelity.pictures import PictureOcr
 from app.fidelity import OOXML_FORMATS, assess, prepare_copy, prepared_copy_path, probe
 from app.filelock import try_lock, unlock
@@ -248,8 +248,8 @@ class DocumentService:
                     warnings.extend(parsed.warnings)
                     ocr_enabled = parsed.ocr_enabled
                     if extension in OOXML_FORMATS:
-                        directory = model_dir(self.settings)
-                        pictures = PictureOcr(directory) if directory else None
+                        ocr = ModelOcr(self.settings)
+                        pictures = PictureOcr(ocr) if ocr.configured else None
                         try:
                             inventory = probe(path, extension, pictures)
                             markdown, extra, notes, fidelity = assess(inventory, markdown, prepared)

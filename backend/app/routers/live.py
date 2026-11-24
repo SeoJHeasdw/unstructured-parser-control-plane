@@ -4,7 +4,7 @@ from importlib.util import find_spec
 from fastapi import APIRouter, File, HTTPException, Query, Request, UploadFile
 from fastapi.responses import FileResponse
 from app.adapters.registry import PARSER_BY_EXTENSION
-from app.adapters.ocr import model_dir
+from app.ocr_model import load_ocr
 from app.models import DocumentHistory, DocumentList, LiveDocument, ParseResult, ParseRunList, StoredParseRun
 from app.service import Conflict, InvalidName, MissingDocument, MissingRun, QueueUnavailable, TooLarge
 
@@ -20,7 +20,9 @@ def parser_catalog(request: Request):
         "docling_installed": find_spec("docling") is not None,
         "pdf_model_directory": bool(settings.docling_artifacts and settings.docling_artifacts.is_dir()),
         "ocr_enabled": settings.ocr_enabled,
-        "ocr_models_found": model_dir(settings) is not None,
+        # OCR 모델(OpenAI 호환 비전 API) 연결이 설정됐는지. 라이브러리 OCR은 쓰지 않는다. 호출해 보지는 않는다.
+        "ocr_models_found": load_ocr().configured,
+        "ocr_model": {key: value for key, value in load_ocr().public().items() if key in ("label", "model_id", "mode", "configured")},
     }
 
 

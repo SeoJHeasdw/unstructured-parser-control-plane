@@ -2,6 +2,28 @@
 
 > **기준 시점: 2026-11-12.** 이 문서는 인수인계 시점의 스냅샷이다. 코드·실행 상태·의존성·데이터는 바뀔 수 있으므로 새 세션에서는 아래 확인 순서부터 진행한다. 이 문서는 요구사항이나 고객 환경이 확정되었다는 뜻이 아니다.
 
+## 2026-11-24 (마감) 모델 OCR 연결·D번호·에이전트 활동 — 다음 세션 시작점
+
+**끝낸 것(백엔드, 커밋함):**
+- **모델 OCR 연결**(`app/ocr_model.py`, `app/adapters/ocr.py`): OpenAI 호환 비전 API. `OCR_BASE_URL·OCR_MODEL·OCR_MODE(region|page)·지시문` 또는 화면 저장값(`/api/models/ocr`, 연결 확인은 글자 든 시험 그림을 실제로 읽힘). region은 Docling 레이아웃 영역마다 호출(겹친 영역 제거, 단 구분 읽기 순서), page는 쪽 한 번 호출(`<|det|>` 블록 해석). 출력 정리: OTSL·HTML 표 → Markdown 표, `\(\pm\)` 같은 LaTeX 기호 → 일반 기호, **끝까지 이어지는 반복 폭주만** 자름(중간 되풀이는 정상 내용이라 둠).
+- 적용 경로: 이미지 파일(프레임마다), Office·SVG 속 그림(`fidelity/pictures.py`), **PDF의 글자 층 없는 쪽**(200 dpi 렌더링 → OCR → 쪽 순서 자리에 끼우고 뒤 위치 정보를 민다). OCR로 읽은 결과에는 항상 `OCR 모델로 읽은…원본 대조 필요` 경고(`ocr-read`)를 남겨 `ok`로 부풀리지 않는다. EasyOCR 코드는 모두 지웠다.
+- **문서 번호**(`documents.seq`): 올린 순서, 기존 DB는 올릴 때 매김. `LiveDocument.seq`. 작업 에이전트 D번호가 이 값을 쓴다(화면과 같은 번호).
+- **에이전트 활동 API** `GET /api/agent/activity`(묶음·보고서·호출 기록, 읽기 전용).
+- 보고서에 `empty`(글자 없는 이미지, 실패로 세지 않음), `ocr-read`·`ocr-repeat` 코드. `ver` 줄은 `docling=2.150.0 ocr-model=PaddleOCR-VL-1.6-GGUF/region` 형식.
+- 검증: 백엔드 188 통과(가짜 OCR 서버로 이미지·Office 그림·스캔 PDF 끼워 넣기·설정 API). 실제 PaddleOCR-VL로 `08_scans` 4건을 콘솔 경로 그대로 처리해 4건 모두 `ocr-read` 경고로 끝나는 것 확인.
+
+**진행 중(커밋 안 함):** 별도 작업자가 프론트를 고치는 중 — D번호 표시·검색, '에이전트 작업' 화면, 모델 연결의 OCR 카드, '글자 없음' 표시, `docs/FRONTEND_AND_INTERACTION_CONTRACT.md`. 다음 세션에서 `git status`로 `frontend/` 변경을 확인하고 `npm test`·`npm run build`·화면 검수 후 커밋한다.
+
+**다음 할 일(추천 순서):**
+1. 프론트 변경 검수·커밋(위).
+2. 반복 자르기 판단을 실제 출력으로 확인(TIF 점검표에서 예전 규칙이 발동했었음 → 끝 반복만 자르도록 고침, 재확인 필요).
+3. 디지털 PDF 쪽 안의 큰 그림(스캔 삽입·차트) OCR. 지금은 글자 층 없는 쪽만 OCR한다.
+4. 도표 이미지(계통도·흐름도)의 그림 영역 글자: region 방식에서 picture 영역도 읽는지 실제 이미지로 확인.
+5. 작업 에이전트 2단계(청킹·임베딩 평가), 3단계 Milvus 적재(로컬 Milvus 2.6.27: `infra/milvus-dev`, `docker compose up -d`, REST 127.0.0.1:19530).
+6. 고객사 요청: 게이트웨이 OCR 모델 서빙(영역 방식 PaddleOCR-VL-1.6 또는 쪽 방식 Schift·Unlimited-OCR), Milvus 제공, 임베딩 모델, 에이전트용 LLM 목록.
+
+**이 Mac 상태:** Docker Desktop·Milvus 컨테이너는 켜 둠(끄려면 `infra/milvus-dev`에서 `docker compose stop`). 시험용 llama-server·임시 콘솔 서버는 껐다. 다시 켜기: `llama-server -hf PaddlePaddle/PaddleOCR-VL-1.6-GGUF --host 127.0.0.1 --port 8091 --temp 0 -c 16384 -ngl 99`.
+
 ## 2026-11-24 OCR: 라이브러리 OCR 끔, 모델 OCR로 교체 진행
 
 - **사용자 결정:** OCR은 문서 OCR 모델만 쓴다. EasyOCR·Tesseract 같은 라이브러리 OCR은 쓰지 않고 벤치마크하지도 않는다(경험상 품질이 매우 낮음). 고객사에는 OCR 모델을 게이트웨이(GPU 서빙)에 올려 달라고 요청할 예정이라 연결은 OpenAI 호환 비전 API로 한다.

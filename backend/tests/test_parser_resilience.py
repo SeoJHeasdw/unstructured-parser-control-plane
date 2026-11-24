@@ -16,6 +16,7 @@ from app.fidelity.probe import probe
 from app.format_gate import check
 from main import create_app
 from tests import edge_case_files as files
+from tests.fake_ocr import FakeOcr, brightness
 from tests.test_live_api import upload, wait_status
 
 
@@ -80,28 +81,27 @@ def test_picture_model_absent_and_extension_mismatch(tmp_path):
         assert process(client, "bad.jpg", b"plain text", "failed")["error_code"] == "format_mismatch"
 
 
-def test_picture_frames_and_low_confidence_survive_json_storage(tmp_path, monkeypatch):
+def test_image_frames_are_read_by_ocr_model(tmp_path, monkeypatch):
+    """여러 프레임 TIFF: 프레임마다 OCR 모델을 부르고 쪽 위치·빈 프레임·OCR 경고를 남긴다. 글자 없는 사진은 no_text."""
     pil = pytest.importorskip("PIL.Image")
-    np = pytest.importorskip("numpy")
-    # Model-independent coverage, including native numpy score types returned by EasyOCR.
-    class Reader:
-        def readtext(self, pixels, **_):
-            v = pixels[0, 0, 0]
-            if v == 255:
-                return []
-            return [([(1, 1), (15, 1), (15, 12), (1, 12)], f"frame {v}", np.float32(.3))]
-    version = ocr.importlib.metadata.version
-    monkeypatch.setattr(ocr.importlib.metadata, "version", lambda name: "test" if name == "easyocr" else version(name))
-    monkeypatch.setattr(ocr, "_reader", lambda _: Reader())
-    monkeypatch.setattr(ocr, "model_dir", lambda _: tmp_path)
-    out = io.BytesIO()
-    frames = [pil.new("RGB", (30, 20), (v,v,v)) for v in (20, 255, 40)]
-    frames[0].save(out, "TIFF", save_all=True, append_images=frames[1:])
-    with TestClient(create_app(Settings(tmp_path))) as client:
-        result = process(client, "pages.tif", out.getvalue())
-        assert result["markdown"] == "frame 20\n\nframe 40"
-        assert [(loc["page"], loc["start_line"]) for loc in result["locations"]] == [(1, 1), (3, 3)]
-        assert len(result["warnings"]) == 2 and result["ocr_enabled"] is True
+    fake = FakeOcr(lambda prompt, png: "" if brightness(png) == 255 else f"frame {brightness(png)}")
+    fake.env(monkeypatch, mode="page")
+    try:
+        out = io.BytesIO()
+        frames = [pil.new("RGB", (30, 20), (v, v, v)) for v in (20, 255, 40)]
+        frames[0].save(out, "TIFF", save_all=True, append_images=frames[1:])
+        blank = io.BytesIO()
+        pil.new("RGB", (30, 20), "white").save(blank, "PNG")
+        with TestClient(create_app(Settings(tmp_path))) as client:
+            result = process(client, "pages.tif", out.getvalue())
+            assert result["markdown"] == "frame 20\n\nframe 40"
+            assert [(loc["page"], loc["start_line"]) for loc in result["locations"]] == [(1, 1), (3, 3)]
+            assert result["ocr_enabled"] is True and result["parser"] == "ocr-model"
+            assert result["warnings"][0] == ocr.OCR_READ_WARNING and any("프레임: 2" in w for w in result["warnings"])
+            assert {request["prompt"] for request in fake.requests} == {"document parsing."}
+            assert process(client, "photo.png", blank.getvalue(), "failed")["error_code"] == "no_text"
+    finally:
+        fake.close()
 
 
 def test_sparse_worksheet_and_real_anchors(tmp_path):
@@ -201,14 +201,22 @@ def test_zip_namespace_and_slide_order(tmp_path):
     assert [item["location"] for item in probe(path, "PPTX", RecordImages())["items"]] == ["슬라이드 1", "슬라이드 1", "슬라이드 2"]
 
 
-def test_real_nested_svg_and_mixed_pdf(tmp_path):
+def _ink(png: bytes) -> bool:
+    from PIL import Image
+    return Image.open(io.BytesIO(png)).convert("L").getextrema()[0] < 128
+
+
+def test_office_pictures_and_scanned_pdf_pages_use_ocr_model(tmp_path, monkeypatch):
+    """DOCX 안 그림(SVG 속 그림 포함)과 글자 층 없는 PDF 쪽을 OCR 모델로 읽고, 쪽 순서 자리에 넣는다."""
     pil = pytest.importorskip("PIL.Image")
     pdf = pytest.importorskip("pypdfium2")
     pytest.importorskip("docling.document_converter")
     from PIL import ImageDraw, ImageFont
     settings = Settings(tmp_path, docling_artifacts=Settings.from_env().docling_artifacts)
-    if not ocr.model_dir(settings) or not settings.docling_artifacts:
-        pytest.skip("local PDF layout and Korean EasyOCR weights required")
+    if not settings.docling_artifacts:
+        pytest.skip("local Docling PDF layout models required")
+    fake = FakeOcr(lambda prompt, png: "REPORT 4729" if _ink(png) else "")
+    fake.env(monkeypatch, mode="page")
     image = pil.new("RGB", (720, 320), "white")
     ImageDraw.Draw(image).text((50, 100), "REPORT 4729", fill="black", font=ImageFont.load_default(size=48))
     out = io.BytesIO()
@@ -222,14 +230,18 @@ def test_real_nested_svg_and_mixed_pdf(tmp_path):
         pages.new_page(320, 200)
         pages.import_pages(raster)
         pages.save(mixed)
-    with TestClient(create_app(settings)) as client:
-        stored = process(client, "picture.docx", doc, timeout=60)
-        assert stored["ocr_enabled"] and "VECTOR TITLE" in stored["markdown"] and "4729" in stored["markdown"]
-        assert any(f["code"] == "image_ocr" and f["ocr"]["recognized"] == 1 for f in stored["fidelity"]["findings"])
-        result = process(client, "mixed.pdf", mixed.getvalue(), timeout=90)
-        assert result["ocr_enabled"] and "4729" in result["markdown"]
-        assert 2 in {loc["page"] for loc in result["locations"]}
-        assert any("페이지: 1" in w for w in result["warnings"])
+    try:
+        with TestClient(create_app(settings)) as client:
+            stored = process(client, "picture.docx", doc, timeout=60)
+            assert stored["ocr_enabled"] and "VECTOR TITLE" in stored["markdown"] and "4729" in stored["markdown"]
+            assert any(f["code"] == "image_ocr" and f["ocr"]["recognized"] >= 1 for f in stored["fidelity"]["findings"])
+            result = process(client, "mixed.pdf", mixed.getvalue(), timeout=90)
+            assert result["ocr_enabled"] and result["markdown"] == "REPORT 4729"
+            assert [loc["page"] for loc in result["locations"]] == [2]
+            assert any(w.startswith("OCR 모델로 읽은 PDF 쪽: 2 (fake-ocr)") for w in result["warnings"])
+            assert any("페이지: 1" in w for w in result["warnings"])
+    finally:
+        fake.close()
 
 
 def test_standalone_svg_vector_text_and_unavailable_embedded_images(tmp_path):
@@ -242,23 +254,14 @@ def test_standalone_svg_vector_text_and_unavailable_embedded_images(tmp_path):
         assert process(client, "wrong.svg", b"<html/>", "failed")["error_code"] == "format_unrecognized"
 
 
-def test_ocr_budget_accounts_for_frames_pixels_and_tiles():
+def test_ocr_budget_accounts_for_frames_and_pixels():
     budget = ocr.ImageBudget()
     budget.charge(9000, 400)
-    assert budget.frames == 1 and budget.tiles > 1
+    assert budget.frames == 1 and budget.pixels == 3_600_000
     before = vars(budget).copy()
     with pytest.raises(ParserError) as exc:
         budget.charge(40000, 40000)
     assert exc.value.code == "limit_exceeded" and vars(budget) == before
-
-
-def test_tiled_ocr_merges_seams_and_keeps_separate_labels():
-    hits = [
-        ocr._Hit(2200, 30, 2300, 60, "LABEL", 0.9, False, (0, 0)),
-        ocr._Hit(2220, 30, 2300, 60, "ABEL", 0.95, True, (2080, 0)),
-        ocr._Hit(3400, 30, 3500, 60, "LABEL", 0.9, False, (2080, 0)),
-    ]
-    assert [hit.text for hit in ocr._merge_tiles(hits)] == ["LABEL", "LABEL"]
 
 
 def test_svg_symbol_references_and_image_signature(tmp_path):

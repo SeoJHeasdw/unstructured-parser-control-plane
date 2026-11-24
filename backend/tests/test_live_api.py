@@ -291,3 +291,21 @@ def test_shutdown_marks_queued_retries_failed_and_keeps_previous_result(client, 
         release.set()
         stopper.join(timeout=5)
     assert not stopper.is_alive()
+
+
+def test_document_numbers_follow_upload_order_and_survive_upgrade(tmp_path):
+    """문서 번호(seq): 번호 열이 없던 DB를 올리면 올린 순서대로 매기고, 새 문서는 다음 번호를 받는다."""
+    import sqlite3
+    from app.repository import DocumentRepository
+    database = tmp_path / "documents.sqlite3"
+    with sqlite3.connect(database) as conn:
+        conn.execute("""CREATE TABLE documents (id TEXT PRIMARY KEY, name TEXT NOT NULL, format TEXT NOT NULL,
+            size_bytes INTEGER NOT NULL, status TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL,
+            parser TEXT, parser_version TEXT, error TEXT, source_file TEXT NOT NULL, result_file TEXT, run_id TEXT)""")
+        conn.execute("INSERT INTO documents VALUES ('b','나중.txt','TXT',1,'uploaded','2026-01-02T00:00:00+00:00','2026-01-02T00:00:00+00:00',NULL,NULL,NULL,'b.txt',NULL,NULL)")
+        conn.execute("INSERT INTO documents VALUES ('a','먼저.txt','TXT',1,'uploaded','2026-01-01T00:00:00+00:00','2026-01-01T00:00:00+00:00',NULL,NULL,NULL,'a.txt',NULL,NULL)")
+    repo = DocumentRepository(database)
+    repo.initialize()
+    assert (repo.get("a")["seq"], repo.get("b")["seq"]) == (1, 2)
+    repo.initialize()  # 다시 올려도 번호는 그대로
+    assert repo.create("c", "새.txt", "TXT", 1, "c.txt")["seq"] == 3

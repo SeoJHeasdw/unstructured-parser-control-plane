@@ -11,6 +11,7 @@ from app.config import Settings
 from app import connection_store
 from app.connection_store import ConnectionStore
 from app.middleware import LocalRequestGuard, RuntimeHeader
+from app.routers.agent import router as agent_router
 from app.routers.live import router as live_router, summary_router as live_summary_router
 from app.routers.models import router as models_router
 from app.routers.lineage import router as lineage_router
@@ -51,6 +52,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(lineage_router)
     app.include_router(retrieval_router)
     app.include_router(vectordb_router)
+    app.include_router(agent_router)
 
     @app.get("/api/health")
     def health():

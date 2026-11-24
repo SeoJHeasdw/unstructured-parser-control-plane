@@ -51,6 +51,16 @@ class DocumentRepository:
             for column in ("result_parser", "result_parser_version", "result_warnings", "error_code"):
                 if column not in columns:
                     conn.execute(f"ALTER TABLE documents ADD COLUMN {column} TEXT")
+            if "seq" not in columns:
+                # 문서 번호(D번호). 화면과 작업 에이전트가 같은 번호로 문서를 부른다. 기존 문서는 올린 순서대로 매긴다.
+                conn.execute("ALTER TABLE documents ADD COLUMN seq INTEGER")
+                conn.execute('''
+                    UPDATE documents SET seq = (
+                        SELECT COUNT(*) FROM documents d2
+                        WHERE d2.created_at < documents.created_at
+                           OR (d2.created_at = documents.created_at AND d2.rowid <= documents.rowid))
+                ''')
+            conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS documents_seq ON documents(seq)")
             run_columns = {row[1] for row in conn.execute("PRAGMA table_info(parse_runs)")}
             if "duration_ms" not in run_columns:
                 conn.execute("ALTER TABLE parse_runs ADD COLUMN duration_ms INTEGER")
@@ -82,7 +92,9 @@ class DocumentRepository:
     def create(self, doc_id: str, name: str, format: str, size: int, source_file: str) -> dict[str, Any]:
         timestamp = now()
         with self.connect() as conn:
-            conn.execute("INSERT INTO documents (id,name,format,size_bytes,status,created_at,updated_at,source_file) VALUES (?,?,?,?,?,?,?,?)", (doc_id,name,format,size,"uploaded",timestamp,timestamp,source_file))
+            conn.execute("INSERT INTO documents (id,name,format,size_bytes,status,created_at,updated_at,source_file,seq) "
+                         "VALUES (?,?,?,?,?,?,?,?,(SELECT COALESCE(MAX(seq), 0) + 1 FROM documents))",
+                         (doc_id,name,format,size,"uploaded",timestamp,timestamp,source_file))
             self._event(conn, doc_id, "uploaded", "파일을 로컬에 저장했습니다. 아직 처리하지 않았습니다.")
         return self.get(doc_id)  # type: ignore[return-value]
 
