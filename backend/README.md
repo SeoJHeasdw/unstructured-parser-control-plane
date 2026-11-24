@@ -24,7 +24,7 @@ pip install -r requirements-docling.lock.txt   # Windows 포함 정확한 버전
 export DOCOPS_DOCLING_ARTIFACTS=/path/to/prepared/models
 ```
 
-**OCR은 문서 OCR 모델만 씁니다(2026-11-24 결정).** EasyOCR 같은 라이브러리 OCR 경로는 껐습니다. OCR 모델(OpenAI 호환 비전 API, 고객사 게이트웨이 서빙 예정)을 연결하기 전까지 스캔 PDF는 텍스트 층만 읽고 `OCR 미적용` 경고를 남기며, 글자 층이 없으면 `no_text`로 실패합니다. 이미지 파일과 Office·SVG 안의 그림 글자는 'OCR 모델 미연결'로 처리하지 않습니다. SVG의 벡터 글자와 Office 본문은 그대로 읽습니다.
+**OCR은 문서 OCR 모델만 씁니다(2026-11-24 결정).** 라이브러리 OCR(EasyOCR 등)은 쓰지 않습니다. 콘솔 '모델 연결'이나 `.env`의 `OCR_BASE_URL`·`OCR_MODEL`·`OCR_MODE`로 OpenAI 호환 비전 API의 OCR 모델(고객사 게이트웨이 서빙 예정, 개발 중에는 llama.cpp·Ollama)을 연결하면 PDF의 글자 층 없는 쪽과 쪽 면적 10% 이상 그림, 이미지 파일(PNG·JPEG·BMP·TIFF·GIF·WebP), Office·SVG 안 그림을 읽습니다. `region` 방식은 Docling 레이아웃 영역마다, `page` 방식은 쪽 전체를 한 번 호출합니다. OCR로 읽은 결과에는 항상 원본 대조 경고가 붙습니다. 연결 전에는 스캔 PDF는 텍스트 층만 읽고 `OCR 미적용` 경고를 남기며(글자 층이 없으면 `no_text`), 이미지 파일은 'OCR 모델 미연결'(`parser_unavailable`)로 처리하지 않습니다. 후보 모델 비교는 [OCR 모델 비교](../docs/reports/ocr-bench/README.md)에 있습니다.
 
 ## API
 

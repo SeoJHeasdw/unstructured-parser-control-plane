@@ -73,7 +73,7 @@ flowchart LR
 
 - 업로드와 파싱은 별개다. 업로드한 파일은 `runtime/uploads/`, 성공 결과는 `runtime/results/`, 문서 정보·상태·이력은 `runtime/documents.sqlite3`에 저장한다. `DOCOPS_RUNTIME_DIR`로 위치를 바꿀 수 있다. 런타임 데이터는 `.gitignore` 대상이다.
 - 텍스트 입력은 파일당 100 MiB, CSV는 100만 행·1,000열, 셀당 4,194,304자, 물리적 한 줄당 8,388,608자, UTF-8 Markdown 결과 100 MiB까지 처리합니다. UTF-8, CP949 및 BOM이 있는 UTF-16·32를 읽는다.
-- 로컬 EasyOCR 한국어·영어 모델이 준비되면 PDF의 이미지 영역, Office에서 참조한 그림, PNG·JPEG·BMP·TIFF·GIF·WebP 및 SVG 내부 그림을 읽습니다. PDF에서 글자·표가 없는 페이지, 그림 인식 실패와 낮은 신뢰도는 원본 대조 대상으로 기록한다.
+- **OCR은 문서 OCR 모델만 쓴다(2026-11-24).** OpenAI 호환 비전 API로 연결한 모델이 PDF의 글자 층 없는 쪽(200 dpi 렌더링)과 디지털 쪽의 큰 그림, 이미지 파일, Office·SVG 안 그림을 읽는다. `region` 방식은 Docling 레이아웃 영역마다, `page` 방식은 쪽 전체를 한 번 호출한다(`app/ocr_model.py`, `app/adapters/ocr.py`). OCR로 읽은 결과에는 항상 원본 대조 경고를 남긴다. PDF에서 글자·표가 없는 페이지는 계속 경고한다.
 - 지원 경로가 없는 확장자는 `unsupported`, 파서·입력 오류는 `failed`로 표시한다. 실제 형식 판별은 아직 확장자 중심이며 결과는 Markdown 텍스트다. 구조화된 페이지·시트·셀 위치의 완전한 보존, 문서 간 참조 추출, 검색 인덱싱은 아직 구현되지 않았다.
 - 처리 요청은 **전용 워커 1개와 메모리 대기열**로 접수한다. 기본 구성에서 워커 1건과 대기 64건까지 가능하며, `processing`은 대기와 실제 파싱을 구분하지 않는다. 대기열이 차면 HTTP 503과 함께 거절 이력을 기록하고 해당 문서의 기존 상태를 유지한다. 동일 문서가 이미 `processing`이면 HTTP 409다. 이 대기열은 재시작 후 살아남는 내구성 작업 큐가 아니다.
 - 정상 종료 시 새 요청을 막고 아직 시작하지 않은 대기 작업을 실패로 기록한다. 실행 중인 워커는 최대 5초 기다린다. 계속 실행 중이면 워커가 종료될 때까지 런타임 폴더 잠금을 유지하며, 프로세스가 먼저 종료되면 운영체제가 잠금을 해제한다. 다음 시작 시 남은 모든 `processing` 문서를 실패로 바꾸고 이력을 남긴다. 자동 재실행은 하지 않으며 사용자가 다시 요청해야 한다. 런타임 폴더 잠금은 같은 저장소를 사용하는 서버의 중복 실행을 방지한다.
@@ -136,7 +136,7 @@ Mock 모델과 로컬 API 상태명은 프로토타입 계약이다. 운영 계�
 | `backend/app/lineage.py`, `routers/lineage.py` | 업로드 목록과 저장된 구조 분석으로 문서군·판·최신 판단·참조 연결 상태 계산 | 링크 대상 확인을 실제 원천·버전 체계와 연결 |
 | `backend/app/chunking.py`, `embedding.py`, `retrieval_jobs.py`, `routers/retrieval.py` | 청킹 전략, 임베딩 연결(`EMBED_*`)·호출, 질문 세트 저장, 단일 평가 작업·벡터 캐시 | 평가 이력 보존, 실제 색인 파이프라인과 분리 유지 |
 | `backend/app/vectordb.py`, `routers/vectordb.py` | Milvus REST v2 읽기 전용 조회(`MILVUS_*`)와 예시 데이터 | 쓰기·삭제는 범위 밖 |
-| `backend/app/adapters/` | 텍스트/CSV·선택적 Docling 파서와 확장자 기반 선택 | 실제 형식 판별, 위치가 있는 구조화 결과, 추가 파서와 OCR을 별도 어댑터로 확장 |
+| `backend/app/adapters/`, `backend/app/ocr_model.py` | 텍스트/CSV·선택적 Docling 파서와 확장자 기반 선택, 문서 OCR 모델 연결(OpenAI 호환 비전 API, 영역·쪽 방식, 출력 정리: 표 토큰·HTML 표 → Markdown, LaTeX 기호, 반복 폭주) | 실제 형식 판별, 위치가 있는 구조화 결과, 추가 파서와 OCR을 별도 어댑터로 확장 |
 | `backend/app/format_gate.py`, `fidelity/`, `textnorm.py` | 파서 전 내용 서명 판별(DRM·암호·불일치 → 실패 코드), OOXML 파싱용 사본 보정(기호 글꼴·첨자→유니코드), 원본 인벤토리와 결과 대조(기호 손실·병합 셀·글상자·흰회색·숨김·그림 종류)와 보충 추출, 기호 보존 파일명 키 | 판별 결과로 파서 자동 선택, 병합 셀 반복 제거, PDF 글자 층 대조, 영역 단위 OCR 연결 |
 | `backend/app/agent/`, `backend/docops.py` | 작업 에이전트 도구(2026-11-24): OpenCode용 stdio MCP 서버와 CLI. 실행 중인 콘솔 API를 HTTP로 부르는 클라이언트이며 저장소를 직접 열지 않는다. 묶음 진행·D번호·호출 기록·타이핑용 보고서는 `runtime/agent/`([작업 에이전트 도구](AGENT_TOOLS.md)) | 2단계 청킹·평가, 3단계 Milvus 적재(승인), 4단계 검색(읽기 전용 묶음으로 분리) |
 | `backend/app/middleware.py` | 로컬 API의 Origin 및 요청 크기 제한, 모든 응답의 저장소 표식(`x-docops-runtime`) | 인증·인가의 대체가 아님. 배포 경계와 운영 보안은 별도 설계 |

@@ -19,7 +19,7 @@
 |---|---|---:|---|
 | `GET /api/health` | API 기능 제공 상태 | `200` | 해당 응답은 고정값으로, Docling 설치·모델 또는 실제 문서의 파싱 성공을 확인하지 않음 |
 | `GET /api/data` | `mock-data/data.json` 전체 | `200` | 예시 파일을 읽지 못하면 서버 오류 가능 |
-| `GET /api/live/parsers` | `routes`는 서버에 등록된 확장자 → 파서 ID 매핑. `docling_installed`, `pdf_model_directory`, `ocr_enabled`, `ocr_models_found`는 패키지·폴더·설정·로컬 모델 파일 확인값이다. 조회는 모델 로딩이나 파싱을 실행하지 않는다. | `200` | |
+| `GET /api/live/parsers` | `routes`는 서버에 등록된 확장자 → 파서 ID 매핑(이미지는 `ocr-model`). `docling_installed`, `pdf_model_directory`는 패키지·폴더 확인값, `ocr_models_found`는 OCR 모델 연결이 **설정됐는지**(2026-11-24부터, 호출해 보지 않음), `ocr_model`은 `{label, model_id, mode, configured}`. 조회는 모델 로딩·호출이나 파싱을 실행하지 않는다. | `200` | |
 | `GET /api/live/documents` | 로컬 문서 목록, `{ "documents": [...] }` | `200` | 현재 필터·페이지네이션 없음 |
 | `POST /api/live/documents` | `multipart/form-data`의 `file` **1개**. 저장만 수행 | `201`, `LiveDocument` | `400` 파일명 오류/길이 정보 문제, `403` 허용되지 않은 Origin, `413` 크기 초과, `422` 필수 파일 필드 누락 등 |
 | `GET /api/live/documents/{id}` | 해당 문서 상태 | `200`, `LiveDocument` | `404` ID 형식이 틀렸거나 없는 문서 |
@@ -36,6 +36,8 @@
 | `GET /api/models`, `POST /api/models/{key}/test`, `POST /api/models/{key}/models` | 생성 모델 연결(`primary`·`secondary`)과 임베딩 연결(`embedding`) 상태(키 값 제외, `saved`=화면에서 저장한 값을 씀), 사용자가 누를 때만 짧은 채팅 요청·모델 목록 조회 | `200` | `404` 연결 없음, `409` 미설정, `403` 허용되지 않은 Origin |
 | `PUT /api/models/{primary\|secondary\|embedding}`, `DELETE /api/models/{…}/saved` | 화면에서 연결 저장 `{label, base_url, model_id \| models[], api_key?, clear_api_key?}` · 저장값 지우고 `.env`로 되돌리기. `<runtime>/settings/connections.json`(0600)에 두고 `.env`보다 우선, 다음 요청부터 반영. `api_key`를 보내지 않으면 저장된 키 유지 | `200` 갱신된 목록 | `400` 주소·글자 형식 오류(계정 정보가 든 URL 거부), `404` 없는 자리 |
 | `POST /api/models/draft/test`, `POST /api/models/draft/models`, `POST /api/models/embedding/test` | 저장하지 않고 입력 중인 값으로 확인 `{kind: chat\|embed, key, base_url, model_id \| models, api_key?}`(키를 비우면 저장된 키), 저장된 임베딩 연결로 짧은 문장 하나 임베딩(차원·지연) | `200` `{ok, status, latency_ms, …}` | `400` 입력 오류, `409` 미설정 |
+| `GET /api/models`의 `ocr`, `PUT /api/models/ocr`, `DELETE /api/models/ocr/saved`, `POST /api/models/ocr/test` (2026-11-24) | 문서 OCR 모델 연결 `{label, base_url, model_id, api_key?, clear_api_key?, mode: region\|page, text_prompt, table_prompt, page_prompt}`(지시문은 비우면 기본값 `OCR:`·`Table Recognition:`·`document parsing.`). 응답에 키 값 없음(`api_key_set`). 연결 확인은 'OCR TEST 12.5 mg/mL'이 든 시험 그림을 실제로 읽혀 `12.5`가 나오는지 본다(사용자가 누를 때만, **외부 모델 호출**). `POST /api/models/draft/test`에 `kind: ocr`로 저장 전 확인 | `200` | `400` 입력 오류·방식 오류, `409` 연결 미설정 |
+| `GET /api/agent/activity?limit=` (2026-11-24) | 작업 에이전트(MCP·CLI)의 묶음·보고서·호출 기록. `runtime/agent/`를 읽기만 한다. 묶음의 문서는 `seq`(D번호)로 준다 | `200`, `{available, batches, reports, calls}` | |
 | `GET /api/lineage?source=live\|example` | 문서 계보(판 묶음·최신 판단·포함·참조 연결 상태). `live`는 업로드 목록과 **이미 실행해 둔** 구조 분석 결과만 읽고 분석·파싱을 새로 시작하지 않는다. `example`은 `mock-data/lineage-example.json`으로 계산한다 | `200`, `LineageData` | `400` 출처 값 오류, `503` 예시 파일 읽기 실패 |
 | `GET /api/retrieval/config` | 임베딩 연결(`EMBED_*`와 주소가 있는 `MODEL_*`·`MODEL2_*`, 키 값 제외), 모델 사양, 청킹 전략 설명, 요청 한도, 벡터 캐시 크기 | `200` | `403` 허용되지 않은 Origin(이하 `/api/retrieval`, `/api/vectordb` 공통) |
 | `GET /api/retrieval/documents`, `GET /api/retrieval/samples` | 청킹 원문 후보: 성공 결과가 있는 실제 문서 / 합성 예시 3종(`sop` 절차서, `report` 그림 많은 점검 보고서, `coa` 표 많은 시험 성적서)과 요소 구성 | `200` | |
@@ -93,9 +95,12 @@ Content-Type: text/plain
   "updated_at": "2026-11-12T05:00:00+00:00",
   "parser": null,
   "error": null,
-  "error_code": null
+  "error_code": null,
+  "seq": 12
 }
 ```
+
+`seq`(2026-11-24)는 문서 번호다. 올린 순서로 1부터 매기며 바뀌지 않는다(유일 인덱스). 화면과 작업 에이전트가 `D12`처럼 같은 번호로 부른다. 번호 열이 없던 DB는 시작할 때 기존 문서에 올린 순서(`created_at`, 같으면 저장 순서)대로 매긴다.
 
 | 필드 | 의미 및 제한 |
 |---|---|
@@ -262,9 +267,9 @@ stateDiagram-v2
 |---|---|---|
 | `.txt`, `.md`, `.log` | Python 텍스트 | UTF-8(선택 BOM), CP949, BOM이 있는 UTF-16/32. 100 MiB. 디코딩 실패·NUL은 `encoding_unknown`, 빈 본문은 `no_text` |
 | `.csv` | Python CSV → Markdown | 텍스트 입력은 파일당 100 MiB, CSV는 100만 행·1,000열, 셀당 4,194,304자, 물리적 한 줄당 8,388,608자, UTF-8 Markdown 결과 100 MiB까지 처리합니다. 큰 파일은 두 차례 순회하여 열 너비를 확인한 뒤 행 단위로 출력한다. |
-| `.pdf` | Docling + 선택적 EasyOCR | 텍스트·스캔 혼합, OCR 설정과 페이지 위치를 기록한다. 최대 500쪽, 렌더링 페이지당 3,200만 픽셀. |
-| PNG·JPEG·BMP·TIFF·GIF·WebP | EasyOCR | 다중 프레임·EXIF 회전·투명 배경을 처리한다. 프레임당 3,200만, 문서당 누적 1억 6천만 픽셀, 최대 128프레임·256타일. |
-| SVG | XML 텍스트 + 선택적 EasyOCR | 최대 10 MiB. 벡터 글자와 인라인 그림을 읽는다. 원격 참조는 가져오지 않는다. |
+| `.pdf` | Docling(글자 층·레이아웃·표) + OCR 모델(연결 시) | 글자 층 없는 쪽은 200 dpi로 렌더링해 OCR 모델로 읽고 쪽 순서 자리에 끼운다. 디지털 쪽의 큰 그림(쪽 면적 10% 이상, 문서당 40개)은 잘라 읽어 그 쪽 끝에 `[그림 속 글자]`로 붙인다. OCR로 읽은 쪽·그림은 경고로 남긴다. 최대 500쪽, 렌더링 페이지당 3,200만 픽셀. Docling 안의 OCR은 쓰지 않는다. |
+| PNG·JPEG·BMP·TIFF·GIF·WebP | OCR 모델(`ocr-model`) | 다중 프레임·EXIF 회전·투명 배경을 처리한다. 프레임당 3,200만, 문서당 누적 1억 6천만 픽셀, 최대 128프레임. 모델 미연결이면 `parser_unavailable`, 글자가 없으면 `no_text`(작업 에이전트 보고서에서는 `empty`로 따로 센다). |
+| SVG | XML 텍스트 + OCR 모델(인라인 그림, 연결 시) | 최대 10 MiB. 벡터 글자와 인라인 그림을 읽는다. 원격 참조는 가져오지 않는다. |
 | `.docx` | 사본 보정 → 선택 설치 Docling → 원문 대조 | Docling 2.150.0의 합성 DOCX 검증. 엣지 케이스 실측(아래)은 합성 문서 기준이며 복잡한 실제 문서 품질은 별도 검증 필요 |
 | `.xlsx`, `.pptx` | 사본 보정 → 선택 설치 Docling 경로 → 원문 대조 | XLSX는 합성 문서로 첨자·병합 셀·글상자·흰회색 글자를 실측. PPTX는 합성 그림 슬라이드에서 OCR을 확인했다. 캐시 값이 없는 보이는 시트의 셀은 수식 원문·셀 위치를 보충한다. 외부 문서 참조와 수식 재계산은 별도 범위 |
 | HWP/HWPX, ZIP, 메일 및 그 밖의 형식 | 현재 미지원 | 업로드 후 처리 요청 시 `unsupported`. Mock 파이프라인의 예시 구성과 실제 지원은 별개 |
