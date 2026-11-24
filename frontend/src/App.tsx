@@ -22,6 +22,7 @@ const LineageView = lazy(() => import('./LineageView'));
 const ChunkBench = lazy(() => import('./ChunkBench'));
 const EmbeddingEval = lazy(() => import('./EmbeddingEval'));
 const VectorDbWorkspace = lazy(() => import('./VectorDbWorkspace'));
+const AgentActivity = lazy(() => import('./AgentActivity'));
 
 /** 사이드바 접기·펼치기 아이콘. 둥근 막대가 사이드바, 화살표가 누를 때 갈 방향이다.
  * 상태가 바뀌면 막대가 줄고 늘며 화살표가 뒤집히고, 마우스를 올리면 누른 뒤 모습을 미리 보여 준다(shell.css). */
@@ -116,6 +117,7 @@ export default function App() {
     : route.doc ? `doc:${route.doc}` as const : route.sample ? `sample:${route.sample}` as const : undefined;
   const nav = (expanded: boolean) => <nav className="shell-nav" aria-label="업무 메뉴">
     {navLink('live', '문서함', FolderOpen, active === 'live', expanded)}
+    {navLink('agent', '에이전트 작업', destinations.agent.icon, active === 'agent', expanded)}
     {navLink('parsers', '파서 플로우', destinations.parsers.icon, active === 'parsers' || active === 'pipeline', expanded)}
     {navLink('chunking', '청킹 비교', destinations.chunking.icon, active === 'chunking', expanded)}
     <hr className="shell-nav-rule" />
@@ -149,13 +151,14 @@ export default function App() {
       <div id="workspace-content" ref={content} tabIndex={-1} className={'shell-content' + (active === 'pipeline' ? ' is-fill' : '')}>
         {toolsList.includes(active) && <a className="workspace-back" href={workspaceHref({page:'analysis'})} onClick={e => link(e, 'analysis')}><ArrowLeft size={15}/>분석 도구로</a>}
         {examples.includes(active) && <nav className="example-nav" aria-label="예시 둘러보기">{examples.map(page => <a key={page} href={workspaceHref({page})} aria-current={active === page ? 'page' : undefined} onClick={e => link(e, page)}>{destinations[page].label}</a>)}</nav>}
-        {active !== 'live' && active !== 'pipeline' && <div className="shell-title-row"><div><h1 tabIndex={-1}>{info.label}</h1>{active === 'parsers' && <p>파일 형식별 처리 경로와 로컬 문서의 파싱 상태를 확인하세요.</p>}{active === 'chunking' && <p>같은 원문에서 전략을 바꿔 가며 청크의 크기와 표·그림 보존 결과를 비교하세요.</p>}</div>
+        {active !== 'live' && active !== 'pipeline' && <div className="shell-title-row"><div><h1 tabIndex={-1}>{info.label}</h1>{active === 'parsers' && <p>파일 형식별 처리 경로와 로컬 문서의 파싱 상태를 확인하세요.</p>}{active === 'chunking' && <p>같은 원문에서 전략을 바꿔 가며 청크의 크기와 표·그림 보존 결과를 비교하세요.</p>}{active === 'agent' && <p>작업 에이전트(OpenCode 등)가 도구로 실행한 파싱 묶음과 보고서, 호출 기록을 읽기 전용으로 확인하세요.</p>}</div>
           {active === 'parsers' && <div className="shell-flow-actions"><WorkspaceLink className="button-secondary" to={{page:'pipeline', mode:'design'}} onNavigate={openRoute}><FlaskConical size={16}/>모의 플로우 설계</WorkspaceLink>{fullscreenButton}</div>}</div>}
         {active === 'analysis' && <div className="tools-directory">{toolsList.map(page => {
           const tool = destinations[page], Icon = tool.icon;
           return <a key={page} href={workspaceHref({page})} onClick={e => link(e, page)}><Icon size={22} strokeWidth={1.75}/><span><strong>{tool.label}</strong><small>{tool.description}</small></span><ArrowRight size={17}/></a>;
         })}</div>}
         {keep('live', <LiveWorkspace active={active === 'live'} route={route} onRoute={changeLive} onNavigate={openRoute} onUploadStateChange={setUploading} onFamily={id => go({ page: 'relations', familyDoc: id })}/>)}
+        {keep('agent', <AgentActivity active={active === 'agent'} onNavigate={openRoute}/>)}
         {example && !data && active !== 'pipeline' && <div className="panel shell-loading" role={mockError ? 'alert' : 'status'}><AlertCircle size={21}/><p>{mockError ? '예시 데이터를 불러오지 못했습니다.' : '예시 데이터를 불러오는 중입니다.'}</p>{mockError && <button className="button-secondary" onClick={() => setAttempt(n => n + 1)}>다시 시도</button>}</div>}
         {active === 'overview' && data && <Dashboard docs={data.documents} onOpenDoc={setSelected} onNavigate={navigate}/>}
         {data && keep('documents', <DocumentBrowser docs={data.documents} filter={filter} onFilterChange={setFilter} onOpenDoc={setSelected} onPipeline={format => navigate('pipeline', {format})}/>)}

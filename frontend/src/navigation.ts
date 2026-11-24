@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
-import { BookOpen, Boxes, Database, FileSearch, FlaskConical, FolderOpen, GitBranch, GitCompareArrows, ListChecks, Network, Scissors, Settings2, Workflow } from 'lucide-react';
+import { BookOpen, Bot, Boxes, Database, FileSearch, FlaskConical, FolderOpen, GitBranch, GitCompareArrows, ListChecks, Network, Scissors, Settings2, Workflow } from 'lucide-react';
 
 export const destinations = {
   live: { label: '문서함', group: '실제 문서', icon: FolderOpen, description: '파일 업로드와 파싱, 추출 결과 검수', alias: '실제 파일 처리' },
+  agent: { label: '에이전트 작업', group: '실제 문서', icon: Bot, description: '작업 에이전트가 실행한 묶음과 보고서, 도구 호출 기록을 확인합니다.', alias: 'OpenCode MCP 작업 도구 호출 기록 보고서 묶음 B번호 R번호 D번호' },
   parsers: { label: '파서 플로우', group: '문서 처리', icon: Workflow, description: '파일 형식별 파서와 추출 단계, 처리 문서를 확인합니다.', alias: '파서 파이프라인 파서 관리 라우팅 OCR' },
   analysis: { label: '분석 도구', group: '분석 도구', icon: Boxes, description: '문서 분석과 검색 품질 평가', alias: '' },
   chunking: { label: '청킹 비교', group: '문서 처리', icon: Scissors, description: '같은 원문을 여러 전략으로 나누고 청크를 비교합니다.', alias: '청킹 벤치 전략 관리' },

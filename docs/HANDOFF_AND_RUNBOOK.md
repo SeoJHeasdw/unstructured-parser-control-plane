@@ -12,15 +12,15 @@
 - 보고서에 `empty`(글자 없는 이미지, 실패로 세지 않음), `ocr-read`·`ocr-repeat` 코드. `ver` 줄은 `docling=2.150.0 ocr-model=PaddleOCR-VL-1.6-GGUF/region` 형식.
 - 검증: 백엔드 188 통과(가짜 OCR 서버로 이미지·Office 그림·스캔 PDF 끼워 넣기·설정 API). 실제 PaddleOCR-VL로 `08_scans` 4건을 콘솔 경로 그대로 처리해 4건 모두 `ocr-read` 경고로 끝나는 것 확인.
 
-**진행 중(커밋 안 함):** 별도 작업자가 프론트를 고치는 중 — D번호 표시·검색, '에이전트 작업' 화면, 모델 연결의 OCR 카드, '글자 없음' 표시, `docs/FRONTEND_AND_INTERACTION_CONTRACT.md`. 다음 세션에서 `git status`로 `frontend/` 변경을 확인하고 `npm test`·`npm run build`·화면 검수 후 커밋한다.
+**프론트(커밋함, 같은 날 밤):** D번호 표시·검색(`D12`·`d-12`·`#12`·`12`), '에이전트 작업' 화면(`?view=agent`: 묶음·보고서·호출 기록, 10초 자동 새로고침은 화면이 보일 때만), 모델 연결의 'OCR 모델' 탭(방식·지시문·저장 전 확인·되돌리기, 키는 표시 안 함), 이미지 `no_text`는 '글자 없음'(실패 필터·건수에서 제외), 파서 플로우에 연결된 OCR 모델 ID. 프론트 144 통과·빌드. **브라우저로 화면을 직접 보지는 못했다**(jsdom 테스트만) → 다음 세션 첫 일로 화면 검수.
+**같은 날 밤 추가(백엔드):** 디지털 PDF 쪽의 큰 그림(쪽 면적 10% 이상, 문서당 40개) OCR → 그 쪽 끝에 `[그림 속 글자]`, `/api/agent/activity`에 로컬 Origin 검사, 문서 정합성(API 계약·아키텍처·README·형식·파이프라인).
 
 **다음 할 일(추천 순서):**
-1. 프론트 변경 검수·커밋(위).
-2. 반복 자르기 판단을 실제 출력으로 확인(TIF 점검표에서 예전 규칙이 발동했었음 → 끝 반복만 자르도록 고침, 재확인 필요).
-3. 디지털 PDF 쪽 안의 큰 그림(스캔 삽입·차트) OCR. 지금은 글자 층 없는 쪽만 OCR한다.
-4. 도표 이미지(계통도·흐름도)의 그림 영역 글자: region 방식에서 picture 영역도 읽는지 실제 이미지로 확인.
-5. 작업 에이전트 2단계(청킹·임베딩 평가), 3단계 Milvus 적재(로컬 Milvus 2.6.27: `infra/milvus-dev`, `docker compose up -d`, REST 127.0.0.1:19530).
-6. 고객사 요청: 게이트웨이 OCR 모델 서빙(영역 방식 PaddleOCR-VL-1.6 또는 쪽 방식 Schift·Unlimited-OCR), Milvus 제공, 임베딩 모델, 에이전트용 LLM 목록.
+1. 새 화면 브라우저 검수(에이전트 작업, OCR 모델 탭, D번호, 글자 없음).
+2. 실제 OCR 모델로 다시 확인(모델 실행은 이번 밤에 하지 않음): 반복 자르기(끝 반복만), 디지털 PDF 큰 그림, 도표 이미지의 그림 영역, `08_scans`·`09_images`·스캔 COA 재처리 후 보고서.
+3. (선택) OCR 연결 창의 게이트웨이 모델 목록: 백엔드 `/api/models/draft/models`가 `kind: ocr`를 받도록 하고 화면에 목록 선택 추가.
+4. 작업 에이전트 2단계(청킹·임베딩 평가), 3단계 Milvus 적재(로컬 Milvus 2.6.27: `infra/milvus-dev`, `docker compose up -d`, REST 127.0.0.1:19530).
+5. 고객사 요청: 게이트웨이 OCR 모델 서빙(영역 방식 PaddleOCR-VL-1.6 또는 쪽 방식 Schift·Unlimited-OCR), Milvus 제공, 임베딩 모델, 에이전트용 LLM 목록.
 
 **이 Mac 상태:** Docker Desktop·Milvus 컨테이너는 켜 둠(끄려면 `infra/milvus-dev`에서 `docker compose stop`). 시험용 llama-server·임시 콘솔 서버는 껐다. 다시 켜기: `llama-server -hf PaddlePaddle/PaddleOCR-VL-1.6-GGUF --host 127.0.0.1 --port 8091 --temp 0 -c 16384 -ngl 99`.
 

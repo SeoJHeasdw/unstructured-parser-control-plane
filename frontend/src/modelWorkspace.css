@@ -108,7 +108,7 @@
 .mw-form { display: grid; gap: 16px; }
 .mw-form > label, .mw-field { display: grid; gap: 6px; }
 .mw-form > label > span, .mw-field > span, .mw-field > label { color: var(--ink-2); font-size: 13px; font-weight: 650; }
-.mw-form input:not([type=checkbox]) { min-height: 38px; padding: 0 10px; border: 1px solid var(--rule-strong); border-radius: 8px; background: var(--surface); color: var(--ink-1); font: inherit; font-size: 13.5px; }
+.mw-form input:not([type=checkbox]):not([type=radio]) { min-height: 38px; padding: 0 10px; border: 1px solid var(--rule-strong); border-radius: 8px; background: var(--surface); color: var(--ink-1); font: inherit; font-size: 13.5px; }
 .mw-form input:disabled { background: var(--surface-2); color: var(--ink-4); }
 .mw-form input:focus-visible { outline: 2px solid var(--accent-ring); outline-offset: 0; border-color: transparent; }
 .mw-form small { color: var(--ink-3); font-size: 12px; }
@@ -132,3 +132,23 @@
 .mw-form-error { display: flex; align-items: center; gap: 7px; margin-top: 14px; color: var(--bad); font-size: 13px; }
 .ui-dialog-foot .mw-forget { margin-right: auto; }
 @media (max-width: 520px) { .mw-edit { margin-left: 0; } .mw-usage { margin-inline: 13px; } }
+
+/* ---------- OCR 모델 ---------- */
+.mw-sub { color: var(--ink-3); font-size: 12px; }
+.mw-prompt { display: inline-flex; align-items: center; gap: 5px; color: var(--ink-3); font-size: 12px; }
+.mw-prompt code { padding: 2px 6px; border-radius: 5px; background: var(--surface-3); color: var(--ink-2); }
+.mw-prompt small { color: var(--ink-4); font-size: 11px; }
+.mw-modes { display: grid; gap: 6px; min-width: 0; margin: 0; padding: 0; border: 0; }
+.mw-modes legend { margin-bottom: 6px; padding: 0; color: var(--ink-2); font-size: 13px; font-weight: 650; }
+.mw-mode { display: flex; align-items: flex-start; gap: 9px; padding: 9px 11px; border: 1px solid var(--rule); border-radius: 8px; cursor: pointer; transition: border-color var(--dur-1), background-color var(--dur-1); }
+.mw-mode:hover { border-color: var(--rule-strong); }
+.mw-mode:has(input:checked) { border-color: #cdd9fb; background: var(--accent-soft); }
+.mw-mode:has(input:focus-visible) { outline: 2px solid var(--accent-ring); outline-offset: 1px; }
+.mw-mode input { margin: 3px 0 0; accent-color: var(--accent); }
+.mw-mode b { color: var(--ink-1); font-size: 13.5px; font-weight: 650; }
+.mw-mode small { margin-left: 4px; color: var(--ink-3); font-size: 12.5px; }
+.mw-prompts { display: grid; gap: 10px; }
+.mw-prompts > summary { width: fit-content; cursor: pointer; color: var(--ink-2); font-size: 13px; font-weight: 650; }
+.mw-prompts[open] > summary { margin-bottom: 2px; }
+.mw-prompts > label { display: grid; gap: 6px; }
+.mw-prompts > label > span { color: var(--ink-2); font-size: 13px; font-weight: 600; }

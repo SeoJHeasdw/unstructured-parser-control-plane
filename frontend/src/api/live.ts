@@ -1,6 +1,7 @@
 /** API boundary for explicit local file operations. No request runs until called. */
 export type LiveStatus = 'uploaded' | 'processing' | 'completed' | 'failed' | 'unsupported';
-export type LiveDoc = { id: string; name: string; format: string; size_bytes: number; status: LiveStatus; created_at: string; updated_at: string; parser: string | null; error: string | null; error_code?: string | null };
+/** seq: 문서 번호. 화면과 작업 에이전트가 'D12'처럼 부른다. 예전 서버는 보내지 않는다. */
+export type LiveDoc = { id: string; name: string; format: string; size_bytes: number; status: LiveStatus; created_at: string; updated_at: string; parser: string | null; error: string | null; error_code?: string | null; seq?: number | null };
 export type LiveResult = { id: string; markdown: string; parser: string; parser_version: string; is_stale: boolean; fidelity?: {findings?: {message: string}[]} | null; warnings: string[] };
 export type ResultLocation = { start_line: number; end_line: number; page: number | null; start_offset?: number | null; end_offset?: number | null; sheet: string | null; row: number | null; column: number | null; columns: number | null };
 export type ParseRun = { run_id: string; completed_at: string | null; parser: string | null; parser_version: string | null; ocr_enabled: boolean | null; is_latest: boolean; duration_ms?: number | null };
@@ -26,9 +27,11 @@ async function readResponse<T>(response:Response):Promise<T> {
  return await response.json() as T;
 }
 
+/** ocr_models_found: OCR 모델 연결 설정 여부(호출해 보지는 않음). ocr_model은 예전 서버에 없다. */
 export type ParserCatalog = {
  routes: Record<string, string>; docling_installed: boolean; pdf_model_directory: boolean;
  ocr_enabled: boolean; ocr_models_found: boolean;
+ ocr_model?: { label: string; model_id: string; mode: 'region' | 'page'; configured: boolean } | null;
 };
 export async function getParserCatalog(signal: AbortSignal): Promise<ParserCatalog> {
  const catalog = await readResponse<ParserCatalog>(await fetch('/api/live/parsers', { signal }));

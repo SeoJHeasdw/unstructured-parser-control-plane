@@ -96,3 +96,5 @@
   .shell-flow-fullscreen .pr-stages strong { font-size:18px; }
   .shell-flow-fullscreen .pr-stages p { font-size:14px; }
 }
+.pr-ocr-model { color:var(--ink-3); font-size:11.5px; }
+.pr-ocr-model code { font:600 11.5px ui-monospace,SFMono-Regular,Consolas,monospace; color:var(--ink-2); overflow-wrap:anywhere; }

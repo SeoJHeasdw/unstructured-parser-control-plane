@@ -203,3 +203,11 @@
 .lw-drop-hint { animation: ui-fade .14s ease-out; }
 .lw-inbox, .lw-detail, .lw-empty, .compare-space { animation: ui-fade .2s ease-out; }
 .st-row { animation: ui-fade .16s ease-out; }
+
+/* 문서 번호(D12): 작업 에이전트와 사람이 같은 번호로 부른다. 고정폭·작게. */
+.lw-seq { display: inline-block; padding: 0 5px; border-radius: 4px; background: var(--surface-3); color: var(--ink-2); font: 600 11.5px/18px ui-monospace,SFMono-Regular,Consolas,monospace; font-variant-numeric: tabular-nums; letter-spacing: 0; white-space: nowrap; vertical-align: 1px; }
+.lw-file-copy small .lw-seq, .pr-doc small .lw-seq { margin-right: 4px; }
+.lw-subline > .lw-seq { font-size: 12px; }
+/* 글자 없음: 실패가 아닌 중립 상태 */
+.lw-status.is-no_text { color: var(--ink-3); }
+.lw-message.is-neutral { color: var(--ink-2); background: var(--surface-3); border-left-color: var(--rule-strong); }

@@ -1,19 +1,24 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { ArrowUpRight, Scissors, Workflow, CheckCircle2, CircleAlert, Clock3, FilePlus2, FolderOpen, ListFilter, LoaderCircle, RefreshCw, Search } from 'lucide-react';
 import { LiveRequestError, getLiveDocument, getLiveResult, listLiveDocuments, processLiveDocument, uploadLiveDocument } from './api/live';
-import type { LiveDoc, LiveResult, LiveStatus } from './api/live';
-import LiveDocumentView, { displayDate, displaySize, failureReason, FileGlyph, StatusBadge } from './LiveDocumentView';
+import type { LiveDoc, LiveResult } from './api/live';
+import LiveDocumentView, { DocNumber, displayDate, displaySize, displayStatus, FileGlyph, isNoTextImage, matchesDocQuery, statusNote, StatusBadge } from './LiveDocumentView';
+import type { DisplayStatus } from './LiveDocumentView';
 import { ArrowLeft } from 'lucide-react';
 import { DocumentRuns } from './compare/LiveCompare';
 import { workspaceHref, type WorkspaceRoute } from './navigation';
 import { WorkspaceLink } from './WorkspaceLink';
 import './live.css';
 
-type Filter = 'all' | 'attention' | LiveStatus;
+type Filter = 'all' | 'attention' | DisplayStatus;
 const filterOptions: {id:Filter; label:string}[] = [
- {id:'all',label:'전체 상태'},{id:'attention',label:'실패 · 미지원'},{id:'uploaded',label:'실행 전'},{id:'processing',label:'처리 중 / 대기'},{id:'completed',label:'완료'},{id:'failed',label:'실패'},{id:'unsupported',label:'지원 안 됨'}
+ {id:'all',label:'전체 상태'},{id:'attention',label:'실패 · 미지원'},{id:'uploaded',label:'실행 전'},{id:'processing',label:'처리 중 / 대기'},{id:'completed',label:'완료'},{id:'failed',label:'실패'},{id:'unsupported',label:'지원 안 됨'},{id:'no_text',label:'글자 없음 (이미지)'}
 ];
-const needsAttention = (status: LiveStatus) => status === 'failed' || status === 'unsupported';
+const needsAttention = (status: DisplayStatus) => status === 'failed' || status === 'unsupported';
+/** 끝난 작업의 안내. 글자 없는 이미지는 실패가 아니므로 오류로 띄우지 않는다. */
+const outcome = (doc: LiveDoc) => isNoTextImage(doc) ? {notice:`${doc.name}: 이미지에서 글자를 찾지 못했습니다. 상세에서 확인해 주세요.`}
+  : doc.status === 'completed' ? {notice:`${doc.name} 파싱이 완료되었습니다. 결과를 확인해 주세요.`}
+  : doc.status === 'failed' || doc.status === 'unsupported' ? {error:`${doc.name}: ${doc.status === 'failed' ? '파싱에 실패했습니다.' : '지원하지 않는 형식입니다.'} 상세 상태를 확인해 주세요.`} : null;
 const POLL_INTERVAL_MS = 2000;
 const MAX_POLL_ATTEMPTS = 120;
 
@@ -75,13 +80,14 @@ export default function LiveWorkspace({ active = true, route, onRoute, onFamily,
  const current = detail?.missing ? null : listed ?? detail?.doc ?? null;
  const processingCount=documents.filter(doc=>doc.status==='processing').length;
  const filtered = useMemo(() => {
-  const search = query.trim().toLowerCase();
-  return documents.filter(doc => (filter === 'all' || (filter === 'attention' ? needsAttention(doc.status) : doc.status === filter))
-    && `${doc.name} ${doc.format} ${doc.id}`.toLowerCase().includes(search));
+  return documents.filter(doc => {
+   const status = displayStatus(doc);
+   return (filter === 'all' || (filter === 'attention' ? needsAttention(status) : status === filter)) && matchesDocQuery(doc, query);
+  });
  }, [documents, filter, query]);
  const counts = useMemo(() => {
-  const next: Record<Filter, number> = { all: documents.length, uploaded: 0, processing: 0, completed: 0, failed: 0, unsupported: 0, attention: 0 };
-  for (const doc of documents) next[doc.status] += 1;
+  const next: Record<Filter, number> = { all: documents.length, uploaded: 0, processing: 0, completed: 0, failed: 0, unsupported: 0, no_text: 0, attention: 0 };
+  for (const doc of documents) next[displayStatus(doc)] += 1;
   next.attention = next.failed + next.unsupported;
   return next;
  }, [documents]);
@@ -173,11 +179,9 @@ export default function LiveWorkspace({ active = true, route, onRoute, onFamily,
  useEffect(()=>{
   for(const doc of documents){
    if(!watchedJobs.current.has(doc.id))continue;
-   if(doc.status==='completed'){
-    watchedJobs.current.delete(doc.id);setActionError('');setNotice(`${doc.name} 파싱이 완료되었습니다. 결과를 확인해 주세요.`);
-   }else if(doc.status==='failed'||doc.status==='unsupported'){
-    watchedJobs.current.delete(doc.id);setNotice('');setActionError(`${doc.name}: ${doc.status==='failed'?'파싱에 실패했습니다.':'지원하지 않는 형식입니다.'} 상세 상태를 확인해 주세요.`);
-   }
+   const done=outcome(doc);
+   if(done?.notice){watchedJobs.current.delete(doc.id);setActionError('');setNotice(done.notice)}
+   else if(done?.error){watchedJobs.current.delete(doc.id);setNotice('');setActionError(done.error)}
   }
  },[documents]);
  useEffect(()=>{
@@ -241,9 +245,10 @@ export default function LiveWorkspace({ active = true, route, onRoute, onFamily,
   try {
    const updated=await processLiveDocument(doc.id);
    if(mounted.current){
+    const done=outcome(updated);
     if(updated.status==='processing'){watchedJobs.current.add(updated.id);setNotice('파싱 작업이 접수되었습니다. 대기 또는 처리 상태를 자동으로 확인합니다.')}
-    else if(updated.status==='completed'){setNotice(`${updated.name} 파싱이 완료되었습니다. 결과를 확인해 주세요.`)}
-    else if(updated.status==='failed'||updated.status==='unsupported'){setActionError(`${updated.name}: ${updated.status==='failed'?'파싱에 실패했습니다.':'지원하지 않는 형식입니다.'} 상세 상태를 확인해 주세요.`)}
+    else if(done?.notice){setNotice(done.notice)}
+    else if(done?.error){setActionError(done.error)}
     mutationVersion.current += 1;
     setDocuments(prev=>prev.map(item=>item.id===updated.id?updated:item));
    }
@@ -282,9 +287,9 @@ export default function LiveWorkspace({ active = true, route, onRoute, onFamily,
     </nav>}
     <div className="lw-sheet">
       <div className="lw-tools">
-        <label className="lw-search"><Search size={17} /><input aria-label="실제 문서 검색" placeholder="파일명, 확장자 또는 ID 검색" value={query} onChange={event => setQuery(event.target.value)} /></label>
+        <label className="lw-search"><Search size={17} /><input aria-label="실제 문서 검색" placeholder="파일명, D번호, 확장자 또는 ID 검색" value={query} onChange={event => setQuery(event.target.value)} /></label>
         <label className="lw-filter"><ListFilter size={16}/><select aria-label="처리 상태 필터" value={filter} onChange={event => setFilter(event.target.value as Filter)}>
-          {filterOptions.map(option => <option key={option.id} value={option.id}>{option.label}{countsAvailable ? ` (${counts[option.id]})` : ''}</option>)}
+          {filterOptions.filter(option => option.id !== 'no_text' || counts.no_text > 0 || filter === 'no_text').map(option => <option key={option.id} value={option.id}>{option.label}{countsAvailable ? ` (${counts[option.id]})` : ''}</option>)}
         </select></label>
         {(query || filter !== 'all') && filtered.length > 0 && <button className="lw-reset" onClick={resetFilters}>조건 초기화</button>}
         {countsAvailable && <span className="lw-count">{filtered.length.toLocaleString('ko-KR')}개 문서</span>}
@@ -302,13 +307,13 @@ export default function LiveWorkspace({ active = true, route, onRoute, onFamily,
              if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return;
              e.preventDefault(); selectDocument(doc.id);
            }}>
-             <span className="lw-file"><FileGlyph format={doc.format}/><span className="lw-file-copy"><FileName name={doc.name}/><small>{needsAttention(doc.status) ? failureReason(doc) : `${doc.format || '확장자 없음'} · ${displaySize(doc.size_bytes)}`}</small></span></span>
-             <StatusBadge status={doc.status}/><time dateTime={doc.updated_at}>{displayDate(doc.updated_at)}</time>
+             <span className="lw-file"><FileGlyph format={doc.format}/><span className="lw-file-copy"><FileName name={doc.name}/><small><DocNumber seq={doc.seq}/>{statusNote(doc) ?? `${doc.format || '확장자 없음'} · ${displaySize(doc.size_bytes)}`}</small></span></span>
+             <StatusBadge status={displayStatus(doc)}/><time dateTime={doc.updated_at}>{displayDate(doc.updated_at)}</time>
            </a></li>)}</ul>
          </>}
       </div>
     </div>
-    <details className="lw-disclosure"><summary>지원 형식 안내</summary><p>TXT·CSV·MD·LOG는 기본 환경에서 처리합니다. PDF·DOCX·PPTX·XLSX는 Docling이 필요합니다. 한국어·영어 OCR 모델이 있으면 이미지와 스캔 PDF의 글자도 읽습니다. SVG 벡터 글자는 기본 환경에서 읽습니다.</p></details>
+    <details className="lw-disclosure"><summary>지원 형식 안내</summary><p>TXT·CSV·MD·LOG는 기본 환경에서 처리합니다. PDF·DOCX·PPTX·XLSX는 Docling이 필요합니다. 설정의 모델 연결에서 OCR 모델을 연결하면 이미지와 스캔 PDF의 글자도 읽습니다. SVG 벡터 글자는 기본 환경에서 읽습니다.</p></details>
   </section>}
   {current && detail?.error && <div className="lw-message is-warning" role="alert">마지막 조회 결과입니다. {detail.error}<button onClick={() => setDetailRevision(n => n + 1)}>다시 시도</button></div>}
   {selectedId && !current && <section className="lw-empty">

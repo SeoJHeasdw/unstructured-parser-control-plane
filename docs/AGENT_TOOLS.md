@@ -28,7 +28,8 @@ flowchart LR
 - MCP 서버와 CLI는 **실행 중인 콘솔 서버의 HTTP API만** 부른다. 서버가 `runtime/server.lock`으로 저장소를 혼자 쓰기 때문에 SQLite를 직접 열지 않는다. 덕분에 에이전트가 한 일이 콘솔 화면에도 그대로 보인다.
 - 서버 찾기: `DOCOPS_API_URL`이 있으면 그 주소, 없으면 `127.0.0.1:8000~8019`의 `/api/health`를 보고 응답 헤더 `x-docops-runtime`(저장소 경로의 SHA-256)이 같은 서버를 고른다. 이 헤더는 이제 앱이 모든 응답에 붙이므로 `run.sh`·`start.cmd` 어느 쪽으로 띄워도 찾는다. 사내 `HTTP_PROXY`가 127.0.0.1 요청을 가로채지 않게 프록시를 쓰지 않는다.
 - 표준 라이브러리만 쓴다. 의존성 잠금 파일은 바뀌지 않았고, 가상환경 없이 Python 3.12 이상이면 실행된다(`python3.13 -I docops.py status`로 확인).
-- 에이전트 상태는 `runtime/agent/`에 둔다: `calls.jsonl`(모든 도구 호출), `aliases.json`(D번호), `batches.json`(B번호), `registry.json`(원본 경로→문서), `runs.json`(실행별 지표 캐시), `reports/*.txt`.
+- D번호는 서버가 매긴 문서 번호(`LiveDocument.seq`)라 콘솔 화면과 같다. 번호를 보내지 않는 이전 서버에서만 작업 도구가 `aliases.json`에 따로 매긴다. 콘솔의 '에이전트 작업' 화면(`?view=agent`)에서 묶음·보고서·호출 기록을 본다.
+- 에이전트 상태는 `runtime/agent/`에 둔다: `calls.jsonl`(모든 도구 호출), `batches.json`(B번호), `registry.json`(원본 경로→문서), `runs.json`(실행별 지표 캐시), `reports/*.txt`.
 
 ## 3. 고객사 PC 설치
 

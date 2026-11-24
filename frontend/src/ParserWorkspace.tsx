@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { ArrowRight, ChevronRight, CircleAlert, FileCheck2, FileCode2, FileInput, FileText, GitBranch, Layers3, PencilRuler, Play, RefreshCw, ScanText, Scissors, Settings2, SlidersHorizontal, Table2, Workflow } from 'lucide-react';
 import { getParserCatalog, listLiveDocuments, processLiveDocument, type LiveDoc, type ParserCatalog } from './api/live';
-import { displayDate, failureReason, FileGlyph, StatusBadge } from './LiveDocumentView';
+import { DocNumber, displayDate, displayStatus, FileGlyph, statusNote, StatusBadge } from './LiveDocumentView';
 import { WorkspaceLink } from './WorkspaceLink';
 import type { WorkspaceRoute } from './navigation';
 import './parserWorkspace.css';
@@ -38,12 +38,12 @@ function Environment({ engine, format, catalog }: { engine: string; format: stri
     facts.push(catalog.docling_installed ? 'Docling 설치됨' : 'Docling 설치 필요');
     if (format === 'PDF') facts.push(catalog.pdf_model_directory ? 'PDF 모델 폴더 확인' : 'PDF 모델 폴더 없음');
   }
-  if (['docling', 'ocr-model', 'python-svg'].includes(engine)) {
-    facts.push(catalog.ocr_models_found ? 'OCR 모델 연결됨' : 'OCR 모델 미연결');
-  }
-  if (!facts.length) facts.push('Python 표준 라이브러리');
-  facts.push('문서 파싱 1개씩 · 단일 워커');
-  return <p className="pr-environment"><Settings2 size={15} aria-hidden="true"/><strong>실행 환경</strong>{facts.map(fact => <span key={fact}>{fact}</span>)}</p>;
+  const ocr = ['docling', 'ocr-model', 'python-svg'].includes(engine);
+  if (!facts.length && !ocr) facts.push('Python 표준 라이브러리');
+  const model = catalog.ocr_model?.configured ? catalog.ocr_model.model_id : '';
+  return <p className="pr-environment"><Settings2 size={15} aria-hidden="true"/><strong>실행 환경</strong>{facts.map(fact => <span key={fact}>{fact}</span>)}
+    {ocr && <span>{catalog.ocr_models_found ? 'OCR 모델 연결됨' : 'OCR 모델 미연결'}{catalog.ocr_models_found && model && <small className="pr-ocr-model"> · <code>{model}</code></small>}</span>}
+    <span>문서 파싱 1개씩 · 단일 워커</span></p>;
 }
 
 function RouteDiagram({ format, engine, catalog, onNavigate }: { format: string; engine?: string; catalog: ParserCatalog; onNavigate: Navigate }) {
@@ -74,7 +74,7 @@ function RouteDocuments({ docs, error, format, canParse, pendingId, onProcess, o
   const [attention, setAttention] = useState(false);
   const [page, setPage] = useState(0);
   const matching = docs?.filter(doc => doc.format.toUpperCase() === format) ?? [];
-  const issues = matching.filter(doc => doc.status === 'failed' || doc.status === 'unsupported');
+  const issues = matching.filter(doc => ['failed', 'unsupported'].includes(displayStatus(doc)));
   const rows = attention ? issues : matching;
   const size = 5;
   const current = Math.min(page, Math.max(0, Math.ceil(rows.length / size) - 1));
@@ -85,7 +85,7 @@ function RouteDocuments({ docs, error, format, canParse, pendingId, onProcess, o
     {error ? <p className="pr-empty" role="alert">{error} <button className="text-button" onClick={refresh}>다시 시도</button></p> :
       !docs ? <p className="pr-empty" role="status">문서 목록을 불러오는 중입니다.</p> :
       rows.length ? <ul>{rows.slice(current * size, (current + 1) * size).map(doc => <li key={doc.id}>
-        <WorkspaceLink className="pr-doc" to={{page:'live', doc:doc.id}} onNavigate={onNavigate}><FileGlyph format={doc.format}/><span><b>{doc.name}</b><small>{doc.status === 'failed' || doc.status === 'unsupported' ? failureReason(doc) : displayDate(doc.updated_at)}</small></span><StatusBadge status={doc.status}/><ChevronRight size={15}/></WorkspaceLink>
+        <WorkspaceLink className="pr-doc" to={{page:'live', doc:doc.id}} onNavigate={onNavigate}><FileGlyph format={doc.format}/><span><b>{doc.name}</b><small><DocNumber seq={doc.seq}/>{statusNote(doc) ?? displayDate(doc.updated_at)}</small></span><StatusBadge status={displayStatus(doc)}/><ChevronRight size={15}/></WorkspaceLink>
         {canParse && (doc.status === 'uploaded' || doc.status === 'failed') && <button className="pr-process" disabled={pendingId !== null}
           onClick={() => onProcess(doc)} aria-label={doc.name + (doc.status === 'failed' ? ' 다시 파싱' : ' 파싱 실행')}>
           <Play size={14}/>{pendingId === doc.id ? '접수 중' : doc.status === 'failed' ? '다시 파싱' : '파싱 실행'}</button>}

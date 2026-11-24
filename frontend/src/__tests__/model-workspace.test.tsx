@@ -126,3 +126,114 @@ describe('모델 연결 화면', () => {
     expect(within(saved).getByRole('button', { name: '임베딩 확인' })).toBeTruthy();
   });
 });
+
+describe('OCR 모델 연결', () => {
+  const defaults = { mode: 'region', text_prompt: 'OCR:', table_prompt: 'Table Recognition:', page_prompt: 'document parsing.' };
+  const ocr = { key: 'ocr', label: 'OCR 모델', base_url: 'http://127.0.0.1:8090/v1', model_id: 'demo-ocr', api_key_set: true, configured: true,
+    mode: 'region', text_prompt: 'OCR:', table_prompt: 'Table Recognition:', page_prompt: 'document parsing.', saved: false, defaults };
+  type Call = { url: string; method: string; body: Record<string, unknown> | null };
+  function serveOcr(respond: (call: Call) => Response | undefined) {
+    const calls: Call[] = [];
+    vi.stubGlobal('fetch', vi.fn(async (url: string, init?: RequestInit) => {
+      const call = { url, method: init?.method ?? 'GET', body: init?.body ? JSON.parse(String(init.body)) : null };
+      calls.push(call);
+      return respond(call) ?? json({ connections: [configured], embedding: null, ocr });
+    }));
+    return calls;
+  }
+  async function openOcrTab() {
+    const user = userEvent.setup();
+    render(<ModelWorkspace />);
+    await user.click(await screen.findByRole('tab', { name: /OCR 모델/ }));
+    return { user, card: screen.getByRole('region', { name: 'OCR 모델' }) };
+  }
+
+  it('카드에 방식·지시문과 키 설정 여부만 보이고, 확인은 누를 때만 시험 그림을 읽힌다', async () => {
+    const calls = serveOcr(call => call.url === '/api/models/ocr/test' ? json({ ok: true, status: 200, latency_ms: 812, model: 'demo-ocr', reply: 'OCR TEST 12.5 mg/mL' }) : undefined);
+    const { user, card } = await openOcrTab();
+    expect(within(card).getByText('demo-ocr')).toBeTruthy();
+    expect(within(card).getByText('영역 방식')).toBeTruthy();
+    expect(within(card).getByText('Table Recognition:')).toBeTruthy();
+    expect(within(card).getByText('설정됨 (표시하지 않음)')).toBeTruthy();
+    expect(within(card).getByText(/라이브러리 OCR\(EasyOCR 등\)은 쓰지 않습니다/)).toBeTruthy();
+    expect(within(card).getByText('확인 전')).toBeTruthy();
+    expect(calls.some(call => call.url.endsWith('/test'))).toBe(false);
+    await user.click(within(card).getByRole('button', { name: 'OCR 확인' }));
+    expect(await within(card).findByText('812 ms')).toBeTruthy();
+    expect(within(card).getByText(/OCR TEST 12\.5 mg\/mL/)).toBeTruthy();
+    expect(calls.find(call => call.url === '/api/models/ocr/test')).toEqual({ url: '/api/models/ocr/test', method: 'POST', body: null });
+  });
+
+  it('편집 팝업에서 쪽 방식과 지시문을 고르고 저장 전에 확인한 뒤 저장한다', async () => {
+    const saved = { ...ocr, label: '사내 OCR', mode: 'page', page_prompt: '<image>\nFree OCR.', saved: true };
+    const calls = serveOcr(call => {
+      if (call.url === '/api/models/draft/test') return json({ ok: false, status: 200, latency_ms: 40, model: 'demo-ocr', reply: 'hello', error: '응답은 왔지만 시험 그림의 글자를 읽지 못했습니다.' });
+      if (call.url === '/api/models/ocr' && call.method === 'PUT') return json({ connections: [configured], embedding: null, ocr: saved });
+      return undefined;
+    });
+    const { user, card } = await openOcrTab();
+    await user.click(within(card).getByRole('button', { name: '설정 편집' }));
+    const dialog = screen.getByRole('dialog', { name: 'OCR 모델 연결 설정' });
+    expect(within(dialog).queryByRole('button', { name: /게이트웨이 모델 목록/ })).toBeNull();
+    expect(within(dialog).getByRole('radio', { name: /영역 방식/ })).toHaveProperty('checked', true);
+    expect(within(dialog).getByRole('textbox', { name: '글자 지시문' }).getAttribute('placeholder')).toBe('OCR:');
+    await user.click(within(dialog).getByRole('radio', { name: /쪽 방식\(쪽 전체를 한 번 호출 · Schift·Unlimited-OCR 등\)/ }));
+    expect(within(dialog).queryByRole('textbox', { name: '글자 지시문' })).toBeNull();
+    const pagePrompt = within(dialog).getByRole('textbox', { name: '쪽 지시문' });
+    expect(pagePrompt).toHaveProperty('value', '');
+    expect(pagePrompt.getAttribute('placeholder')).toBe('document parsing.');
+    await user.clear(within(dialog).getByRole('textbox', { name: '이름' })); await user.type(within(dialog).getByRole('textbox', { name: '이름' }), '사내 OCR');
+    await user.click(pagePrompt); await user.paste('<image> Free OCR.');
+    await user.click(within(dialog).getByRole('button', { name: '저장 전 확인' }));
+    expect(await within(dialog).findByText('응답은 왔지만 확인 기준을 통과하지 못했습니다. 모델과 설정을 확인하세요.')).toBeTruthy();
+    expect(within(dialog).getByText('모델 응답: hello')).toBeTruthy();
+    const draft = calls.find(call => call.url === '/api/models/draft/test')!.body;
+    expect(draft).toMatchObject({ kind: 'ocr', base_url: ocr.base_url, model_id: 'demo-ocr', mode: 'page', text_prompt: '', table_prompt: '' });
+    expect(draft).not.toHaveProperty('api_key');
+    await user.click(within(dialog).getByRole('button', { name: '저장' }));
+    const put = calls.find(call => call.method === 'PUT')!;
+    expect(put.url).toBe('/api/models/ocr');
+    expect(put.body).toEqual({ label: '사내 OCR', base_url: ocr.base_url, model_id: 'demo-ocr', mode: 'page', text_prompt: '', table_prompt: '', page_prompt: put.body!.page_prompt });
+    expect(String(put.body!.page_prompt)).toContain('Free OCR.');
+    const updated = await screen.findByRole('region', { name: '사내 OCR' });
+    expect(within(updated).getByText('쪽 방식')).toBeTruthy();
+    expect(within(updated).getByText('화면에서 저장')).toBeTruthy();
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
+  it('새 키는 보내기만 하고 화면에 다시 보이지 않으며, 저장값을 지우면 .env 값으로 돌아간다', async () => {
+    const saved = { ...ocr, saved: true };
+    let current: Record<string, unknown> = saved;
+    const calls = serveOcr(call => {
+      if (call.url === '/api/models/ocr' && call.method === 'PUT') return json({ connections: [configured], embedding: null, ocr: current });
+      if (call.url === '/api/models/ocr/saved' && call.method === 'DELETE') { current = { ...ocr, base_url: 'http://env-host/v1', saved: false }; return json({ connections: [configured], embedding: null, ocr: current }); }
+      return json({ connections: [configured], embedding: null, ocr: current });
+    });
+    const { user, card } = await openOcrTab();
+    await user.click(within(card).getByRole('button', { name: '설정 편집' }));
+    let dialog = screen.getByRole('dialog', { name: 'OCR 모델 연결 설정' });
+    expect(within(dialog).getByLabelText('API 키').getAttribute('placeholder')).toContain('저장된 키 유지');
+    await user.type(within(dialog).getByLabelText('API 키'), 'sk-ocr-secret');
+    await user.click(within(dialog).getByRole('button', { name: '저장' }));
+    expect(calls.find(call => call.method === 'PUT')!.body).toMatchObject({ api_key: 'sk-ocr-secret', mode: 'region' });
+    const after = await screen.findByRole('region', { name: 'OCR 모델' });
+    expect(within(after).queryByText(/sk-ocr-secret/)).toBeNull();
+    await user.click(within(after).getByRole('button', { name: '설정 편집' }));
+    dialog = screen.getByRole('dialog', { name: 'OCR 모델 연결 설정' });
+    await user.click(within(dialog).getByRole('button', { name: '.env 값으로 되돌리기' }));
+    expect(calls.some(call => call.url === '/api/models/ocr/saved' && call.method === 'DELETE')).toBe(true);
+    expect(await screen.findByText('화면에서 저장한 값을 지우고 .env 값으로 되돌렸습니다.')).toBeTruthy();
+    const reverted = screen.getByRole('region', { name: 'OCR 모델' });
+    expect(within(reverted).getByText('http://env-host/v1')).toBeTruthy();
+    expect(within(reverted).getByText('.env')).toBeTruthy();
+  });
+
+  it('예전 서버처럼 OCR 정보가 없으면 탭에서 그 사실만 알린다', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => json({ connections: [configured], embedding: null })));
+    const user = userEvent.setup();
+    render(<ModelWorkspace />);
+    await user.click(await screen.findByRole('tab', { name: /OCR 모델/ }));
+    expect(screen.getByText(/OCR 모델 연결 정보를 읽지 못했습니다/)).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'OCR 확인' })).toBeNull();
+  });
+});

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { AlertCircle, ArrowLeft, BookOpen, CircleAlert, Scissors, CircleCheck, CircleSlash, Clock3, Download, File, FileText, FileSpreadsheet, FileImage, FileArchive, Presentation, GitCompareArrows, LoaderCircle, Play, RefreshCw, TriangleAlert, Workflow } from 'lucide-react';
+import { AlertCircle, ArrowLeft, BookOpen, CircleAlert, CircleDashed, Scissors, CircleCheck, CircleSlash, Clock3, Download, File, FileText, FileSpreadsheet, FileImage, FileArchive, Presentation, GitCompareArrows, LoaderCircle, Play, RefreshCw, TriangleAlert, Workflow } from 'lucide-react';
 import { getDocumentHistory, listParseRuns, liveSourceUrl } from './api/live';
 import type { HistoryEntry, LiveDoc, LiveResult, LiveStatus, ParseRun } from './api/live';
 import { WorkspaceLink } from './WorkspaceLink';
@@ -7,10 +7,40 @@ import type { DetailTab, WorkspaceRoute } from './navigation';
 import { Tabs } from './ui';
 import { StructurePanel } from './StructurePanel';
 
-export const statusLabels: Record<LiveStatus, string> = {
-  uploaded: '실행 전', processing: '처리 중 / 대기', completed: '처리 완료', failed: '처리 실패', unsupported: '지원 안 됨',
+/** 화면에 보이는 상태. 글자 없는 이미지는 서버에서 failed지만 실패로 보이지 않는다(no_text). */
+export type DisplayStatus = LiveStatus | 'no_text';
+export const statusLabels: Record<DisplayStatus, string> = {
+  uploaded: '실행 전', processing: '처리 중 / 대기', completed: '처리 완료', failed: '처리 실패', unsupported: '지원 안 됨', no_text: '글자 없음',
 };
-const statusIcons = { uploaded: Clock3, processing: LoaderCircle, completed: CircleCheck, failed: CircleAlert, unsupported: CircleSlash };
+const statusIcons = { uploaded: Clock3, processing: LoaderCircle, completed: CircleCheck, failed: CircleAlert, unsupported: CircleSlash, no_text: CircleDashed };
+
+/** 서버의 이미지 형식 목록(app/formats.py IMAGE_FORMATS)과 같다. */
+const IMAGE_FORMATS = ['PNG', 'JPG', 'JPEG', 'BMP', 'TIFF', 'TIF', 'GIF', 'WEBP'];
+export const NO_TEXT_NOTE = '이미지에서 글자를 찾지 못했습니다. 글자 없는 사진이면 정상이고, 글자가 보이는 이미지라면 OCR이 놓친 것입니다.';
+/** 이미지에서 글자를 찾지 못한 경우는 실패가 아니라 '글자 없음'이다. 다른 실패는 그대로 실패다. */
+export const isNoTextImage = (doc: Pick<LiveDoc, 'status' | 'error_code' | 'format'>) =>
+  doc.status === 'failed' && doc.error_code === 'no_text' && IMAGE_FORMATS.includes((doc.format || '').toUpperCase());
+export const displayStatus = (doc: LiveDoc): DisplayStatus => isNoTextImage(doc) ? 'no_text' : doc.status;
+
+/** 문서 번호 'D12'. 예전 서버처럼 번호가 없으면 빈 문자열. */
+export const docNumber = (seq?: number | null) => typeof seq === 'number' && Number.isInteger(seq) && seq > 0 ? `D${seq}` : '';
+/** 'D12'·'d12'·'D-12'·'#12'·'12'를 번호로 읽는다. 번호 모양이 아니면 null. */
+export function parseDocNumber(query: string): number | null {
+  const match = /^(?:d\s*-?\s*|#)?0*(\d{1,9})$/i.exec(query.trim());
+  return match ? Number(match[1]) : null;
+}
+/** 검색어가 이름·형식·ID에 들어 있거나, 번호 모양이면 문서 번호와 같을 때 맞는다. */
+export function matchesDocQuery(doc: LiveDoc, query: string) {
+  const search = query.trim().toLowerCase();
+  if (`${doc.name} ${doc.format} ${doc.id}`.toLowerCase().includes(search)) return true;
+  const number = parseDocNumber(search);
+  return number !== null && doc.seq === number;
+}
+export function DocNumber({ seq }: { seq?: number | null }) {
+  const label = docNumber(seq);
+  // 뒤의 공백은 줄 안에서 다음 글자와 붙어 읽히지 않게 한다(flex 줄에서는 무시된다).
+  return label ? <><span className="lw-seq">{label}</span>{' '}</> : null;
+}
 const dateFormat = new Intl.DateTimeFormat('ko-KR', {
   year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false,
 });
@@ -26,7 +56,7 @@ export function displaySize(bytes: number) {
   return `${(bytes / 1024 ** 3).toFixed(2)} GB`;
 }
 
-export function StatusBadge({ status }: { status: LiveStatus }) {
+export function StatusBadge({ status }: { status: DisplayStatus }) {
   const Icon = statusIcons[status] ?? AlertCircle;
   return <span className={`lw-status is-${status}`}><Icon size={15} aria-hidden="true" />{statusLabels[status] ?? status}</span>;
 }
@@ -49,6 +79,8 @@ const failureLabels: Record<string, string> = {
   no_text: '추출할 수 있는 텍스트를 찾지 못했습니다.', interrupted: '서버 중단으로 처리가 끝나지 않았습니다.',
 };
 export const failureReason = (doc: LiveDoc) => failureLabels[doc.error_code ?? ''] || doc.error || '처리 상태를 확인하세요.';
+/** 목록 행의 둘째 줄: 실패·미지원은 사유, 글자 없음은 설명, 나머지는 기본 정보. */
+export const statusNote = (doc: LiveDoc) => isNoTextImage(doc) ? NO_TEXT_NOTE : doc.status === 'failed' || doc.status === 'unsupported' ? failureReason(doc) : null;
 
 const tabs = [{ id: 'result', label: '추출 결과' }, { id: 'history', label: '처리 이력' }, { id: 'structure', label: '구조·참조' }] as const;
 
@@ -83,7 +115,8 @@ type Props = {
 
 export default function LiveDocumentView({ doc, result, resultError, resultLoading, submittingId, onBack, onProcess, onCompare, tab, onTab, onFamily, onPickFile, onNavigate }: Props) {
   const replaceFile = ['format_mismatch','encrypted','drm_protected','drm_suspected'].includes(doc.error_code ?? '');
-  const failed = doc.status === 'failed' || doc.status === 'unsupported';
+  const noText = isNoTextImage(doc);
+  const failed = !noText && (doc.status === 'failed' || doc.status === 'unsupported');
   const running = doc.status === 'processing';
   const submitting = submittingId === doc.id;
   const hasComparison = !!result;
@@ -107,7 +140,7 @@ export default function LiveDocumentView({ doc, result, resultError, resultLoadi
     <button className="lw-back" onClick={onBack}><ArrowLeft size={16} />문서함으로</button>
     <header className="lw-detail-head">
       <FileGlyph format={doc.format} />
-      <div className="lw-detail-name"><h1 tabIndex={-1}>{doc.name}</h1><div className="lw-subline"><StatusBadge status={doc.status} />{onNavigate
+      <div className="lw-detail-name"><h1 tabIndex={-1}>{doc.name}</h1><div className="lw-subline"><DocNumber seq={doc.seq} /><StatusBadge status={displayStatus(doc)} />{onNavigate
         ? <WorkspaceLink className="lw-flow-link" to={{page:'parsers',format:doc.format}} onNavigate={onNavigate}><Workflow size={14}/>{doc.format || '확장자 없음'} 파서 플로우</WorkspaceLink>
         : <span>{doc.format || '확장자 없음'}</span>}<span>{displaySize(doc.size_bytes)}</span></div></div>
       <div className="lw-head-actions">
@@ -119,6 +152,7 @@ export default function LiveDocumentView({ doc, result, resultError, resultLoadi
         </button>}
       </div>
     </header>
+    {noText && <div className="lw-message is-neutral" role="note"><CircleDashed size={18} aria-hidden="true" /><span>{NO_TEXT_NOTE}</span></div>}
     {failed && <div className="lw-message is-error"><TriangleAlert size={18} /><div><strong>{failureReason(doc)}</strong>
       {doc.error && failureReason(doc) !== doc.error && <details><summary>오류 상세</summary><p>{doc.error}</p></details>}
     </div></div>}
@@ -149,7 +183,7 @@ export default function LiveDocumentView({ doc, result, resultError, resultLoadi
           </section>}
       </Tabs>
     </div>
-    {doc.status === 'unsupported' && <details id="detail-formats" className="lw-disclosure"><summary>지원 형식</summary><p>TXT·CSV·MD·LOG·SVG 벡터 글자는 기본 환경에서 읽습니다. PDF·DOCX·PPTX·XLSX는 Docling을, PNG·JPEG·TIFF·BMP·GIF·WebP와 스캔 글자는 로컬 OCR 모델을 사용합니다.</p></details>}
+    {doc.status === 'unsupported' && <details id="detail-formats" className="lw-disclosure"><summary>지원 형식</summary><p>TXT·CSV·MD·LOG·SVG 벡터 글자는 기본 환경에서 읽습니다. PDF·DOCX·PPTX·XLSX는 Docling을, PNG·JPEG·TIFF·BMP·GIF·WebP와 스캔 글자는 모델 연결에서 연결한 OCR 모델로 읽습니다.</p></details>}
     <details className="lw-disclosure"><summary>파일 정보</summary><dl className="lw-meta">
       <div><dt>문서 ID</dt><dd>{doc.id}</dd></div><div><dt>저장 시각</dt><dd>{displayDate(doc.created_at)}</dd></div>
       <div><dt>마지막 변경</dt><dd>{displayDate(doc.updated_at)}</dd></div><div><dt>적용 파서</dt><dd>{doc.parser || '미지정'}</dd></div>
