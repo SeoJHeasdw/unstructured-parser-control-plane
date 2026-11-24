@@ -50,7 +50,7 @@ py -3.12 --version
 - 인터넷이 열려 있는 PC에서는 `start.cmd --docling --check`로 패키지를 먼저 설치하세요. PDF 모델은 다음 명령으로 받습니다. 모델은 기본적으로 사용자 홈의 `.cache/docling/models`에 저장됩니다. 다른 위치의 모델을 쓰려면 `DOCOPS_DOCLING_ARTIFACTS`를 설정하세요. 이후 `start.cmd --docling`으로 시작합니다.
 
 ```cmd
-backend\.venv-docling\Scripts\docling-tools.exe models download layout tableformer easyocr --easyocr-lang ko --easyocr-lang en
+backend\.venv-docling\Scripts\docling-tools.exe models download layout tableformer
 ```
 
 ### Windows용 ZIP 만들기
@@ -87,14 +87,11 @@ TXT·CSV·MD·LOG는 기본 설치만으로 처리할 수 있습니다. **Doclin
 pip install -r requirements-docling.lock.txt
 ```
 
-PDF에는 미리 준비된 Docling 레이아웃·표 모델이 필요합니다. 로컬 EasyOCR 한국어·영어 모델이 준비되면 PDF의 이미지 영역, Office에서 참조한 그림, PNG·JPEG·BMP·TIFF·GIF·WebP 및 SVG 내부 그림을 읽습니다. SVG의 벡터 글자는 기본 설치에서도 읽습니다. PDF는 OCR을 사용할 수 없으면 텍스트 층을 처리하고 경고를 남깁니다.
+PDF에는 미리 준비된 Docling 레이아웃·표 모델이 필요합니다. macOS·Linux에서는 Docling 가상환경에서 `docling-tools models download layout tableformer`로 받습니다. 파싱 중에는 모델을 다운로드하지 않습니다.
 
-OCR 모델은 위 Windows 다운로드 명령으로 준비할 수 있습니다. macOS·Linux에서는 Docling 가상환경에서 같은 `docling-tools models download layout tableformer easyocr --easyocr-lang ko --easyocr-lang en` 명령을 사용합니다. 파싱 중에는 모델을 다운로드하지 않습니다. OCR 모델 폴더는 아래 순서로 찾습니다.
+**OCR은 문서 OCR 모델만 씁니다(2026-11-24 결정).** EasyOCR 같은 라이브러리 OCR 경로는 껐습니다. OCR 모델(OpenAI 호환 비전 API, 고객사 게이트웨이 서빙 예정)을 연결하기 전까지 스캔 PDF는 텍스트 층만 읽고 `OCR 미적용` 경고를 남기며, 글자 층이 없으면 `no_text`로 실패합니다. 이미지 파일과 Office·SVG 안의 그림 글자는 'OCR 모델 미연결'로 처리하지 않습니다. SVG의 벡터 글자와 Office 본문은 그대로 읽습니다. `DOCOPS_OCR`·`DOCOPS_OCR_MODELS`는 더 이상 효과가 없습니다.
 
-1. `DOCOPS_OCR_MODELS`를 지정하면 그 폴더에서 `craft_mlt_25k.pth`와 `korean_g2.pth`를 찾습니다.
-2. 지정하지 않으면 Docling 모델 폴더의 `EasyOcr/`, 이어서 `~/.EasyOCR/model`을 확인합니다. `DOCOPS_OCR=0`으로 OCR을 끌 수 있습니다.
-
-Office 그림에서 읽은 글자는 보충 추출에 원본 문단·슬라이드·시트 위치와 함께 표시합니다. PDF에서는 본문 글자나 표가 없는 페이지를, 여러 프레임을 가진 이미지에서는 텍스트를 인식하지 못한 프레임을 경고합니다.
+PDF에서는 본문 글자나 표가 없는 페이지를 경고합니다.
 
 ### 2. 프론트엔드
 
@@ -115,7 +112,7 @@ npm run dev
 - 전용 워커 1개가 한 번에 문서 1건을 처리하고, 메모리 대기열에는 기본 최대 64건이 추가로 기다립니다. `processing`은 실제 처리와 대기를 모두 포함합니다. 대기열이 가득 차면 새 처리 요청은 HTTP 503으로 거절되고 거절 이력이 남습니다. 동일 문서의 중복 처리 요청은 HTTP 409입니다.
 - 정상 종료 시 새 요청을 막고 미실행 대기 작업은 실패 이력과 함께 재시도 가능한 상태로 바꿉니다. 진행 중 작업은 최대 5초 기다리며 그 뒤에도 실행 중이면 워커가 끝날 때까지 데이터 폴더 잠금을 유지합니다. 프로세스가 먼저 종료되면 재시작 시 남은 `processing` 작업을 실패로 기록합니다. 중단된 작업은 자동 재실행하지 않습니다.
 - 재처리 중이나 실패 후에도 마지막 성공 결과를 조회할 수 있으며 `is_stale: true`와 함께 표시합니다. 성공 이력이 없거나 저장된 결과를 읽을 수 없으면 결과 조회가 HTTP 409를 반환합니다. 화면은 현재 오류 메시지로 이 두 경우를 구분하며, 안정적인 오류 코드는 향후 과제입니다. 결과 경고는 `warnings`로 반환합니다.
-- Docling과 EasyOCR는 로컬에서 실행합니다. 합성 문서로 본문 보존과 위치를 검증했으며, 고객 문서 OCR 정확도는 별도 평가가 필요합니다.
+- Docling은 로컬에서 실행합니다. 합성 문서로 본문 보존과 위치를 검증했습니다. OCR은 문서 OCR 모델 연결 후 처리하며 후보 모델을 평가 중입니다.
 - **구조 분석**(실제 파일 처리 화면): 원본을 열어 압축 항목·메일 첨부·Office/HWP 내장 개체·PDF 첨부를 하위 문서로 펼치고, 하이퍼링크·외부 통합문서 참조(셀 위치)·필드 연결·공유 폴더 경로·문서번호 후보와 암호화·DRM 의심·확장자 불일치·매크로를 표시합니다. 원본은 바꾸지 않고 디스크에 풀지 않으며 버튼을 눌러야 실행합니다. 결과는 `runtime/structure/`에 저장합니다.
 - **파싱 전 판별·원문 대조(2026-11-19):** 처리 전에 내용 서명으로 DRM·암호·확장자 불일치를 걸러 실패 사유 코드(`error_code`)로 남깁니다. DRM은 판별만 하며 해제본이 필요합니다. DOCX·XLSX·PPTX는 임시 사본에서 기호 글꼴·위/아래첨자를 유니코드로 바꿔 파싱하고, 원본과 대조해 특수기호 손실·병합 셀·흰회색 글자·읽지 않은 그림을 경고하며 빠진 글상자·SVG 글자는 결과 끝에 보충합니다.
 - 형식 선택은 현재 확장자 기반이며, ZIP/메일 첨부 분해·XLSX 외부 참조 추출·검색 인덱싱은 아직 구현하지 않았습니다. 모델은 연결 확인과 목록 조회만 하며 문서 처리 단계에서는 호출하지 않습니다.

@@ -33,7 +33,7 @@ def wait_status(client, doc_id, expected, timeout=5):
 def test_parser_catalog_reports_local_routing_without_running_a_job(client):
     catalog = client.get('/api/live/parsers').json()
     assert catalog["routes"]["PDF"] == catalog["routes"]["XLSX"] == "docling"
-    assert catalog["routes"]["JPEG"] == "easyocr"
+    assert catalog["routes"]["JPEG"] == "ocr-model"
     assert catalog["routes"]["SVG"] == "python-svg"
     assert catalog["routes"]["CSV"] == "python-csv"
     assert catalog["routes"]["TXT"] == "python-text"

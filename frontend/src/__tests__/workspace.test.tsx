@@ -121,7 +121,7 @@ describe('문서 운영 Mock 콘솔',()=>{
     await user.click(within(screen.getByRole('navigation',{name:'업무 메뉴'})).getByRole('link',{name:'파서 플로우'}));
     await user.click(await screen.findByRole('link',{name:'XLSX'}));
     expect(screen.getByText('워크시트 추출')).toBeTruthy();
-    expect(screen.getByText('OCR 설정 꺼짐')).toBeTruthy();
+    expect(screen.getByText('OCR 모델 미연결')).toBeTruthy();
     expect(mockFetch.mock.calls.some(([url]) => url === '/api/data')).toBe(false);
     await user.click(screen.getByRole('link',{name:'모의 경로 설계'}));
     expect(await screen.findByRole('heading',{name:'스프레드시트'})).toBeTruthy();

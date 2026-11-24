@@ -11,7 +11,8 @@ const engines = new Map([
   ['docling', { name: 'Docling', icon: Layers3 }],
   ['python-text', { name: '텍스트', icon: FileText }],
   ['python-csv', { name: 'CSV 테이블', icon: Table2 }],
-  ['easyocr', { name: 'EasyOCR', icon: ScanText }],
+  ['ocr-model', { name: 'OCR 모델', icon: ScanText }],
+  ['easyocr', { name: 'EasyOCR(사용 중단)', icon: ScanText }],
   ['python-svg', { name: 'SVG', icon: FileCode2 }],
 ]);
 const formatName = (ext: string) => ext || '확장자 없음';
@@ -19,10 +20,11 @@ const formatName = (ext: string) => ext || '확장자 없음';
 function extraction(format: string, engine: string) {
   switch (engine) {
     case 'docling':
-      if (format === 'PDF') return ['페이지 분석', '페이지의 본문·표를 추출합니다. 로컬 OCR 모델이 있으면 스캔 글자도 읽습니다.'];
+      if (format === 'PDF') return ['페이지 분석', '페이지의 본문·표를 추출합니다. 스캔 쪽은 OCR 모델을 연결한 뒤 읽습니다.'];
       if (format === 'XLSX') return ['워크시트 추출', '시트의 셀과 표를 읽고 원본 행·열 위치를 대조합니다.'];
       return ['Office 구조 추출', '본문·표를 변환하고 원본의 기호, 첨자와 내장 그림을 점검합니다.'];
-    case 'easyocr': return ['이미지 문자 인식', '프레임별로 한국어·영어 글자를 인식하고 추출 순서를 기록합니다.'];
+    case 'ocr-model': return ['이미지 문자 인식', '문서 OCR 모델로 글자를 읽습니다. 모델이 연결되지 않으면 처리하지 않습니다.'];
+    case 'easyocr': return ['이미지 문자 인식(사용 중단)', '이전 실행 기록입니다. 라이브러리 OCR은 더 이상 쓰지 않습니다.'];
     case 'python-svg': return ['벡터 글자 추출', 'SVG의 텍스트를 읽고 내장 이미지에서 추출 가능한 글자를 보충합니다.'];
     case 'python-csv': return ['행·열 복원', '인코딩과 구분자를 판별한 뒤 행과 열을 Markdown 표로 변환합니다.'];
     case 'python-text': return ['텍스트 읽기', '인코딩을 판별해 본문의 줄바꿈과 문자 순서를 보존합니다.'];
@@ -36,8 +38,8 @@ function Environment({ engine, format, catalog }: { engine: string; format: stri
     facts.push(catalog.docling_installed ? 'Docling 설치됨' : 'Docling 설치 필요');
     if (format === 'PDF') facts.push(catalog.pdf_model_directory ? 'PDF 모델 폴더 확인' : 'PDF 모델 폴더 없음');
   }
-  if (['docling', 'easyocr', 'python-svg'].includes(engine)) {
-    facts.push(!catalog.ocr_enabled ? 'OCR 설정 꺼짐' : catalog.ocr_models_found ? '로컬 OCR 모델 확인' : '로컬 OCR 모델 미확인');
+  if (['docling', 'ocr-model', 'python-svg'].includes(engine)) {
+    facts.push(catalog.ocr_models_found ? 'OCR 모델 연결됨' : 'OCR 모델 미연결');
   }
   if (!facts.length) facts.push('Python 표준 라이브러리');
   facts.push('문서 파싱 1개씩 · 단일 워커');

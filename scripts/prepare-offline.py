@@ -117,15 +117,7 @@ def build_archive(path, wheelhouses, models):
                 for source in tree_files(models / directory):
                     name = source.relative_to(models).as_posix()
                     archive.write(source, f"{prefix}/offline/docling-models/{name}")
-            ocr_files = ("craft_mlt_25k.pth", "korean_g2.pth")
-            configured = os.environ.get("DOCOPS_OCR_MODELS")
-            candidates = [Path(configured).expanduser()] if configured else [models / "EasyOcr", Path.home() / ".EasyOCR/model"]
-            directory = next((p for p in candidates if all((p / name).is_file() for name in ocr_files)), None)
-            if directory:
-                for name in ocr_files:
-                    archive.write(directory / name, f"{prefix}/offline/docling-models/EasyOcr/{name}")
-            else:
-                print("OCR weights unavailable. This bundle can parse native PDF text; OCR requires local weights.")
+            # 라이브러리 OCR(EasyOCR) 가중치는 넣지 않는다(2026-11-24 결정). OCR은 연결한 문서 OCR 모델이 맡는다.
     with ZipFile(path) as archive:
         names = {name.removeprefix(prefix + "/") for name in archive.namelist()}
         missing = required - names

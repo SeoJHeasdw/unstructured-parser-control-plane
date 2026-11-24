@@ -11,7 +11,7 @@ from app.formats import IMAGE_FORMATS
 from app.models import ResultLocation
 
 MODEL_FILES = ("craft_mlt_25k.pth", "korean_g2.pth")
-MODEL_HELP = "한국어·영어 OCR 실행에는 EasyOCR와 craft_mlt_25k.pth, korean_g2.pth가 필요합니다. DOCOPS_OCR_MODELS 경로를 확인해 주세요."
+MODEL_HELP = "OCR 모델이 연결되지 않았습니다. 라이브러리 OCR(EasyOCR 등)은 쓰지 않으며, 문서 OCR 모델을 연결하면 스캔·그림 글자를 읽습니다."
 MAX_FRAME_PIXELS = 32_000_000
 MAX_PIXELS = 160_000_000
 MAX_FRAMES = 128
@@ -21,6 +21,12 @@ _MAX_TILES = 256
 
 
 def model_dir(settings: Settings) -> Path | None:
+    """EasyOCR 가중치 폴더. 2026-11-24 결정(OCR은 문서 OCR 모델만, 라이브러리 OCR 금지)으로 항상 None을 돌려
+    PDF·이미지·Office 그림·SVG 어느 경로에서도 EasyOCR을 부르지 않는다. 모델 OCR 연결 때 이 모듈의 EasyOCR 코드를 지운다."""
+    return None
+
+
+def _legacy_model_dir(settings: Settings) -> Path | None:  # pragma: no cover - 모델 OCR로 교체하며 삭제
     if not settings.ocr_enabled or importlib.util.find_spec("easyocr") is None:
         return None
     if settings.ocr_model_dir:

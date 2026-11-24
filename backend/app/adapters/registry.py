@@ -14,7 +14,7 @@ PARSER_BY_EXTENSION = {
     **dict.fromkeys(sorted(DOCLING_FORMATS), "docling"),
     **dict.fromkeys(sorted(TEXT_FORMATS - {"CSV"}), "python-text"),
     "CSV": "python-csv",
-    **dict.fromkeys(sorted(IMAGE_FORMATS), "easyocr"),
+    **dict.fromkeys(sorted(IMAGE_FORMATS), "ocr-model"),
     "SVG": "python-svg",
 }
 

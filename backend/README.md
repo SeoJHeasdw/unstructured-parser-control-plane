@@ -24,7 +24,7 @@ pip install -r requirements-docling.lock.txt   # Windows 포함 정확한 버전
 export DOCOPS_DOCLING_ARTIFACTS=/path/to/prepared/models
 ```
 
-로컬 EasyOCR 한국어·영어 모델이 준비되면 PDF의 이미지 영역, Office에서 참조한 그림, PNG·JPEG·BMP·TIFF·GIF·WebP 및 SVG 내부 그림을 읽습니다. 모델 설치 방법과 경로 설정은 프로젝트 README의 PDF·Office 실제 파싱 절을 참고하세요.
+**OCR은 문서 OCR 모델만 씁니다(2026-11-24 결정).** EasyOCR 같은 라이브러리 OCR 경로는 껐습니다. OCR 모델(OpenAI 호환 비전 API, 고객사 게이트웨이 서빙 예정)을 연결하기 전까지 스캔 PDF는 텍스트 층만 읽고 `OCR 미적용` 경고를 남기며, 글자 층이 없으면 `no_text`로 실패합니다. 이미지 파일과 Office·SVG 안의 그림 글자는 'OCR 모델 미연결'로 처리하지 않습니다. SVG의 벡터 글자와 Office 본문은 그대로 읽습니다.
 
 ## API
 
