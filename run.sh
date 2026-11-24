@@ -69,7 +69,9 @@ fi
 if [ -x "$VENV/bin/python" ]; then VPY="$VENV/bin/python"; else VPY="$VENV/Scripts/python.exe"; fi
 
 # 의존성 잠금 파일이 바뀌면 다시 설치하도록 지문을 남긴다.
-fingerprint() { cksum < "$LOCK" | tr -d ' '; }
+fingerprint() {
+  { cat "$LOCK"; if [ "$DOCLING" = 1 ]; then cat "$BACKEND/requirements.lock.txt"; fi; } | cksum | tr -d ' '
+}
 STAMP="$VENV/.lock-stamp"
 
 if [ ! -f "$VPY" ]; then
@@ -104,8 +106,9 @@ if [ ! -f "$ROOT/.env" ] && [ -f "$ROOT/.env.example" ]; then
 fi
 
 if [ "$CHECK" = 1 ]; then
-  ( cd "$BACKEND" && "$VPY" -c "from main import app, DATA; assert app.state.settings.static_dir and DATA.is_file(), 'Frontend or mock data is missing.'" )
-  echo "[ok] frontend and Python dependencies are ready."
+  set --
+  [ "$DOCLING" = 0 ] || set -- --docling
+  ( cd "$BACKEND" && "$VPY" check_local.py "$@" )
   exit 0
 fi
 

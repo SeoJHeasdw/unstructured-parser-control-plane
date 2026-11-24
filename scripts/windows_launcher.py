@@ -5,13 +5,8 @@ import os
 from pathlib import Path
 import re
 import shutil
-import socket
 import subprocess
 import sys
-import threading
-import time
-from urllib.request import ProxyHandler, build_opener
-import webbrowser
 
 ROOT = Path(__file__).resolve().parents[1]
 BACKEND = ROOT / "backend"
@@ -150,34 +145,8 @@ def ensure_python(offline, docling):
     return python
 
 
-def wait_for_browser(process, url):
-    opener = build_opener(ProxyHandler({}))
-    for _ in range(100):
-        if process.poll() is not None:
-            return
-        try:
-            with opener.open(url + "api/health", timeout=0.5) as response:
-                if json.load(response).get("status") == "ok":
-                    webbrowser.open(url)
-                    return
-        except (OSError, ValueError):
-            time.sleep(0.25)
-
-
-def check_port(port):
-    with socket.socket() as listener:
-        if hasattr(socket, "SO_EXCLUSIVEADDRUSE"):
-            listener.setsockopt(socket.SOL_SOCKET, socket.SO_EXCLUSIVEADDRUSE, 1)
-        try:
-            listener.bind(("127.0.0.1", port))
-        except OSError as exc:
-            raise SetupError(f"Port {port} is unavailable. Try start.cmd 8010.") from exc
-
-
 def start(args):
     docling = not args.base and (args.docling or any((OFFLINE / "wheels-docling").glob("*.whl")))
-    if not args.check:
-        check_port(args.port)
     # 파이썬 환경(venv)을 먼저 만든다. 화면 빌드(npm)가 막혀도 venv와 패키지는 남아 다음 실행에서 이어진다.
     print("[setup] 1/2 Python venv and packages", flush=True)
     python = ensure_python(args.offline, docling)
@@ -188,25 +157,12 @@ def start(args):
     if not env_file.exists() and example.is_file():
         shutil.copyfile(example, env_file)
     if args.check:
-        check_app = (
-            "from main import app, DATA; "
-            "assert app.state.settings.static_dir and DATA.is_file(), 'Frontend or mock data is missing.'"
-        )
-        run([python, "-c", check_app], cwd=BACKEND, timeout=60)
-        if docling:
-            env = os.environ | {"HF_HUB_OFFLINE": "1", "TRANSFORMERS_OFFLINE": "1"}
-            run([python, "-c", "from docling.document_converter import DocumentConverter"], env=env, timeout=120)
-        print("[ok] frontend and Python dependencies are ready.")
+        run([python, "check_local.py", *(["--docling"] if docling else [])], cwd=BACKEND, timeout=180)
         return 0
 
-    url = f"http://127.0.0.1:{args.port}/"
-    print(f"\nUnstructured Data Console - {url}\nStop: Ctrl+C\n", flush=True)
     process = subprocess.Popen(
-        [python, "-m", "uvicorn", "main:app", "--host", "127.0.0.1", "--port", str(args.port)],
-        cwd=BACKEND,
+        [python, "launch_local.py", str(args.port), "0" if args.no_browser else "1"], cwd=BACKEND
     )
-    if not args.no_browser:
-        threading.Thread(target=wait_for_browser, args=(process, url), daemon=True).start()
     try:
         return process.wait()
     except KeyboardInterrupt:

@@ -309,3 +309,20 @@ def test_document_numbers_follow_upload_order_and_survive_upgrade(tmp_path):
     assert (repo.get("a")["seq"], repo.get("b")["seq"]) == (1, 2)
     repo.initialize()  # 다시 올려도 번호는 그대로
     assert repo.create("c", "새.txt", "TXT", 1, "c.txt")["seq"] == 3
+
+
+def test_pdf_model_catalog_reports_incomplete_installation(tmp_path):
+    from app.docling_models import PDF_FILES
+    models = tmp_path / "모델"
+    models.mkdir()
+    with TestClient(create_app(Settings(runtime_dir=tmp_path / "runtime", docling_artifacts=models))) as instance:
+        for name in PDF_FILES:
+            (models / name).parent.mkdir(parents=True, exist_ok=True)
+            (models / name).write_bytes(b"present")
+        (models / PDF_FILES[-1]).write_bytes(b"")
+        partial = instance.get("/api/live/parsers").json()
+        assert partial["pdf_model_directory"] and not partial["pdf_models_ready"]
+        assert partial["pdf_missing_files"] == [PDF_FILES[-1].as_posix()]
+        (models / PDF_FILES[-1]).write_bytes(b"present")
+        ready = instance.get("/api/live/parsers").json()
+        assert ready["pdf_models_ready"] and ready["pdf_missing_files"] == []

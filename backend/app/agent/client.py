@@ -4,6 +4,7 @@
   응답 헤더 x-docops-runtime이 같은 저장소(runtime_id)인 서버를 고른다.
 - 사내 PC의 HTTP_PROXY 설정이 127.0.0.1 요청까지 가로채지 않도록 프록시를 쓰지 않는다.
 """
+from http.client import HTTPException
 import json
 import os
 from pathlib import Path
@@ -56,8 +57,9 @@ class Api:
             url = f"http://{HOST}:{port}"
             try:
                 status, headers, body = self._send("GET", url + "/api/health", timeout=0.4)
-                ok = status == 200 and json.loads(body).get("status") == "ok"
-            except (OSError, ValueError, ApiError):
+                payload = json.loads(body)
+                ok = status == 200 and isinstance(payload, dict) and payload.get("status") == "ok"
+            except (OSError, ValueError, HTTPException, ApiError):
                 continue
             if not ok:
                 continue
@@ -81,7 +83,12 @@ class Api:
                 return self._send(method, self.base + path, body, headers, timeout)
             except ApiError:
                 raise
-            except OSError as exc:
+            except (OSError, HTTPException) as exc:
+                if method != "GET":
+                    if not self.fixed:
+                        self.base = None
+                    raise ServerDown("서버 응답이 끊겨 요청의 완료 여부를 확인하지 못했습니다. "
+                                     "문서함과 실행 이력을 확인해 주세요.") from None
                 # 서버가 다시 떠서 포트가 바뀌었을 수 있다. 한 번만 다시 찾는다.
                 if self.fixed or attempt:
                     raise ServerDown(f"콘솔 서버에 연결하지 못했습니다({type(exc).__name__}). 콘솔이 켜져 있는지 확인해 주세요.") from None

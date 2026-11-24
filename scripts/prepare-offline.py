@@ -12,17 +12,8 @@ from windows_launcher import ROOT, BACKEND, FRONTEND, OFFLINE, SetupError, front
 
 CORE_PY = ("3.12", "3.13", "3.14", "3.15")
 DOCLING_PY = "3.12"
-MODEL_DIRS = (
-    Path("docling-project--docling-layout-heron"),
-    Path("docling-project--docling-models/model_artifacts/tableformer"),
-)
-MODEL_FILES = (
-    MODEL_DIRS[0] / "config.json",
-    MODEL_DIRS[0] / "preprocessor_config.json",
-    MODEL_DIRS[0] / "model.safetensors",
-    MODEL_DIRS[1] / "accurate/tm_config.json",
-    MODEL_DIRS[1] / "accurate/tableformer_accurate.safetensors",
-)
+sys.path.insert(0, str(BACKEND))
+from app.docling_models import LAYOUT_DIR, TABLE_DIR, missing_files
 
 
 def npm_build(from_cache):
@@ -62,10 +53,9 @@ def write_pins(path, pins):
 def model_source():
     value = os.environ.get("DOCOPS_DOCLING_ARTIFACTS") or os.environ.get("DOCLING_ARTIFACTS_PATH")
     root = Path(value).expanduser() if value else Path.home() / ".cache" / "docling" / "models"
-    for relative in MODEL_FILES:
-        path = root / relative
-        if not path.is_file() or path.stat().st_size == 0:
-            raise SetupError(f"Docling PDF model file is missing: {path}. Run docling-tools models download layout tableformer.")
+    missing = missing_files(root)
+    if missing:
+        raise SetupError(f"Docling PDF model files missing: {', '.join(missing)}. Run docling-tools models download layout tableformer.")
     return root
 
 
@@ -79,17 +69,18 @@ def tree_files(top, suffixes=None):
 
 def source_files():
     fixed = (
-        "start.cmd", ".env.example", "README.md", "AGENTS.md", ".gitattributes", ".gitignore",
-        "backend/main.py", "backend/README.md", "frontend/index.html",
+        "start.cmd", "run.sh", "opencode-workspace/AGENTS.md", ".env.example", "README.md", "AGENTS.md", ".gitattributes", ".gitignore",
+        "backend/main.py", "backend/launch_local.py", "backend/check_local.py", "backend/docops.py", "backend/README.md", "frontend/index.html",
         "frontend/package.json", "frontend/package-lock.json", "frontend/tsconfig.json",
         "frontend/vite.config.ts", "scripts/windows_launcher.py", "scripts/prepare-offline.py",
         "scripts/prepare-offline.sh", "samples/GPT_SAMPLE_GENERATION_PROMPT.md",
     )
-    yield from (ROOT / name for name in fixed if (ROOT / name).is_file())
+    yield from (ROOT / name for name in fixed)
     yield from sorted(BACKEND.glob("requirements*.txt"))
     yield from tree_files(BACKEND / "app", {".py"})
     yield from tree_files(BACKEND / "tests", {".py"})
     yield from tree_files(FRONTEND / "src", {".css", ".json", ".ts", ".tsx", ".svg", ".png"})
+    yield from tree_files(FRONTEND / "src" / "compare" / "sources", {".pdf", ".docx", ".xlsx"})
     yield from tree_files(FRONTEND / "dist")
     yield from tree_files(ROOT / "docs", {".md"})
     yield from tree_files(ROOT / "mock-data", {".json"})
@@ -113,7 +104,7 @@ def build_archive(path, wheelhouses, models):
             for wheel in sorted(directory.glob("*.whl")):
                 archive.write(wheel, f"{prefix}/offline/{directory.name}/{wheel.name}")
         if models:
-            for directory in MODEL_DIRS:
+            for directory in (LAYOUT_DIR, TABLE_DIR):
                 for source in tree_files(models / directory):
                     name = source.relative_to(models).as_posix()
                     archive.write(source, f"{prefix}/offline/docling-models/{name}")

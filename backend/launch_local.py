@@ -1,4 +1,4 @@
-"""Start the local console for run.sh, or open its existing instance."""
+"""Start the local console for run.sh and start.cmd, or open its existing instance."""
 
 import errno
 from http.client import HTTPConnection, HTTPException
@@ -44,9 +44,6 @@ def running_port(runtime_dir, ports, runtime_id):
     lock_path = runtime_dir / "server.lock"
     if not lock_path.is_file():
         return None
-    port = legacy_port(lock_path)
-    if port is not None:
-        return port
     for port in ports:
         conn = HTTPConnection(HOST, port, timeout=0.25)
         try:
@@ -58,6 +55,8 @@ def running_port(runtime_dir, ports, runtime_id):
             continue
         finally:
             conn.close()
+    if sys.platform != "win32":
+        return legacy_port(lock_path)
     return None
 
 
@@ -78,7 +77,7 @@ def reserve_listener(ports):
                 continue
             raise
         return listener, port
-    raise OSError(f"{ports.start}~{ports[-1]}번 포트가 사용 중입니다. ./run.sh <다른 포트>로 실행하세요.")
+    raise OSError(f"{ports.start}~{ports[-1]}번 포트가 사용 중입니다. 다른 시작 포트를 지정해 주세요.")
 
 
 def open_when_ready(server, url):

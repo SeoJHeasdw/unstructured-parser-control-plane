@@ -16,20 +16,37 @@ def _load(path: Path, default):
         return default
 
 
+def _recent_lines(handle):
+    """Read a JSONL snapshot backwards, splitting bytes before decoding UTF-8."""
+    end = handle.seek(0, 2)
+    remainder = b""
+    while end:
+        size = min(end, 64 * 1024)
+        end -= size
+        handle.seek(end)
+        lines = (handle.read(size) + remainder).split(b"\n")
+        remainder = lines[0]
+        yield from reversed(lines[1:])
+    if remainder:
+        yield remainder
+
+
 def _calls(path: Path, limit: int) -> list[dict]:
-    try:
-        lines = path.read_text(encoding="utf-8").splitlines()
-    except OSError:
-        return []
     calls = []
-    for line in reversed(lines):
-        try:
-            entry = json.loads(line)
-        except ValueError:
-            continue
-        calls.append({key: entry.get(key) for key in ("ts", "tool", "args", "kind", "repeat", "ms", "result")})
-        if len(calls) >= limit:
-            break
+    try:
+        with path.open("rb") as handle:
+            for line in _recent_lines(handle):
+                try:
+                    entry = json.loads(line)
+                except (ValueError, UnicodeError):
+                    continue
+                if not isinstance(entry, dict):
+                    continue
+                calls.append({key: entry.get(key) for key in ("ts", "tool", "args", "kind", "repeat", "ms", "result")})
+                if len(calls) >= limit:
+                    break
+    except OSError:
+        pass
     return calls
 
 

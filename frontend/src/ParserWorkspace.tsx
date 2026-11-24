@@ -36,14 +36,23 @@ function Environment({ engine, format, catalog }: { engine: string; format: stri
   const facts: string[] = [];
   if (engine === 'docling') {
     facts.push(catalog.docling_installed ? 'Docling 설치됨' : 'Docling 설치 필요');
-    if (format === 'PDF') facts.push(catalog.pdf_model_directory ? 'PDF 모델 폴더 확인' : 'PDF 모델 폴더 없음');
+    if (format === 'PDF' && catalog.pdf_models_ready !== false) {
+      facts.push(catalog.pdf_models_ready ? 'PDF 모델 파일 확인' : catalog.pdf_model_directory ? 'PDF 모델 폴더 확인' : 'PDF 모델 폴더 없음');
+    }
   }
   const ocr = ['docling', 'ocr-model', 'python-svg'].includes(engine);
   if (!facts.length && !ocr) facts.push('Python 표준 라이브러리');
   const model = catalog.ocr_model?.configured ? catalog.ocr_model.model_id : '';
-  return <p className="pr-environment"><Settings2 size={15} aria-hidden="true"/><strong>실행 환경</strong>{facts.map(fact => <span key={fact}>{fact}</span>)}
+  return <><p className="pr-environment"><Settings2 size={15} aria-hidden="true"/><strong>실행 환경</strong>{facts.map(fact => <span key={fact}>{fact}</span>)}
     {ocr && <span>{catalog.ocr_models_found ? 'OCR 모델 연결됨' : 'OCR 모델 미연결'}{catalog.ocr_models_found && model && <small className="pr-ocr-model"> · <code>{model}</code></small>}</span>}
-    <span>문서 파싱 1개씩 · 단일 워커</span></p>;
+    <span>문서 파싱 1개씩 · 단일 워커</span></p>
+    {format === 'PDF' && catalog.pdf_models_ready === false && <details className="pr-model-help">
+      <summary>PDF 모델 설치 필요{catalog.pdf_missing_files?.length ? ` · 누락 ${catalog.pdf_missing_files.length}개` : ''}</summary>
+      <p>Docling 환경에서 아래 명령으로 레이아웃·표 모델을 준비한 뒤 콘솔을 다시 실행하세요.</p>
+      <code>docling-tools models download layout tableformer</code>
+      {!!catalog.pdf_missing_files?.length && <ul>{catalog.pdf_missing_files.map(file => <li key={file}>{file}</li>)}</ul>}
+    </details>}
+    </>;
 }
 
 function RouteDiagram({ format, engine, catalog, onNavigate }: { format: string; engine?: string; catalog: ParserCatalog; onNavigate: Navigate }) {

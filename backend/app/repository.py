@@ -1,4 +1,6 @@
 """SQLite document records and atomic lifecycle transitions."""
+from collections.abc import Iterator
+from contextlib import contextmanager
 import json
 import sqlite3
 from datetime import datetime, timezone
@@ -13,12 +15,17 @@ class DocumentRepository:
     def __init__(self, database: Path):
         self.database = database
 
-    def connect(self) -> sqlite3.Connection:
+    @contextmanager
+    def connect(self) -> Iterator[sqlite3.Connection]:
         connection = sqlite3.connect(self.database, timeout=30)
-        connection.row_factory = sqlite3.Row
-        connection.execute("PRAGMA foreign_keys=ON")
-        connection.execute("PRAGMA busy_timeout=30000")
-        return connection
+        try:
+            connection.row_factory = sqlite3.Row
+            connection.execute("PRAGMA foreign_keys=ON")
+            connection.execute("PRAGMA busy_timeout=30000")
+            with connection:
+                yield connection
+        finally:
+            connection.close()
 
     def initialize(self) -> None:
         with self.connect() as conn:
@@ -54,12 +61,9 @@ class DocumentRepository:
             if "seq" not in columns:
                 # 문서 번호(D번호). 화면과 작업 에이전트가 같은 번호로 문서를 부른다. 기존 문서는 올린 순서대로 매긴다.
                 conn.execute("ALTER TABLE documents ADD COLUMN seq INTEGER")
-                conn.execute('''
-                    UPDATE documents SET seq = (
-                        SELECT COUNT(*) FROM documents d2
-                        WHERE d2.created_at < documents.created_at
-                           OR (d2.created_at = documents.created_at AND d2.rowid <= documents.rowid))
-                ''')
+                ordered = conn.execute("SELECT rowid FROM documents ORDER BY created_at, rowid")
+                conn.executemany("UPDATE documents SET seq=? WHERE rowid=?",
+                                 ((seq, row[0]) for seq, row in enumerate(ordered, 1)))
             conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS documents_seq ON documents(seq)")
             run_columns = {row[1] for row in conn.execute("PRAGMA table_info(parse_runs)")}
             if "duration_ms" not in run_columns:

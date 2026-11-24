@@ -17,6 +17,7 @@ import threading
 
 from app.adapters.base import ParsedDocument, ParserError
 from app.config import Settings
+from app.docling_models import LAYOUT_FILES, missing_files
 from app.formats import IMAGE_FORMATS
 from app.models import ResultLocation
 from app.ocr_model import OcrConnection, OcrError, concurrency, cut_repetition, load_ocr, normalize, recognize
@@ -87,7 +88,7 @@ class Layout:
 
     @classmethod
     def get(cls, settings: Settings) -> "Layout | None":
-        if not settings.docling_artifacts or not settings.docling_artifacts.is_dir():
+        if missing_files(settings.docling_artifacts, LAYOUT_FILES):
             return None
         with cls._guard:
             key = str(settings.docling_artifacts)

@@ -13,6 +13,7 @@ import difflib
 import hashlib
 import json
 import os
+from contextlib import contextmanager
 from pathlib import Path
 import platform
 import re
@@ -166,50 +167,42 @@ class Store:
     def save(self, name: str, value) -> None:
         path = self._path(name)
         temp = path.with_suffix(f".{os.getpid()}.tmp")
-        temp.write_text(json.dumps(value, ensure_ascii=False), encoding="utf-8")
-        for attempt in range(20):
-            try:
-                os.replace(temp, path)
-                return
-            except PermissionError:
-                # Windows: 다른 프로세스가 잠깐 파일을 읽는 중이면 교체가 거부된다.
-                time.sleep(0.05 * (attempt + 1))
-        temp.unlink(missing_ok=True)
+        try:
+            temp.write_text(json.dumps(value, ensure_ascii=False), encoding="utf-8")
+            for attempt in range(20):
+                try:
+                    os.replace(temp, path)
+                    return
+                except PermissionError:
+                    if attempt == 19:
+                        raise
+                    time.sleep(0.05 * (attempt + 1))
+        finally:
+            temp.unlink(missing_ok=True)
 
+    @contextmanager
     def locked(self):
-        """프로세스 사이 잠금. 같은 스레드에서 겹쳐 들어와도(재진입) 파일 잠금은 한 번만 잡는다.
-        잠금 안에서는 네트워크 호출을 하지 않는다(다른 도구 호출이 기다리지 않게)."""
-        store = self
-
-        class _Lock:
-            def __enter__(self):
-                store._thread_lock.acquire()
-                depth = getattr(store._local, "depth", 0)
-                store._local.depth = depth + 1
-                if depth:
-                    return self
-                store._local.handle = (store.dir / "agent.lock").open("a+")
+        """Serialize state changes across threads and processes, allowing nested calls."""
+        with self._thread_lock:
+            if getattr(self._local, "holding_lock", False):
+                yield
+                return
+            with (self.dir / "agent.lock").open("a+") as handle:
                 deadline = time.monotonic() + 10
                 while True:
                     try:
-                        try_lock(store._local.handle)
-                        return self
+                        try_lock(handle)
+                        break
                     except OSError:
-                        if time.monotonic() > deadline:
-                            store._local.handle.close()
-                            store._local.depth = 0
-                            store._thread_lock.release()
+                        if time.monotonic() >= deadline:
                             raise ToolError("busy", "작업 도구 상태 파일이 잠겨 있습니다. 잠시 뒤 다시 시도해 주세요.")
                         time.sleep(0.05)
-
-            def __exit__(self, *exc):
-                store._local.depth -= 1
-                if not store._local.depth:
-                    unlock(store._local.handle)
-                    store._local.handle.close()
-                store._thread_lock.release()
-
-        return _Lock()
+                self._local.holding_lock = True
+                try:
+                    yield
+                finally:
+                    self._local.holding_lock = False
+                    unlock(handle)
 
     def append_call(self, entry: dict) -> None:
         with (self.dir / "calls.jsonl").open("a", encoding="utf-8") as handle:
@@ -377,9 +370,11 @@ class Ops:
         counts = Counter(doc["status"] for doc in docs)
         problems = []
         if not parsers["docling_installed"]:
-            problems.append("Docling 미설치: PDF·Office 파싱 불가(run.sh --docling 으로 띄워야 함)")
+            problems.append("Docling 미설치: PDF·Office 파싱 불가(start.cmd --docling 또는 ./run.sh --docling)")
         elif not parsers["pdf_model_directory"]:
             problems.append("PDF 모델 폴더 없음: PDF 파싱 불가")
+        elif parsers.get("pdf_models_ready") is False:
+            problems.append("PDF 모델 파일 누락: docling-tools models download layout tableformer 로 준비 필요")
         if not parsers["ocr_models_found"]:
             problems.append("OCR 모델 미연결: 스캔 쪽·이미지·문서 속 그림의 글자를 읽지 않음(콘솔 '모델 연결'에서 OCR 모델 설정)")
         if not self.roots:
@@ -782,7 +777,7 @@ class Ops:
         flag = lambda key: "1" if parsers.get(key) else "0"  # noqa: E731
         block = [f"DOCOPS {label} {_now().strftime('%m-%d %H:%M')} build {self.build}",
                  f"env {osname} py{sys.version_info[0]}.{sys.version_info[1]} docling{flag('docling_installed')} "
-                 f"pdfm{flag('pdf_model_directory')} ocr{flag('ocr_enabled')} ocrm{flag('ocr_models_found')}"]
+                 f"pdfm{flag('pdf_models_ready' if 'pdf_models_ready' in parsers else 'pdf_model_directory')} ocr{flag('ocr_enabled')} ocrm{flag('ocr_models_found')}"]
         versions = sorted({f"{v['latest']['parser']}={(v['latest'].get('parser_version') or '').replace(' ', '')}" for v in views if v["latest"] and v["latest"].get("parser")})
         if versions:
             block.append("ver " + " ".join(versions))

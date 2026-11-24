@@ -1,0 +1,61 @@
+name: Windows console
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'backend/**'
+      - 'frontend/**'
+      - 'mock-data/**'
+      - 'opencode-workspace/**'
+      - 'scripts/*.py'
+      - 'start.cmd'
+      - '.github/workflows/windows.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 25
+    env:
+      PYTHONUTF8: '1'
+      DOCOPS_RUNTIME_DIR: ${{ github.workspace }}\설치 확인
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Start from source
+        shell: cmd
+        run: start.cmd --base --check
+      - name: Test frontend
+        working-directory: frontend
+        run: npm test
+      - name: Test backend on Windows
+        working-directory: backend
+        run: |
+          .\.venv\Scripts\python -m pip install -r requirements-dev.txt pillow==13.0.0 openpyxl==3.1.5
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          .\.venv\Scripts\python -m pytest -q
+      - name: Build Windows x64 bundle
+        run: python scripts/prepare-offline.py
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.15'
+      - name: Check unpacked bundle with Python 3.15
+        run: |
+          Expand-Archive offline/unstructured-parser-control-plane-windows.zip "$env:RUNNER_TEMP\배포 확인"
+          Set-Location "$env:RUNNER_TEMP\배포 확인\unstructured-parser-control-plane"
+          python scripts/windows_launcher.py --offline --check
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python backend/docops.py init-workspace "$env:RUNNER_TEMP\agent workspace" --roots "$env:RUNNER_TEMP\samples"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-x64
+          path: offline/unstructured-parser-control-plane-windows.zip
+          if-no-files-found: error

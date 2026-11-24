@@ -30,6 +30,7 @@ async function readResponse<T>(response:Response):Promise<T> {
 /** ocr_models_found: OCR 모델 연결 설정 여부(호출해 보지는 않음). ocr_model은 예전 서버에 없다. */
 export type ParserCatalog = {
  routes: Record<string, string>; docling_installed: boolean; pdf_model_directory: boolean;
+ pdf_models_ready?: boolean; pdf_missing_files?: string[];
  ocr_enabled: boolean; ocr_models_found: boolean;
  ocr_model?: { label: string; model_id: string; mode: 'region' | 'page'; configured: boolean } | null;
 };

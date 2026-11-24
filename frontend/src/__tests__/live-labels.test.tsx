@@ -143,6 +143,18 @@ describe('파서 플로우의 OCR 모델', () => {
     expect(within(docs).getByRole('button', { name: /실패 · 미지원 1/ })).toBeTruthy();
   });
 
+  it('PDF 모델이 일부만 있으면 누락 파일과 설치 방법을 보여 준다', async () => {
+    const missing = 'tableformer/accurate/tm_config.json';
+    serve([], path => path === '/api/live/parsers' ? json({ ...catalog, ocr_models_found: false,
+      pdf_models_ready: false, pdf_missing_files: [missing] }) : undefined);
+    render(<ParserWorkspace format="PDF" onNavigate={vi.fn()} />);
+    const summary = await screen.findByText('PDF 모델 설치 필요 · 누락 1개');
+    await userEvent.setup().click(summary);
+    expect(screen.getByText(missing)).toBeTruthy();
+    expect(screen.getByText('docling-tools models download layout tableformer')).toBeTruthy();
+    expect(screen.queryByText('PDF 모델 파일 확인')).toBeNull();
+  });
+
   it('OCR 모델이 없으면 미연결만 보인다', async () => {
     serve([], path => path === '/api/live/parsers' ? json({ ...catalog, ocr_models_found: false, ocr_model: { label: 'OCR 모델', model_id: '', mode: 'region', configured: false } }) : undefined);
     render(<ParserWorkspace format="PNG" onNavigate={vi.fn()} />);

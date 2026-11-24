@@ -19,7 +19,7 @@
 |---|---|---:|---|
 | `GET /api/health` | API 기능 제공 상태 | `200` | 해당 응답은 고정값으로, Docling 설치·모델 또는 실제 문서의 파싱 성공을 확인하지 않음 |
 | `GET /api/data` | `mock-data/data.json` 전체 | `200` | 예시 파일을 읽지 못하면 서버 오류 가능 |
-| `GET /api/live/parsers` | `routes`는 서버에 등록된 확장자 → 파서 ID 매핑(이미지는 `ocr-model`). `docling_installed`, `pdf_model_directory`는 패키지·폴더 확인값, `ocr_models_found`는 OCR 모델 연결이 **설정됐는지**(2026-11-24부터, 호출해 보지 않음), `ocr_model`은 `{label, model_id, mode, configured}`. 조회는 모델 로딩·호출이나 파싱을 실행하지 않는다. | `200` | |
+| `GET /api/live/parsers` | `routes`는 서버에 등록된 확장자 → 파서 ID 매핑(이미지는 `ocr-model`). `docling_installed`, `pdf_model_directory`는 패키지·폴더 확인값. `pdf_models_ready`는 필수 레이아웃·표 파일 5개가 존재하고 0바이트보다 큰지 확인한 값이며, `pdf_missing_files`는 누락·빈 파일의 모델 폴더 기준 상대 경로 목록. `ocr_models_found`는 OCR 모델 연결이 **설정됐는지**(2026-11-24부터, 호출해 보지 않음), `ocr_model`은 `{label, model_id, mode, configured}`. 조회는 모델 로딩·호출이나 파싱을 실행하지 않는다. | `200` | |
 | `GET /api/live/documents` | 로컬 문서 목록, `{ "documents": [...] }` | `200` | 현재 필터·페이지네이션 없음 |
 | `POST /api/live/documents` | `multipart/form-data`의 `file` **1개**. 저장만 수행 | `201`, `LiveDocument` | `400` 파일명 오류/길이 정보 문제, `403` 허용되지 않은 Origin, `413` 크기 초과, `422` 필수 파일 필드 누락 등 |
 | `GET /api/live/documents/{id}` | 해당 문서 상태 | `200`, `LiveDocument` | `404` ID 형식이 틀렸거나 없는 문서 |

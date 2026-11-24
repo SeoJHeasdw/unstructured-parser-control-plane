@@ -221,3 +221,53 @@ def test_tool_schemas_stay_flat():
         for prop in schema["properties"].values():
             assert prop["type"] in ("string", "integer", "boolean"), tool["name"]
         assert list(schema["properties"]) == TOOL_ARGS[tool["name"]]
+
+
+def test_interrupted_upload_is_not_sent_again(tmp_path, monkeypatch):
+    api = Api()
+    monkeypatch.setattr(api, "discover", lambda: "http://127.0.0.1:8000")
+    methods = []
+
+    def lose_response(method, *args):
+        methods.append(method)
+        raise ConnectionResetError()
+
+    monkeypatch.setattr(api, "_send", lose_response)
+    source = tmp_path / "one.txt"
+    source.write_bytes(b"one")
+    with pytest.raises(ServerDown, match="완료 여부"):
+        api.upload(source, source.name)
+    assert methods == ["POST"]
+    with pytest.raises(ServerDown):
+        api.get("/api/health")
+    assert methods == ["POST", "GET", "GET"]
+
+
+def test_activity_tail_handles_split_utf8_and_partial_records(tmp_path):
+    from app.routers.agent import _calls
+
+    path = tmp_path / "calls.jsonl"
+    rows = [json.dumps({"tool": "first"}), json.dumps({"tool": "중간" * 30000}, ensure_ascii=False),
+            "null", json.dumps({"tool": "latest"}), '{"unfinished":']
+    path.write_bytes("\r\n".join(rows).encode("utf-8"))
+    assert [entry["tool"] for entry in _calls(path, 2)] == ["latest", "중간" * 30000]
+
+
+def test_locked_state_write_reports_failure_and_unlocks(tmp_path, monkeypatch):
+    import app.agent.ops as ops_module
+    from app.agent.ops import Store
+
+    store = Store(tmp_path)
+    with store.locked():
+        store.save("batches", {"n": 1})
+        with monkeypatch.context() as patch:
+            def denied(*args):
+                raise PermissionError("locked")
+            patch.setattr(ops_module.os, "replace", denied)
+            patch.setattr(ops_module.time, "sleep", lambda _: None)
+            with store.locked(), pytest.raises(PermissionError):
+                store.save("batches", {"n": 2})
+    assert store.load("batches", {}) == {"n": 1}
+    with store.locked():
+        store.save("batches", {"n": 3})
+    assert store.load("batches", {}) == {"n": 3}

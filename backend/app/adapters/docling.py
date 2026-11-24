@@ -9,6 +9,7 @@ import zipfile
 
 from app.adapters.base import ParsedDocument, ParserError
 from app.config import Settings
+from app.docling_models import missing_files
 from app.adapters.ocr import MAX_FRAME_PIXELS, MODEL_HELP, OCR_READ_WARNING, REPEAT_WARNING, ModelOcr
 from app.models import ResultLocation
 from app.adapters.docling_locations import markdown_locations
@@ -178,6 +179,10 @@ class DoclingAdapter:
                 raise ParserError("오프라인 Docling 모델 경로가 없습니다. 미리 준비된 모델 경로를 설정해 주세요.", code="parser_unavailable")
             ocr = ModelOcr(self.settings)
             count = _pdf_pages(path, RENDER_SCALE if ocr.configured else 1.0)
+            missing = missing_files(self.settings.docling_artifacts)
+            if missing:
+                raise ParserError("PDF 모델 파일이 빠져 있거나 비어 있습니다: " + ", ".join(missing) +
+                                  ". docling-tools models download layout tableformer 로 준비해 주세요.", code="parser_unavailable")
             converter = self._pdf()
         else:
             fmt = {"DOCX": InputFormat.DOCX, "PPTX": InputFormat.PPTX, "XLSX": InputFormat.XLSX}[extension]
