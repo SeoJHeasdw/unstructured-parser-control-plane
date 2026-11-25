@@ -4,9 +4,11 @@
 
 setup  backend/.venv, Python 패키지, 화면 빌드, .env, PDF 모델, 자체 점검. 네트워크를 쓴다(--offline이면 묶음 안의 파일만).
        기본은 Docling(PDF·Office 파싱)까지 넣는 전체 모드(Python 3.12). --lite는 Docling 없이 TXT·CSV·MD·LOG만(3.12~3.15).
-       끝나면 backend/.venv/docops-setup.json에 모드와 설치 기준(잠금 파일·화면 소스 지문)을 남기고,
+       끝나면 backend/.venv/docops-setup.json에 모드와 설치 기준(잠금 파일 지문)을 남기고,
        설치되지 않은 것(예: 받지 못한 PDF 모델)을 마지막 요약에 다시 보여 준다.
-run    그 기록과 지금 코드가 맞는지만 확인하고 서버를 띄운다. 설치하지 않고 네트워크도 쓰지 않는다.
+       화면을 빌드하면 frontend/dist/docops-build.json에 그 빌드를 만든 화면 소스의 파일별 지문을 남긴다.
+       기록이 없거나 지금 소스와 다른 빌드(예: 이전 실행기가 남긴 것)는 쓰지 않고 다시 빌드한다.
+run    그 기록들과 지금 코드가 맞는지만 확인하고 서버를 띄운다. 설치하지 않고 네트워크도 쓰지 않는다.
 
 Windows·macOS·Linux 공통이고 Python 3.9 이상에서 돈다. 표준 라이브러리만 쓴다.
 """
@@ -14,6 +16,7 @@ from __future__ import annotations
 
 import argparse
 from concurrent.futures import ThreadPoolExecutor
+from datetime import datetime
 import hashlib
 from http.client import HTTPConnection, HTTPException
 import json
@@ -42,8 +45,10 @@ SETUP_CMD = "setup.cmd" if WINDOWS else "./setup.sh"
 PYTHON_INSTALL = ("winget install --exact --id Python.Python.3.12 --architecture x64" if WINDOWS
                   else "Python 3.12 설치 (macOS 예: brew install python@3.12)")
 NODE_INSTALL = "winget install --exact --id OpenJS.NodeJS.LTS" if WINDOWS else "Node.js 22 LTS 설치"
-# 화면 빌드 결과(frontend/dist)를 바꾸는 입력. 바뀌면 run이 setup을 다시 하라고 알린다.
+# 화면 빌드 결과(frontend/dist)를 바꾸는 입력(과 src 아래 전부). 바뀌면 run이 setup을 다시 하라고 알린다.
 FRONTEND_INPUTS = ("package.json", "package-lock.json", "index.html", "vite.config.ts", "tsconfig.json")
+# frontend/dist 안의 빌드 기록. 오프라인 ZIP에도 들어간다(숨김 파일이면 ZIP에서 빠지므로 점으로 시작하지 않는다).
+BUILD_STAMP = "docops-build.json"
 CONSOLE_PORTS = range(8000, 8020)
 RUNTIME_HEADER = "x-docops-runtime"
 PROBE = """\
@@ -99,15 +104,23 @@ def installed_pins(requirements):
     return {name: version for name, version, windows_only in lock_entries(requirements) if WINDOWS or not windows_only}
 
 
+def _normalized(data):
+    # 줄바꿈만 다른 사본(Git autocrlf, ZIP)은 같은 것으로 본다.
+    return data.replace(b"\r\n", b"\n")
+
+
 def _digest(paths):
     digest = hashlib.sha256()
     for name, path in paths:
         digest.update(name.encode("utf-8") + b"\0")
         if path.is_file():
-            # 줄바꿈만 다른 사본(Git autocrlf, ZIP)은 같은 것으로 본다.
-            digest.update(path.read_bytes().replace(b"\r\n", b"\n"))
+            digest.update(_normalized(path.read_bytes()))
         digest.update(b"\0")
     return digest.hexdigest()
+
+
+def content_digest(data):
+    return hashlib.sha256(_normalized(data)).hexdigest()
 
 
 def lock_hash(full):
@@ -115,15 +128,59 @@ def lock_hash(full):
     return _digest((path.name, path) for path in locks)
 
 
-def frontend_hash():
-    files = {name: FRONTEND / name for name in FRONTEND_INPUTS}
+def frontend_sources():
+    """화면 빌드에 들어가는 소스 {frontend 기준 상대 경로: 경로}: 설정 파일과 src 아래 전부(숨김 제외)."""
+    files = {name: FRONTEND / name for name in FRONTEND_INPUTS if (FRONTEND / name).is_file()}
     source = FRONTEND / "src"
     if source.is_dir():
         for path in source.rglob("*"):
             relative = path.relative_to(FRONTEND).as_posix()
             if path.is_file() and not any(part.startswith(".") for part in relative.split("/")):
                 files[relative] = path
-    return _digest(sorted(files.items()))
+    return dict(sorted(files.items()))
+
+
+def stamp_frontend(dist):
+    """빌드 직후 그 빌드를 만든 소스의 파일별 지문과 시각을 dist에 남긴다."""
+    sources = {name: content_digest(path.read_bytes()) for name, path in frontend_sources().items()}
+    stamp = {"version": 1, "built_at": datetime.now().astimezone().isoformat(timespec="seconds"), "sources": sources}
+    (dist / BUILD_STAMP).write_text(json.dumps(stamp, ensure_ascii=False, indent=1), encoding="utf-8")
+
+
+def read_stamp(dist):
+    try:
+        stamp = json.loads((dist / BUILD_STAMP).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    if not isinstance(stamp, dict) or not isinstance(stamp.get("sources"), dict) or not stamp["sources"]:
+        return None
+    return stamp
+
+
+def frontend_drift(dist):
+    """빌드 기록과 내용이 다르거나 없어진 화면 소스 목록. 기록이 없으면 None.
+
+    기록이 없는 빌드는 어느 코드로 만들었는지 알 수 없다(이전 실행기나 직접 npm run build로 만든 것).
+    기록에 없는 새 파일은 세지 않는다. 같은 폴더에 새 코드를 덮어쓰면 옛 파일이 남는데, 그 때문에 맞는 빌드를 거부하면 안 된다.
+    새 파일이 빌드에 들어가려면 다른 소스가 그 파일을 불러야 하고, 그 소스가 바뀌므로 여기서 잡힌다.
+    """
+    stamp = read_stamp(dist)
+    if stamp is None:
+        return None
+    current = frontend_sources()
+    return [name for name, digest in stamp["sources"].items()
+            if name not in current or content_digest(current[name].read_bytes()) != digest]
+
+
+def stale_reason(drift):
+    if drift is None:
+        return ("frontend/dist 를 어느 코드로 만들었는지 기록이 없습니다"
+                "(이전 실행기나 직접 npm run build 로 만든 빌드). 그대로 쓰면 옛 화면이 뜰 수 있습니다.")
+    return f"frontend/dist 가 지금 화면 코드로 만든 빌드가 아닙니다(달라진 소스: {changed_files(drift)})."
+
+
+def changed_files(drift):
+    return ", ".join(drift[:3]) + (f" 외 {len(drift) - 3}개" if len(drift) > 3 else "")
 
 
 def read_state():
@@ -274,28 +331,35 @@ def npm_command():
     return ["npm"] if shutil.which("npm") else None
 
 
-def ensure_frontend(offline, previous):
-    """화면 소스 지문을 돌려준다. 바뀐 게 없으면 다시 빌드하지 않는다."""
+def ensure_frontend(offline):
+    """frontend/dist를 지금 화면 소스로 만든 빌드로 맞춘다. 빌드 기록이 지금 소스와 같으면 다시 빌드하지 않는다.
+
+    빌드가 있다는 것만으로 쓰지 않는다. 예전 실행기는 dist가 있으면 빌드를 건너뛰어,
+    코드를 덮어쓴 고객사 PC에서 옛 화면이 그대로 떴다(2026-11-25).
+    """
     custom = os.environ.get("DOCOPS_STATIC_DIR")
     if custom:
         if not frontend_ready(Path(custom).resolve()):
             raise SetupError("DOCOPS_STATIC_DIR 에 완성된 화면 빌드가 없습니다.")
         say("화면: DOCOPS_STATIC_DIR 사용")
-        return None
+        return
     dist = FRONTEND / "dist"
-    current = frontend_hash()
-    if frontend_ready(dist) and (offline or previous.get("frontend") == current):
-        say("화면: 이미 준비됨")
-        return current
+    present = frontend_ready(dist)
+    drift = frontend_drift(dist) if present else None
+    if present and drift == []:
+        say("화면: 이미 준비됨 (지금 코드로 만든 빌드)")
+        return
+    stale = stale_reason(drift) if present else None
     if offline:
-        raise SetupError("화면 빌드(frontend/dist)가 없습니다. 준비된 Windows ZIP을 쓰세요.")
+        raise SetupError(f"{stale}\n  --offline 은 ZIP 안의 화면 빌드만 씁니다. 같은 코드로 만든 Windows ZIP을 쓰세요." if stale
+                         else "화면 빌드(frontend/dist)가 없습니다. 준비된 Windows ZIP을 쓰세요.")
     npm = npm_command()
     if npm is None:
-        if frontend_ready(dist) and not previous:
-            say("Node.js가 없어 들어 있는 화면 빌드(frontend/dist)를 그대로 씁니다.")
-            return current
-        raise SetupError(f"화면을 빌드하려면 Node.js(20.19 이상 또는 22.12 이상)가 필요합니다.\n  {NODE_INSTALL}\n"
-                         "  설치 후 새 터미널에서 다시 실행하세요.")
+        raise SetupError((f"{stale}\n" if stale else "")
+                         + f"화면을 빌드하려면 Node.js(20.19 이상 또는 22.12 이상)가 필요합니다.\n  {NODE_INSTALL}\n"
+                         "  설치 후 새 터미널에서 다시 실행하세요. 인터넷이 없는 PC는 이 코드로 만든 Windows ZIP을 씁니다.")
+    if stale:
+        say(f"화면: {stale} 다시 빌드합니다.")
     say("화면 빌드 중 (npm ci → npm run build)")
     try:
         run([*npm, "ci", "--prefer-offline", "--no-audit", "--no-fund", "--fetch-retries=1", "--fetch-timeout=15000"],
@@ -306,7 +370,7 @@ def ensure_frontend(offline, previous):
                          "NODE_EXTRA_CA_CERTS=<사내 루트 CA 파일>, 사내 미러는 npm_config_registry 를 설정하세요.") from exc
     if not frontend_ready(dist):
         raise SetupError("화면 빌드 결과(frontend/dist)가 완전하지 않습니다.")
-    return current
+    stamp_frontend(dist)
 
 
 # ---------------------------------------------------------------- setup
@@ -379,11 +443,10 @@ def setup(args):
     if folder or port:
         where = f"http://127.0.0.1:{port}/" if port else f"데이터 폴더 {folder}"
         raise SetupError(f"콘솔이 실행 중입니다({where}). 실행 창에서 Ctrl+C로 끈 뒤 다시 실행하세요.")
-    previous = read_state()
     say("1/3 Python 환경")
     python = ensure_python(full, args.offline)
     say("2/3 화면")
-    frontend = ensure_frontend(args.offline, previous)
+    ensure_frontend(args.offline)
     env_file, example = ROOT / ".env", ROOT / ".env.example"
     if not env_file.exists() and example.is_file():
         shutil.copyfile(example, env_file)
@@ -402,8 +465,7 @@ def setup(args):
             warnings = json.loads(report.read_text(encoding="utf-8")).get("warnings", [])
         except (OSError, ValueError):
             warnings = []
-    write_state({"mode": "full" if full else "lite", "packages": lock_hash(full), "frontend": frontend,
-                 "warnings": warnings})
+    write_state({"mode": "full" if full else "lite", "packages": lock_hash(full), "warnings": warnings})
     print(summary(full, warnings), flush=True)
     return 0
 
@@ -441,14 +503,22 @@ def check_ready():
             raise SetupError("DOCOPS_STATIC_DIR 에 완성된 화면 빌드가 없습니다.")
     elif not frontend_ready(FRONTEND / "dist"):
         raise SetupError(f"화면 빌드(frontend/dist)가 없습니다. {again}")
-    elif state.get("frontend") != frontend_hash():
-        raise SetupError(f"화면 코드가 바뀌었습니다(코드 업데이트). {again}")
+    else:
+        drift = frontend_drift(FRONTEND / "dist")
+        if drift is None:
+            raise SetupError(f"{stale_reason(None)} {again}")
+        if drift:
+            raise SetupError(f"화면 코드가 바뀌었습니다(코드 업데이트: {changed_files(drift)}). {again}")
     return full
 
 
 def start(args):
     full = check_ready()
     say("모드: " + ("전체 (Docling)" if full else "lite (Docling 없음: TXT·CSV·MD·LOG만)"), "run")
+    stamp = None if os.environ.get("DOCOPS_STATIC_DIR") else read_stamp(FRONTEND / "dist")
+    if stamp and stamp.get("built_at"):
+        # 고객사에서 어떤 화면이 떴는지 바로 대조할 수 있게 빌드 시각을 보여 준다.
+        say(f"화면 빌드: {stamp['built_at']}", "run")
     process = subprocess.Popen([str(venv_python()), "launch_local.py", str(args.port), "0" if args.no_browser else "1"],
                                cwd=BACKEND)
     try:

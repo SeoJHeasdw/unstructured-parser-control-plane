@@ -69,7 +69,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
         @app.get("/", include_in_schema=False)
         def home():
-            return FileResponse(index)
+            # 새 빌드를 올린 뒤에도 브라우저가 캐시한 옛 index.html(→ 옛 화면)을 쓰지 않게 매번 다시 확인시킨다.
+            # /assets 파일은 이름에 내용 지문이 들어가 있어 캐시해도 된다.
+            return FileResponse(index, headers={"Cache-Control": "no-cache"})
     return app
 
 app = create_app()

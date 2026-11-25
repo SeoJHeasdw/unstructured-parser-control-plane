@@ -8,7 +8,8 @@ import sys
 import tempfile
 from zipfile import ZIP_DEFLATED, ZipFile
 
-from console import ROOT, BACKEND, FRONTEND, OFFLINE, SetupError, frontend_ready, locked_versions, offline_pip_env
+from console import (ROOT, BACKEND, BUILD_STAMP, FRONTEND, OFFLINE, SetupError, content_digest, frontend_ready,
+                     locked_versions, offline_pip_env, read_stamp, stamp_frontend)
 
 CORE_PY = ("3.12", "3.13", "3.14", "3.15")
 DOCLING_PY = "3.12"
@@ -30,6 +31,8 @@ def npm_build(from_cache):
     subprocess.run([*npm, "run", "build"], cwd=FRONTEND, check=True, timeout=180)
     if not frontend_ready(FRONTEND / "dist"):
         raise SetupError("Frontend build did not produce a complete frontend/dist directory.")
+    # setup --offline 은 이 기록이 ZIP 안의 화면 소스와 맞는 빌드만 쓴다.
+    stamp_frontend(FRONTEND / "dist")
 
 
 def pip_download(requirements, target, python_version, caches, from_cache):
@@ -79,8 +82,8 @@ def source_files():
     yield from sorted(BACKEND.glob("requirements*.txt"))
     yield from tree_files(BACKEND / "app", {".py"})
     yield from tree_files(BACKEND / "tests", {".py"})
-    yield from tree_files(FRONTEND / "src", {".css", ".json", ".ts", ".tsx", ".svg", ".png"})
-    yield from tree_files(FRONTEND / "src" / "compare" / "sources", {".pdf", ".docx", ".xlsx"})
+    # 화면 소스는 빌드 기록(frontend_sources)과 같은 범위를 통째로 넣는다. 빠지면 고객사 PC에서 빌드 기록과 맞지 않는다.
+    yield from tree_files(FRONTEND / "src")
     yield from tree_files(FRONTEND / "dist")
     yield from tree_files(ROOT / "docs", {".md"})
     yield from tree_files(ROOT / "mock-data", {".json"})
@@ -94,7 +97,7 @@ def build_archive(path, wheelhouses, models):
     prefix = "unstructured-parser-control-plane"
     required = {
         "setup.cmd", "run.cmd", "scripts/console.py", "backend/main.py", "backend/requirements.lock.txt",
-        "frontend/dist/index.html", "mock-data/data.json",
+        "frontend/dist/index.html", f"frontend/dist/{BUILD_STAMP}", "mock-data/data.json",
     }
     with ZipFile(path, "w", ZIP_DEFLATED, compresslevel=3) as archive:
         for source in source_files():
@@ -115,6 +118,11 @@ def build_archive(path, wheelhouses, models):
         broken = archive.testzip()
         if missing or broken:
             raise SetupError(f"Bundle validation failed. Missing: {sorted(missing)}. Corrupt entry: {broken}.")
+        stamp = read_stamp(FRONTEND / "dist") or {"sources": {}}
+        drift = [name for name, digest in stamp["sources"].items()
+                 if f"frontend/{name}" not in names or content_digest(archive.read(f"{prefix}/frontend/{name}")) != digest]
+        if not stamp["sources"] or drift:
+            raise SetupError(f"Bundle validation failed: frontend/dist does not match the bundled frontend sources {drift[:5]}.")
 
 
 def prepare(args):

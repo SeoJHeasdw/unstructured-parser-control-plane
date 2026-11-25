@@ -92,7 +92,9 @@ def test_built_frontend_is_served_when_present(tmp_path):
     (static / "index.html").write_text("<html>앱</html>", encoding="utf-8")
     (static / "assets" / "app.js").write_text("console.log(1)", encoding="utf-8")
     with TestClient(create_app(Settings(runtime_dir=tmp_path / "rt", static_dir=static))) as client:
-        assert "앱" in client.get("/").text
+        home = client.get("/")
+        assert "앱" in home.text
+        assert home.headers["cache-control"] == "no-cache"  # 업데이트 뒤 브라우저가 옛 화면을 쓰지 않게
         assert client.get("/assets/app.js").status_code == 200
         assert client.get("/api/health").json()["status"] == "ok"
 

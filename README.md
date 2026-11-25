@@ -97,6 +97,8 @@ run.cmd
 |---|---|
 | `아직 설치되지 않았습니다` | `setup.cmd`를 먼저 실행합니다. |
 | `패키지 목록이 바뀌었습니다` / `화면 코드가 바뀌었습니다` | 코드를 업데이트한 뒤에 나옵니다. `setup.cmd`를 다시 실행합니다(lite로 쓰던 PC는 `--lite`). |
+| `frontend/dist 를 어느 코드로 만들었는지 기록이 없습니다` | 예전 실행기(`start.cmd`)가 남긴 화면 빌드입니다. 그대로 쓰면 코드를 업데이트해도 **옛 화면**이 뜹니다. `setup.cmd`가 Node.js로 다시 빌드합니다. Node.js가 없는 PC는 Node.js를 설치하거나 같은 코드로 만든 오프라인 ZIP을 씁니다. |
+| 업데이트했는데 화면이 옛날 그대로 | 실행 창의 `[run] 화면 빌드: <시각>`이 방금 setup한 시각인지 봅니다. 맞으면 브라우저 캐시이므로 `Ctrl+Shift+R`(Windows `Ctrl+F5`)로 새로 고칩니다. 이 버전부터 서버는 화면의 시작 파일을 캐시하지 않게 보냅니다. |
 | `콘솔이 실행 중입니다` | 콘솔 실행 창에서 `Ctrl+C`로 끈 뒤 setup을 다시 실행합니다. |
 | `Docling(PDF·Office 파싱)에는 Python 3.12가 필요합니다` | Python 3.12를 설치하고 새 터미널에서 다시 실행합니다. 당장 화면만 띄우려면 `setup.cmd --lite`를 씁니다. |
 | `backend/.venv 는 Python 3.13 입니다` | 예전에 다른 버전으로 만든 환경입니다. `backend\.venv` 이름을 바꾸고(예: `.venv-py313`) setup을 다시 실행합니다. |
@@ -121,6 +123,7 @@ run.cmd
 - 대상 PC에는 Python만 있으면 됩니다. Docling을 쓰는 묶음은 3.12, 기본 묶음은 3.12~3.15가 필요하며, Node·npm·PyPI 접속은 필요 없습니다.
 - 설치한 뒤 실행은 똑같이 `run.cmd`입니다.
 - `--from-cache`를 주면 이미 설치된 `node_modules`와 기존 `offline\wheels*` 폴더로 다시 만듭니다.
+- ZIP의 화면 빌드에는 빌드 기록(`frontend\dist\docops-build.json`: 소스 파일별 지문과 빌드 시각)이 들어갑니다. `setup --offline`은 기록이 ZIP 안의 화면 소스와 맞는 빌드만 쓰므로, 예전 ZIP의 화면이나 옛 설치에 남은 빌드는 쓰지 않습니다.
 
 ## 개발자용
 

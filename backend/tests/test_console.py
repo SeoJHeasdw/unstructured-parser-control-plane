@@ -38,8 +38,27 @@ def project(tmp_path, monkeypatch):
 
 
 def record(full=True):
-    console.write_state({"mode": "full" if full else "lite", "packages": console.lock_hash(full),
-                         "frontend": console.frontend_hash()})
+    """setup이 끝난 상태: 설치 기록과, 지금 화면 소스로 만든 빌드 기록."""
+    console.write_state({"mode": "full" if full else "lite", "packages": console.lock_hash(full)})
+    console.stamp_frontend(console.FRONTEND / "dist")
+
+
+def fake_npm(monkeypatch):
+    """npm ci → npm run build 대신 새 빌드를 쓴다(Vite처럼 dist를 비우고 다시 만든다)."""
+    calls = []
+
+    def run(command, **kwargs):
+        step = "build" if command[1:] == ["run", "build"] else command[1]
+        calls.append(step)
+        if step == "build":
+            dist = console.FRONTEND / "dist"
+            shutil.rmtree(dist)
+            (dist / "assets").mkdir(parents=True)
+            (dist / "index.html").write_text('<script src="/assets/new.js"></script>', encoding="utf-8")
+            (dist / "assets" / "new.js").write_text("", encoding="utf-8")
+    monkeypatch.setattr(console, "npm_command", lambda: ["npm"])
+    monkeypatch.setattr(console, "run", run)
+    return calls
 
 
 # ---------------------------------------------------------------- 옵션
@@ -119,9 +138,60 @@ def test_runtime_folder_from_dotenv(project, monkeypatch):
 
 
 def test_frontend_is_not_rebuilt_when_unchanged(project, monkeypatch):
+    console.stamp_frontend(console.FRONTEND / "dist")
     monkeypatch.setattr(console, "npm_command", lambda: pytest.fail("npm must not run"))
-    current = console.frontend_hash()
-    assert console.ensure_frontend(False, {"frontend": current}) == current
+    console.ensure_frontend(False)
+
+
+def test_leftover_build_without_record_is_rebuilt(project, monkeypatch):
+    """예전 실행기가 남긴 dist(기록 없음)를 '이미 준비됨'으로 쓰면 코드를 업데이트해도 옛 화면이 뜬다."""
+    calls = fake_npm(monkeypatch)
+    console.ensure_frontend(False)
+    assert calls == ["ci", "build"]
+    assert console.frontend_drift(console.FRONTEND / "dist") == []
+    assert "new.js" in (console.FRONTEND / "dist" / "index.html").read_text(encoding="utf-8")
+
+
+def test_build_from_other_code_is_rebuilt(project, monkeypatch):
+    console.stamp_frontend(console.FRONTEND / "dist")
+    (console.FRONTEND / "src" / "main.tsx").write_text("export const changed = 1\n", encoding="utf-8")
+    calls = fake_npm(monkeypatch)
+    console.ensure_frontend(False)
+    assert calls == ["ci", "build"] and console.frontend_drift(console.FRONTEND / "dist") == []
+
+
+def test_leftover_build_is_not_used_without_node(project, monkeypatch):
+    monkeypatch.setattr(console, "npm_command", lambda: None)
+    with pytest.raises(console.SetupError, match="기록이 없습니다(.|\n)*Node.js"):
+        console.ensure_frontend(False)
+
+
+def test_bundle_build_is_used_without_node(project, monkeypatch):
+    """오프라인 ZIP을 --offline 없이 setup 해도 ZIP 안의 (기록 있는) 빌드를 쓴다."""
+    console.stamp_frontend(console.FRONTEND / "dist")
+    monkeypatch.setattr(console, "npm_command", lambda: None)
+    console.ensure_frontend(False)
+
+
+def test_offline_rejects_build_from_other_code(project, monkeypatch):
+    console.stamp_frontend(console.FRONTEND / "dist")
+    (console.FRONTEND / "src" / "main.tsx").write_text("export const changed = 1\n", encoding="utf-8")
+    monkeypatch.setattr(console, "npm_command", lambda: pytest.fail("offline must not build"))
+    with pytest.raises(console.SetupError, match="src/main.tsx(.|\n)*같은 코드로 만든 Windows ZIP"):
+        console.ensure_frontend(True)
+
+
+def test_offline_rejects_build_without_record(project):
+    with pytest.raises(console.SetupError, match="기록이 없습니다"):
+        console.ensure_frontend(True)
+
+
+def test_files_left_over_from_overwrite_do_not_count(project):
+    """같은 폴더에 새 코드를 덮어쓰면 지운 소스가 남는다. 그것만으로 맞는 빌드를 거부하지 않는다."""
+    console.stamp_frontend(console.FRONTEND / "dist")
+    (console.FRONTEND / "src" / "Removed.tsx").write_text("export {}\n", encoding="utf-8")
+    assert console.frontend_drift(console.FRONTEND / "dist") == []
+    console.ensure_frontend(True)
 
 
 def test_summary_repeats_what_was_not_installed():
@@ -159,8 +229,23 @@ def test_run_notices_package_update(project):
 def test_run_notices_frontend_update(project):
     record(full=False)
     (console.FRONTEND / "src" / "main.tsx").write_text("export const changed = 1\n", encoding="utf-8")
-    with pytest.raises(console.SetupError, match="화면 코드가 바뀌었습니다.*--lite"):
+    with pytest.raises(console.SetupError, match="화면 코드가 바뀌었습니다.*src/main.tsx.*--lite"):
         console.check_ready()
+
+
+def test_run_rejects_build_without_record(project):
+    """setup 기록은 맞아도 dist를 어느 코드로 만들었는지 모르면 띄우지 않는다(예: dist만 옛 것으로 바꿔 넣음)."""
+    record(full=True)
+    (console.FRONTEND / "dist" / console.BUILD_STAMP).unlink()
+    with pytest.raises(console.SetupError, match="기록이 없습니다.*setup"):
+        console.check_ready()
+
+
+def test_run_shows_build_time(project, monkeypatch, capsys):
+    record(full=True)
+    monkeypatch.setattr(console.subprocess, "Popen", lambda *a, **k: type("P", (), {"wait": lambda self: 0})())
+    assert console.start(console.parse_args(["run", "--no-browser"])) == 0
+    assert "[run] 화면 빌드: " in capsys.readouterr().out
 
 
 def test_line_endings_do_not_count_as_changes(project):
