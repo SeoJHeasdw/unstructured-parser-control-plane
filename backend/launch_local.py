@@ -104,9 +104,9 @@ def launch(requested_port, browser):
 
     if find_spec("docling") is not None and missing_files(settings.docling_artifacts):
         # setup에서 모델을 받지 못한 채 쓰는 경우. 설치 기록이 아니라 지금 파일 상태를 본다.
-        print("[주의] PDF 모델이 없어 PDF 파싱은 안 됩니다(Office·텍스트는 됩니다). "
-              "huggingface.co 에 접속되는 상태에서 setup을 다시 실행하거나, 막힌 PC는 다른 PC에서 만든 모델 ZIP을 "
-              "setup --models <ZIP 경로> 로 설치하세요.", flush=True)
+        print("[주의] PDF 모델이 없어 PDF는 글자 층만 읽습니다(표 구조 없음, 스캔 쪽은 OCR 모델 필요). "
+              "모델을 쓰려면 huggingface.co 에 접속되는 상태에서 setup을 다시 실행하거나, "
+              "다른 PC에서 만든 모델 ZIP을 setup --models <ZIP 경로> 로 설치하세요.", flush=True)
     listener, port = reserve_listener(ports)
     with listener:
         url = f"http://{HOST}:{port}/"

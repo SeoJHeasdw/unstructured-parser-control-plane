@@ -6,7 +6,9 @@ import { alignResults, diagnosticLabels, highlightParts, LINE_LIMIT, lines } fro
 import type { Diagnostic, DiffRow } from './diff';
 import { columnName } from './worksheet';
 
-export type ResultPane = { text: string; meta: ReactNode; locations?: ResultLocation[] };
+/** pageUnit: 위치의 page가 PDF 쪽인지 PPTX 슬라이드인지(근거 버튼 이름). */
+export type ResultPane = { text: string; meta: ReactNode; locations?: ResultLocation[]; pageUnit?: 'page' | 'slide' };
+export const pageLabel = (page: number, unit?: 'page' | 'slide') => unit === 'slide' ? `슬라이드 ${page}` : `원문 ${page}쪽`;
 export type ReviewLocation = { page: number | null; sheet: string | null; cell?: string };
 export type ReviewEvidence = { location: ReviewLocation; side: 'left' | 'right'; line: number };
 const PAGE_SIZE = 200;
@@ -154,7 +156,7 @@ export function ResultReview({ baseline, candidate, onEvidence }: {
         {current.notes?.map(note => <span key={note.type}><strong>{note.label}</strong> {note.detail}</span>)}
         {!origins.length && <span>원문 위치 미기록</span>}
         {origins.map(({ location: origin, side, line }) => <button type="button" className="button-quiet" key={origin.page ?? `${origin.sheet}!${origin.cell}`} onClick={event => { event.currentTarget.focus({preventScroll:true}); onEvidence({location: origin, side, line}); }}>
-          {origin.page ? `원문 ${origin.page}쪽` : `${origin.sheet}!${origin.cell}`} <ArrowRight size={13} />
+          {origin.page ? pageLabel(origin.page, (side === 'left' ? baseline : candidate)?.pageUnit) : `${origin.sheet}!${origin.cell}`} <ArrowRight size={13} />
         </button>)}
       </div>}
       {truncated && <p className="compare-limit">결과별 첫 {LINE_LIMIT.toLocaleString()}줄을 비교했어요.</p>}

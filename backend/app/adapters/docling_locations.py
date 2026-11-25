@@ -6,9 +6,10 @@ from app.models import ResultLocation
 _TABLE_SEPARATOR = re.compile(r"^\s*\|(?:\s*:?-+:?\s*\|)+\s*$")
 
 
-def markdown_locations(document, markdown: str, extension: str) -> list[ResultLocation]:
+def markdown_parts(document, markdown: str):
+    """Docling 직렬화 조각별 (시작 줄, 끝 줄, 조각 글, 문서 항목). 조각을 이어 붙인 글이 저장 결과와 다르면 None."""
     from docling_core.transforms.serializer.markdown import MarkdownDocSerializer, MarkdownParams
-    from docling_core.types.doc.document import DEFAULT_CONTENT_LAYERS, DOCUMENT_TOKENS_EXPORT_LABELS, TableItem
+    from docling_core.types.doc.document import DEFAULT_CONTENT_LAYERS, DOCUMENT_TOKENS_EXPORT_LABELS
 
     serializer = MarkdownDocSerializer(doc=document, params=MarkdownParams(
         labels=DOCUMENT_TOKENS_EXPORT_LABELS, layers=DEFAULT_CONTENT_LAYERS,
@@ -16,24 +17,46 @@ def markdown_locations(document, markdown: str, extension: str) -> list[ResultLo
     parts = [part for part in serializer.get_parts() if part.text]
     # Offsets are meaningful only when these serializer parts reproduce the stored text.
     if "\n\n".join(part.text for part in parts) != markdown:
-        return []
-
-    locations = []
+        return None
+    spans = []
     line = 1
     for part in parts:
-        text_lines = part.text.split("\n")
-        end = line + len(text_lines) - 1
-        items = part.get_unique_doc_items()
-        if extension == "PDF":
+        end = line + part.text.count("\n")
+        spans.append((line, end, part.text, part.get_unique_doc_items()))
+        line = end + 2
+    return spans
+
+
+def markdown_locations(document, markdown: str, extension: str, parts=None) -> list[ResultLocation]:
+    """PDF·PPTX는 쪽(슬라이드) 번호, XLSX·XLSM 표는 시트·행·열."""
+    from docling_core.types.doc.document import TableItem
+
+    parts = parts if parts is not None else markdown_parts(document, markdown)
+    if parts is None:
+        return []
+    locations = []
+    for line, end, text, items in parts:
+        text_lines = text.split("\n")
+        if extension in ("PDF", "PPTX"):
             pages = {prov.page_no for item in items for prov in item.prov}
             if len(pages) == 1:
                 locations.append(ResultLocation(start_line=line, end_line=end, page=pages.pop()))
-            elif pages:
-                locations.extend(_pdf_spans(items, part.text, text_lines, line))
+            elif pages and extension == "PDF":
+                locations.extend(_pdf_spans(items, text, text_lines, line))
         elif len(items) == 1 and isinstance(items[0], TableItem):
             locations.extend(_worksheet_rows(document, items[0], text_lines, line))
-        line = end + 2
     return locations
+
+
+def sheet_of(document, item) -> str | None:
+    """항목이 속한 워크시트 이름(Docling은 시트마다 'sheet' 묶음을 둔다)."""
+    node, guard = item, 0
+    while node is not None and getattr(node, "parent", None) is not None and guard < 32:
+        node = node.parent.resolve(document)
+        guard += 1
+        if getattr(node, "label", None) == "sheet" and getattr(node, "name", None):
+            return node.name
+    return None
 
 
 def _pdf_spans(items, text: str, lines: list[str], first_line: int) -> list[ResultLocation]:

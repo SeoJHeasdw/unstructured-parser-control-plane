@@ -12,7 +12,9 @@ from app.config import Settings
 from app.docling_models import missing_files
 from app.adapters.ocr import MAX_FRAME_PIXELS, MODEL_HELP, OCR_READ_WARNING, REPEAT_WARNING, ModelOcr
 from app.models import ResultLocation
-from app.adapters.docling_locations import markdown_locations
+from app.adapters.docling_locations import markdown_locations, markdown_parts, sheet_of
+from app.adapters.markdown_edit import insert_lines, lift_title_rows, table_gaps
+from app.adapters.pptx_notes import note_lines, pptx_notes
 
 logger = logging.getLogger(__name__)
 
@@ -25,6 +27,7 @@ MAX_OFFICE_ENTRIES = 10_000
 # 워크시트 형식. XLSM(매크로 사용 통합문서)도 본문은 XLSX와 같은 SpreadsheetML이라 같은 Docling 경로로 읽는다.
 WORKBOOKS = {"XLSX", "XLSM"}
 OFFICE = {"DOCX", "PPTX", *WORKBOOKS}
+LOCATED = {"PDF", "PPTX", *WORKBOOKS}  # 원문 위치를 남기는 형식: PDF 쪽, PPTX 슬라이드, 워크시트 행
 
 
 def _pdf_pages(path: Path, scale: float) -> int:
@@ -162,6 +165,43 @@ class DoclingAdapter:
         self._pdf_models = model_key
         return self._pdf_converter
 
+    def _structure(self, path: Path, extension: str, document, markdown: str, locations: list, parts):
+        """파서 결과에 빠진 구조를 보탠다: 시트 제목, 발표자 메모, 목록 바로 뒤 표 앞의 빈 줄. 기존 줄은 바꾸지 않는다."""
+        inserts, notes = [], []
+        if extension in WORKBOOKS and parts:
+            seen = set()
+            for start, _, _, items in parts:
+                sheet = next((name for name in (sheet_of(document, item) for item in items) if name), None)
+                if sheet and sheet not in seen:
+                    seen.add(sheet)
+                    inserts.append((start, [f"## 시트: {sheet}", ""], None))
+        if extension == "PPTX":
+            try:
+                slides = pptx_notes(path)
+            except Exception as exc:
+                logger.warning("Speaker notes could not be read (%s)", type(exc).__name__)
+                slides, notes = {}, ["발표자 메모를 읽지 못했습니다. 메모는 원본에서 확인해 주세요."]
+            line_count = markdown.count("\n") + 1
+            for number, text in sorted(slides.items()):
+                pages = [(start, end, {prov.page_no for item in items for prov in item.prov}) for start, end, _, items in parts or []]
+                own = [end for _, end, seen_pages in pages if seen_pages == {number}]
+                later = [start for start, _, seen_pages in pages if seen_pages and min(seen_pages) > number]
+                if own:
+                    inserts.append((max(own) + 1, ["", *note_lines(number, text)], {"page": number}))
+                elif later:
+                    inserts.append((min(later), [*note_lines(number, text), ""], {"page": number}))
+                else:
+                    inserts.append((line_count + 1, ["", *note_lines(number, text)], {"page": number}))
+            if slides:
+                notes.append(f"발표자 메모 {len(slides)}개를 슬라이드 내용 끝에 '> 발표자 메모(슬라이드 N)'으로 붙였습니다(파서 결과에는 없던 글자).")
+        inserts += table_gaps(markdown)
+        if inserts:
+            markdown, locations = insert_lines(markdown, locations, inserts)
+        markdown, locations, lifted = lift_title_rows(markdown, locations)
+        if lifted:
+            notes.append(f"표 맨 위의 전체 너비 병합 행 {lifted}개(제목·안내 문구)를 표 위 문단으로 옮겼습니다(칸마다 반복하지 않음).")
+        return markdown, locations, notes
+
     def parse(self, path: Path, extension: str) -> ParsedDocument:
         # Set these before importing model libraries so their first initialization is offline.
         os.environ["HF_HUB_OFFLINE"] = "1"
@@ -199,12 +239,16 @@ class DoclingAdapter:
             if not visible_text.strip():
                 # 글자 층이 없는 PDF(전체 스캔)와 그림만 있는 Office 문서. PDF는 아래에서 OCR 모델로 읽는다.
                 markdown = ""
-            locations = []
-            if markdown and (extension == "PDF" or extension in WORKBOOKS):
+            locations, parts = [], None
+            if markdown and extension in LOCATED:
                 try:
-                    locations = markdown_locations(result.document, markdown, extension)
+                    parts = markdown_parts(result.document, markdown)
+                    locations = markdown_locations(result.document, markdown, extension, parts)
                 except Exception as exc:
                     logger.warning("Source locations could not be exported (%s)", type(exc).__name__)
+            if markdown:
+                markdown, locations, notes = self._structure(path, extension, result.document, markdown, locations, parts)
+                warnings.extend(notes)
             if extension == "PDF":
                 empty = sorted(set(range(1, count + 1)) - _pages_with_content(result.document))
                 read, repeated = {}, []

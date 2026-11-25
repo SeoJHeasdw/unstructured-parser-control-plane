@@ -9,10 +9,10 @@ import './officeSource.css';
  * 원문 대조의 Office 원본 보기. 파일을 브라우저 안에서만 다시 그린다(서버·외부로 보내지 않음).
  * Word·PowerPoint와 글꼴·줄바꿈·쪽 나눔이 다를 수 있어 화면에 '브라우저 재현'이라고 밝힌다.
  */
-export default function OfficeSource({ kind, data, expanded }: { kind: 'docx' | 'pptx'; data: ArrayBuffer; expanded: boolean }) {
+export default function OfficeSource({ kind, data, expanded, page }: { kind: 'docx' | 'pptx'; data: ArrayBuffer; expanded: boolean; page?: number }) {
   return <div className={`office-source${expanded ? ' is-expanded' : ''}`}>
     <p className="office-note">브라우저에서 다시 그린 원본입니다. {kind === 'docx' ? 'Word' : 'PowerPoint'}와 글꼴·줄바꿈·{kind === 'docx' ? '쪽 나눔' : '도형 효과'}이 다를 수 있으니, 정확한 배치는 원본 다운로드로 확인하세요.</p>
-    {kind === 'docx' ? <DocxSource data={data} /> : <PptxSource data={data} />}
+    {kind === 'docx' ? <DocxSource data={data} /> : <PptxSource data={data} target={page} />}
   </div>;
 }
 
@@ -78,8 +78,15 @@ function toUrl(bytes: Uint8Array, mime: string) {
   return typeof URL.createObjectURL === 'function' ? URL.createObjectURL(new Blob([bytes as BlobPart], { type: mime })) : '';
 }
 
-function PptxSource({ data }: { data: ArrayBuffer }) {
+function PptxSource({ data, target }: { data: ArrayBuffer; target?: number }) {
   const [deck, setDeck] = useState<Deck>();
+  const list = useRef<HTMLDivElement>(null);
+  // 추출 결과의 '슬라이드 N' 근거를 누르면 그 슬라이드로 옮긴다.
+  useEffect(() => {
+    const box = list.current?.closest<HTMLElement>('.office-source');
+    const slide = list.current?.querySelector<HTMLElement>(`[data-slide="${target}"]`);
+    if (box && slide) box.scrollTop += slide.getBoundingClientRect().top - box.getBoundingClientRect().top - 8;
+  }, [deck, target]);
   const [error, setError] = useState('');
   useEffect(() => {
     let alive = true;
@@ -92,9 +99,9 @@ function PptxSource({ data }: { data: ArrayBuffer }) {
   if (error) return <p className="office-status is-error" role="alert">{error}</p>;
   if (!deck) return <p className="office-status" role="status">슬라이드를 그리는 중…</p>;
   const hidden = deck.slides.filter(slide => slide.hidden).length;
-  return <div className="pptx-source">
+  return <div className="pptx-source" ref={list}>
     <p className="pptx-count">슬라이드 {deck.slides.length}장{hidden ? ` · 숨긴 슬라이드 ${hidden}장` : ''}</p>
-    {deck.slides.map(slide => <figure key={slide.number} className={`pptx-slide${slide.hidden ? ' is-hidden' : ''}`} aria-label={`슬라이드 ${slide.number}`}>
+    {deck.slides.map(slide => <figure key={slide.number} data-slide={slide.number} className={`pptx-slide${slide.hidden ? ' is-hidden' : ''}${slide.number === target ? ' is-target' : ''}`} aria-label={`슬라이드 ${slide.number}`}>
       <figcaption><strong>슬라이드 {slide.number}</strong>{slide.hidden && <span className="pptx-flag"><EyeOff size={12} aria-hidden="true" />숨긴 슬라이드</span>}{slide.layout && <small>{slide.layout}</small>}</figcaption>
       <Stage deck={deck} slide={slide} />
       {slide.notes && <details className="pptx-notes"><summary><StickyNote size={13} aria-hidden="true" />발표자 메모</summary><p>{slide.notes}</p></details>}

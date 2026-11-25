@@ -11,6 +11,7 @@ const engines = new Map([
   ['docling', { name: 'Docling', icon: Layers3 }],
   ['python-text', { name: '텍스트', icon: FileText }],
   ['python-csv', { name: 'CSV 테이블', icon: Table2 }],
+  ['pdf-text', { name: 'PDF 글자 층', icon: FileText }],
   ['ocr-model', { name: 'OCR 모델', icon: ScanText }],
   ['easyocr', { name: 'EasyOCR(사용 중단)', icon: ScanText }],
   ['python-svg', { name: 'SVG', icon: FileCode2 }],
@@ -24,6 +25,7 @@ function extraction(format: string, engine: string) {
       if (format === 'XLSX') return ['워크시트 추출', '시트의 셀과 표를 읽고 원본 행·열 위치를 대조합니다.'];
       if (format === 'XLSM') return ['워크시트 추출 · 매크로 미실행', '셀과 표를 XLSX와 같이 읽습니다. 매크로는 실행하지 않고, 모듈 수와 자동 실행 여부를 경고로 남깁니다.'];
       return ['Office 구조 추출', '본문·표를 변환하고 원본의 기호, 첨자와 내장 그림을 점검합니다.'];
+    case 'pdf-text': return ['글자 층 읽기', 'PDF 모델 없이 쪽마다 글자 층을 줄 단위로 읽습니다. 표 구조는 복원하지 않고, 글자 층이 없는 쪽은 OCR 모델로 읽습니다.'];
     case 'ocr-model': return ['이미지 문자 인식', '문서 OCR 모델로 글자를 읽습니다. 모델이 연결되지 않으면 처리하지 않습니다.'];
     case 'easyocr': return ['이미지 문자 인식(사용 중단)', '이전 실행 기록입니다. 라이브러리 OCR은 더 이상 쓰지 않습니다.'];
     case 'python-svg': return ['벡터 글자 추출', 'SVG의 텍스트를 읽고 내장 이미지에서 추출 가능한 글자를 보충합니다.'];
@@ -35,21 +37,22 @@ function extraction(format: string, engine: string) {
 
 function Environment({ engine, format, catalog }: { engine: string; format: string; catalog: ParserCatalog }) {
   const facts: string[] = [];
+  if (engine === 'pdf-text') facts.push('PDF 모델 없음 · 글자 층만 읽음', '표 구조 없음');
   if (engine === 'docling') {
     facts.push(catalog.docling_installed ? 'Docling 설치됨' : 'Docling 설치 필요');
     if (format === 'PDF' && catalog.pdf_models_ready !== false) {
       facts.push(catalog.pdf_models_ready ? 'PDF 모델 파일 확인' : catalog.pdf_model_directory ? 'PDF 모델 폴더 확인' : 'PDF 모델 폴더 없음');
     }
   }
-  const ocr = ['docling', 'ocr-model', 'python-svg'].includes(engine);
+  const ocr = ['docling', 'ocr-model', 'python-svg', 'pdf-text'].includes(engine);
   if (!facts.length && !ocr) facts.push('Python 표준 라이브러리');
   const model = catalog.ocr_model?.configured ? catalog.ocr_model.model_id : '';
   return <><p className="pr-environment"><Settings2 size={15} aria-hidden="true"/><strong>실행 환경</strong>{facts.map(fact => <span key={fact}>{fact}</span>)}
     {ocr && <span>{catalog.ocr_models_found ? 'OCR 모델 연결됨' : 'OCR 모델 미연결'}{catalog.ocr_models_found && model && <small className="pr-ocr-model"> · <code>{model}</code></small>}</span>}
     <span>문서 파싱 1개씩 · 단일 워커</span></p>
     {format === 'PDF' && catalog.pdf_models_ready === false && <details className="pr-model-help">
-      <summary>PDF 모델 설치 필요{catalog.pdf_missing_files?.length ? ` · 누락 ${catalog.pdf_missing_files.length}개` : ''}</summary>
-      <p>콘솔을 끄고 setup을 다시 실행하면 레이아웃·표 모델을 받습니다(huggingface.co 접속 필요). huggingface.co가 막힌 PC는 접속되는 PC에서 첫 번째 명령으로 모델 ZIP을 만들어 옮긴 뒤, 이 PC에서 두 번째 명령으로 설치하고 콘솔을 다시 시작하세요.</p>
+      <summary>PDF 모델 없음{catalog.pdf_missing_files?.length ? ` · 누락 ${catalog.pdf_missing_files.length}개` : ''} · 글자 층만 읽는 중</summary>
+      <p>지금은 PDF 글자 층만 읽습니다(표 구조 없음, 여러 단은 순서가 섞일 수 있음). 표 구조까지 읽으려면 레이아웃·표 모델이 필요합니다. 콘솔을 끄고 setup을 다시 실행하면 모델을 받습니다(huggingface.co 접속 필요). huggingface.co가 막힌 PC는 접속되는 PC에서 첫 번째 명령으로 모델 ZIP을 만들어 옮긴 뒤, 이 PC에서 두 번째 명령으로 설치하고 콘솔을 다시 시작하세요.</p>
       <code>python scripts/prepare-offline.py --models-only</code>
       <code>setup.cmd --models &lt;ZIP 경로&gt;</code>
       {!!catalog.pdf_missing_files?.length && <ul>{catalog.pdf_missing_files.map(file => <li key={file}>{file}</li>)}</ul>}

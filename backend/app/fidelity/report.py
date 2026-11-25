@@ -10,7 +10,7 @@ from app.models import ResultLocation
 from app.textnorm import compatibility_form, special_counts
 
 SUPPLEMENT_MARK = "<!-- docops:supplement -->"
-_KIND_LABEL = {"floating_text": "글상자", "svg_text": "SVG 글자", "image_ocr": "그림 OCR", "section_text": "머리말·꼬리말", "formula": "수식 원문"}
+_KIND_LABEL = {"floating_text": "글상자", "svg_text": "SVG 글자", "image_ocr": "그림 OCR", "section_text": "머리말·꼬리말", "footnote": "각주·미주", "formula": "수식 원문"}
 
 
 def _compact(text: str) -> str:
@@ -58,7 +58,7 @@ def assess(inventory: dict, markdown: str, prepared: dict | None = None) -> tupl
     expected = inventory.get("symbols", {})
     found = special_counts(markdown)
     for item in missing_items:
-        if item["kind"] in {"floating_text", "section_text"}:
+        if item["kind"] in {"floating_text", "section_text", "footnote"}:
             for ch, count in special_counts(item["text"]).items():
                 found[ch] = found.get(ch, 0) + count
     lost, normalized = {}, {}

@@ -131,6 +131,17 @@ def _rels(archive: zipfile.ZipFile, part: str) -> dict[str, str]:
     return result
 
 
+def _typed_target(archive: zipfile.ZipFile, part: str, kind: str) -> str | None:
+    """관계 종류(…/footnotes 등)로 찾은 내부 부분 경로."""
+    folder, base = posixpath.split(part)
+    root = _part(archive, posixpath.join(folder, "_rels", base + ".rels"))
+    for rel in root.iter(q("pr", "Relationship")) if root is not None else ():
+        if rel.get("Type", "").rsplit("/", 1)[-1] == kind and rel.get("TargetMode") != "External":
+            target = rel.get("Target", "")
+            return target.lstrip("/") if target.startswith("/") else posixpath.normpath(posixpath.join(folder, target))
+    return None
+
+
 def _picture_bytes(inv, archive, name, limit):
     if archive is None:
         return None
@@ -316,7 +327,7 @@ class _Docx:
             color, ratio = collector["low"][0][1], min(r for _, _, r in collector["low"])
             self.inv.low_contrast.append({"text": low_text[:200], "color": color, "ratio": ratio, "location": st.get("loc", "")})
         if st.get("section") and not st.get("textbox") and text.strip():
-            self.inv.add_item({"kind": "section_text", "text": text, "location": st.get("loc", st["section"])})
+            self.inv.add_item({"kind": st.get("section_kind", "section_text"), "text": text, "location": st.get("loc", st["section"])})
         if st.get("out") is not None:
             st["out"].append(text)
 
@@ -456,6 +467,18 @@ def _probe_docx(archive: zipfile.ZipFile, inv: Inventory) -> None:
                 if section is not None:
                     prefix = f"{label} {posixpath.basename(target)} "
                     _Docx(archive, inv, target).walk(section, {"prefix": prefix, "section": label})
+        # 각주·미주: Docling 2.150.0은 각주 본문을 결과에 넣지 않는다. 본문에서 참조한 순서로 번호를 매겨 대조한다.
+        for kind, label in (("footnote", "각주"), ("endnote", "미주")):
+            numbers: dict[str, int] = {}
+            for ref in body.iter(q("w", f"{kind}Reference")):
+                numbers.setdefault(ref.get(q("w", "id")) or "", len(numbers) + 1)
+            target = _typed_target(archive, part, f"{kind}s")
+            notes = _part(archive, target, inv) if numbers and target else None
+            for note in notes.findall(q("w", kind)) if notes is not None else ():
+                number = numbers.get(note.get(q("w", "id")) or "")
+                if number is None or note.get(q("w", "type")) in ("separator", "continuationSeparator", "continuationNotice"):
+                    continue
+                _Docx(archive, inv, target).walk(note, {"prefix": f"{label} {number} ", "section": label, "section_kind": "footnote"})
 
 
 

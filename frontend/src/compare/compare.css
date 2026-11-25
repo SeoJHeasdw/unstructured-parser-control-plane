@@ -388,3 +388,6 @@ button.compare-line-no:hover { background: var(--pane-mark); }
 .source-line.is-rule .source-cells-rule { height: 100%; border-inline: 1px solid var(--rule); }
 .source-line > div { font-variant-ligatures: none; }
 .source-figure { display: inline-block; padding: 2px 8px; border: 1px dashed var(--rule-strong); border-radius: var(--r-1); color: var(--ink-3); font-size: 13px; }
+.source-table-line { display: grid; grid-template-columns: minmax(0, 1fr) 34px; align-items: center; }
+.source-evidence { display: flex; justify-content: center; }
+.evidence-link.is-icon { min-height: 26px; min-width: 26px; margin: 0; padding: 0; justify-content: center; }

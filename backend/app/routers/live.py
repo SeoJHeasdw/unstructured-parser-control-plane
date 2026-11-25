@@ -3,7 +3,6 @@ from importlib.util import find_spec
 
 from fastapi import APIRouter, File, HTTPException, Query, Request, UploadFile
 from fastapi.responses import FileResponse
-from app.adapters.registry import PARSER_BY_EXTENSION
 from app.docling_models import missing_files
 from app.ocr_model import load_ocr
 from app.models import DocumentHistory, DocumentList, LiveDocument, ParseResult, ParseRunList, StoredParseRun
@@ -19,7 +18,8 @@ def parser_catalog(request: Request):
     ocr = load_ocr()
     missing = missing_files(settings.docling_artifacts)
     return {
-        "routes": PARSER_BY_EXTENSION,
+        # PDF 모델이 없으면 PDF는 글자 층 파서(pdf-text)로 간다. 고정 표(PARSER_BY_EXTENSION)가 아니라 지금 경로를 돌려준다.
+        "routes": request.app.state.documents.parsers.routes(),
         "docling_installed": find_spec("docling") is not None,
         "pdf_model_directory": bool(settings.docling_artifacts and settings.docling_artifacts.is_dir()),
         "pdf_models_ready": not missing,

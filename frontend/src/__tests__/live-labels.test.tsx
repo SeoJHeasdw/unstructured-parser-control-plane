@@ -149,7 +149,7 @@ describe('파서 플로우의 OCR 모델', () => {
     serve([], path => path === '/api/live/parsers' ? json({ ...catalog, ocr_models_found: false,
       pdf_models_ready: false, pdf_missing_files: [missing] }) : undefined);
     render(<ParserWorkspace format="PDF" onNavigate={vi.fn()} />);
-    const summary = await screen.findByText('PDF 모델 설치 필요 · 누락 1개');
+    const summary = await screen.findByText('PDF 모델 없음 · 누락 1개 · 글자 층만 읽는 중');
     await userEvent.setup().click(summary);
     expect(screen.getByText(missing)).toBeTruthy();
     expect(screen.getByText('python scripts/prepare-offline.py --models-only')).toBeTruthy();

@@ -25,7 +25,7 @@ setup.cmd
 
 1. Python 가상환경 `backend\.venv`를 만들고 패키지를 설치합니다(Docling 포함).
 2. 화면을 빌드하고, `.env`가 없으면 `.env.example`로 만듭니다.
-3. PDF 모델(레이아웃·표)을 받습니다. `huggingface.co`에 접속해야 합니다. 받기 전에 10초 안에 접속되는지 확인하고, 막혀 있으면 받지 않고 원인을 한 줄로 알려 줍니다. 받지 못해도 설치는 계속하며 이 경우 PDF만 파싱되지 않습니다. 받지 못한 것은 **setup 마지막 요약에 `[주의]`로 다시 표시**되고, `run`을 띄울 때도 한 줄로 알려 줍니다. `huggingface.co`가 막힌 PC는 [아래 절](#huggingfaceco가-막힌-pc-pdf-모델-zip으로-옮기기)처럼 다른 PC에서 만든 모델 ZIP으로 설치합니다.
+3. PDF 모델(레이아웃·표)을 받습니다. `huggingface.co`에 접속해야 합니다. 받기 전에 10초 안에 접속되는지 확인하고, 막혀 있으면 받지 않고 원인을 한 줄로 알려 줍니다. 받지 못해도 설치는 계속합니다. 이 경우 PDF는 레이아웃·표 모델 없이 **글자 층만** 읽습니다(아래 '파싱' 참고). 받지 못한 것은 **setup 마지막 요약에 `[주의]`로 다시 표시**되고, `run`을 띄울 때도 한 줄로 알려 줍니다. `huggingface.co`가 막힌 PC는 [아래 절](#huggingfaceco가-막힌-pc-pdf-모델-zip으로-옮기기)처럼 다른 PC에서 만든 모델 ZIP으로 설치합니다.
 4. 합성 CSV로 파싱과 청킹을 시험합니다. 시험은 임시 저장소에서 하므로 문서함에는 아무것도 남지 않습니다.
 
 **3. 실행: 매번**
@@ -121,11 +121,13 @@ setup.cmd --models C:\경로\docling-pdf-models.zip
 - 실제 원본·결과·이력은 `runtime/`에 저장됩니다(`DOCOPS_RUNTIME_DIR`로 바꿀 수 있음). Git에는 올리지 않습니다.
 
 **파싱**
-- 파서는 확장자로 고릅니다. TXT·CSV·MD·LOG는 내장 파서, PDF·DOCX·PPTX·XLSX·XLSM은 Docling, 이미지는 OCR 모델이 맡습니다. HWP/HWPX, ZIP 안 파일, 메일 첨부는 본문을 파싱하지 않고 구조 분석에서 목록만 보여 줍니다. 지원하지 않는 형식은 `unsupported`가 됩니다.
+- 파서는 확장자로 고릅니다. TXT·CSV·MD·LOG는 내장 파서, PDF·DOCX·PPTX·XLSX·XLSM은 Docling(PDF 모델이 없으면 PDF는 글자 층 파서), 이미지는 OCR 모델이 맡습니다. HWP/HWPX, ZIP 안 파일, 메일 첨부는 본문을 파싱하지 않고 구조 분석에서 목록만 보여 줍니다. 지원하지 않는 형식은 `unsupported`가 됩니다.
 - **파싱 성공이 품질 보증은 아닙니다.** Docling 결과는 합성 문서로만 확인했고, 실제 고객 문서 품질은 아직 평가하지 않았습니다. 복잡한 표나 원문 위치가 정확하다고 보장하지 않습니다.
 - 파서를 부르기 전에 내용 서명을 확인합니다. DRM, 암호, 확장자 불일치는 사유 코드(`error_code`)를 붙여 실패로 남깁니다. DRM은 판별만 하므로 해제본이 필요합니다.
 - DOCX·XLSX·XLSM·PPTX는 사본에서 기호 글꼴과 첨자를 보정한 뒤 파싱합니다. 원문과 대조해 특수기호 손실, 병합 셀, 흰색 글자, 읽지 않은 그림을 경고합니다.
 - **XLSM(매크로 사용 통합문서)** 은 셀과 표를 XLSX와 같이 읽습니다. **매크로는 실행하지 않고** 코드도 결과 본문에 넣지 않습니다. 코드가 든 VBA 모듈이 있으면 모듈 수·줄 수와 "셀 값은 파일에 마지막으로 저장된 값"이라는 경고를 남기고, 열 때 자동 실행되는 프로시저(`Workbook_Open`·`Auto_Open` 등)가 있으면 함께 알립니다. 모듈 목록과 매크로 코드 속 경로·URL·문서번호 후보는 문서 상세의 **구조 분석**에서 봅니다.
+- **PDF 모델이 없을 때(고객사 PC 기본):** PDF는 레이아웃·표 모델 없이 **글자 층만** 읽습니다(파서 `pdf-text`, pypdfium2). 쪽 위치는 남지만 표는 칸 구조 없이 줄 글자로 나오고, 여러 단 문서는 읽는 순서가 섞일 수 있어 결과에 항상 경고가 붙습니다. 글자 층이 없는 쪽은 OCR 모델을 연결했으면 그 모델로 읽고, 글꼴 문제로 글자 층이 깨진 쪽은 따로 경고합니다. 모델 파일이 준비되면 다시 Docling으로 파싱합니다.
+- **결과 보강:** XLSX·XLSM은 시트마다 `## 시트: 이름` 제목을 넣고, PPTX는 슬라이드 번호를 원문 위치로 남기며 발표자 메모를 슬라이드 끝에 `> 발표자 메모(슬라이드 N): …`로 붙입니다(Docling은 메모를 버림). 목록 바로 뒤에 붙은 표 앞에는 빈 줄을 넣습니다. DOCX 각주·미주가 결과에 없으면 `보충 추출`에 `각주 N`으로 덧붙입니다.
 - 재처리 중이거나 실패한 뒤에도 마지막 성공본을 볼 수 있으며, 이때 `is_stale`로 표시됩니다.
 
 **처리 한도**
@@ -151,7 +153,7 @@ setup.cmd --models C:\경로\docling-pdf-models.zip
 | `콘솔이 실행 중입니다` | 콘솔 실행 창에서 `Ctrl+C`로 끈 뒤 setup을 다시 실행합니다. |
 | `Docling(PDF·Office 파싱)에는 Python 3.12가 필요합니다` | Python 3.12를 설치하고 새 터미널에서 다시 실행합니다. 당장 화면만 띄우려면 `setup.cmd --lite`를 씁니다. |
 | `backend/.venv 는 Python 3.13 입니다` | 예전에 다른 버전으로 만든 환경입니다. `backend\.venv` 이름을 바꾸고(예: `.venv-py313`) setup을 다시 실행합니다. |
-| setup 요약에 `[주의] PDF 모델`이 뜸, 또는 PDF만 실패함 | `huggingface.co`가 막혀 있으면(요약에 `접속되지 않습니다`) 다른 PC에서 만든 모델 ZIP을 `setup.cmd --models <ZIP>`으로 설치합니다([위 절](#huggingfaceco가-막힌-pc-pdf-모델-zip으로-옮기기)). 접속되는 PC라면 setup을 다시 실행합니다. 다른 위치의 모델 폴더를 쓰려면 `.env`의 `DOCOPS_DOCLING_ARTIFACTS`로 지정합니다. |
+| setup 요약에 `[주의] PDF 모델`이 뜸, 또는 PDF 결과에 `글자 층만 읽었습니다` 경고 | `huggingface.co`가 막혀 있으면(요약에 `접속되지 않습니다`) 다른 PC에서 만든 모델 ZIP을 `setup.cmd --models <ZIP>`으로 설치합니다([위 절](#huggingfaceco가-막힌-pc-pdf-모델-zip으로-옮기기)). 접속되는 PC라면 setup을 다시 실행합니다. 다른 위치의 모델 폴더를 쓰려면 `.env`의 `DOCOPS_DOCLING_ARTIFACTS`로 지정합니다. |
 | `setup --models` 가 `내용이 다른 모델 파일이 이미 있어` 멈춤 | 설치 위치에 다른 버전의 모델이 있습니다. 콘솔은 그 파일을 지우지 않습니다. 직접 옮기거나 지운 뒤 다시 실행하거나, `.env`의 `DOCOPS_DOCLING_ARTIFACTS`로 빈 폴더를 지정합니다. |
 | 인증서 오류(`UNABLE_TO_VERIFY_LEAF_SIGNATURE`, pip SSL) | npm은 `NODE_EXTRA_CA_CERTS=<사내 루트 CA 파일>`(Node 22.15 이상이면 `NODE_OPTIONS=--use-system-ca`도 가능), pip는 `PIP_CERT=<같은 파일>`을 설정합니다. |
 | 사내 패키지 미러를 써야 함 | `npm_config_registry`와 `PIP_INDEX_URL`을 설정합니다. |

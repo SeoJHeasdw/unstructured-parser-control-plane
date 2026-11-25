@@ -122,7 +122,7 @@ function runPane(run: StoredParseRun | undefined, doc: LiveDoc): ResultPane | un
   if (!run) return;
   const ocr = run.ocr_enabled === null ? (doc.format === 'PDF' ? 'OCR 설정 미기록' : '') : run.ocr_enabled ? 'OCR 사용' : 'OCR 미적용';
   const desc = [run.parser || '파서 미기록', run.parser_version, ocr].filter(Boolean).join(' · ');
-  return { text: run.markdown, locations: run.locations, meta: <div className="compare-run-meta">
+  return { text: run.markdown, locations: run.locations, pageUnit: doc.format === 'PPTX' ? 'slide' : 'page', meta: <div className="compare-run-meta">
     <p>{desc}</p>
     {run.is_latest && doc.status !== 'completed' && <p className="compare-warning">이전 성공 결과 · 현재 작업 결과 아님</p>}
     {run.warnings.map(warning => <p key={warning} className="compare-warning">{warning}</p>)}
@@ -178,7 +178,7 @@ function SourceOriginal({ doc, active, location, onLocation }: {
     : data?.kind === 'text' ? () => <TextSource {...data} />
     : imageUrl && !imageFailed ? () => <div className="compare-image-source"><img src={imageUrl} alt={doc.name} onError={() => setImageFailed(true)} /></div>
     : office && officeFile?.data ? (expanded: boolean) => <Suspense fallback={<p className="office-status" role="status">원본 보기를 준비하는 중…</p>}>
-      <OfficeSource kind={office} data={officeFile.data!} expanded={expanded} /></Suspense>
+      <OfficeSource kind={office} data={officeFile.data!} expanded={expanded} page={location?.page ?? undefined} /></Suspense>
     : undefined;
   const error = preview?.error ?? image?.error ?? officeFile?.error;
   const fallback = error || imageFailed ? <div role="alert"><p>{error ?? '브라우저에서 이 이미지를 표시할 수 없어요.'}</p>

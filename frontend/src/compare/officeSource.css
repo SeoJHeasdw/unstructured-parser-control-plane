@@ -36,3 +36,7 @@
 .pptx-notes summary { display: flex; align-items: center; gap: 6px; color: var(--ink-2); cursor: pointer; }
 .pptx-notes p { margin: 6px 0 0; white-space: pre-wrap; color: var(--ink-1); }
 .office-source.is-expanded .pptx-slide { width: 100%; max-width: 1120px; margin-inline: auto; }
+.pptx-slide.is-target .pptx-stage { outline: 3px solid var(--evidence-ink); outline-offset: 2px; }
+.pptx-slide.is-target figcaption strong { color: var(--evidence-ink); }
+/* 원문 대조 칸에서는 PDF 보기와 같은 높이로 두고 안에서 스크롤한다(근거 버튼으로 슬라이드에 옮겨 갈 수 있게). */
+.office-source:not(.is-expanded) { height: clamp(420px, 68dvh, 850px); }

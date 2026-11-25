@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { BookOpen, GitCompareArrows, LocateFixed } from 'lucide-react';
-import { ResultReview, type ResultPane, type ReviewEvidence, type ReviewLocation } from './ResultReview';
+import { ResultReview, pageLabel, type ResultPane, type ReviewEvidence, type ReviewLocation } from './ResultReview';
 import { columnName } from './worksheet';
 import { lines } from './diff';
 import { tableLines } from '../markdown';
@@ -76,26 +76,32 @@ export function ReviewDesk({ mode, onMode, canCompare, baseline, candidate, orig
           <div className="source-lines" ref={viewport} tabIndex={0} aria-label="추출 본문">
           {sourceStatus}
           {!sourceStatus && !output.length && <p>표시할 추출 텍스트가 없습니다.</p>}
-          {output.slice(shownPage * 120, (shownPage + 1) * 120).map((value, i) => {
+          {(() => { let previous = new Set<string>(); return output.slice(shownPage * 120, (shownPage + 1) * 120).map((value, i) => {
             const number = shownPage * 120 + i + 1;
             const locations = sourcePane?.locations?.filter(l => l.start_line <= number && l.end_line >= number) ?? [];
             const origins = new Map<string, ReviewLocation>();
             for (const l of locations) {
-              if (l.page) origins.set(`원문 ${l.page}쪽`, {page:l.page, sheet:null});
+              if (l.page) origins.set(pageLabel(l.page, sourcePane?.pageUnit), {page:l.page, sheet:null});
               else if (l.sheet && l.column && l.row) {
                 const cell = columnName(l.column) + l.row;
                 origins.set(l.sheet + '!' + cell, {page:null, sheet:l.sheet, cell});
               }
             }
+            // 같은 위치가 여러 줄에 걸치면(PPTX 슬라이드, PDF 쪽) 그 묶음의 첫 줄에만 근거 버튼을 단다.
+            const labels = new Set(origins.keys());
+            const shown = Array.from(origins).filter(([label]) => !previous.has(label));
+            previous = labels;
             const table = tables.get(number);
             const heading = textMode === 'read' && !table ? /^(#{1,6})\s+(.*)$/.exec(value) : null;
             const body = table ? table.role === 'rule' ? <span className="source-cells-rule" aria-hidden="true" />
-              : <span className={`source-cells${table.role === 'head' ? ' is-head' : ''}`} style={{ gridTemplateColumns: table.columns }}>{table.cells.map((cell, c) => <span key={c}>{cell}</span>)}</span>
+              : <span className="source-table-line"><span className={`source-cells${table.role === 'head' ? ' is-head' : ''}`} style={{ gridTemplateColumns: table.columns }}>{table.cells.map((cell, c) => <span key={c}>{cell}</span>)}</span>
+                {/* 표 줄은 칸 정렬이 흐트러지지 않게 근거를 오른쪽 고정 칸에 아이콘으로 단다 */}
+                <span className="source-evidence">{shown.map(([label, loc]) => <button className="evidence-link is-icon" key={label} aria-label={label} data-tip={label} onClick={() => reveal(loc, number)}><LocateFixed size={14}/></button>)}</span></span>
               : heading ? <span className={`source-heading is-h${heading[1].length}`}><span className="source-mark">{heading[1]}</span> {heading[2]}</span>
               : textMode === 'read' && /^\s*<!--\s*image\s*-->\s*$/.test(value) ? <span className="source-figure">그림 자리 · 그림 안 글자 없음</span> : value || ' ';
             return <div className={'source-line' + (table ? table.role === 'rule' ? ' is-table is-rule' : ' is-table' : '') + (highlight?.line === number && highlight.text === sourcePane?.text ? ' is-evidence' : '')} key={number}><small aria-hidden="true">{number}</small><div>{body}
-              {Array.from(origins, ([label, loc]) => <button className="evidence-link" key={label} onClick={() => reveal(loc, number)}><LocateFixed size={14}/>{label}</button>)}</div></div>;
-          })}</div>
+              {!table && shown.map(([label, loc]) => <button className="evidence-link" key={label} onClick={() => reveal(loc, number)}><LocateFixed size={14}/>{label}</button>)}</div></div>;
+          }); })()}</div>
           {!sourceStatus && !sourcePane?.locations?.length && <p className="reader-foot">원문 위치 미기록 · 원본에서 직접 확인하세요.</p>}
           {pageCount > 1 && <div className="compare-pages"><button disabled={!shownPage} onClick={() => setPage(shownPage - 1)}>이전</button><span>{shownPage+1} / {pageCount}</span><button disabled={shownPage >= pageCount-1} onClick={() => setPage(shownPage + 1)}>다음</button></div>}
         </section>

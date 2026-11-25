@@ -32,7 +32,8 @@ def wait_status(client, doc_id, expected, timeout=5):
 
 def test_parser_catalog_reports_local_routing_without_running_a_job(client):
     catalog = client.get('/api/live/parsers').json()
-    assert catalog["routes"]["PDF"] == catalog["routes"]["XLSX"] == "docling"
+    assert catalog["routes"]["XLSX"] == catalog["routes"]["XLSM"] == "docling"
+    assert catalog["routes"]["PDF"] == "pdf-text"  # PDF 모델이 없으면 글자 층 파서
     assert catalog["routes"]["JPEG"] == "ocr-model"
     assert catalog["routes"]["SVG"] == "python-svg"
     assert catalog["routes"]["CSV"] == "python-csv"
@@ -322,7 +323,7 @@ def test_pdf_model_catalog_reports_incomplete_installation(tmp_path):
         (models / PDF_FILES[-1]).write_bytes(b"")
         partial = instance.get("/api/live/parsers").json()
         assert partial["pdf_model_directory"] and not partial["pdf_models_ready"]
-        assert partial["pdf_missing_files"] == [PDF_FILES[-1].as_posix()]
+        assert partial["pdf_missing_files"] == [PDF_FILES[-1].as_posix()] and partial["routes"]["PDF"] == "pdf-text"
         (models / PDF_FILES[-1]).write_bytes(b"present")
         ready = instance.get("/api/live/parsers").json()
-        assert ready["pdf_models_ready"] and ready["pdf_missing_files"] == []
+        assert ready["pdf_models_ready"] and ready["pdf_missing_files"] == [] and ready["routes"]["PDF"] == "docling"

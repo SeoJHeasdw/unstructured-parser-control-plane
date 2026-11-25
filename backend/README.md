@@ -44,6 +44,8 @@ export DOCOPS_DOCLING_ARTIFACTS=/path/to/prepared/models
 - 처리 요청 시 파서보다 먼저 **내용 서명**을 본다. DRM으로 감싼 파일(`drm_protected`/`drm_suspected`), 암호 문서(`encrypted`), 확장자와 내용이 다른 파일(`format_mismatch`)은 파서를 부르지 않고 `failed`와 `error_code`로 남긴다. DRM은 판별만 하며 복호화하지 않는다. 제품 머리말은 `DOCOPS_DRM_SIGNATURES`로 등록한다(`.env.example` 참고).
 - DOCX·XLSX·XLSM·PPTX는 `runtime/work/`에 임시 사본을 만들어 Word '기호 삽입'(Symbol 글꼴)·위/아래첨자를 유니코드(`≥`, `m²`, `CO₂`)로 바꾼 뒤 파싱한다. 원본은 바꾸지 않고 사본은 처리 후 지운다. `DOCOPS_OOXML_PREPARE=0`이면 끈다.
 - 파싱 뒤 원본 XML을 직접 읽어 결과와 대조한다: 특수기호 손실 수, 병합 셀, 흰색에 가까운 글자·숨김 글자, OCR 없이 읽지 않은 그림 수. 결과에 없던 글상자·SVG 글자는 결과 끝 `## 보충 추출`에 원문 위치와 함께 덧붙인다. 보고서는 `result`·`runs/{run_id}` 응답의 `fidelity`, 요약은 `warnings`.
+- PDF 모델 파일이 없으면 PDF는 `app/adapters/pdf_text.py`(`pdf-text`, pypdfium2 글자 층)로 읽는다. 쪽 위치·한계 경고·큰 그림/깨진 글자 층 경고를 남기고, 글자 층 없는 쪽과 큰 그림은 OCR 모델이 있으면 읽는다. 모델이 갖춰지면 Docling으로 돌아간다(`ParserRegistry.parser_name`).
+- Docling 결과 보강(`DoclingAdapter._structure`, `app/adapters/markdown_edit.py`): XLSX·XLSM 시트 제목, PPTX 슬라이드 위치와 발표자 메모(`app/adapters/pptx_notes.py`), 표 앞 빈 줄, 표 맨 위 전체 너비 병합 제목 행을 표 위 문단으로. 줄을 끼우면 원문 위치도 함께 민다. 테스트는 `tests/test_parser_structure.py`.
 - XLSM은 XLSX와 같은 Docling 워크시트 경로(위치 대조·원본 셀 미리보기·원문 대조 포함)로 읽는다. 매크로는 실행하지 않는다. `app/vba.py`가 `vbaProject.bin`의 모듈 목록과 소스를 읽어([MS-OVBA] 압축 해제) 결과 `warnings`에 모듈·줄 수와 자동 실행 프로시저를 남기고, 구조 분석에 모듈 목록(`stats.macro`)과 매크로 코드 속 경로·URL·문서번호 후보를 넣는다. 코드는 결과 본문에 넣지 않는다. 테스트는 `tests/test_xlsm.py`.
 - 엣지 케이스 회귀 테스트는 `tests/test_edge_cases.py`. Docling 실측 테스트 1개는 Docling이 설치된 가상환경에서만 돈다.
 

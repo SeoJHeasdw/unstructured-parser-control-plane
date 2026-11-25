@@ -4,7 +4,7 @@
 기존 문서함에는 아무것도 남기지 않는다. --fetch-models면 빠진 PDF 모델을 docling-tools로 받는다.
 받기 전에 huggingface.co(또는 HF_ENDPOINT로 지정한 사내 미러)에 접속되는지 10초 안에 확인하고, 막혀 있으면 받지 않는다.
 --models-from <ZIP 또는 폴더>면 받지 않고 그 묶음을 검증해 설치한다(app/model_bundle.py, huggingface.co가 막힌 PC용).
-받지 못해도 경고만 남기고 계속한다(PDF만 안 되고 나머지는 된다). 파싱 중에는 모델을 받지 않는다.
+받지 못해도 경고만 남기고 계속한다(PDF는 글자 층만 읽고 나머지는 그대로 된다). 파싱 중에는 모델을 받지 않는다.
 --report 파일에 설치되지 않은 항목을 남기면 setup이 마지막 요약에 다시 보여 준다.
 """
 import argparse
@@ -128,7 +128,7 @@ def ensure_models(settings: Settings, fetch: bool, bundle: Path | None = None) -
     else:
         problem = "설치 묶음에 들어 있지 않습니다"
         fix = f"모델 포함 ZIP(--with-docling-models)을 쓰거나, {BUNDLE_FIX}"
-    item = {"item": "PDF 모델", "problem": problem, "effect": "PDF 파싱이 안 됩니다(Office·텍스트 파싱은 됩니다)",
+    item = {"item": "PDF 모델", "problem": problem, "effect": "PDF는 레이아웃·표 모델 없이 글자 층만 읽습니다(표 구조 없음, 스캔 쪽은 OCR 모델 필요). Office·텍스트는 그대로 됩니다",
             "fix": fix, "missing": missing}
     print(f"[주의] PDF 모델: {problem}. {item['effect']}")
     print(f"       빠진 파일: {', '.join(missing)}")

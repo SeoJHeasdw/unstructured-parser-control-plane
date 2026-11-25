@@ -3,6 +3,7 @@ import { cleanup, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { displayWidth, isNumeric, parseInline, parseMarkdown, splitRow, tableLines } from '../markdown';
 import { ReviewDesk } from '../compare/ReviewDesk';
+import type { ResultLocation } from '../api/live';
 import { MarkdownView } from '../MarkdownView';
 import { ResultBody } from '../LiveDocumentView';
 
@@ -131,5 +132,17 @@ describe('원문 대조의 추출 결과', () => {
     expect(lines[17].querySelector('small')?.textContent).toBe('18');
     await user.click(screen.getByRole('radio', { name: 'Markdown 원문' }));
     expect(document.querySelectorAll('.source-line')[17].textContent).toBe('18| 온도            | ≤ −70℃        | −72℃ 적합       |');
+  });
+});
+
+describe('원문 대조 근거 버튼', () => {
+  it('같은 위치가 여러 줄에 걸치면 첫 줄에만 달고, PPTX는 슬라이드로 부른다', () => {
+    const text = '# 측정 결과\n\n| 구분 | 결과 |\n|---|---|\n| 온도 | −72℃ |\n\n다음 슬라이드';
+    const locations = [{ start_line: 1, end_line: 5, page: 3 }, { start_line: 7, end_line: 7, page: 4 }] as ResultLocation[];
+    render(<ReviewDesk mode="source" onMode={() => {}} canCompare={false} original={<p>원본</p>} summary={null}
+      sourcePane={{ text, locations, meta: null, pageUnit: 'slide' }} onLocation={() => {}} />);
+    expect(screen.getAllByRole('button', { name: '슬라이드 3' })).toHaveLength(1);
+    expect(screen.getAllByRole('button', { name: '슬라이드 4' })).toHaveLength(1);
+    expect(screen.queryByRole('button', { name: /원문 3쪽/ })).toBeNull();
   });
 });
