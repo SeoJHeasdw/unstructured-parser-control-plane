@@ -316,3 +316,8 @@ Docling 실행 시 `HF_HUB_OFFLINE=1`, `TRANSFORMERS_OFFLINE=1`을 설정하며 
 - 파싱 전 형식·DRM 판별: `backend/app/format_gate.py`. 사본 보정·원문 대조: `backend/app/fidelity/`(`prepare.py`, `probe.py`, `report.py`). 문자 도우미(기호 글꼴 표·첨자·대비·파일명 키): `backend/app/textnorm.py`.
 - 엣지 케이스 회귀: `backend/tests/test_edge_cases.py`(Docling 실측 테스트는 Docling이 설치된 환경에서만 실행), 합성 파일 `backend/tests/edge_case_files.py`.
 - 프론트 실제 API 경계: `frontend/src/api/live.ts`. 실제 API와 실패 동작의 회귀: `backend/tests/test_live_api.py`, `frontend/src/__tests__/live.test.tsx`.
+
+
+### 작업 도구의 청킹 비교
+
+`POST /api/retrieval/chunk`는 선택적으로 `summary_only: true`를 받는다. 이때 source는 문서 식별 정보와 이전 성공본 여부만 포함한다. 성공한 전략별 응답은 id·kind·stats만 포함한다. 생략하면 기존 벤치 화면용 전체 응답을 반환한다. 작업 도구 `chunk`는 `embed: false`로 로컬 분할을 요청한다. 길이는 추정 토큰 수다.

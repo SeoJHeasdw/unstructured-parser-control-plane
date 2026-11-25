@@ -4,7 +4,7 @@
 
 ## 빠른 시작
 
-사용자는 **`setup`**(설치·갱신)과 **`run`**(실행) 두 가지만 알면 됩니다. Windows는 `setup.cmd`·`run.cmd`, macOS·Linux·Git Bash는 `./setup.sh`·`./run.sh`를 씁니다.
+**이미 설치한 Windows PC**에서는 실행 중인 콘솔을 닫고 GitHub **Code → Download ZIP**을 받습니다. 압축을 푼 폴더 안의 파일과 폴더를 기존 `run.cmd`가 있는 폴더에 복사하고 **모두 덮어쓰기**를 선택합니다. **`setup.cmd` → `run.cmd`** 순서로 실행하면 업데이트가 끝납니다. OpenCode를 쓸 때는 설치 폴더 안의 **`OpenCode`** 폴더를 엽니다. MCP 설정은 준비 단계에서 자동으로 생성됩니다.
 
 **1. 준비물 설치 (Windows, 처음 한 번)**
 
@@ -102,7 +102,7 @@ setup.cmd --models C:\경로\docling-pdf-models.zip
 
 - 콘솔 서버가 파일을 `runtime/`으로 **복사**합니다. 원본 폴더의 파일은 그대로입니다. 허용 폴더 밖, 숨김·잠금 파일(`.`·`~$`로 시작), 빈 파일, 크기 제한(100MB)을 넘는 파일은 가져오지 않습니다.
 - 이름·크기·내용(SHA-256)이 같은 원본이 이미 있으면 새로 만들지 않고 그 문서를 씁니다.
-- 허용 폴더는 `.env`로만 바꿀 수 있고 화면에서는 바꿀 수 없습니다. 작업 도구(`docops.py`·OpenCode)와 같은 설정 이름이지만, OpenCode는 `opencode.json`의 값을 씁니다.
+- 허용 폴더는 `.env`로만 바꿀 수 있고 화면에서는 바꿀 수 없습니다. 작업 도구(`docops.py`·OpenCode)와 같은 설정 이름이지만, OpenCode는 작업 폴더에 지정한 값이 있으면 우선 사용합니다.
 - 고객사 보안 정책이 "로컬 프로그램이 지정 폴더의 파일을 읽는 것"까지 허용하는지는 확인하지 않았습니다.
 
 ## 모델 연결 (OCR · 생성 · 임베딩)
@@ -196,10 +196,6 @@ cd frontend && npm test && npm run build
 cd backend && .venv/bin/python -m pip install -r requirements-dev.txt && .venv/bin/python -m pytest -q
 ```
 
-**작업 에이전트 도구**(OpenCode MCP·CLI, 표준 라이브러리만 사용)는 [작업 에이전트 도구](docs/AGENT_TOOLS.md)에 정리돼 있습니다.
-
-```bash
-py -3.12 backend/docops.py init-workspace "C:/work/docops-agent" --roots "C:/work/samples"
-```
+**OpenCode에서 첫 시험**은 설치 폴더 안의 `OpenCode`를 열고 “연결을 확인해줘”라고 요청하면 됩니다. 필요한 경우 [연결 진단과 파싱 실험](docs/AGENT_TOOLS.md)을 참고하세요.
 
 **문서**: 이어서 작업할 때는 [인수인계와 실행 안내](docs/HANDOFF_AND_RUNBOOK.md)부터 읽습니다. 구조는 [아키텍처](docs/ARCHITECTURE.md), API는 [백엔드 README](backend/README.md), 나머지는 [문서 안내](docs/README.md)에 있습니다.

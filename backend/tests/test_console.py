@@ -111,6 +111,7 @@ def test_setup_passes_bundle_to_check_instead_of_downloading(project, monkeypatc
     monkeypatch.setattr(console, "ensure_frontend", lambda offline: None)
     monkeypatch.setattr(console, "run", lambda command, **kwargs: commands.append([str(part) for part in command]))
     console.setup(console.parse_args(["setup", "--models", str(bundle)]))
+    assert ["python", "docops.py", "init-workspace", str(project / "OpenCode")] in commands
     assert commands[-1][-3:] == ["--docling", "--models-from", str(bundle.resolve())]
     console.setup(console.parse_args(["setup"]))
     assert commands[-1][-2:] == ["--docling", "--fetch-models"]

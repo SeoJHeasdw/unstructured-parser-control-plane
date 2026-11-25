@@ -172,6 +172,8 @@ def chunk(request: Request, body: dict = Body(...)):
             result = run_strategy(src, spec, limit, embed)
             if model:
                 result["semantic"]["model"] = model
+            if body.get("summary_only") is True:
+                return {"id": sid, "kind": result["kind"], "stats": result["stats"]}
             return result
         except NeedsEmbedding as exc:
             return {**normalize_strategy(spec), "pending": {"missing": exc.missing, "total": exc.total, "model": model}, **empty}
@@ -183,6 +185,8 @@ def chunk(request: Request, body: dict = Body(...)):
     for start in range(0, len(strategies), parallelism):
         batch = range(start, min(start + parallelism, len(strategies)))
         results.extend(request.app.state.chunk_pool.map(evaluate, batch))
+    if body.get("summary_only") is True:
+        return {"source": meta, "results": results}
     return {"source": {**meta, **describe_source(src), "text": src.text}, "results": results}
 
 

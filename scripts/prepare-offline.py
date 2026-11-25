@@ -102,7 +102,7 @@ def source_files():
         "backend/main.py", "backend/launch_local.py", "backend/check_local.py", "backend/docops.py", "backend/README.md", "frontend/index.html",
         "frontend/package.json", "frontend/package-lock.json", "frontend/tsconfig.json",
         "frontend/vite.config.ts", "scripts/console.py", "scripts/prepare-offline.py",
-        "scripts/prepare-offline.sh", "samples/GPT_SAMPLE_GENERATION_PROMPT.md",
+        "scripts/prepare-offline.sh", "samples/GPT_SAMPLE_GENERATION_PROMPT.md", "samples/agent-check/AI 연결 점검.md",
     )
     yield from (ROOT / name for name in fixed)
     yield from sorted(BACKEND.glob("requirements*.txt"))
@@ -124,6 +124,7 @@ def build_archive(path, wheelhouses, models):
     required = {
         "setup.cmd", "run.cmd", "scripts/console.py", "backend/main.py", "backend/requirements.lock.txt",
         "frontend/dist/index.html", f"frontend/dist/{BUILD_STAMP}", "mock-data/data.json",
+        "backend/docops.py", "backend/app/agent/diagnostics.py", "opencode-workspace/AGENTS.md", "samples/agent-check/AI 연결 점검.md",
     }
     with ZipFile(path, "w", ZIP_DEFLATED, compresslevel=3) as archive:
         for source in source_files():

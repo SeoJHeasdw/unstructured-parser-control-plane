@@ -465,6 +465,7 @@ def setup(args):
     if not env_file.exists() and example.is_file():
         shutil.copyfile(example, env_file)
         say(".env 를 .env.example 에서 만들었습니다. 모델 주소는 화면의 설정 › 모델 연결에서 넣어도 됩니다.")
+    run([python, "docops.py", "init-workspace", ROOT / "OpenCode"], cwd=BACKEND, timeout=60)
     say("3/3 " + ("PDF 모델 확인과 자체 점검" if full else "자체 점검"))
     with tempfile.TemporaryDirectory() as temp:
         report = Path(temp) / "check.json"

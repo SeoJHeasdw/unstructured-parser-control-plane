@@ -1,6 +1,9 @@
 """작업 에이전트 도구(MCP·CLI): 실제 HTTP 서버를 임시 저장소로 띄워 합성 파일로 검증한다."""
 import io
 import json
+import hashlib
+import os
+from contextlib import contextmanager
 from pathlib import Path
 import re
 import threading
@@ -12,7 +15,7 @@ import uvicorn
 from fastapi.testclient import TestClient
 
 from app.agent import codes
-from app.agent.client import Api, ServerDown
+from app.agent.client import Api, ApiError, ServerDown
 from app.agent.mcp import TOOLS, serve
 from app.agent.ops import TOOL_ARGS, Ops
 from app.config import Settings
@@ -22,17 +25,42 @@ from main import create_app
 DOCS = Path(__file__).resolve().parents[2] / "docs"
 
 
-@pytest.fixture()
-def live(tmp_path):
-    runtime = tmp_path / "runtime"
-    server = uvicorn.Server(uvicorn.Config(create_app(Settings(runtime_dir=runtime)), host="127.0.0.1", port=0, log_level="warning"))
+@contextmanager
+def _test_server(runtime, monkeypatch):
+    app = create_app(Settings(runtime_dir=runtime))
+    if os.environ.get("DOCOPS_TEST_TRANSPORT") == "asgi":
+        # 같은 API·multipart·워커를 쓰되, loopback bind가 제한된 환경에서만 전송을 바꾼다.
+        url = "http://127.0.0.1:18888"
+        with TestClient(app) as client:
+            def send(api, method, target, body=None, headers=None, timeout=None, digest=False):
+                if not target.startswith(url + "/"):
+                    raise ConnectionRefusedError()
+                response = client.request(method, target[len(url):], content=body, headers=headers)
+                if response.is_error:
+                    raise ApiError(response.status_code, response.json().get("detail", ""))
+                data = hashlib.sha256(response.content).hexdigest() if digest else response.content
+                return response.status_code, response.headers, data
+            monkeypatch.setattr(Api, "_send", send)
+            yield url
+        return
+    server = uvicorn.Server(uvicorn.Config(app, host="127.0.0.1", port=0, log_level="warning"))
     thread = threading.Thread(target=server.run, daemon=True)
     thread.start()
-    for _ in range(200):
-        if server.started:
-            break
-        time.sleep(0.05)
-    port = server.servers[0].sockets[0].getsockname()[1]
+    try:
+        for _ in range(200):
+            if server.started:
+                break
+            time.sleep(0.05)
+        port = server.servers[0].sockets[0].getsockname()[1]
+        yield f"http://127.0.0.1:{port}"
+    finally:
+        server.should_exit = True
+        thread.join(timeout=10)
+
+
+@pytest.fixture()
+def live(tmp_path, monkeypatch):
+    runtime = tmp_path / "runtime"
     docs = tmp_path / "docs"
     (docs / "sub").mkdir(parents=True)
     (docs / "a.txt").write_text("교정 주기는 12개월이다.\n허용 오차 ±0.5 °C\n", encoding="utf-8")
@@ -42,10 +70,12 @@ def live(tmp_path):
     (docs / "보고서.hwp").write_bytes(b"HWP Document File")
     outside = tmp_path / "outside.txt"
     outside.write_text("밖", encoding="utf-8")
-    ops = Ops(runtime, api=Api(base_url=f"http://127.0.0.1:{port}"), roots=[docs], wait_seconds=20, confirm_over=50)
-    yield {"ops": ops, "docs": docs, "outside": outside, "runtime": runtime, "url": f"http://127.0.0.1:{port}"}
-    server.should_exit = True
-    thread.join(timeout=10)
+    with _test_server(runtime, monkeypatch) as url:
+        ops = Ops(runtime, api=Api(base_url=url), roots=[docs], wait_seconds=20, confirm_over=50)
+        try:
+            yield {"ops": ops, "docs": docs, "outside": outside, "runtime": runtime, "url": url}
+        finally:
+            ops.close()
 
 
 def typing_block(text: str) -> list[str]:
@@ -295,3 +325,171 @@ def test_same_name_size_and_mtime_still_require_matching_bytes(live):
     rows = ops.documents()
     assert len(rows) == 3
     assert ops.api.get(f"/api/live/documents/{rows[2]['id']}/result")["markdown"] == "sample C"
+
+
+def test_named_batches_keep_their_first_report_and_resume_once(live, monkeypatch):
+    from concurrent.futures import ThreadPoolExecutor
+
+    ops = live["ops"]
+    second = Ops(live["runtime"], api=Api(base_url=live["url"]), roots=ops.roots, wait_seconds=10)
+    try:
+        # Two CLI processes can submit before either connection gets a worker.
+        with monkeypatch.context() as pause:
+            pause.setattr(Ops, "_ensure_pump", lambda self: None)
+            pause.setattr(ops, "wait_seconds", 0)
+            pause.setattr(second, "wait_seconds", 0)
+            assert "진행 중 B1" in call(ops, "parse", target="a.txt")
+            assert "진행 중 B1" in call(second, "parse", target="a.txt")
+            assert "진행 중 B2" in call(second, "parse", target="*.csv")
+        with ThreadPoolExecutor(2) as pool:
+            first = pool.submit(ops.wait, "B1")
+            last = pool.submit(second.wait, "B2")
+            first_block = typing_block(first.result(timeout=15))
+            assert first_block[0].startswith("DOCOPS B1")
+            assert typing_block(last.result(timeout=15))[0].startswith("DOCOPS B2")
+        assert len(ops.documents()) == 2
+        assert all(len(ops.runs(d["id"])) == 1 for d in ops.documents())
+        call(ops, "parse", target="D1")
+        assert typing_block(second.report("B1")) == first_block
+        assert ops.call("wait", {"batch": "B999"})[1]
+    finally:
+        second.close()
+
+
+def test_uncertain_request_is_recovered_without_replaying(live):
+    ops = live["ops"]
+    item = {"path": str(live["docs"] / "a.txt"), "doc": None, "state": "file", "note": ""}
+    batch = {"n": 1, "target": "a.txt", "started": "2026-01-01T00:00:00+00:00", "finished": None, "reparse": False,
+             "items": [item], "skips": {}, "error": ""}
+    ops.store.save("batches", {"next": 2, "items": [batch]})
+    marker = {**item, "state": "error", "note": "upload-unknown"}
+    (ops.store.dir / "pump.jsonl").write_text(json.dumps([1, 0, marker]) + "\n[1,", encoding="utf-8")
+    text = ops.wait("B1")
+    assert text.startswith("결과: 등록·처리 요청 오류 1건")
+    assert "req-error upload-unknown1" in typing_block(text)
+    assert ops.documents() == []
+    assert "req-error upload-unknown1" in typing_block(ops.report("all"))
+
+
+def test_file_resolution_paging_and_confirmation_for_document_numbers(live):
+    ops, docs = live["ops"], live["docs"]
+    for n in range(32):
+        (docs / "sub" / f"[합성] {n:02}.txt").write_text("샘플", encoding="utf-8")
+    assert len(ops.resolve("sub/[합성] 01.txt")[0]) == 1
+    assert len(ops.resolve("**/*.txt")[0]) == 34
+    assert "offset=30" in ops.files("sub")
+    assert "[합성] 30.txt" in ops.files("sub", 30)
+    # A misspelled path containing directories must never be replaced with a same-name file elsewhere.
+    assert ops.call("parse", {"target": "typo/a.txt"})[1]
+    assert ops.call("parse", {"target": "a.txt", "preview_only": True})[1]
+    assert len(ops.documents()) == 0
+    call(ops, "parse", target="a.txt")
+    call(ops, "parse", target="*.csv")
+    ops.confirm_over = 1
+    assert "미리보기" in ops.parse("D1 D2")
+    assert len(ops.runs(ops.find_doc("D1")["id"])) == 1
+
+
+def test_folder_link_cannot_register_an_outside_file(live):
+    link = live["docs"] / "연결.txt"
+    try:
+        link.symlink_to(live["outside"])
+    except OSError:
+        pytest.skip("파일 링크 생성 권한 없음")
+    ops = live["ops"]
+    assert ops.call("parse", {"target": str(link)})[1]
+    assert link.name not in ops.files()
+    item = {"path": str(link), "doc": None, "state": "file", "note": ""}
+    ops._register_item(item, {"roots": [str(live["docs"])]}, {})
+    assert item["note"] == "outside" and ops.documents() == []
+
+
+def test_long_line_match_chunk_stats_and_probe(live):
+    ops = live["ops"]
+    receipt = ops.status(check="connection")
+    assert re.fullmatch("DOCOPS-CHECK-[0-9a-f]{12}", receipt)
+    assert receipt != ops.status(check="connection")
+    (live["docs"] / "long.md").write_text("가" * 5000 + "구매 승인 번호 759\n\n|A|B|\n|---|---|\n|12|17|", encoding="utf-8")
+    call(ops, "parse", target="long.md")
+    assert "구매 승인 번호 759" in ops.read("D1", find="구매 승인")
+    assert "가" * 100 in ops.read("D1")
+    assert ops.call("read", {"id": "D1", "find": "가", "page": 1})[1]
+    lines = typing_block(ops.chunk("D1", size=64))
+    assert lines[0] == "D1 chunk target=64 stale=0"
+    assert [line.split()[0] for line in lines[1:]] == ["fixed", "recursive", "element"]
+    assert all("table-split=" in line for line in lines[1:])
+    assert ops.call("chunk", {"id": "D1", "strategy": "semantic"})[1]
+    assert ops.call("chunk", {"id": "D1", "size": 0})[1]
+
+
+def test_model_evidence_requires_result_from_tool_and_exact_final_text():
+    from app.agent.diagnostics import model_evidence
+
+    receipt = "DOCOPS-CHECK-aabbccddeeff"
+    used = {"part": {"type": "tool", "tool": "docops_status",
+                     "state": {"status": "completed", "input": {"check": "connection"}, "output": receipt}}}
+    say = {"part": {"type": "text", "text": receipt}}
+    def run(*events):
+        return model_evidence("\n".join(json.dumps(e) for e in events))[0]
+    assert run(used, say)
+    assert not run(say)
+    assert not run(say, used)
+    assert not run(used, used, say)
+    assert not run(used, {"part": {"type": "text", "text": "확인했어요"}})
+    assert not run(used, say, {"type": "error"})
+    error = {"type": "error", "error": {"data": {"statusCode": 503, "message": "internal-secret"}}}
+    ok, message = model_evidence(json.dumps(error))
+    assert not ok and "503" in message and "internal-secret" not in message
+
+
+def test_workspace_and_real_stdio_doctor_stages(tmp_path, monkeypatch, capsys):
+    import sys
+    from docops import init_workspace
+    from app.agent.diagnostics import doctor
+
+    workspace = tmp_path / "한글 작업"
+    workspace.mkdir()
+    entry = DOCS.parent / "backend" / "docops.py"
+    config = workspace / "opencode.json"
+    config.write_text(json.dumps({"model": "company/test", "provider": {"company": {"name": "test"}}}), encoding="utf-8")
+    (workspace / "AGENTS.md").write_text("현장 지침", encoding="utf-8")
+    monkeypatch.setenv("DOCOPS_RUNTIME_DIR", str(tmp_path / "runtime"))
+    monkeypatch.setenv("DOCOPS_API_URL", "http://127.0.0.1:1")
+    assert init_workspace([str(workspace), "--roots", str(tmp_path)]) == 0
+    before = json.loads(config.read_text(encoding="utf-8"))
+    assert init_workspace([str(workspace)]) == 0
+    assert json.loads(config.read_text(encoding="utf-8")) == before
+    assert before["model"] == "company/test" and before["provider"]["company"]["name"] == "test"
+    assert before["mcp"]["docops"]["command"] == [sys.executable, str(entry), "mcp"]
+    assert (workspace / "AGENTS.md").read_text(encoding="utf-8") == "현장 지침"
+    assert before["instructions"] == ["DOCOPS_GUIDE.md"]
+    assert doctor([str(workspace)], entry) == 1
+    message = capsys.readouterr().out
+    assert "[PASS mcp]" in message and "[FAIL console]" in message
+
+
+def test_large_confirmed_batch_runs_all_upload_rounds(live):
+    ops = live["ops"]
+    folder = live["docs"] / "묶음"
+    folder.mkdir()
+    for index in range(75):
+        (folder / f"{index:03}.txt").write_text(f"합성 문서 {index}", encoding="utf-8")
+    assert "미리보기" in ops.parse(str(folder))
+    ops.wait_seconds = 60
+    block = typing_block(ops.parse(str(folder), confirm=True))
+    assert "sum 75 ok75" in block
+    assert len(ops.documents()) == 75
+    assert "before=D36" in ops.docs()
+    assert "D35 " in ops.docs(before="D36")
+
+
+def test_page_read_excludes_interleaved_locations(live, monkeypatch):
+    ops = live["ops"]
+    call(ops, "parse", target="a.txt")
+    monkeypatch.setattr(ops, "run_detail", lambda *args: {
+        "markdown": "첫 쪽 제목\n둘째 쪽 내용\n첫 쪽 보충",
+        "locations": [{"page": 1, "start_line": 1, "end_line": 1},
+                      {"page": 1, "start_line": 3, "end_line": 3}]
+    })
+    excerpt = ops.read("D1", page=1)
+    assert "[줄 1-1]" in excerpt and "첫 쪽 보충" in excerpt and "둘째 쪽 내용" not in excerpt

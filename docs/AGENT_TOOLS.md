@@ -1,6 +1,6 @@
 # 작업 에이전트 도구 (MCP · CLI)
 
-> 2026-11-24 1단계(파싱·검수) 구현. 청킹·평가, Milvus 적재, 검색은 아직 없다. 고객사 PC(Windows)와 고객사 게이트웨이 모델로는 아직 돌려보지 않았다.
+> 11월 25일 고객사 Windows PC에서 콘솔 설치와 스크립트 파서 실행을 확인했다. 사내 OpenCode 모델 연결은 현장 시험 대상이다. 이전 Qwen 도구 호출 실험은 개발용 Mac에서 진행했다. 현재 도구는 파싱·검수와 로컬 청킹 비교를 지원한다.
 
 ## 1. 목적과 역할 경계
 
@@ -18,7 +18,7 @@ OpenCode 같은 에이전트에게 "이 폴더 파싱해 보고 보고서 보여
 flowchart LR
     OC["OpenCode Desktop\n(사내 중형 모델)"] -->|"stdio MCP"| MCP["docops.py mcp\n(표준 라이브러리만)"]
     CLI["docops.py <도구>"] --> OPS
-    MCP --> OPS["app/agent/ops.py\n도구 9개 · 묶음 진행 · 요약"]
+    MCP --> OPS["app/agent/ops.py\n도구 10개 · 묶음 진행 · 요약"]
     OPS -->|"HTTP 127.0.0.1"| API["실행 중인 콘솔 서버\n(run.cmd · run.sh)"]
     OPS --> ST["runtime/agent/\n호출 기록 · 번호 · 보고서"]
     API --> RT["runtime/ (서버 소유)"]
@@ -33,15 +33,43 @@ flowchart LR
 
 ## 3. 고객사 PC 설치
 
-1. 콘솔을 평소처럼 띄운다(cmd에서 `run.cmd`, Git Bash에서 `./run.sh`. 처음에는 `setup.cmd`로 설치한다).
-2. 작업 폴더를 **저장소 밖에** 만든다. 경로는 이 PC 기준으로 자동으로 채워진다.
+기존 콘솔을 닫고 GitHub의 **Code → Download ZIP**을 선택한다. 압축을 푼 폴더의 내용을 기존 설치 폴더에 복사해 모두 덮어쓴다. **`setup.cmd` → `run.cmd`** 순서로 실행한다. `setup.cmd`가 설치 폴더 안의 **OpenCode** 작업 폴더와 MCP 설정을 준비한다. Desktop에서 그 폴더를 열고 기존 사내 모델을 선택한다.
 
-   ```bash
-   py -3.12 backend/docops.py init-workspace "C:/work/docops-agent" --roots "C:/work/samples"
-   ```
+### 필요할 때만 쓰는 진단
 
-   문서 폴더가 여럿이면 `;`로 잇는다. 이 명령은 작업 폴더에 `opencode.json`과 `AGENTS.md`(에이전트 작업 안내)를 만든다. 이미 `opencode.json`이 있으면 다른 설정은 그대로 두고 `mcp.docops`, `permission`, `tools`, `share`만 덮어쓴다.
-3. OpenCode Desktop에서 그 작업 폴더를 연다. 모델 연결(base_url·model·api_key)은 기존 전역 설정을 쓴다. 모델 설정이 프로젝트 폴더의 `opencode.json`에만 있었다면 그 `provider` 부분을 작업 폴더의 `opencode.json`에 옮겨 넣는다.
+```powershell
+.\backend\.venv\Scripts\python.exe backend/docops.py doctor "OpenCode"
+```
+
+`PASS mcp`는 MCP 초기화와 도구 목록 조회, `PASS console`은 콘솔 상태 조회 성공을 뜻한다.
+
+**사내 모델 호출 시험.** OpenCode에 등록된 정확한 `provider/model` ID를 넣는다. 아래 값은 예시다. CLI는 최대 4분 동안 도구 이벤트와 최종 답변을 기다리며 파서용 API 키를 요구하지 않는다.
+
+```powershell
+.\backend\.venv\Scripts\python.exe backend/docops.py doctor "OpenCode" --model "사내공급자/배포모델ID"
+```
+
+`PASS model`에는 새 세션에서 `docops_status(check="connection")` 호출 1건이 완료되고 모델의 마지막 답변이 도구에서 발급한 일회성 코드와 일치해야 한다. 이 상태 호출은 문서 목록이나 본문을 조회하지 않는다. CLI가 없는 Desktop에서는 위 작업 폴더를 열고 모델을 선택한 뒤 기본 `doctor`가 출력한 한국어 문장을 붙여 넣는다. 콘솔의 **에이전트 작업 → 호출 기록**에서 `status`의 check 인자와 반환 코드를 답변에 대조한다.
+
+**같은 입력으로 현장 시험하기**
+
+| 순서 | OpenCode에 입력할 문장 | 확인할 결과 |
+|---|---|---|
+| 1 | “AI 연결 점검.md 한 건만 파싱해 줘. 묶음 결과를 보여줘.” | 배포본에 들어 있는 합성 파일 1건. B번호와 보고서의 합계 확인 |
+| 2 | “방금 문서에서 점검번호와 보관 위치를 근거 줄과 함께 찾아줘.” | 실제 `docops_read` 호출. 추출값은 `FIELD-026`, `B-204` |
+| 3 | “같은 문서를 64토큰 기준 고정 길이·재귀·요소 단위로 비교해 줘.” | `docops_chunk` 1회로 세 전략의 청크 수와 표 분할 수 확인 |
+| 4 | “방금 B번호 보고서를 다시 보여줘.” | 같은 B번호의 첫 타이핑용 블록과 일치 |
+
+게이트웨이가 꺼졌을 때는 아래 CLI로 같은 작업을 한다. `--workspace`는 OpenCode용 설정의 허용 폴더·runtime·API 주소를 이 프로세스에 적용한다. D번호와 B번호는 실제 결과에서 옮긴다.
+
+```powershell
+.\backend\.venv\Scripts\python.exe backend/docops.py --workspace "OpenCode" parse "AI 연결 점검.md"
+.\backend\.venv\Scripts\python.exe backend/docops.py --workspace "OpenCode" wait B1
+.\backend\.venv\Scripts\python.exe backend/docops.py --workspace "OpenCode" read D1 --find "점검번호"
+.\backend\.venv\Scripts\python.exe backend/docops.py --workspace "OpenCode" chunk D1 --size 64
+```
+
+실제 문서는 콘솔의 기존 허용 폴더(`.env`의 `DOCOPS_AGENT_ROOTS`)에서 고른다. 별도로 설정하지 않은 PC는 기본 `samples` 폴더에서 합성 문서를 찾는다. 허용 폴더를 직접 지정한 고객사 PC에서 위 합성 시험을 하려면 시험 문서를 그 폴더에 복사한다. 모델 연결은 기존 OpenCode 전역 설정이나 작업 폴더의 provider 설정을 쓴다.
 
 `init-workspace`가 넣는 설정과 이유:
 
@@ -49,27 +77,28 @@ flowchart LR
 |---|---|---|
 | `mcp.docops.timeout` | `120000` | OpenCode의 MCP 요청 시간 제한 기본값이 5초다(1.18.31 스키마로 확인). |
 | `DOCOPS_AGENT_WAIT_SECONDS` | `40` | `parse`·`wait`가 한 번에 기다리는 시간. 설정이 없으면 4초(기본 시간 제한 5초 안). |
-| `DOCOPS_AGENT_ROOTS` | 문서 폴더 | 이 폴더 밖의 파일은 읽지 않는다. 없으면 저장소의 `samples/`만 허용. 콘솔 화면의 '허용 폴더에서 가져오기'도 같은 규칙(`app/folder_import.py`)을 쓰지만, 콘솔 서버는 `.env`의 값을 읽는다. |
+| `DOCOPS_AGENT_ROOTS` | 문서 폴더 | 이 폴더 밖의 파일은 읽지 않는다. 생략하면 기존 작업 폴더, 환경·.env, 기본 samples 순으로 결정. 콘솔 화면의 '허용 폴더에서 가져오기'도 같은 규칙(`app/folder_import.py`)을 쓰지만, 콘솔 서버는 `.env`의 값을 읽는다. |
 | `permission`, `tools` | 편집·셸·웹·파일 읽기 끔 | 실험·보고만 한다. 고를 도구가 적을수록 중형 모델이 덜 헤맨다. |
 | `share` | `disabled` | OpenCode의 세션 공유(대화를 OpenCode 서버에 올려 링크를 만드는 기능)를 끈다. 모델 위치와 무관한 OpenCode 자체 기능이다. 내부망에서 외부가 막혀 있으면 실제 위험은 거의 없다. |
 
-`permission`·`tools`·`mcp.<이름>` 형식은 OpenCode 1.18에서 deprecated 표시가 있지만 동작한다. 고객사 OpenCode Desktop의 버전이 확인되면 새 형식(`permissions`, `mcp.servers`)으로 바꿀지 정한다.
+새 폴더에는 이 Mac에서 연결을 확인한 OpenCode 1.18 호환 형식을 쓴다. 기존 JSON에 V2 설정이 있으면 `mcp.servers` 아래에 `codemode: false`와 실행 시간 제한을 둔다. 고객사 Desktop 버전은 현장 확인 대상이다. 작업 폴더의 모델 설정과 직접 작성한 AGENTS.md는 보존한다. 사용자 지침이 있는 폴더에는 DOCOPS_GUIDE.md를 추가한다. [OpenCode MCP 설정](https://opencode.ai/docs/mcp-servers/) · [OpenCode 권한 설정](https://opencode.ai/docs/permissions/)
 
 ## 4. 도구
 
 | 도구 | 인자 | 하는 일 |
 |---|---|---|
-| `status` | 없음 | 서버 연결, Docling·PDF 모델·OCR 준비, 허용 폴더, 문서 수, 최근 묶음 |
-| `files` | `folder`(선택) | 허용 폴더 안 원본 파일을 형식별로 센다(등록 전) |
+| `status` | `check`(선택, connection) | 서버 연결, Docling·PDF 모델·OCR 준비, 허용 폴더, 문서 수, 최근 묶음 |
+| `files` | `folder`, `offset`(선택) | 허용 폴더 안 원본 파일을 형식별로 세고 30건씩 표시한다 |
 | `parse` | `target`(필수), `reparse`, `confirm` | 파일·폴더·패턴(`*.pdf`)·파일 이름·D번호(`D12`, `D3 D7`)·`failed`를 묶음(B번호)으로 등록·파싱. 50개 넘으면 미리보기 후 `confirm=true` |
-| `wait` | 없음 | 진행 중인 묶음을 기다리고 진행 상황 또는 최종 요약 |
-| `docs` | `state`(all·ok·warn·fail·unsup·run·new) | 문서 목록(최근 40건) |
+| `wait` | `batch`(선택, B번호) | 진행 중인 묶음을 기다리고 진행 상황 또는 최종 요약 |
+| `docs` | `state`(all·ok·warn·empty·fail·unsup·run·new), `before`(D번호) | 최신순 문서 목록을 40건씩 표시 |
 | `doc` | `id` | 문서 하나의 원인·경고·처리 시간·이력 |
 | `read` | `id`, `page` / `sheet` / `find` | 결과 본문 일부(3,500자 한도) |
 | `compare` | `id` | 직전 성공 실행과 최신 실행 비교 |
-| `report` | `scope`(today·last·all) | 사람이 옮겨 적을 보고서(R번호) |
+| `chunk` | `id`, `strategy`, `size` | 기본 512 추정 토큰. 고정 길이·재귀·요소 단위 비교, 또는 한 전략 측정. 원문 포함률과 표 분할 수를 집계 |
+| `report` | `scope`(today·last·all·B번호) | 날짜·전체는 R번호. last·B번호는 묶음의 첫 보고 블록을 다시 표시 |
 
-묶음 진행은 MCP 프로세스의 백그라운드 스레드가 맡는다: 파일 등록(한 회차 20개) → 처리 요청(서버 대기열 64건 한도, 503이면 다음 회차) → 완료 확인. 도구를 부르지 않는 동안에도 서버는 처리를 계속한다. 이름과 크기가 같은 후보는 원본 SHA-256을 대조한 뒤 재사용한다. 검증된 파일은 다음 실행에서 로컬 파일 해시와 저장된 대응을 확인한다. 이전 등록 이력은 첫 사용 시 다시 대조한다. `source-check`는 원본 대조 실패, `upload-unknown`·`process-unknown`은 등록·실행 응답 중단을 뜻한다. 이때는 문서함과 실행 이력에서 반영 여부를 확인한다.
+묶음 진행은 MCP 프로세스의 백그라운드 스레드가 맡는다: 파일 등록(한 회차 20개) → 처리 요청(서버 대기열 64건 한도, 503이면 다음 회차) → 완료 확인. 연결이 유지되는 동안 작업자가 등록·접수를 계속한다. CLI 종료·MCP 재연결 뒤에는 `wait B번호`로 이어 간다. 같은 runtime의 두 연결은 한 번에 한 작업자만 요청을 전송한다. 접수 여부가 불명확한 요청은 기록에 오류로 남긴다. 이름과 크기가 같은 후보는 원본 SHA-256을 대조한 뒤 재사용한다. 검증된 파일은 다음 실행에서 로컬 파일 해시와 저장된 대응을 확인한다. 이전 등록 이력은 첫 사용 시 다시 대조한다. `source-check`는 원본 대조 실패, `upload-unknown`·`process-unknown`은 등록·실행 응답 중단을 뜻한다. 이때는 문서함과 실행 이력에서 반영 여부를 확인한다.
 
 ## 5. 중형 모델을 위한 설계
 
@@ -77,7 +106,7 @@ flowchart LR
 
 | 예상 실패 | 대책 |
 |---|---|
-| 도구를 잘못 고름 | 도구 9개, 이름이 겹치지 않게. OpenCode 기본 도구는 작업 폴더에서 끔 |
+| 도구를 잘못 고름 | 도구 10개, 이름이 겹치지 않게. OpenCode 기본 도구는 작업 폴더에서 끔 |
 | 인자를 틀리게 만듦 | 한 단계 인자, 필수 1개 이하, 형식은 string·integer·boolean만(테스트로 고정). `path`·`document_id`·`query` 같은 흔한 다른 이름도 받고, 인자를 JSON 문자열로 보내도 읽음 |
 | 긴 ID를 잘못 옮김 | 32자 hex 대신 D번호. `D12`·`d-12`·`12`·`#12`·파일 이름 일부 모두 받음 |
 | 경로 표기 | 따옴표·백틱 제거, `\` 대신 `/` 허용, 파일 이름만 주면 허용 폴더에서 찾음, macOS 분해형 한글 이름도 같게 봄 |
@@ -114,7 +143,8 @@ agent call16 err4 not-found2 outside1 bad-arg1
 | `sum N ...` | 판정별 건수. **합이 N이어야 한다**(옮겨 적다 틀린 숫자를 찾는 검산). `reuse`는 이미 처리돼 다시 하지 않은 수 |
 | `<형식> N ... tA/Bs(Dn)` | 형식별 판정, 평균/최대 처리 시간과 가장 느린 문서. 형식 줄의 합도 N |
 | `fail`, `warn` | 코드별 문서 수와 D번호(3개까지, 나머지 `+k`) |
-| `skip` | 등록하지 않은 파일 사유별 수 |
+| `skip` | 제외 규칙에 따라 등록하지 않은 파일 수 |
+| `req-error` | 등록·처리 요청이 실패하거나 완료 여부를 확인할 수 없는 건수. `sum`은 집계된 문서 수 |
 | `diff N sameA chgB` | 직전 성공 실행이 있는 문서의 변화. `txt±%`(공백 뺀 글자), `tbl±`(표 행), `num±`(숫자), `bad±`(깨진 글자 U+FFFD), `warn -코드 +코드` |
 | `agent` | 이 범위의 도구 호출 수, 오류 종류별 수, 반복 호출 수 |
 
@@ -184,4 +214,4 @@ agent call16 err4 not-found2 outside1 bad-arg1
 - 이 시험에서 드러난 **파서 쪽 문제**(도구 문제 아님): ① 스캔 PDF(`COA_…_스캔.pdf`)가 경고 없이 `ok`로 나오지만 본문에 OCR 오인이 많다(`FBX-1O1`, `엔도록신`, `mglmL`, `≤`→`드`). PDF OCR 경로에는 신뢰도·OCR 적용 쪽 경고가 없어 `ok`가 품질을 과장한다. ② 글자 없는 사진 JPG 4개가 `fail no-text`로 집계된다.
 - 하지 않음: 고객사 Windows PC·Git Bash·게이트웨이 모델, 고객사 OpenCode Desktop 버전, 대용량 폴더(수백 개) 진행.
 - 참고: 앞서 "OpenCode `run`이 Ollama에 요청을 보내기 전에 멈춘다"고 기록했으나 잘못된 판단이었다. 요청은 도달했고 4B 모델이 생각 토큰을 길게 만들어 느렸을 뿐이며, 시험용 `timeout`이 연결을 끊었다.
-- 다음 단계 후보: 2단계 청킹·임베딩 평가 도구(기존 `/api/retrieval` 감싸기), 3단계 Milvus 적재(계획→실행 분리, 실행만 승인), 4단계 검색(읽기 전용 묶음).
+- 다음 단계 후보: 임베딩 기반 검색 품질 평가, 3단계 Milvus 적재(계획→실행 분리, 실행만 승인), 4단계 검색(읽기 전용 묶음).

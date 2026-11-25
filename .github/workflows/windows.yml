@@ -34,7 +34,11 @@ jobs:
       # 전체 모드(Docling·torch) 첫 설치는 시간이 오래 걸려 CI에서는 lite로 설치·점검한다.
       - name: Set up from source
         shell: cmd
-        run: setup.cmd --lite
+        run: |
+          call setup.cmd --lite
+          if errorlevel 1 exit /b 1
+          if not exist OpenCode\opencode.json exit /b 1
+          if not exist OpenCode\AGENTS.md exit /b 1
       - name: Run readiness after setup
         shell: cmd
         run: backend\.venv\Scripts\python -c "import sys; sys.path.insert(0, 'scripts'); import console; print(console.check_ready())"

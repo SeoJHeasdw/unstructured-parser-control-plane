@@ -15,3 +15,5 @@ offline/
 .pytest_cache/
 infra/milvus-dev/volumes/
 bench-data/
+
+/OpenCode/

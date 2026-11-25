@@ -10,6 +10,8 @@
 from collections import Counter
 from datetime import datetime, timezone
 import difflib
+import fnmatch
+from functools import lru_cache
 import hashlib
 import json
 import os
@@ -17,6 +19,7 @@ from contextlib import contextmanager
 from pathlib import Path
 import platform
 import re
+import secrets
 import sys
 import threading
 import time
@@ -26,7 +29,7 @@ import unicodedata
 from app.agent import codes
 from app.agent.client import Api, ApiError, ServerDown
 from app.filelock import try_lock, unlock
-from app.folder_import import resolve_roots, root_candidates
+from app.folder_import import hidden, resolve_roots, root_candidates
 
 PROJECT = Path(__file__).resolve().parents[3]
 APP_DIR = Path(__file__).resolve().parents[1]
@@ -108,6 +111,17 @@ def _refs(numbers: list[int]) -> str:
     return shown + (f" +{len(numbers) - REF_LIMIT}" if len(numbers) > REF_LIMIT else "")
 
 
+def _matches_pattern(parts: tuple[str, ...], pattern: tuple[str, ...]) -> bool:
+    @lru_cache(None)
+    def match(i: int, j: int) -> bool:
+        if j == len(pattern):
+            return i == len(parts)
+        if pattern[j] == "**":
+            return match(i, j + 1) or (i < len(parts) and match(i + 1, j))
+        return i < len(parts) and fnmatch.fnmatch(parts[i], pattern[j]) and match(i + 1, j + 1)
+    return match(0, 0)
+
+
 def build_id() -> str:
     """배포된 코드 판별용 6자리. 줄바꿈(CRLF/LF)과 무관하게 같은 소스면 같은 값이다."""
     digest = hashlib.sha256()
@@ -122,7 +136,12 @@ def build_id() -> str:
 def as_bool(value) -> bool:
     if isinstance(value, bool):
         return value
-    return str(value).strip().lower() in _TRUE if value is not None else False
+    word = str(value).strip().lower()
+    if value is None or word in ("false", "no", "n", "0", "off", "아니오", "아니요", "거짓"):
+        return False
+    if word in _TRUE:
+        return True
+    raise ToolError("bad-arg", "reparse와 confirm은 true 또는 false를 넣으세요.")
 
 
 def as_int(value) -> int | None:
@@ -130,12 +149,10 @@ def as_int(value) -> int | None:
         return None
     if isinstance(value, bool):
         raise ToolError("bad-arg", "쪽 번호는 숫자여야 합니다.", "예: page=3")
-    if isinstance(value, (int, float)):
-        return int(value)
-    match = re.search(r"\d+", str(value))
-    if not match:
-        raise ToolError("bad-arg", f"숫자를 읽지 못했습니다: {value!r}", "예: page=3")
-    return int(match.group())
+    match = re.fullmatch(r"(\d+)(?:쪽|페이지)?", str(value).strip())
+    if not match or int(match[1]) < 1:
+        raise ToolError("bad-arg", "1 이상의 정수를 넣으세요.")
+    return int(match[1])
 
 
 def as_text(value) -> str:
@@ -238,6 +255,7 @@ class Ops:
         self.confirm_over = confirm_over if confirm_over is not None else int(os.environ.get("DOCOPS_AGENT_CONFIRM_OVER", "50"))
         self._pump_thread: threading.Thread | None = None
         self._pump_lock = threading.Lock()
+        self._stop = threading.Event()
         self._last_call: tuple[str, float, str] | None = None
         self._parsers: dict | None = None
         self.build = build_id()
@@ -248,6 +266,8 @@ class Ops:
         # 화면의 '허용 폴더에서 가져오기'와 같은 규칙(app/folder_import.py)을 쓴다.
         if given is None:
             given, _ = root_candidates()
+            # MCP starts in OpenCode/, the console starts in backend/. Resolve relative roots like the console.
+            given = [APP_DIR.parent / path for path in given]
         return resolve_roots(given)
 
     def parsers(self, refresh: bool = False) -> dict:
@@ -346,18 +366,25 @@ class Ops:
                 "warn": warn, "verdict": codes.verdict(doc["status"], warn, doc.get("error_code"), doc.get("format"))}
 
     # ------------------------------------------------------------------ 도구: status
-    def status(self) -> str:
+    def status(self, check: str = "") -> str:
+        if check:
+            if check != "connection":
+                raise ToolError("bad-arg", "check에는 connection을 넣거나 생략하세요.")
+            health = self.api.get("/api/health")
+            if health.get("status") != "ok" or health.get("live_processing") != "available":
+                raise ToolError("api", "문서 콘솔의 상태 응답을 확인하지 못했습니다.")
+            return f"DOCOPS-CHECK-{secrets.token_hex(6)}"
         lines = []
         try:
             parsers = self.parsers(refresh=True)
-            server = f"{self.api.base}" + (" (같은 저장소 확인)" if not self.api.note else f" — {self.api.note}")
+            server = f"{self.api.base}" + (" (지정한 API 주소)" if self.api.fixed else f" — {self.api.note}" if self.api.note else " (같은 저장소 확인)")
         except ServerDown as exc:
             raise ToolError("server-down", str(exc), "사용자에게 콘솔을 켜 달라고 요청하세요.") from None
         docs = self.documents()
         counts = Counter(doc["status"] for doc in docs)
-        problems = []
+        problems = list(self.root_notes)
         if not parsers["docling_installed"]:
-            problems.append("Docling 미설치: PDF·Office 파싱 불가(setup을 --lite 없이 다시 실행)")
+            problems.append("Docling 미설치: Office 구조 파싱 제한. PDF 글자 층은 pdf-text 경로로 확인하세요.")
         elif not parsers["pdf_model_directory"] or parsers.get("pdf_models_ready") is False:
             problems.append("PDF 모델 없음: PDF는 글자 층만 읽음(pdf-text, 표 구조 없음·스캔 쪽은 OCR 모델 필요)")
         if not parsers["ocr_models_found"]:
@@ -370,7 +397,6 @@ class Ops:
         lines.append(f"서버: {server}")
         lines += [f"주의: {problem}" for problem in problems]
         lines.append("허용 폴더: " + (" | ".join(str(root) for root in self.roots) or "없음"))
-        lines += [f"주의: {note}" for note in self.root_notes]
         lines.append("문서: 전체 {} (완료 {}, 실패 {}, 미지원 {}, 처리 중 {}, 미처리 {})".format(
             len(docs), counts["completed"], counts["failed"], counts["unsupported"], counts["processing"], counts["uploaded"]))
         batch = self._latest_batch()
@@ -409,70 +435,78 @@ class Ops:
         path = Path(self._clean_target(text))
         return any((candidate.exists() for candidate in ([path] if path.is_absolute() else [root / path for root in self.roots])))
 
+    def _allowed_file(self, path: Path, roots=None) -> bool:
+        try:
+            resolved = path.resolve()
+            return any(path.is_relative_to(root) and resolved.is_relative_to(root) and
+                       not any(hidden(part) for part in (*path.relative_to(root).parts, *resolved.relative_to(root).parts))
+                       for root in (self.roots if roots is None else roots))
+        except (OSError, RuntimeError):
+            return False
+
     def _walk(self, folder: Path):
         count = 0
         for current, dirs, files in os.walk(folder):
-            dirs[:] = sorted(d for d in dirs if not d.startswith((".", "$", "__MACOSX")))
+            dirs[:] = sorted(d for d in dirs if not hidden(d) and self._allowed_file(Path(current) / d))
             for name in sorted(files):
                 count += 1
                 if count > SCAN_LIMIT:
-                    return
-                yield Path(current) / name
+                    raise ToolError("scan-limit", f"한 폴더에서 확인할 수 있는 파일은 {SCAN_LIMIT:,}개입니다.",
+                                    "하위 폴더를 지정해 다시 부르세요.")
+                path = Path(current) / name
+                if self._inside(path.resolve()):
+                    yield path
 
     def resolve(self, target: str) -> tuple[list[Path], bool]:
-        """(파일 목록, 폴더·패턴 여부). 폴더·패턴이면 처리 경로가 없는 확장자를 거른다."""
+        """파일·폴더의 실제 경로를 먼저 검사하고 존재하지 않을 때만 패턴으로 해석한다."""
         text = self._clean_target(target)
         if not text:
             raise ToolError("bad-arg", "target이 비어 있습니다.", EXAMPLES["parse"])
         if not self.roots:
-            raise ToolError("outside", "파일을 읽을 허용 폴더가 설정되지 않았습니다.", "사용자에게 DOCOPS_AGENT_ROOTS 설정을 요청하세요.")
-        if any(ch in text for ch in "*?["):
-            pattern_path = Path(text)
-            matches = []
-            if pattern_path.is_absolute():
-                anchor = Path(pattern_path.anchor)
-                parts = pattern_path.parts[1:]
-                split = next(i for i, part in enumerate(parts) if any(ch in part for ch in "*?["))
-                base = anchor.joinpath(*parts[:split])
-                bases = [(base, str(Path(*parts[split:])))]
-            else:
-                bases = [(root, text if "/" in text or "\\" in text else "**/" + text) for root in self.roots]
-            for base, pattern in bases:
-                try:
-                    matches += [path for path in base.glob(pattern) if path.is_file()]
-                except (OSError, ValueError, NotImplementedError):
-                    continue
-            matches = [path.resolve() for path in matches]
-            outside = [path for path in matches if not self._inside(path)]
-            matches = sorted({path for path in matches if self._inside(path)})
-            if not matches:
-                hint = f" 허용 폴더 밖 {len(outside)}개는 제외했습니다." if outside else ""
-                raise ToolError("not-found", f"'{text}'에 맞는 파일이 없습니다.{hint}", "files 로 허용 폴더의 파일을 확인하세요.")
-            return matches, True
+            raise ToolError("outside", "파일을 읽을 허용 폴더가 설정되지 않았습니다.")
         path = Path(text).expanduser()
+        if ".." in path.parts:
+            raise ToolError("outside", "상위 폴더(..)를 포함한 경로입니다.", "허용 폴더 안의 전체 경로를 넣으세요.")
         candidates = [path] if path.is_absolute() else [root / path for root in self.roots]
-        for candidate in candidates:
-            if candidate.exists():
-                resolved = candidate.resolve()
-                if not self._inside(resolved):
-                    raise ToolError("outside", f"허용 폴더 밖의 경로입니다: {resolved}",
-                                    "허용 폴더: " + " | ".join(str(root) for root in self.roots))
-                if resolved.is_dir():
-                    return [p for p in self._walk(resolved) if p.is_file()], True
+        if path.is_absolute() and not self._inside(path):
+            raise ToolError("outside", "허용 폴더 밖의 경로입니다.")
+        existing = [candidate for candidate in candidates if candidate.exists()]
+        if len(existing) > 1:
+            raise ToolError("bad-arg", "여러 허용 폴더에 같은 경로가 있습니다.", "전체 경로를 지정하세요.")
+        if existing:
+            candidate = existing[0]
+            if not self._allowed_file(candidate):
+                raise ToolError("outside", "허용 폴더 밖이거나 숨김 경로입니다.")
+            resolved = candidate.resolve()
+            if resolved.is_dir():
+                return list(self._walk(resolved)), True
+            if resolved.is_file():
                 return [resolved], False
-        # 파일 이름만 준 경우: 허용 폴더 안에서 같은 이름(대소문자·한글 조합형 무시)을 찾는다.
-        wanted = _nfc(path.name).casefold()
-        found = []
-        for root in self.roots:
-            for file in self._walk(root):
-                if _nfc(file.name).casefold() == wanted:
-                    found.append(file.resolve())
-        if len(found) == 1:
-            return found, False
-        if found:
-            listed = " | ".join(str(p) for p in found[:5])
-            raise ToolError("bad-arg", f"같은 이름의 파일이 {len(found)}개입니다: {listed}", "전체 경로로 다시 불러 주세요.")
-        raise ToolError("not-found", f"'{text}'를 허용 폴더에서 찾지 못했습니다.", "files 로 파일 이름을 확인하세요.")
+            raise ToolError("bad-arg", "일반 파일 또는 폴더 경로를 넣으세요.")
+        wildcard = any(ch in text for ch in "*?[")
+        matches = set()
+        if wildcard:
+            # 고정 디렉터리 아래만 걷는다. 절대 패턴으로 허용 범위 밖을 스캔하지 않는다.
+            split = next(i for i, part in enumerate(path.parts) if any(ch in part for ch in "*?["))
+            base = Path(*path.parts[:split])
+            pattern = path.parts[split:] if len(path.parts) > 1 else ("**", *path.parts)
+            bases = [base] if path.is_absolute() else [root / base for root in self.roots]
+            for folder in bases:
+                if not self._allowed_file(folder):
+                    raise ToolError("outside", "허용 폴더 밖이거나 숨김 경로입니다.")
+                for file in self._walk(folder):
+                    rel = file.relative_to(folder)
+                    if _matches_pattern(rel.parts, pattern):
+                        matches.add(file)
+        elif len(path.parts) == 1:
+            wanted = _nfc(path.name).casefold()
+            matches = {f for root in self.roots for f in self._walk(root) if _nfc(f.name).casefold() == wanted}
+        if not matches:
+            raise ToolError("not-found", f"'{text}'를 허용 폴더에서 찾지 못했습니다.", "files 로 확인하세요.")
+        if not wildcard and len(matches) > 1:
+            raise ToolError("bad-arg", "같은 이름의 파일이 여러 개입니다: " + " | ".join(str(p) for p in sorted(matches)[:5]),
+                            "전체 경로를 지정하세요.")
+        return sorted(matches), wildcard
 
     def classify(self, files: list[Path], filtered: bool) -> tuple[list[Path], Counter]:
         supported = set(self.parsers()["routes"])
@@ -483,6 +517,9 @@ class Ops:
                 skips["lock"] += 1
                 continue
             if name.startswith(".") or name.lower() in LOCK_NAMES:
+                skips["hidden"] += 1
+                continue
+            if not self._allowed_file(path) or not path.is_file():
                 skips["hidden"] += 1
                 continue
             try:
@@ -504,17 +541,20 @@ class Ops:
         return keep, skips
 
     # ------------------------------------------------------------------ 도구: files
-    def files(self, folder: str = "") -> str:
+    def files(self, folder: str = "", offset=0) -> str:
+        if isinstance(offset, bool) or not re.fullmatch(r"\d{1,8}", str(offset)):
+            raise ToolError("bad-arg", "offset은 0 이상의 정수입니다.")
+        offset = int(offset)
         if folder:
             paths, _ = self.resolve(folder)
         else:
             if not self.roots:
                 raise ToolError("outside", "허용 폴더가 설정되지 않았습니다.", "사용자에게 DOCOPS_AGENT_ROOTS 설정을 요청하세요.")
-            paths = [p for root in self.roots for p in self._walk(root) if p.is_file()]
+            paths = list(dict.fromkeys(p for root in self.roots for p in self._walk(root)))
         keep, skips = self.classify(paths, True)
         by_ext = Counter(path.suffix.lstrip(".").lower() or "none" for path in keep)
         registry = self.store.load("registry", {})
-        aliases = self.store.load("aliases", {"ids": {}})["ids"]
+        aliases = {doc["id"]: doc["n"] for doc in self.documents()} if registry else {}
         lines = [f"결과: 처리 가능한 파일 {len(keep)}개" + (f", 건너뜀 {sum(skips.values())}개" if skips else ""),
                  "다음: parse 에 파일·폴더 경로나 '*.pdf' 같은 패턴을 넣어 파싱하세요.",
                  "형식: " + (" ".join(f"{ext}{count}" for ext, count in by_ext.most_common()) or "없음")]
@@ -522,12 +562,14 @@ class Ops:
             lines.append("건너뜀: " + " ".join(f"{code}{count}" for code, count in skips.most_common()))
         if len(self.roots) == 1:
             lines.append(f"폴더: {self.roots[0]} (아래 경로는 이 폴더 기준이고, parse 에 그대로 넣을 수 있습니다)")
-        for path in keep[:30]:
+        for path in keep[offset:offset + 30]:
             entry = registry.get(os.path.normcase(str(path)))
             mark = f"  [D{aliases[entry['doc']]}]" if entry and entry.get("doc") in aliases else ""
             lines.append(f"- {self._display(path)}  {_size(path.stat().st_size)}{mark}")
-        if len(keep) > 30:
-            lines.append(f"- … 외 {len(keep) - 30}개")
+        if len(keep) > offset + 30:
+            lines.append(f"다음 목록: 같은 folder에 offset={offset + 30}을 넣으세요.")
+        elif offset and offset >= len(keep):
+            lines.append("이 위치에 표시할 파일이 없습니다. offset=0부터 확인하세요.")
         return "\n".join(lines)
 
     # ------------------------------------------------------------------ 도구: parse / wait
@@ -552,26 +594,36 @@ class Ops:
             if not keep:
                 detail = " ".join(f"{code}{count}" for code, count in skips.most_common()) or "없음"
                 raise ToolError("not-found", f"처리할 파일이 없습니다(건너뜀: {detail}).", "files 로 확인하세요.")
-            if len(keep) > self.confirm_over and not confirm:
-                by_ext = Counter(path.suffix.lstrip(".").lower() for path in keep)
-                return "\n".join([
-                    f"결과: 미리보기 — 파일 {len(keep)}개라 아직 시작하지 않았습니다.",
-                    f"다음: 사용자에게 확인을 받은 뒤 같은 target에 confirm=true를 넣어 parse를 다시 부르세요.",
-                    "형식: " + " ".join(f"{ext}{count}" for ext, count in by_ext.most_common()),
-                ] + (["건너뜀: " + " ".join(f"{c}{n}" for c, n in skips.most_common())] if skips else []))
-            items = [{"path": str(path), "doc": None, "state": "file", "note": ""} for path in keep]
+            items = [{"path": str(path.resolve()), "doc": None, "state": "file", "note": ""} for path in keep]
+        if len(items) > self.confirm_over and not confirm:
+            preview = [f"결과: 미리보기 — 대상 {len(items)}개라 아직 시작하지 않았습니다.",
+                       "다음: 사용자에게 확인을 받은 뒤 같은 target에 confirm=true를 넣어 parse를 다시 부르세요."]
+            formats = Counter(Path(item["path"]).suffix.lower().lstrip(".") for item in items if item["path"])
+            if formats:
+                preview.append("형식: " + " ".join(f"{ext}{count}" for ext, count in formats.most_common()))
+            if skips:
+                preview.append("건너뜀: " + " ".join(f"{key}{n}" for key, n in skips.most_common()))
+            return "\n".join(preview)
         with self.store.locked():
             batches = self.store.load("batches", {"next": 1, "items": []})
-            batch = {"n": batches["next"], "target": label, "reparse": bool(reparse), "started": _iso(),
-                     "finished": None, "skips": dict(skips), "items": items, "error": ""}
-            batches["next"] += 1
-            batches["items"] = (batches["items"] + [batch])[-50:]
-            self.store.save("batches", batches)
+            unfinished = [b for b in batches["items"] if not b.get("finished")]
+            roots = list(map(str, self.roots))
+            active = next((b for b in reversed(unfinished) if b["target"] == label and b["reparse"] == bool(reparse)
+                           and b.get("roots") == roots), None)
+            if active is None:
+                batch = {"n": batches["next"], "target": label, "reparse": bool(reparse), "started": _iso(),
+                         "finished": None, "roots": roots, "skips": dict(skips), "items": items, "error": ""}
+                batches["next"] += 1
+                recent = batches["items"][-49:]
+                batches["items"] = [b for b in batches["items"][:-49] if not b.get("finished")] + recent + [batch]
+                self.store.save("batches", batches)
+            else:
+                batch = active
         self._ensure_pump()
         return self._await(batch["n"], started=True)
 
-    def wait(self) -> str:
-        batch = self._latest_batch()
+    def wait(self, batch: str = "") -> str:
+        batch = self._named_batch(batch) if batch else self._latest_batch()
         if not batch:
             return "결과: 진행 중인 묶음이 없습니다.\n다음: parse 로 파싱을 시작하세요."
         if batch.get("finished"):
@@ -583,6 +635,15 @@ class Ops:
         batches = self.store.load("batches", {"items": []})["items"]
         unfinished = [batch for batch in batches if not batch.get("finished")]
         return (unfinished or batches or [None])[-1]
+
+    def _named_batch(self, value: str) -> dict:
+        match = re.fullmatch(r"[bB]?(\d+)", as_text(value))
+        if not match:
+            raise ToolError("bad-arg", "묶음 번호는 B12 형식으로 넣으세요.")
+        batch = self._batch(int(match.group(1)))
+        if not batch:
+            raise ToolError("not-found", f"B{int(match.group(1))} 묶음 기록이 없습니다.")
+        return batch
 
     def _batch(self, n: int) -> dict | None:
         return next((batch for batch in self.store.load("batches", {"items": []})["items"] if batch["n"] == n), None)
@@ -597,17 +658,18 @@ class Ops:
                 return self._digest_text(batch)
             if time.monotonic() >= deadline:
                 return self._progress_text(batch, started)
+            self._ensure_pump()
             time.sleep(0.5)
 
     def _progress_text(self, batch: dict, started: bool) -> str:
         states = Counter(item["state"] for item in batch["items"])
         done = states["done"] + states["error"]
         lines = [f"결과: 진행 중 B{batch['n']} — 전체 {len(batch['items'])}, 끝남 {done}, 처리 대기 {states['queued'] + states['pending']}, 등록 중 {states['file']}",
-                 "다음: wait 를 부르세요(한 번에 최대 {}초 기다립니다).".format(round(self.wait_seconds))]
+                 f"다음: wait(batch='B{batch['n']}')로 같은 묶음을 확인하세요."]
         if batch.get("error"):
             lines.append(f"주의: {batch['error']}")
         if started:
-            lines.append("참고: 이 묶음은 도구를 부르지 않는 동안에도 콘솔 서버에서 계속 처리됩니다.")
+            lines.append("참고: CLI 창이나 OpenCode 연결이 닫히면 다음 wait 호출이 남은 등록을 이어갑니다.")
         return "\n".join(lines)
 
     def _ensure_pump(self) -> None:
@@ -617,53 +679,89 @@ class Ops:
             self._pump_thread = threading.Thread(target=self._pump, name="docops-agent-pump", daemon=True)
             self._pump_thread.start()
 
+    def close(self) -> None:
+        """CLI 종료나 MCP EOF에서 진행 중인 회차의 기록을 끝낸다."""
+        self._stop.set()
+        if self._pump_thread:
+            self._pump_thread.join()
+
     def _pump(self) -> None:
-        """묶음 진행: 파일 등록 → 처리 요청(대기열 64건 한도 안에서) → 완료 확인. 도구 호출과 무관하게 돈다."""
-        loop, down_since = 0, None
+        # 네트워크 요청을 하는 작업자는 runtime마다 한 명이다. 다른 연결도 상태 파일은 읽을 수 있다.
         while True:
-            loop += 1
-            try:
-                docs = {doc["id"]: doc for doc in self.documents()}
-                down_since = None
-            except ServerDown as exc:
-                down_since = down_since or time.monotonic()
-                self._mark_error(str(exc))
-                if time.monotonic() - down_since > 120:
-                    return
-                time.sleep(3)
-                continue
-            except Exception as exc:  # noqa: BLE001 — 스레드가 조용히 죽지 않게
-                print(f"[docops-agent] pump error: {type(exc).__name__}: {exc}", file=sys.stderr)
-                time.sleep(3)
-                continue
-            with self.store.locked():
-                active = [batch for batch in self.store.load("batches", {"items": []})["items"] if not batch.get("finished")]
-            if not active:
+            if not any(not b.get("finished") for b in self.store.load("batches", {"items": []})["items"]):
                 return
-            # 네트워크 작업(등록·처리 요청)은 잠금 밖에서 하고, 결과만 잠금 안에서 합친다.
-            full, uploads = False, 0
-            for batch in active:
+            with (self.store.dir / "pump.lock").open("a+b") as owner:
+                try:
+                    try_lock(owner)
+                except OSError:
+                    delay = 0.5
+                else:
+                    try:
+                        delay = self._pump_once()
+                    except (ServerDown, ApiError, OSError, ToolError) as exc:
+                        self._mark_error(str(exc))
+                        delay = 3
+                    finally:
+                        unlock(owner)
+            if self._stop.wait(delay):
+                return
+
+    def _pump_once(self) -> float:
+        # 회차 도중 프로세스가 종료되면 POST 완료 여부가 불명확하다. 기록을 복구하고
+        # 해당 요청은 자동 재전송하지 않는다. queued만 다음 회차의 새 문서 상태로 판정한다.
+        journal = self.store.dir / "pump.jsonl"
+        with self.store.locked():
+            batches = self.store.load("batches", {"items": []})
+            active = {b["n"]: b for b in batches["items"] if not b.get("finished")}
+            if journal.exists():
+                with journal.open(encoding="utf-8") as handle:
+                    for row in handle:
+                        if not row.endswith("\n"):
+                            break
+                        number, index, item = json.loads(row)
+                        if number in active:
+                            active[number]["items"][index] = item
+                self.store.save("batches", batches)
+                journal.unlink()
+        if not active:
+            return 1
+        docs = {doc["id"]: doc for doc in self.documents()}
+        uploads, full = 0, False
+        with journal.open("a", encoding="utf-8") as handle:
+            def record(number, index, item):
+                handle.write(json.dumps([number, index, item], ensure_ascii=True) + "\n")
+                handle.flush()
+
+            for number, batch in active.items():
                 batch["error"] = ""
-                for item in batch["items"]:
-                    if item["state"] == "file" and uploads < 20:
-                        self._register_item(item, batch, docs)
-                        uploads += 1
-                    if item["state"] == "pending" and not full:
-                        full = self._enqueue_item(item, loop)
-                    if item["state"] == "queued" and item.get("q", 0) < loop:
+                for index, item in enumerate(batch["items"]):
+                    state = item["state"]
+                    if state == "queued":
                         doc = docs.get(item["doc"])
                         if doc is None:
-                            item["state"], item["note"] = "error", "missing"
+                            item.update(state="error", note="missing")
                         elif doc["status"] != "processing":
                             item["state"] = "done"
-                if all(item["state"] in ("done", "error") for item in batch["items"]):
+                        continue
+                    if state == "file" and uploads < 20:
+                        record(number, index, {**item, "state": "error", "note": "upload-unknown"})
+                        self._register_item(item, batch, docs)
+                        uploads += 1
+                        record(number, index, item)
+                    if item["state"] == "pending" and not full:
+                        record(number, index, {**item, "state": "error", "note": "process-unknown"})
+                        full = self._enqueue_item(item)
+                        if item["state"] == "queued" and item["doc"] in docs:
+                            docs[item["doc"]]["status"] = "processing"
+                        record(number, index, item)
+                if all(i["state"] in ("done", "error") for i in batch["items"]):
                     batch["finished"] = _iso()
-            updated = {batch["n"]: batch for batch in active}
-            with self.store.locked():
-                batches = self.store.load("batches", {"next": 1, "items": []})
-                batches["items"] = [updated.get(batch["n"], batch) for batch in batches["items"]]
-                self.store.save("batches", batches)
-            time.sleep(0.2 if uploads else 1.0)
+        with self.store.locked():
+            batches = self.store.load("batches", {"items": []})
+            batches["items"] = [active.get(b["n"], b) for b in batches["items"]]
+            self.store.save("batches", batches)
+            journal.unlink()
+        return 0.2 if uploads else 1.0
 
     def _mark_error(self, message: str) -> None:
         with self.store.locked():
@@ -693,6 +791,10 @@ class Ops:
 
     def _register_item(self, item: dict, batch: dict, docs: dict) -> None:
         path = Path(item["path"])
+        roots = [Path(root) for root in batch["roots"]] if "roots" in batch else self.roots
+        if not self._allowed_file(path, roots):
+            item.update(state="error", note="outside")
+            return
         try:
             stat = path.stat()
         except OSError:
@@ -741,7 +843,7 @@ class Ops:
         else:
             item["state"] = "pending"
 
-    def _enqueue_item(self, item: dict, loop: int) -> bool:
+    def _enqueue_item(self, item: dict) -> bool:
         """처리 요청. 대기열이 가득 차면 True(이번 회차에는 더 넣지 않는다)."""
         try:
             self.api.post(f"/api/live/documents/{item['doc']}/process")
@@ -750,29 +852,41 @@ class Ops:
             return False
         except ApiError as exc:
             if exc.status == 409:
-                item["state"], item["q"] = "queued", loop
+                item["state"] = "queued"
                 return False
             if exc.status == 503:
                 return True
             item["state"], item["note"] = "error", "missing" if exc.status == 404 else f"process-{exc.status}"
             return False
-        item["state"], item["q"] = "queued", loop
+        item["state"] = "queued"
         return False
 
     # ------------------------------------------------------------------ 요약(타이핑용)
     def _digest_text(self, batch: dict, again: bool = False) -> str:
-        ids = [item["doc"] for item in batch["items"] if item.get("doc")]
+        label = f"B{batch['n']}"
+        saved = self.store.load("reports/" + label, None)
+        if saved:
+            return self._wrap(label, saved["block"], saved["summary"], again)
+        ids = [item["doc"] for item in batch["items"] if item.get("doc") and item["state"] != "error"]
         errors = Counter(item["note"] for item in batch["items"] if item["state"] == "error")
         skips = Counter(batch.get("skips", {}))
-        for note, count in errors.items():
-            skips[note] += count
         since = _local(batch["started"])
-        block, summary = self.summary(f"B{batch['n']}", ids, since, skips, reused=sum(1 for i in batch["items"] if i["note"] == "reuse"))
-        return self._wrap(f"B{batch['n']}", block, summary, again)
+        block, summary = self.summary(label, ids, since, skips, errors,
+                                      reused=sum(1 for i in batch["items"] if i["note"] == "reuse"))
+        with self.store.locked():
+            saved = self.store.load("reports/" + label, None)
+            if saved is None:
+                saved = {"block": block, "summary": summary}
+                self.store.save("reports/" + label, saved)
+        return self._wrap(label, saved["block"], saved["summary"], again)
 
     def _wrap(self, label: str, block: list[str], summary: str, again: bool = False) -> str:
         path = self.store.dir / "reports" / f"{label}.txt"
-        path.write_text("\n".join(block) + "\n", encoding="utf-8")
+        with self.store.locked():
+            if not path.exists() or path.read_text(encoding="utf-8") != "\n".join(block) + "\n":
+                temp = path.with_suffix(".tmp")
+                temp.write_text("\n".join(block) + "\n", encoding="utf-8")
+                temp.replace(path)
         head = [summary,
                 ("참고: 이미 끝난 묶음입니다. 같은 결과를 다시 보여 줍니다.\n" if again else "") +
                 "다음: 응답에 아래 '타이핑용' 블록을 ```text 코드 블록으로 한 글자도 바꾸지 말고 복사하세요. "
@@ -780,7 +894,7 @@ class Ops:
                 "----- 타이핑용 -----", *block, "-----", f"파일: {path}"]
         return "\n".join(head)
 
-    def summary(self, label: str, ids: list[str], since: datetime | None, skips: Counter, reused: int = 0) -> tuple[list[str], str]:
+    def summary(self, label: str, ids: list[str], since: datetime | None, skips: Counter, errors: Counter, reused: int = 0) -> tuple[list[str], str]:
         docs = {doc["id"]: doc for doc in self.documents()}
         views = [self.doc_view(docs[doc_id]) for doc_id in dict.fromkeys(ids) if doc_id in docs]
         verdicts = Counter(view["verdict"] for view in views)
@@ -831,6 +945,8 @@ class Ops:
         for prefix, grouped in (("실패", fails), ("경고", warns)):
             for code, numbers in sorted(grouped.items(), key=lambda pair: (-len(pair[1]), pair[0])):
                 notes.append(f"설명({prefix}): {code} {len(numbers)}건 {_refs(numbers)} — {codes.MEANINGS.get(code, '코드표 참고')}")
+        if errors:
+            block += ["req-error " + " ".join(f"{code}{n}" for code, n in errors.most_common())]
         if skips:
             block.append("skip " + " ".join(f"{code}{count}" for code, count in skips.most_common()))
         diff = self._diff_line(views)
@@ -847,10 +963,15 @@ class Ops:
             summary = f"결과: 아직 끝나지 않은 문서 {verdicts['run'] + verdicts['new']}건 포함 (전체 {len(views)}건)"
         elif bad:
             summary = f"결과: 실패 있음 — 전체 {len(views)}건 중 실패·미지원 {bad}, 경고 {verdicts['warn']}"
+        elif empties and not verdicts["warn"]:
+            summary = f"결과: 글자 없는 이미지 {len(empties)}건 — 원본 확인 필요 (전체 {len(views)}건)"
         elif verdicts["warn"]:
             summary = f"결과: 경고 있음 — 전체 {len(views)}건 중 경고 {verdicts['warn']} (경고는 품질 확인이 필요하다는 뜻입니다)"
         else:
             summary = f"결과: 경고 없이 끝남 — {len(views)}건 (파싱 성공이 품질 보증은 아닙니다)"
+        if errors:
+            summary = (f"결과: 등록·처리 요청 오류 {sum(errors.values())}건"
+                       + (" / " + summary.removeprefix("결과: ") if views else " — 집계된 파싱 문서 없음"))
         return block, "\n".join([summary, *notes])
 
     @staticmethod
@@ -866,7 +987,7 @@ class Ops:
             old = self.run_metrics(view["doc"]["id"], view["previous"])
             new = view["metrics"]
             compared += 1
-            if old["sha"] == new["sha"]:
+            if old["sha"] == new["sha"] and old["warn"] == new["warn"]:
                 continue
             changes.append((self._delta_score(old, new), view["doc"]["n"], self._delta(old, new)))
         if not compared:
@@ -897,13 +1018,18 @@ class Ops:
         return " ".join(parts) or "fmt"
 
     # ------------------------------------------------------------------ 도구: docs / doc
-    def docs(self, state: str = "all") -> str:
+    def docs(self, state: str = "all", before: str = "") -> str:
         state = (as_text(state) or "all").lower()
         aliases = {"성공": "ok", "경고": "warn", "실패": "fail", "전체": "all", "failed": "fail", "completed": "ok", "warning": "warn"}
         state = aliases.get(state, state)
         if state not in ("all", *codes.VERDICTS):
             raise ToolError("bad-arg", f"state는 all, {', '.join(codes.VERDICTS)} 중 하나입니다(받은 값: {state}).", "예: state=\"fail\"")
         docs = list(reversed(self.documents()))
+        if before:
+            cursor = _DOC_REF.fullmatch(as_text(before))
+            if not cursor:
+                raise ToolError("bad-arg", "before에는 마지막으로 본 문서 번호를 넣으세요. 예: D41")
+            docs = [d for d in docs if d["n"] < int(cursor[1])]
         views = []
         for doc in docs:
             view = self.doc_view(doc) if doc["status"] == "completed" else {"doc": doc, "warn": [], "verdict": codes.verdict(doc["status"], None, doc.get("error_code"), doc.get("format"))}
@@ -922,6 +1048,8 @@ class Ops:
             seen.update(dict.fromkeys(found))
             code = ",".join(found)
             lines.append(f"D{doc['n']} {doc['format'].lower()} {view['verdict']}{(' ' + code) if code else ''}  {_size(doc['size_bytes'])}  {_clip(doc['name'], 40)}")
+        if len(views) == 40 and docs[-1]["n"] < views[-1]["doc"]["n"]:
+            lines.append(f"다음 목록: 같은 state에 before=D{views[-1]['doc']['n']}을 넣으세요.")
         lines += [f"설명: {code} — {codes.MEANINGS.get(code, '코드표 참고')}" for code in seen]
         return "\n".join(lines)
 
@@ -974,6 +1102,8 @@ class Ops:
         detail = self.run_detail(doc["id"], latest["run_id"])
         lines = detail["markdown"].splitlines()
         page, sheet, find = as_int(page), as_text(sheet), as_text(find)
+        if sum(bool(key) for key in (page, sheet, find)) > 1:
+            raise ToolError("bad-arg", "page, sheet, find 중 하나만 선택하세요.")
         stale = " (이전 성공본: 지금 재처리 중이거나 마지막 처리가 실패함)" if doc["status"] != "completed" else ""
         if page is not None or sheet:
             key, value = ("page", page) if page is not None else ("sheet", sheet)
@@ -982,17 +1112,29 @@ class Ops:
                 known = sorted({loc.get(key) for loc in detail["locations"] if loc.get(key) is not None}, key=str)
                 listed = ", ".join(map(str, known[:20])) or "위치 정보 없음"
                 raise ToolError("not-found", f"D{doc['n']}에서 {key}={value} 위치를 찾지 못했습니다. 있는 값: {listed}", "있는 값 중 하나로 다시 부르세요.")
-            start, end = min(loc["start_line"] for loc in spans), max(loc["end_line"] for loc in spans)
+            ranges = []
+            for loc in sorted(spans, key=lambda loc: loc["start_line"]):
+                first, last = max(1, loc["start_line"]), min(len(lines), loc["end_line"])
+                if first > last:
+                    continue
+                if ranges and first <= ranges[-1][1] + 1:
+                    ranges[-1] = (ranges[-1][0], max(last, ranges[-1][1]))
+                else:
+                    ranges.append((first, last))
             label = f"{key} {value}"
         elif find:
-            wanted = find.casefold()
-            hits = [i for i, line in enumerate(lines) if wanted in line.casefold()]
+            pattern = re.compile(re.escape(find), re.IGNORECASE)
+            hits = [i for i, line in enumerate(lines) if pattern.search(line)]
             if not hits:
                 return f"결과: D{doc['n']} 본문에 '{find}'가 없습니다{stale}.\n다음: 다른 단어로 찾거나 page 로 쪽을 읽으세요."
             out = [f"결과: D{doc['n']} '{find}' {len(hits)}곳{stale}", "다음: 더 넓게 보려면 page 를 넣어 읽으세요."]
             used = 0
             for index in hits[:12]:
-                chunk = f"[줄 {index + 1}] " + _clip(lines[index], 160)
+                line = lines[index]
+                match = pattern.search(line)
+                start = max(0, match.start() - 56)
+                sample = line[start:max(match.start() + 100, min(match.end() + 40, match.start() + 240))]
+                chunk = f"[줄 {index + 1}] " + ("…" if start else "") + _clip(sample, 300)
                 used += len(chunk)
                 if used > READ_LIMIT:
                     break
@@ -1001,17 +1143,54 @@ class Ops:
                 out.append(f"… 나머지 {len(hits) - (len(out) - 2)}곳 생략. 더 좁은 단어로 찾거나 page 로 읽으세요.")
             return "\n".join(out)
         else:
-            start, end, label = 1, min(len(lines), 60), "앞부분"
+            ranges, label = [(1, min(len(lines), 60))], "앞부분"
         body, used = [], 0
-        for number in range(start, end + 1):
-            text = lines[number - 1] if number - 1 < len(lines) else ""
-            if used + len(text) > READ_LIMIT:
-                body.append(f"… 잘림: 줄 {number}~{end} 생략(전체 {len(lines)}줄)")
+        for first, last in ranges:
+            if used >= READ_LIMIT:
                 break
-            body.append(text)
-            used += len(text) + 1
-        return "\n".join([f"결과: D{doc['n']} {label} (줄 {start}-{end} / 전체 {len(lines)}줄){stale}",
+            if len(ranges) > 1:
+                body.append(f"[줄 {first}-{last}]")
+            for number in range(first, last + 1):
+                text = lines[number - 1]
+                if used + len(text) + 1 > READ_LIMIT:
+                    body.append(text[:READ_LIMIT - used])
+                    body.append(f"… 잘림: 줄 {number}부터 일부 생략. find로 본문을 검색하세요.")
+                    used = READ_LIMIT
+                    break
+                body.append(text)
+                used += len(text) + 1
+        return "\n".join([f"결과: D{doc['n']} {label} (전체 {len(lines)}줄){stale}",
                           "다음: 내용을 요약할 때 경고(doc)와 함께 전하세요.", *body])
+
+    def chunk(self, id: str, strategy: str = "compare", size=512) -> str:
+        from app.chunking import STRATEGY_KINDS, SIZE_RANGE
+
+        strategy = as_text(strategy).lower()
+        kinds = ["fixed", "recursive", "element"] if strategy == "compare" else [strategy]
+        size = as_int(size)
+        low, high = SIZE_RANGE["tokens"]
+        if not size or not low <= size <= high:
+            raise ToolError("bad-arg", f"size는 {low}~{high} 사이의 추정 토큰 수입니다.")
+        if not all(kind in STRATEGY_KINDS and kind != "semantic" for kind in kinds):
+            raise ToolError("bad-arg", "지원하지 않는 청킹 방식입니다.", "compare, fixed, recursive, markdown, sentence, element, parent_child, page 중 선택하세요.")
+        doc = self.find_doc(id)
+        data = self.api.post("/api/retrieval/chunk", {
+            "source": {"doc_id": doc["id"]}, "embed": False, "summary_only": True, "limit_tokens": size,
+            "strategies": [{"kind": k, "params": {"unit": "tokens", "size": size}} for k in kinds],
+        })
+        rows = []
+        for result in data["results"]:
+            if result.get("error") or not result.get("stats"):
+                raise ToolError("chunk", result.get("error") or "청킹 결과가 없습니다.")
+            stats = result["stats"]
+            rows.append(f"{result['kind']} n{stats['count']} p95={stats['tokens']['p95']} max={stats['tokens']['max']} "
+                        f"over={stats['over_limit']} cover={stats['coverage']:.1%} dup={stats['duplication']:.1%} "
+                        f"table-split={stats['tables_split']}/{stats['tables_total']}")
+        stale = bool(data["source"]["is_stale"])
+        return "\n".join([f"결과: D{doc['n']} 청킹 비교" + (" — 이전 성공본(is_stale)" if stale else ""),
+                          "n은 청크 수, p95·max는 추정 토큰, over는 목표 길이 초과 수입니다.",
+                          "cover는 원문 포함률, dup는 중복률, table-split은 분할된 표/전체 표입니다.",
+                          "----- 타이핑용 -----", f"D{doc['n']} chunk target={size} stale={int(stale)}", *rows, "-----"])
 
     def compare(self, id: str) -> str:  # noqa: A002
         doc = self.find_doc(id)
@@ -1021,8 +1200,9 @@ class Ops:
                             f"parse 에 target=\"D{doc['n']}\" 을 넣어 다시 파싱한 뒤 비교하세요.")
         new_run, old_run = runs[0], runs[1]
         new, old = self.run_metrics(doc["id"], new_run), self.run_metrics(doc["id"], old_run)
-        same = new["sha"] == old["sha"]
-        lines = [f"결과: D{doc['n']} " + ("두 실행의 본문이 같습니다" if same else "본문이 바뀌었습니다") +
+        same_text = new["sha"] == old["sha"]
+        same = same_text and old["warn"] == new["warn"]
+        lines = [f"결과: D{doc['n']} " + ("두 실행의 본문과 경고가 같습니다" if same else "본문은 같고 경고가 바뀌었습니다" if same_text else "본문이 바뀌었습니다") +
                  f" ({_short_time(old_run['completed_at'])} → {_short_time(new_run['completed_at'])})",
                  "다음: 사용자에게 아래 타이핑용 블록을 그대로 보여 주세요." if not same else "다음: 사용자에게 변화 없음으로 보고하세요."]
         for key, name in (("chars", "글자"), ("lines", "줄"), ("tables", "표 행"), ("numbers", "숫자"), ("broken", "깨진 글자"), ("pages", "쪽")):
@@ -1032,7 +1212,9 @@ class Ops:
         lines.append(f"경고: {','.join(old_w) or '없음'} → {','.join(new_w) or '없음'}")
         lines.append(f"파서: {old_run['parser']} {old_run['parser_version']} → {new_run['parser']} {new_run['parser_version']}, "
                      f"OCR {_on(old_run['ocr_enabled'])} → {_on(new_run['ocr_enabled'])}, 시간 {_seconds(old_run['duration_ms'])}s → {_seconds(new_run['duration_ms'])}s")
-        if not same:
+        if doc["status"] != "completed":
+            lines.insert(1, "주의: 이전 성공본(is_stale) 두 회차의 비교입니다.")
+        if not same_text:
             old_md = self.run_detail(doc["id"], old_run["run_id"])["markdown"].splitlines()
             new_md = self.run_detail(doc["id"], new_run["run_id"])["markdown"].splitlines()
             shown = 0
@@ -1051,11 +1233,14 @@ class Ops:
     def report(self, scope: str = "today") -> str:
         scope = (as_text(scope) or "today").lower()
         scope = {"오늘": "today", "마지막": "last", "전체": "all", "latest": "last", "recent": "last"}.get(scope, scope)
+        if re.fullmatch(r"b\d+", scope):
+            batch = self._named_batch(scope)
+            return self._digest_text(batch, again=True) if batch.get("finished") else self._progress_text(batch, False)
         if scope not in ("today", "last", "all"):
             raise ToolError("bad-arg", f"scope는 today, last, all 중 하나입니다(받은 값: {scope}).", "예: scope=\"today\"")
         batches = self.store.load("batches", {"items": []})["items"]
         if scope == "last":
-            batch = self._latest_batch()
+            batch = batches[-1] if batches else None
             if not batch:
                 raise ToolError("not-found", "아직 parse 로 처리한 묶음이 없습니다.", "scope=\"today\" 또는 \"all\" 로 부르세요.")
             if not batch.get("finished"):
@@ -1069,19 +1254,19 @@ class Ops:
             scoped = [batch for batch in batches if (_local(batch["started"]) or midnight) >= midnight]
         else:
             ids, since, scoped = [doc["id"] for doc in docs], None, batches
-        if not ids:
-            raise ToolError("not-found", "보고할 문서가 없습니다(오늘 처리한 문서 없음)." if scope == "today" else "등록된 문서가 없습니다.",
-                            "scope=\"all\" 로 전체를 보거나 parse 로 먼저 파싱하세요.")
-        skips = Counter()
+        skips, errors = Counter(), Counter()
         for batch in scoped:
             skips.update(batch.get("skips", {}))
-            skips.update(item["note"] for item in batch["items"] if item["state"] == "error")
+            errors.update(item["note"] for item in batch["items"] if item["state"] == "error")
+        if not ids and not errors:
+            raise ToolError("not-found", "보고할 문서가 없습니다(오늘 처리한 문서 없음)." if scope == "today" else "등록된 문서가 없습니다.",
+                            "scope=all 로 전체를 보거나 parse 로 먼저 파싱하세요.")
         with self.store.locked():
             counters = self.store.load("counters", {"report": 1})
             n = counters["report"]
             counters["report"] += 1
             self.store.save("counters", counters)
-        block, summary = self.summary(f"R{n} {scope}", ids, since, skips)
+        block, summary = self.summary(f"R{n} {scope}", ids, since, skips, errors)
         return self._wrap(f"R{n}", block, summary)
 
     # ------------------------------------------------------------------ 호출 기록과 반복 감지
@@ -1127,42 +1312,59 @@ class Ops:
         renamed = {}
         for key, value in args.items():
             canonical = ARG_ALIASES.get(key.lower(), key.lower())
-            renamed.setdefault(canonical, value)
+            if canonical == "target" and "id" in spec:
+                canonical = "id"
+            if canonical == "id" and name == "parse":
+                canonical = "target"
+            if canonical == "target" and name == "files":
+                canonical = "folder"
+            if canonical == "folder" and name == "parse":
+                canonical = "target"
+            if canonical in renamed and renamed[canonical] != value:
+                raise ToolError("bad-arg", f"{canonical} 값이 둘입니다.")
+            renamed[canonical] = value
         unknown = [key for key in renamed if key not in spec]
-        if unknown and len(spec) == 1 and len(renamed) == 1:
-            renamed = {spec[0]: next(iter(renamed.values()))}
-            unknown = []
-        for key in unknown:
-            renamed.pop(key)
+        if unknown:
+            raise ToolError("bad-arg", f"{name}에서 쓰지 않는 인자: {', '.join(unknown)}",
+                            "가능한 인자: " + (", ".join(spec) or "없음"))
         required = REQUIRED.get(name)
         if required and not as_text(renamed.get(required)):
             raise ToolError("bad-arg", f"{name} 에는 {required} 가 필요합니다.", EXAMPLES[name])
-        if name in ("parse",):
+        for key in spec:
+            if key not in renamed or key in ("size", "offset", "page", "confirm", "reparse"):
+                continue
+            value = renamed[key]
+            if isinstance(value, (dict, list, bool)) and not (key == "target" and isinstance(value, list)):
+                raise ToolError("bad-arg", f"{key}에 문자열을 넣으세요.")
+            renamed[key] = as_text(value)
+        if name == "parse":
             return self.parse(renamed["target"], as_bool(renamed.get("reparse")), as_bool(renamed.get("confirm")))
         return getattr(self, name)(**renamed)
 
 
 TOOL_ARGS = {
-    "status": [],
-    "files": ["folder"],
+    "status": ["check"],
+    "files": ["folder", "offset"],
     "parse": ["target", "reparse", "confirm"],
-    "wait": [],
-    "docs": ["state"],
+    "wait": ["batch"],
+    "docs": ["state", "before"],
     "doc": ["id"],
     "read": ["id", "page", "sheet", "find"],
     "compare": ["id"],
+    "chunk": ["id", "strategy", "size"],
     "report": ["scope"],
 }
-REQUIRED = {"parse": "target", "doc": "id", "read": "id", "compare": "id"}
+REQUIRED = {"parse": "target", "doc": "id", "read": "id", "compare": "id", "chunk": "id"}
 EXAMPLES = {
     "parse": "예: parse(target=\"C:/docs/보고서.pdf\") 또는 parse(target=\"*.pdf\") 또는 parse(target=\"D12\"). 경로의 \\ 대신 / 를 써도 됩니다.",
     "doc": "예: doc(id=\"D12\")",
     "read": "예: read(id=\"D12\", page=3)",
+    "chunk": '예: chunk(id="D12", strategy="compare", size=512)',
     "compare": "예: compare(id=\"D12\")",
 }
 ARG_ALIASES = {
     "path": "target", "file": "target", "files": "target", "filename": "target", "file_path": "target", "folder_path": "target",
     "doc_id": "id", "document": "id", "document_id": "id", "number": "id", "doc": "id", "name": "id",
     "page_number": "page", "pages": "page", "p": "page", "sheet_name": "sheet", "query": "find", "search": "find", "text": "find",
-    "status": "state", "filter": "state", "force": "reparse", "again": "reparse", "yes": "confirm", "dir": "folder", "directory": "folder",
+    "batch_id": "batch", "status": "state", "filter": "state", "force": "reparse", "again": "reparse", "yes": "confirm", "dir": "folder", "directory": "folder",
 }
