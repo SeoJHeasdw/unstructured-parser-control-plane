@@ -371,3 +371,20 @@ button.compare-line-no:hover { background: var(--pane-mark); }
 
 .compare-review-detail { animation: ui-fade .16s ease-out; }
 .review-desk > div:not([hidden]) { animation: ui-fade .18s ease-out; }
+/* 원문 대조의 추출 결과: 읽기 보기에서 표 줄은 칸으로, 제목 줄은 굵게(줄 번호·원문 위치는 그대로) */
+.source-line.is-table { padding-block: 0; }
+.source-line.is-table > small { padding-top: 6px; }
+.source-cells { display: grid; border-inline: 1px solid var(--rule); font-size: 14px; line-height: 1.5; font-variant-numeric: tabular-nums; }
+.source-cells > span { padding: 6px 8px; border-bottom: 1px solid var(--rule); overflow-wrap: anywhere; }
+.source-cells > span + span { border-left: 1px solid var(--rule); }
+.source-cells.is-head { border-top: 1px solid var(--rule); background: var(--surface-3); font-weight: 650; font-size: 13px; }
+.source-cells-rule { display: block; height: 0; }
+.source-heading { font-weight: 700; }
+.source-heading.is-h1 { font-size: 20px; }
+.source-heading.is-h2 { font-size: 16px; }
+.source-mark { color: var(--ink-4); font-weight: 500; }
+.source-line.is-rule { padding-block: 0; line-height: 1; }
+.source-line.is-rule > small { padding-top: 0; }
+.source-line.is-rule .source-cells-rule { height: 100%; border-inline: 1px solid var(--rule); }
+.source-line > div { font-variant-ligatures: none; }
+.source-figure { display: inline-block; padding: 2px 8px; border: 1px dashed var(--rule-strong); border-radius: var(--r-1); color: var(--ink-3); font-size: 13px; }

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { Suspense, lazy, useCallback, useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
 import { ArrowRightLeft, FileSearch, TriangleAlert } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
@@ -10,6 +10,10 @@ import { RunSummary } from './RunSummary';
 import { OriginalPane, PdfSource, TextSource, WorksheetSource } from './SourceViewer';
 import type { RunSide } from './RunSummary';
 import type { ResultPane, ReviewLocation } from './ResultReview';
+
+// DOCX·PPTX 원본 그리기는 큰 라이브러리(docx-preview·JSZip)를 쓰므로 필요할 때만 불러온다.
+const OfficeSource = lazy(() => import('./OfficeSource'));
+const OFFICE: Readonly<Record<string, 'docx' | 'pptx'>> = Object.freeze({ DOCX: 'docx', PPTX: 'pptx' });
 
 type Request<T> = (signal: AbortSignal) => Promise<T>;
 function useLoad<T>(request: Request<T>, enabled: boolean, revision = 0) {
@@ -127,6 +131,8 @@ function runPane(run: StoredParseRun | undefined, doc: LiveDoc): ResultPane | un
 
 const IMAGE_MIME: Readonly<Record<string, string>> = Object.freeze({
   PNG: 'image/png', JPEG: 'image/jpeg', JPG: 'image/jpeg', GIF: 'image/gif', WEBP: 'image/webp', BMP: 'image/bmp', AVIF: 'image/avif',
+  // <img>로만 보이므로 SVG 안의 스크립트는 돌지 않는다.
+  SVG: 'image/svg+xml',
 });
 
 function SourceOriginal({ doc, active, location, onLocation }: {
@@ -138,6 +144,7 @@ function SourceOriginal({ doc, active, location, onLocation }: {
   const sheet = location?.sheet ?? undefined, cell = location?.cell;
   const canPreview = ['TXT', 'LOG', 'CSV', 'MD', 'XLSX', 'XLSM'].includes(format);
   const imageType = IMAGE_MIME[format];
+  const office = OFFICE[format];
   const [retry, setRetry] = useState(0);
   const [imageUrl, setImageUrl] = useState<string>();
   const [imageFailed, setImageFailed] = useState(false);
@@ -147,8 +154,14 @@ function SourceOriginal({ doc, active, location, onLocation }: {
     if (!response.ok) throw Error('원본 이미지 파일을 불러오지 못했어요.');
     return new Blob([await response.blob()], { type: imageType });
   }, [href, imageType]);
+  const loadOffice = useCallback(async (signal: AbortSignal) => {
+    const response = await fetch(href, { signal });
+    if (!response.ok) throw Error('원본 파일을 불러오지 못했어요.');
+    return response.arrayBuffer();
+  }, [href]);
   const preview = useLoad(loadPreview, active && canPreview, retry);
   const image = useLoad(loadImage, active && !!imageType, retry);
+  const officeFile = useLoad(loadOffice, active && !!office, retry);
   const data = preview?.data;
   const page = location?.page ?? 1;
 
@@ -164,15 +177,17 @@ function SourceOriginal({ doc, active, location, onLocation }: {
     : data?.kind === 'sheet' ? () => <WorksheetSource key={`${data.sheet}!${data.cell}`} data={data} onLocation={onLocation} />
     : data?.kind === 'text' ? () => <TextSource {...data} />
     : imageUrl && !imageFailed ? () => <div className="compare-image-source"><img src={imageUrl} alt={doc.name} onError={() => setImageFailed(true)} /></div>
+    : office && officeFile?.data ? (expanded: boolean) => <Suspense fallback={<p className="office-status" role="status">원본 보기를 준비하는 중…</p>}>
+      <OfficeSource kind={office} data={officeFile.data!} expanded={expanded} /></Suspense>
     : undefined;
-  const error = preview?.error ?? image?.error;
+  const error = preview?.error ?? image?.error ?? officeFile?.error;
   const fallback = error || imageFailed ? <div role="alert"><p>{error ?? '브라우저에서 이 이미지를 표시할 수 없어요.'}</p>
     {error && <button type="button" className="button-secondary" onClick={() => setRetry(value => value + 1)}>다시 시도</button>}</div>
-    : canPreview || imageType ? <p role="status">원본을 불러오는 중…</p>
-    : <div><strong>전용 앱에서 원본을 확인하세요</strong><p>{['DOCX', 'PPTX', 'XLS'].includes(format)
+    : canPreview || imageType || office ? <p role="status">원본을 불러오는 중…</p>
+    : <div><strong>전용 앱에서 원본을 확인하세요</strong><p>{['XLS', 'DOC', 'PPT'].includes(format)
       ? '원본을 다운로드하면 전용 앱에서 페이지 배치와 서식을 그대로 확인할 수 있어요.'
       : '원본 파일을 내려받아 열 수 있어요.'}</p></div>;
 
-  return <OriginalPane name={doc.name} label={format === 'XLSX' || format === 'XLSM' ? `${format} 셀 값` : format || '원본 파일'}
+  return <OriginalPane name={doc.name} label={format === 'XLSX' || format === 'XLSM' ? `${format} 셀 값` : office ? `${format} · 브라우저 재현` : format || '원본 파일'}
     href={pdf ? `${href}#page=${page}` : href} downloadName={pdf ? undefined : doc.name} preview={renderPreview} fallback={fallback} />;
 }

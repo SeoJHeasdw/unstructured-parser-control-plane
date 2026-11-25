@@ -231,9 +231,12 @@ describe('실제 문서 로컬 작업 공간',()=>{
     await user.click(screen.getByRole('button',{name:'파싱 실행'}));
     await waitFor(()=>expect(fetchMock.mock.calls.some(([path,init])=>String(path)===`${detailUrl}/process`&&init?.method==='POST')).toBe(true));
     const result=await screen.findByText(content=>content.includes('<script>window.shouldNotExecute = true</script>'));
-    expect(result.className).toBe('live-result-content');
-    expect(result.textContent).toBe(resultText);
-    expect(result.querySelector('script')).toBeNull();
+    expect(result.closest('.md-view')).not.toBeNull();
+    expect(document.querySelector('.md-view script')).toBeNull();
+    await user.click(screen.getByRole('radio',{name:'Markdown 원문'}));
+    const raw=document.querySelector('.live-result-content.is-raw') as HTMLElement;
+    expect(raw.textContent).toBe(resultText);
+    expect(raw.querySelector('script')).toBeNull();
     expect(fetchMock.mock.calls.some(([path])=>String(path)===`${detailUrl}/result`)).toBe(true);
   });
   it('파싱 요청이 실패하면 서버가 반환한 오류를 표시하고 결과 조회를 하지 않는다',async()=>{

@@ -1,0 +1,38 @@
+/* 원문 대조: 브라우저에서 다시 그린 Office 원본 */
+.office-source { display: flex; flex-direction: column; min-height: 0; height: 100%; overflow: auto; background: var(--surface-3); }
+.office-note { margin: 0; padding: 8px 12px; border-bottom: 1px solid var(--rule); background: var(--surface-2); color: var(--ink-3); font-size: var(--fs-xs); line-height: 1.5; }
+.office-status { margin: 16px; color: var(--ink-3); font-size: var(--fs-sm); }
+.office-status.is-error { color: var(--bad); }
+/* DOCX: docx-preview가 쪽(section.docx)을 만든다. 바탕만 콘솔 색에 맞춘다. */
+.docx-source { padding: 8px 0; }
+.docx-host .docx-wrapper { background: transparent; padding: 8px; }
+.docx-host .docx-wrapper > section.docx { box-shadow: 0 1px 3px rgba(22, 30, 48, .18); margin-bottom: 12px; }
+/* PPTX */
+.pptx-source { display: flex; flex-direction: column; gap: 16px; padding: 12px; }
+.pptx-count { margin: 0; color: var(--ink-3); font-size: var(--fs-xs); }
+.pptx-slide { margin: 0; content-visibility: auto; contain-intrinsic-size: auto 360px; }
+.pptx-slide figcaption { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; color: var(--ink-2); font-size: var(--fs-sm); }
+.pptx-slide figcaption small { color: var(--ink-4); font-size: var(--fs-xs); }
+.pptx-flag { display: inline-flex; align-items: center; gap: 4px; padding: 1px 6px; border-radius: 4px; background: var(--warn-soft); color: var(--warn); font-size: var(--fs-xs); font-weight: 650; }
+.pptx-slide.is-hidden .pptx-stage { opacity: .72; }
+.pptx-stage { position: relative; width: 100%; overflow: hidden; container-type: inline-size; box-shadow: 0 1px 3px rgba(22, 30, 48, .18); color: #000; font-family: "Malgun Gothic", "Apple SD Gothic Neo", "Noto Sans KR", sans-serif; line-height: 1.2; }
+.pptx-shape { position: absolute; box-sizing: border-box; transform-origin: center; }
+.pptx-text { position: absolute; inset: 0; display: flex; flex-direction: column; overflow: visible; }
+.pptx-text.is-middle { justify-content: center; }
+.pptx-text.is-bottom { justify-content: flex-end; }
+.pptx-text.is-vertical { writing-mode: vertical-rl; }
+.pptx-text p, .pptx-table p { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.pptx-bullet { display: inline-block; min-width: 1em; }
+.pptx-picture { overflow: hidden; }
+.pptx-picture img { position: absolute; max-width: none; }
+.pptx-missing { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; gap: 6px; border: 1px dashed #9aa5b1; background: #f4f6f8; color: #526171; font-size: var(--fs-xs); text-align: center; }
+.pptx-line { overflow: visible; }
+.pptx-table table { width: 100%; height: 100%; border-collapse: collapse; table-layout: fixed; }
+.pptx-table td { padding: 0.4cqw 0.6cqw; border: 1px solid #8f9aa6; vertical-align: top; }
+.pptx-object { display: flex; flex-direction: column; gap: 4px; padding: 6px; overflow: hidden; border: 1px dashed #8f9aa6; background: rgba(244, 246, 248, .85); color: #394957; font-size: var(--fs-xs); }
+.pptx-object-label { font-weight: 700; }
+.pptx-object ul { margin: 0; padding-left: 16px; }
+.pptx-notes { margin-top: 6px; padding: 6px 10px; border: 1px solid var(--rule); border-radius: var(--r-1); background: var(--surface); font-size: var(--fs-sm); }
+.pptx-notes summary { display: flex; align-items: center; gap: 6px; color: var(--ink-2); cursor: pointer; }
+.pptx-notes p { margin: 6px 0 0; white-space: pre-wrap; color: var(--ink-1); }
+.office-source.is-expanded .pptx-slide { width: 100%; max-width: 1120px; margin-inline: auto; }

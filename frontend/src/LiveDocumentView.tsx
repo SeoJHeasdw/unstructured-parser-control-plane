@@ -6,6 +6,7 @@ import { WorkspaceLink } from './WorkspaceLink';
 import type { DetailTab, WorkspaceRoute } from './navigation';
 import { Tabs } from './ui';
 import { StructurePanel } from './StructurePanel';
+import { MarkdownView, ResultModeSwitch, useResultMode } from './MarkdownView';
 
 /** 화면에 보이는 상태. 글자 없는 이미지는 서버에서 failed지만 실패로 보이지 않는다(no_text). */
 export type DisplayStatus = LiveStatus | 'no_text';
@@ -107,6 +108,23 @@ function History({ doc }: { doc: LiveDoc }) {
   </li>)}</ol>;
 }
 
+const RAW_ONLY = 4 * 1024 * 1024; // 이보다 큰 결과는 읽기 보기를 만들지 않고 원문으로 보인다(브라우저 부담).
+
+/** 추출 결과 본문. 읽기 보기(표·제목·목록을 그림)와 저장된 Markdown 원문을 오간다. */
+export function ResultBody({ markdown }: { markdown: string }) {
+  const [mode, setMode] = useResultMode();
+  const tooLarge = markdown.length > RAW_ONLY;
+  const current = tooLarge ? 'raw' : mode;
+  return <>
+    <div className="lw-result-tools">
+      <ResultModeSwitch value={current} onChange={setMode} />
+      <small>{tooLarge ? '결과가 커서 원문으로만 보입니다.' : current === 'read' ? '표·제목·목록을 그려 보입니다. 저장된 글자는 Markdown 원문 그대로입니다.' : '파서가 저장한 글자 그대로입니다. 청킹·검색은 이 글자를 씁니다.'}</small>
+    </div>
+    {!markdown ? <p className="md-empty">텍스트 결과가 비어 있습니다.</p>
+      : current === 'read' ? <MarkdownView markdown={markdown} /> : <pre className="live-result-content is-raw">{markdown}</pre>}
+  </>;
+}
+
 type Props = {
   doc: LiveDoc; result: LiveResult | null; resultError: string; resultLoading: boolean; submittingId: string | null;
   onNavigate?: (route: WorkspaceRoute) => void;
@@ -178,7 +196,7 @@ export default function LiveDocumentView({ doc, result, resultError, resultLoadi
                 {!!result.warnings.length && <div className="lw-message is-warning" role="alert"><TriangleAlert size={17} /><div><strong>파싱 경고</strong><ul>{result.warnings.map((warning, i) => <li key={i}>{warning}</li>)}</ul></div></div>}
                 {result.fidelity && <details className="lw-disclosure"><summary>원문 충실도 · 확인 항목 {result.fidelity.findings?.length ?? 0}개</summary>
                   {result.fidelity.findings?.length ? <ul>{result.fidelity.findings.map((f,i) => <li key={i}>{f.message}</li>)}</ul> : <p>기록된 확인 항목이 없습니다.</p>}</details>}
-                <pre className="live-result-content">{result.markdown || '텍스트 결과가 비어 있습니다.'}</pre>
+                <ResultBody markdown={result.markdown} />
               </> : <div className="lw-placeholder"><p>{doc.status === 'uploaded' ? '파싱을 실행하면 추출 결과가 여기에 표시됩니다.' : running ? '현재 작업이 끝나면 결과가 표시됩니다.' : '이전에 성공한 파싱 결과가 없습니다.'}</p></div>}
           </section>}
       </Tabs>

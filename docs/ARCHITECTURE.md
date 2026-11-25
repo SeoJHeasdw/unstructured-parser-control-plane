@@ -109,7 +109,8 @@ Mock 모델과 로컬 API 상태명은 프로토타입 계약이다. 운영 계�
 | `frontend/src/api/live.ts` | 실제 파일 API 요청, 응답 타입과 오류 처리. 결과 부재 409와 손상 409를 현재는 오류 메시지로 구분 | 메시지 의존을 없앨 안정적 오류 코드와 버전 정책 정의 |
 | `frontend/src/DocumentBrowser.tsx` | Mock 문서 목록, 필터, 가상 파일 선택·드롭 | 목록 탐색과 실제 업로드 UI의 데이터 출처를 계속 명확하게 구분 |
 | `frontend/src/DocumentDrawer.tsx` | Mock 문서의 정보·처리 내용·참조 상세 패널 | 상세 데이터 계약과 실제 처리 문서의 계약을 필요에 따라 별도 설계 |
-| `frontend/src/CompareView.tsx`, `compare/*` | 예시와 로컬 저장 실행 결과 비교 | PDF 페이지와 XLSX 셀은 Docling에서 확인 가능한 위치를 저장해 연결 |
+| `frontend/src/CompareView.tsx`, `compare/*` | 예시와 로컬 저장 실행 결과 비교 | PDF 페이지와 XLSX·XLSM 셀은 Docling에서 확인 가능한 위치를 저장해 연결. DOCX·PPTX 원본은 브라우저 안에서 다시 그린다(`compare/OfficeSource.tsx`, `compare/pptx.ts`, 2026-11-25) |
+| `frontend/src/MarkdownView.tsx`, `markdown.ts` | 추출 결과 읽기 보기(표·제목·목록), 원문 대조 표 줄 칸 보기 | HTML 주입 없이 블록을 React로 그린다. 저장된 Markdown은 바꾸지 않는다 |
 | `frontend/src/DocumentCommon.tsx`, `DocumentViews.tsx` | 공통 문서 아이콘·상태 표현, 뷰 컴포넌트의 호환 재내보내기 | 공통 표시 규칙과 안정적인 import 경로 유지 |
 | `frontend/src/PipelineStudio.tsx` | 파이프라인 작업 공간 조립: 툴바·도형 팔레트·React Flow 캔버스·상세 패널·운영 기록·흐름 페이지 탭, 편집 이력과 단축키 | 실제 실행 규칙과 시각 편집 상태를 계속 구분 |
 | `frontend/src/flow/flowTypes.ts`, `flowTemplates.ts`, `flowLayout.ts` | 흐름 그래프 타입, 기본 흐름(전체 + 형식별 7개)과 새 형식 흐름 생성, 라우팅 조건에서 형식→흐름 매핑 계산, dagre 자동 정렬, localStorage 로딩·검증·저장 | 실제 파서 라우팅과 연결하지 않음. 실제 구성 계약이 생기면 저장 경계를 백엔드로 옮김 |

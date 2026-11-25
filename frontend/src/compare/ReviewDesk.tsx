@@ -4,6 +4,9 @@ import { BookOpen, GitCompareArrows, LocateFixed } from 'lucide-react';
 import { ResultReview, type ResultPane, type ReviewEvidence, type ReviewLocation } from './ResultReview';
 import { columnName } from './worksheet';
 import { lines } from './diff';
+import { tableLines } from '../markdown';
+import type { TableLine } from '../markdown';
+import { ResultModeSwitch, useResultMode } from '../MarkdownView';
 import type { ReviewMode } from '../navigation';
 import './compare.css';
 
@@ -26,6 +29,9 @@ export function ReviewDesk({ mode, onMode, canCompare, baseline, candidate, orig
   const evidenceTrigger = useRef<HTMLElement | null>(null);
   const view = canCompare ? mode : 'source';
   const output = useMemo(() => sourcePane?.text ? lines(sourcePane.text) : [], [sourcePane?.text]);
+  const [textMode, setTextMode] = useResultMode();
+  // 읽기 보기: 줄 번호와 원문 위치는 그대로 두고 표 줄만 칸으로 그린다(한글 폭을 2칸으로 세어 같은 표는 같은 칸 너비).
+  const tables = useMemo(() => textMode === 'read' && sourcePane?.text ? tableLines(sourcePane.text) : new Map<number, TableLine>(), [sourcePane?.text, textMode]);
   useEffect(() => { if (mode === 'runs') setOpenedRuns(true); }, [mode]);
   const lastSource = useRef(sourceKey);
   useEffect(() => {
@@ -66,7 +72,7 @@ export function ReviewDesk({ mode, onMode, canCompare, baseline, candidate, orig
       </div>
       <div className="source-pair" data-pane={mobilePane}>
         <div className="source-original" ref={source} tabIndex={-1}>{original}</div>
-        <section className="source-output" aria-label="추출 결과"><header><h2>추출 결과</h2>{sourceControl}{sourcePane?.meta}</header>
+        <section className="source-output" aria-label="추출 결과"><header><h2>추출 결과</h2>{sourceControl}<ResultModeSwitch value={textMode} onChange={setTextMode} />{sourcePane?.meta}</header>
           <div className="source-lines" ref={viewport} tabIndex={0} aria-label="추출 본문">
           {sourceStatus}
           {!sourceStatus && !output.length && <p>표시할 추출 텍스트가 없습니다.</p>}
@@ -81,7 +87,13 @@ export function ReviewDesk({ mode, onMode, canCompare, baseline, candidate, orig
                 origins.set(l.sheet + '!' + cell, {page:null, sheet:l.sheet, cell});
               }
             }
-            return <div className={'source-line' + (highlight?.line === number && highlight.text === sourcePane?.text ? ' is-evidence' : '')} key={number}><small aria-hidden="true">{number}</small><div>{value || ' '}
+            const table = tables.get(number);
+            const heading = textMode === 'read' && !table ? /^(#{1,6})\s+(.*)$/.exec(value) : null;
+            const body = table ? table.role === 'rule' ? <span className="source-cells-rule" aria-hidden="true" />
+              : <span className={`source-cells${table.role === 'head' ? ' is-head' : ''}`} style={{ gridTemplateColumns: table.columns }}>{table.cells.map((cell, c) => <span key={c}>{cell}</span>)}</span>
+              : heading ? <span className={`source-heading is-h${heading[1].length}`}><span className="source-mark">{heading[1]}</span> {heading[2]}</span>
+              : textMode === 'read' && /^\s*<!--\s*image\s*-->\s*$/.test(value) ? <span className="source-figure">그림 자리 · 그림 안 글자 없음</span> : value || ' ';
+            return <div className={'source-line' + (table ? table.role === 'rule' ? ' is-table is-rule' : ' is-table' : '') + (highlight?.line === number && highlight.text === sourcePane?.text ? ' is-evidence' : '')} key={number}><small aria-hidden="true">{number}</small><div>{body}
               {Array.from(origins, ([label, loc]) => <button className="evidence-link" key={label} onClick={() => reveal(loc, number)}><LocateFixed size={14}/>{label}</button>)}</div></div>;
           })}</div>
           {!sourceStatus && !sourcePane?.locations?.length && <p className="reader-foot">원문 위치 미기록 · 원본에서 직접 확인하세요.</p>}
