@@ -1,5 +1,5 @@
-import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
-import { ArrowRight, Braces, ChevronDown, Database, Play } from 'lucide-react';
+import { Fragment, useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type KeyboardEvent, type ReactNode } from 'react';
+import { ArrowRight, Braces, ChevronDown, ChevronRight, Database, Play, X } from 'lucide-react';
 import type { Page } from './types';
 import './searchPipeline.css';
 
@@ -45,18 +45,22 @@ const STAGES: Stage[] = [
 ];
 const BY_ID = Object.fromEntries(STAGES.map(s => [s.id, s])) as Record<string, Stage>;
 
-/* ── 흐름 지도: 1060 × 548 좌표. 칸이 좁으면 통째로 줄인다. ───────────── */
-const MW = 1060, MH = 548, NW = 128;
+/* ── 흐름 지도: 1060 × 548 좌표. 칸이 좁으면 줄이되, 너무 작아지면 줄이지 않고 옆으로 넘긴다. ── */
+const MW = 1060, MH = 548, NW = 128, NH = 44, MIN_SCALE = .74;
 const COL = [28, 174, 320, 466, 612, 758, 904];
 type Box = { x: number; y: number; w: number; h: number };
-const box = (x: number, y: number, h = 58): Box => ({ x, y, w: NW, h });
+/** 가운데 높이(cy) 기준 상자 */
+const box = (x: number, cy: number, h = NH, w = NW): Box => ({ x, y: cy - h / 2, w, h });
+const CY: Record<Lane, number> = { agent: 189, query: 306, index: 487 };
 const POS: Record<string, Box> = {
-  a1: box(COL[0], 160), a2: box(COL[1], 160), a3: box(COL[2], 160), a4: box(COL[5], 160), a5: box(COL[6], 160),
-  q1: box(COL[0], 280), q2: box(COL[1], 280), q3a: box(COL[2], 262, 44), q3b: box(COL[2], 312, 44), q4: box(COL[3], 280), q5: box(COL[4], 280), q6: box(COL[5], 280), q7: box(COL[6], 280),
-  i1: box(COL[0], 458), i2: box(COL[1], 458), i3: box(COL[2], 458), i4: box(COL[3], 458), i5: box(COL[4], 458), i6: box(COL[5], 458), i7: box(COL[6], 458),
+  a1: box(COL[0], CY.agent), a2: box(COL[1], CY.agent), a3: box(COL[2], CY.agent), a4: box(COL[5], CY.agent), a5: box(COL[6], CY.agent),
+  q1: box(COL[0], CY.query), q2: box(COL[1], CY.query), q3a: box(COL[2], 282, 40), q3b: box(COL[2], 330, 40), q4: box(COL[3], CY.query), q5: box(COL[4], CY.query), q6: box(COL[5], CY.query), q7: box(COL[6], CY.query),
+  i1: box(COL[0], CY.index), i2: box(COL[1], CY.index), i3: box(COL[2], CY.index), i4: box(COL[3], CY.index), i5: box(COL[4], CY.index), i6: box(COL[5], CY.index), i7: box(COL[6], CY.index),
 };
 const BAR: Box = { x: 28, y: 384, w: 1004, h: 32 };
 const LANE_Y: Record<Lane, number> = { agent: 138, query: 240, index: 436 };
+/** 줄 안에서 몇 번째인지. 줄을 펼칠 때 차례로 나타나는 데 쓴다. */
+const LANE_INDEX = Object.fromEntries(STAGES.map(s => [s.id, STAGES.filter(o => o.lane === s.lane).indexOf(s)]));
 
 const R = (b: Box) => [b.x + b.w, b.y + b.h / 2] as const;
 const L = (b: Box) => [b.x, b.y + b.h / 2] as const;
@@ -90,14 +94,34 @@ const EDGES: Edge[] = [
   edge('a4', 'a5', across(R(POS.a4), L(POS.a5)), 'query'),
   edge('a4', 'a3', `M${POS.a4.x},${POS.a4.y + 20} C${POS.a4.x - 90},${POS.a4.y - 34} ${POS.a3.x + NW + 90},${POS.a3.y - 34} ${POS.a3.x + NW},${POS.a3.y + 20}`, 'loop', LAST),
 ];
+const NAME = (id: string) => id === 'bar' ? 'Milvus' : BY_ID[id].title;
+/** 앞 단계 · 다음 단계. 다시 찾는 고리는 따로 적는다. */
+const prevOf = (id: string) => EDGES.filter(e => e.to === id).map(e => e.tone === 'loop' ? `${NAME(e.from)}(다시 찾을 때)` : NAME(e.from));
+const nextOf = (id: string) => EDGES.filter(e => e.from === id).map(e => e.tone === 'loop' ? `${NAME(e.to)}(다시 찾을 때)` : NAME(e.to));
+const neighbors = (id: string) => EDGES.flatMap(e => e.from === id ? [e.to] : e.to === id ? [e.from] : []);
+
+/* 에이전트 줄과 색인 줄은 접을 수 있다. 접으면 단계 이름이 이어진 캡슐 하나(에이전트는 묻는 쪽 · 답하는 쪽 둘)가 같은 자리에 서고,
+   다른 줄과 잇는 선은 그 캡슐에 그대로 닿는다. 검색 엔드포인트 줄은 이 화면의 주인공이라 늘 펼쳐 둔다. */
+type Foldable = 'agent' | 'index';
+type Open = Record<Foldable, boolean>;
+const isFoldable = (lane: Lane): lane is Foldable => lane !== 'query';
+const laneOf = (id: string): Lane | undefined => id === 'bar' ? undefined : BY_ID[id].lane;
+const span = (from: number, to: number, cy: number): Box => box(COL[from], cy, NH, COL[to] + NW - COL[from]);
+const CAPSULES: { key: string; lane: Foldable; ids: string[]; at: Box }[] = [
+  { key: 'agent-ask', lane: 'agent', ids: ['a1', 'a2', 'a3'], at: span(0, 2, CY.agent) },
+  { key: 'agent-answer', lane: 'agent', ids: ['a4', 'a5'], at: span(5, 6, CY.agent) },
+  { key: 'index', lane: 'index', ids: ['i1', 'i2', 'i3', 'i4', 'i5', 'i6', 'i7'], at: span(0, 6, CY.index) },
+];
+/** 접은 줄 안에서만 잇는 선(다시 찾는 고리는 캡슐 둘을 이으므로 남긴다) */
+const innerLane = (e: Edge) => { const a = laneOf(e.from); return a && a === laneOf(e.to) && isFoldable(a) && e.tone !== 'loop' ? a : undefined; };
 
 type Lens = 'all' | 'user' | 'operator' | 'designer';
 const COUNTS = { fixed: STAGES.filter(s => s.status === 'fixed').length, candidate: STAGES.filter(s => s.status === 'candidate').length, open: STAGES.filter(s => s.status === 'open').length };
-const LENSES: { id: Lens; who: string; what: string; kicker: string; title: [string, string]; ids?: string[] }[] = [
-  { id: 'all', who: '전체', what: '흐름 한 장', kicker: '검색 엔드포인트 · 설계 초안', title: ['에이전트가 묻고', '검색은 근거를 돌려줍니다'] },
-  { id: 'user', who: '사용자', what: '문서가 찾아지기까지', kicker: '사용자가 볼 때', title: ['올린 문서는 미리 잘라 두고', '질문이 오면 그 조각을 찾습니다'], ids: ['a1', 'a5', 'q3a', 'q3b', 'q7', 'i1', 'i2', 'i3', 'i4', 'i5', 'i6', 'i7', 'bar'] },
-  { id: 'operator', who: '운영자', what: '품질을 재는 곳', kicker: '운영자가 볼 때', title: ['단계마다 따로 재야', '어디서 놓쳤는지 압니다'], ids: STAGES.filter(s => s.measure).map(s => s.id) },
-  { id: 'designer', who: '설계자', what: '정할 것', kicker: '설계자가 볼 때', title: [`확정 ${COUNTS.fixed} · 후보 ${COUNTS.candidate}`, `미정 ${COUNTS.open}곳을 함께 정합니다`], ids: STAGES.filter(s => s.status === 'open' || s.questions?.length).map(s => s.id) },
+const LENSES: { id: Lens; who: string; what: string; kicker: string; title: [string, string]; ids?: string[]; opens: Foldable[] }[] = [
+  { id: 'all', who: '전체', what: '흐름 한 장', kicker: '검색 엔드포인트 · 설계 초안', title: ['에이전트가 묻고', '검색은 근거를 돌려줍니다'], opens: [] },
+  { id: 'user', who: '사용자', what: '문서가 찾아지기까지', kicker: '사용자가 볼 때', title: ['올린 문서는 미리 잘라 두고', '질문이 오면 그 조각을 찾습니다'], ids: ['a1', 'a5', 'q3a', 'q3b', 'q7', 'i1', 'i2', 'i3', 'i4', 'i5', 'i6', 'i7', 'bar'], opens: ['index'] },
+  { id: 'operator', who: '운영자', what: '품질을 재는 곳', kicker: '운영자가 볼 때', title: ['단계마다 따로 재야', '어디서 놓쳤는지 압니다'], ids: STAGES.filter(s => s.measure).map(s => s.id), opens: ['index'] },
+  { id: 'designer', who: '설계자', what: '정할 것', kicker: '설계자가 볼 때', title: [`확정 ${COUNTS.fixed} · 후보 ${COUNTS.candidate}`, `미정 ${COUNTS.open}곳을 함께 정합니다`], ids: STAGES.filter(s => s.status === 'open' || s.questions?.length).map(s => s.id), opens: ['agent', 'index'] },
 ];
 
 function useFit(width: number) {
@@ -106,7 +130,7 @@ function useFit(width: number) {
   useLayoutEffect(() => {
     const el = ref.current;
     if (!el) return;
-    const fit = () => { if (el.clientWidth) setScale(Math.min(1, el.clientWidth / width)); };
+    const fit = () => { if (el.clientWidth) setScale(Math.max(MIN_SCALE, Math.min(1, el.clientWidth / width))); };
     fit();
     if (typeof ResizeObserver === 'undefined') return;
     const observer = new ResizeObserver(fit);
@@ -129,61 +153,122 @@ function useFlow() {
   return { t, running: run, replay: () => { setT(0); setRun(true); } };
 }
 
-function FlowMap({ lens, setLens, selected, onSelect, hot }: { lens: Lens; setLens: (lens: Lens) => void; selected?: string; onSelect: (id: string) => void; hot: string[] }) {
+/** 단계에 올리면 뜨는 작은 카드: 하는 일과 앞·다음 단계. 색인 줄은 위로, 나머지는 아래로 띄운다. */
+function HoverCard({ id }: { id: string }) {
+  const s = BY_ID[id], p = POS[id], below = s.lane !== 'index';
+  const left = Math.min(Math.max(p.x + p.w / 2 - 132, 12), MW - 276);
+  const prev = prevOf(id), next = nextOf(id);
+  return <div className="sp-hovercard" role="tooltip" data-place={below ? 'below' : 'above'} style={{ left, top: below ? p.y + p.h + 14 : p.y - 14 }}>
+    <header><span className="sp-pill" data-status={s.status}>{STATUS[s.status]}</span><b>{s.title}</b><small>{s.short}</small></header>
+    <p>{s.does}</p>
+    {(prev.length > 0 || next.length > 0) && <dl>
+      {prev.length > 0 && <><dt>앞</dt><dd>{prev.join(' · ')}</dd></>}
+      {next.length > 0 && <><dt>다음</dt><dd>{next.join(' · ')}</dd></>}
+    </dl>}
+    <small className="sp-hovercard-hint">누르면 정한 것과 정할 것을 봅니다</small>
+  </div>;
+}
+
+function FlowMap({ lens, onLens, open, onFold, selected, onSelect, hot }: {
+  lens: Lens; onLens: (lens: Lens) => void; open: Open; onFold: (lane: Foldable) => void;
+  selected?: string; onSelect: (id: string) => void; hot: string[];
+}) {
   const { ref, scale } = useFit(MW);
   const { t, running, replay } = useFlow();
+  const [hover, setHover] = useState<string>();
   const view = LENSES.find(l => l.id === lens)!;
   const focus = view.ids ? new Set(view.ids) : undefined;
   const dim = (id: string) => focus ? !focus.has(id) : false;
-  return <div className="sp-map" ref={ref} style={{ height: MH * scale }}>
-    <div className="sp-map-stage" style={{ transform: `scale(${scale})` }} data-lens={lens}>
-      <div className="sp-kicker">{view.kicker}</div>
-      <h2 className="sp-title" aria-live="polite">{view.title[0]}<br/><em>{view.title[1]}</em></h2>
-      <div className="sp-lens" role="group" aria-label="누가 보나">
-        {LENSES.map(l => <button key={l.id} aria-pressed={lens === l.id} onClick={() => setLens(l.id)}><b>{l.who}</b><small>{l.what}</small></button>)}
-      </div>
-      <button className="sp-replay" onClick={replay} disabled={running}><Play size={13} aria-hidden="true"/>흐름 다시 보기</button>
+  const folded = (id: string) => { const lane = laneOf(id); return !!lane && isFoldable(lane) && !open[lane]; };
+  /* 짚는 중: 단계에 올렸으면 그 단계와 앞뒤, 아래 판에서 올렸으면 그 단계들. 나머지는 물러난다. */
+  const trace = hover ? new Set([hover, ...neighbors(hover)]) : hot.length ? new Set(hot) : undefined;
+  const ring = (id: string) => hover ? hover === id : hot.includes(id);
+  const traceEdge = (e: Edge) => !!hover && (e.from === hover || e.to === hover);
+  const enter = (id: string) => () => setHover(id), leave = () => setHover(undefined);
 
-      {(Object.keys(LANE_Y) as Lane[]).map(lane => <div key={lane} className="sp-lane-label" data-lane={lane} style={{ top: LANE_Y[lane] }}>{LANE_LABEL[lane]}</div>)}
+  return <div className="sp-map" ref={ref}>
+    <div className="sp-map-size" style={{ width: MW * scale, height: MH * scale }}>
+      <div className="sp-map-stage" style={{ transform: `scale(${scale})` }} data-lens={lens} data-tracing={trace ? true : undefined}>
+        <div className="sp-kicker">{view.kicker}</div>
+        <h2 className="sp-title" aria-live="polite">{view.title[0]}<br/><em>{view.title[1]}</em></h2>
+        <div className="sp-lens" role="group" aria-label="누가 보나">
+          {LENSES.map(l => <button key={l.id} aria-pressed={lens === l.id} onClick={() => onLens(l.id)}><b>{l.who}</b><small>{l.what}</small></button>)}
+        </div>
+        <button className="sp-replay" onClick={replay} disabled={running}><Play size={13} aria-hidden="true"/>흐름 다시 보기</button>
 
-      <svg className="sp-edges" viewBox={`0 0 ${MW} ${MH}`} aria-hidden="true">
-        <defs>{(['query', 'index', 'store', 'loop'] as const).map(tone => <marker key={tone} id={`sp-arrow-${tone}`} viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L8,4 L0,8 z" className="sp-arrowhead" data-tone={tone}/></marker>)}</defs>
-        {EDGES.map(e => {
-          const lit = t >= e.seq, faded = dim(e.from) || dim(e.to);
-          return <g key={`${e.from}-${e.to}`} data-tone={e.tone} data-lit={lit || undefined} data-dim={faded || undefined} data-hot={hot.includes(e.to) || hot.includes(e.from) || undefined}>
-            <path className="sp-edge" d={e.d} pathLength={1} markerEnd={lit ? `url(#sp-arrow-${e.tone})` : undefined}/>
-            {e.tone !== 'loop' && <path className="sp-edge-flow" d={e.d}/>}
-          </g>;
+        {(Object.keys(LANE_Y) as Lane[]).map(lane => isFoldable(lane)
+          ? <button key={lane} className="sp-lane-label" data-lane={lane} aria-expanded={open[lane]} style={{ top: LANE_Y[lane] - 3 }} onClick={() => onFold(lane)}>
+              <ChevronRight className="sp-lane-chev" size={14} aria-hidden="true"/>{LANE_LABEL[lane]}
+              <small>{STAGES.filter(s => s.lane === lane).length}단계 · {open[lane] ? '접기' : '펼치기'}</small>
+            </button>
+          : <div key={lane} className="sp-lane-label" data-lane={lane} style={{ top: LANE_Y[lane] }}>{LANE_LABEL[lane]}</div>)}
+
+        <svg className="sp-edges" viewBox={`0 0 ${MW} ${MH}`} aria-hidden="true">
+          <defs><marker id="sp-arrow" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L8,4 L0,8 z" className="sp-arrowhead"/></marker></defs>
+          {EDGES.map(e => {
+            const lit = t >= e.seq, inner = innerLane(e);
+            return <g key={`${e.from}-${e.to}`} data-tone={e.tone} data-lit={lit || undefined} data-dim={(dim(e.from) || dim(e.to)) || undefined}
+              data-folded={(inner && !open[inner]) || undefined} data-trace={traceEdge(e) || undefined}>
+              <path className="sp-edge" d={e.d} pathLength={1} markerEnd={lit ? 'url(#sp-arrow)' : undefined}/>
+              {e.tone !== 'loop' && <path className="sp-edge-flow" d={e.d}/>}
+            </g>;
+          })}
+        </svg>
+        <div className="sp-loop-label" data-lit={t >= LAST || undefined} data-dim={dim('a4') || undefined} data-trace={(trace?.has('a3') && trace.has('a4')) || undefined}>근거가 모자라면 다시 찾는다</div>
+
+        <div className="sp-bar" data-lit={t >= SEQ.bar || undefined} data-dim={dim('bar') || undefined} data-trace={trace?.has('bar') || undefined} style={{ left: BAR.x, top: BAR.y, width: BAR.w, height: BAR.h }}>
+          <Database size={15} aria-hidden="true"/><b>Milvus</b><span>벡터 + 꼬리표(문서 ID · 판 · 보안등급 · 원문 위치)</span>
+        </div>
+
+        {CAPSULES.map(c => {
+          const shown = !open[c.lane];
+          return <button key={c.key} className="sp-capsule" data-lane={c.lane} data-shown={shown || undefined} data-lit={t >= SEQ[c.ids[0]] || undefined}
+            data-dim={(focus && !c.ids.some(id => focus.has(id))) || undefined} data-trace={c.ids.some(id => trace?.has(id)) || undefined}
+            inert={!shown} tabIndex={shown ? undefined : -1} aria-hidden={!shown || undefined}
+            style={{ left: c.at.x, top: c.at.y, width: c.at.w, height: c.at.h }} onClick={() => onFold(c.lane)}
+            aria-label={`${LANE_LABEL[c.lane]} 펼치기: ${c.ids.map(NAME).join(', ')}`}>
+            <span className="sp-capsule-steps">{c.ids.map((id, k) => <Fragment key={id}>
+              {k > 0 && <ChevronRight size={12} aria-hidden="true"/>}
+              <span data-status={BY_ID[id].status} data-lit={t >= SEQ[id] || undefined}>{BY_ID[id].title}</span>
+            </Fragment>)}</span>
+            <span className="sp-capsule-open">펼치기<ChevronDown size={13} aria-hidden="true"/></span>
+          </button>;
         })}
-      </svg>
-      <div className="sp-loop-label" data-lit={t >= LAST || undefined} data-dim={dim('a4') || undefined}>근거가 모자라면 다시 찾는다</div>
 
-      <div className="sp-bar" data-lit={t >= SEQ.bar || undefined} data-dim={dim('bar') || undefined} style={{ left: BAR.x, top: BAR.y, width: BAR.w, height: BAR.h }}>
-        <Database size={15} aria-hidden="true"/><b>Milvus</b><span>벡터 + 꼬리표(문서 ID · 판 · 보안등급 · 원문 위치)</span>
+        {STAGES.map(s => {
+          const p = POS[s.id], hidden = folded(s.id);
+          return <button key={s.id} className="sp-node" data-status={s.status} data-lit={t >= SEQ[s.id] || undefined} data-now={(running && t === SEQ[s.id]) || undefined}
+            data-dim={dim(s.id) || undefined} data-trace={trace?.has(s.id) || undefined} data-ring={ring(s.id) || undefined}
+            data-folded={hidden || undefined} data-unfolded={(isFoldable(s.lane) && !hidden) || undefined}
+            inert={hidden} tabIndex={hidden ? -1 : undefined} aria-hidden={hidden || undefined} aria-pressed={selected === s.id}
+            style={{ left: p.x, top: p.y, width: p.w, height: p.h, '--i': LANE_INDEX[s.id] } as CSSProperties}
+            onClick={() => onSelect(s.id)} onMouseEnter={enter(s.id)} onMouseLeave={leave} onFocus={enter(s.id)} onBlur={leave}
+            aria-label={`${s.title} · ${STATUS[s.status]}`}>
+            <b>{s.title}</b>
+            <i className="sp-node-status">{STATUS[s.status]}</i>
+            {lens === 'operator' && s.measure && <em className="sp-node-badge" data-kind="measure" data-at={s.id === 'q3a' ? 'top' : undefined}>{s.badge ?? s.measure}</em>}
+            {lens === 'designer' && !!s.questions?.length && <em className="sp-node-badge" data-kind="ask">정할 것 {s.questions.length}</em>}
+          </button>;
+        })}
+
+        {hover && !folded(hover) && <HoverCard id={hover}/>}
       </div>
-
-      {STAGES.map(s => {
-        const p = POS[s.id];
-        return <button key={s.id} className="sp-node" data-status={s.status} data-lit={t >= SEQ[s.id] || undefined} data-now={(running && t === SEQ[s.id]) || undefined}
-          data-dim={dim(s.id) || undefined} data-hot={hot.includes(s.id) || undefined} aria-pressed={selected === s.id}
-          style={{ left: p.x, top: p.y, width: p.w, height: p.h }} onClick={() => onSelect(s.id)} aria-label={`${s.title} · ${STATUS[s.status]}`}>
-          <b>{s.title}</b>{p.h > 50 && <small>{s.short}</small>}
-          <i className="sp-node-status">{STATUS[s.status]}</i>
-          {lens === 'operator' && s.measure && <em className="sp-node-badge" data-kind="measure" data-at={s.id === 'q3a' ? 'top' : undefined}>{s.badge ?? s.measure}</em>}
-          {lens === 'designer' && !!s.questions?.length && <em className="sp-node-badge" data-kind="ask">정할 것 {s.questions.length}</em>}
-        </button>;
-      })}
     </div>
   </div>;
 }
 
-function Inspector({ id, onNavigate }: { id?: string; onNavigate: (page: Page) => void }) {
+function Inspector({ id, onNavigate, onClose, onHot }: { id?: string; onNavigate: (page: Page) => void; onClose: () => void; onHot: (ids: string[]) => void }) {
   const [more, setMore] = useState(false);
   useEffect(() => setMore(false), [id]);
   if (!id) return <div className="sp-inspect sp-inspect-empty">
-    <p><b>단계를 누르면</b> 무엇을 하는지, 무엇이 정해졌고 무엇을 정해야 하는지가 여기 보입니다.</p>
-    <ul className="sp-legend">
-      {(['fixed', 'candidate', 'open', 'agent'] as Status[]).map(k => <li key={k} data-status={k}><i aria-hidden="true"/>{STATUS[k]}<b>{STAGES.filter(s => s.status === k).length}</b></li>)}
+    <p><b>단계를 누르면</b> 무엇을 하는지, 무엇이 정해졌고 무엇을 정해야 하는지가 여기 보입니다. 올려 두면 앞뒤 단계를 짚습니다.</p>
+    <ul className="sp-legend" aria-label="상태별 단계 수">
+      {(['fixed', 'candidate', 'open', 'agent'] as Status[]).map(k => {
+        const ids = STAGES.filter(s => s.status === k).map(s => s.id);
+        return <li key={k} data-status={k} tabIndex={0} onMouseEnter={() => onHot(ids)} onMouseLeave={() => onHot([])} onFocus={() => onHot(ids)} onBlur={() => onHot([])}>
+          <i aria-hidden="true"/>{STATUS[k]}<b>{ids.length}</b>
+        </li>;
+      })}
     </ul>
   </div>;
   const s = BY_ID[id];
@@ -193,12 +278,14 @@ function Inspector({ id, onNavigate }: { id?: string; onNavigate: (page: Page) =
       <h3>{s.title}</h3>
       <small>{LANE_LABEL[s.lane]}</small>
       {s.link && <button className="sp-go" onClick={() => onNavigate(s.link!.page)}>{s.link.label}<ArrowRight size={14} aria-hidden="true"/></button>}
+      <button className="sp-close" onClick={onClose} aria-label="고른 단계 닫기" aria-keyshortcuts="Escape"><X size={15} aria-hidden="true"/></button>
     </div>
     <p className="sp-does">{s.does}</p>
     <div className="sp-facets">
       {s.options && <div><span>후보 · 방법</span><ul className="sp-chips" data-kind="option">{s.options.map(o => <li key={o}>{o}</li>)}</ul></div>}
       {s.measure && <div><span>재는 것</span><ul className="sp-chips" data-kind="measure"><li>{s.measure}</li></ul></div>}
       {s.questions && <div><span>정할 것</span><ul className="sp-chips" data-kind="ask">{s.questions.map(q => <li key={q}>{q}</li>)}</ul></div>}
+      <div><span>앞 · 다음</span><p className="sp-around">{prevOf(id).join(' · ') || '—'}<ArrowRight size={13} aria-hidden="true"/><b>{s.title}</b><ArrowRight size={13} aria-hidden="true"/>{nextOf(id).join(' · ') || '—'}</p></div>
     </div>
     <button className="sp-more" aria-expanded={more} onClick={() => setMore(v => !v)}>자세히<ChevronDown size={14} aria-hidden="true"/></button>
     {more && <p className="sp-detail">{s.detail}</p>}
@@ -284,17 +371,27 @@ function FieldList({ title, fields, onHot }: { title: string; fields: { name: st
 
 export default function SearchPipeline({ onNavigate }: { active: boolean; onNavigate: (page: Page) => void }) {
   const [lens, setLens] = useState<Lens>('all');
+  const [open, setOpen] = useState<Open>({ agent: false, index: false });
   const [selected, setSelected] = useState<string>();
   const [hot, setHot] = useState<string[]>([]);
   const [json, setJson] = useState(false);
   const mapRef = useRef<HTMLDivElement>(null);
+  const unfold = (lanes: Foldable[]) => { if (lanes.length) setOpen(o => ({ ...o, ...Object.fromEntries(lanes.map(lane => [lane, true])) })); };
+  const chooseLens = (next: Lens) => { setLens(next); unfold(LENSES.find(l => l.id === next)!.opens); };
+  const fold = (lane: Foldable) => setOpen(o => ({ ...o, [lane]: !o[lane] }));
   const pick = (id: string) => setSelected(v => v === id ? undefined : id);
-  const show = (id: string) => { setSelected(id); setLens('all'); mapRef.current?.scrollIntoView?.({ block: 'start', behavior: 'smooth' }); };
+  const show = (id: string) => {
+    const lane = BY_ID[id].lane;
+    if (isFoldable(lane)) unfold([lane]);
+    setSelected(id); setLens('all');
+    mapRef.current?.scrollIntoView?.({ block: 'start', behavior: 'smooth' });
+  };
+  const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape' && selected) { event.stopPropagation(); setSelected(undefined); } };
 
   return <article className="sp-root">
-    <div className="sp-board" ref={mapRef}>
-      <FlowMap lens={lens} setLens={setLens} selected={selected} onSelect={pick} hot={hot}/>
-      <Inspector id={selected} onNavigate={onNavigate}/>
+    <div className="sp-board" ref={mapRef} onKeyDown={onKey}>
+      <FlowMap lens={lens} onLens={chooseLens} open={open} onFold={fold} selected={selected} onSelect={pick} hot={hot}/>
+      <Inspector id={selected} onNavigate={onNavigate} onClose={() => setSelected(undefined)} onHot={setHot}/>
     </div>
 
     <div className="sp-grid">

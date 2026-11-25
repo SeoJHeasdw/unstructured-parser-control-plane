@@ -15,7 +15,8 @@
 
 /* ── 흐름 지도 ─────────────────────────────────────────────── */
 .sp-board { border: 1px solid var(--rule); border-radius: 12px; overflow: hidden; background: var(--surface); box-shadow: var(--shadow-1); scroll-margin-top: 72px; }
-.sp-map { position: relative; overflow: hidden; }
+.sp-map { position: relative; overflow-x: auto; overflow-y: hidden; }
+.sp-map-size { position: relative; }
 .sp-map-stage {
   position: absolute; top: 0; left: 0; width: 1060px; height: 548px; transform-origin: 0 0; color: var(--sp-ink);
   background: radial-gradient(circle, #dde3ea 1px, transparent 1.3px) 0 0 / 16px 16px, radial-gradient(ellipse at 54% 38%, #fbfcfe, #eff3f7);
@@ -39,6 +40,13 @@
 
 .sp-lane-label { position: absolute; left: 28px; display: flex; align-items: center; gap: 7px; font-size: 12px; font-weight: 700; color: var(--sp-muted); }
 .sp-lane-label::before { content: ""; width: 12px; height: 1px; background: currentColor; opacity: .7; }
+button.sp-lane-label { gap: 5px; padding: 3px 8px 3px 2px; border: 0; border-radius: 6px; background: none; transition: color var(--dur-1) var(--ease-out), background-color var(--dur-1) var(--ease-out); }
+button.sp-lane-label::before { content: none; }
+button.sp-lane-label small { margin-left: 4px; font-size: 11.5px; font-weight: 650; color: var(--ink-4); }
+button.sp-lane-label:hover { color: var(--action-pressed); background: var(--accent-soft); }
+button.sp-lane-label:hover small { color: var(--sp-query); }
+.sp-lane-chev { transition: transform var(--dur-2) var(--ease-out); }
+button.sp-lane-label[aria-expanded="true"] .sp-lane-chev { transform: rotate(90deg); }
 
 .sp-edges { position: absolute; inset: 0; width: 1060px; height: 548px; overflow: visible; pointer-events: none; }
 .sp-edges g { --c: var(--sp-doc); transition: opacity var(--dur-3) var(--ease-out); }
@@ -51,11 +59,15 @@
 .sp-edges g[data-lit] .sp-edge-flow { opacity: 1; }
 @keyframes sp-flow { to { stroke-dashoffset: -12; } }
 .sp-edges g[data-dim] { opacity: .15; }
-.sp-edges g[data-hot] .sp-edge { stroke: var(--c); stroke-width: 2.4; }
+.sp-edges g[data-folded] { opacity: 0; }
+.sp-map-stage[data-tracing] .sp-edges g:not([data-trace]):not([data-folded]) { opacity: .18; }
+.sp-edges g[data-trace] .sp-edge { stroke: var(--c); stroke-width: 2.4; }
+.sp-edges g[data-trace] .sp-edge-flow { stroke-width: 2.8; stroke-opacity: 1; }
 .sp-arrowhead { fill: #98a4b6; }
 .sp-loop-label { position: absolute; left: 603px; top: 110px; transform: translateX(-50%); padding: 2px 8px; border-radius: 999px; background: var(--accent-soft); font-size: 12px; font-weight: 650; color: var(--action-pressed); white-space: nowrap; opacity: 0; transition: opacity .5s var(--ease-out); }
 .sp-loop-label[data-lit] { opacity: 1; }
 .sp-loop-label[data-dim] { opacity: .2; }
+.sp-map-stage[data-tracing] .sp-loop-label[data-lit]:not([data-trace]) { opacity: .25; }
 
 .sp-bar {
   position: absolute; display: flex; align-items: center; gap: 8px; padding: 0 14px; border-radius: 9px; color: var(--sp-doc);
@@ -64,6 +76,8 @@
 }
 .sp-bar[data-lit] { opacity: 1; }
 .sp-bar[data-dim] { opacity: .2; }
+.sp-map-stage[data-tracing] .sp-bar[data-lit]:not([data-trace]):not([data-dim]) { opacity: .4; }
+.sp-bar[data-trace] { box-shadow: 0 0 0 3px color-mix(in srgb, var(--evidence-surface) 80%, transparent); border-color: var(--sp-doc); }
 .sp-bar b { font-size: 13px; }
 .sp-bar span { font-size: 12.5px; color: var(--sp-ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
@@ -77,16 +91,61 @@
 .sp-node[data-lit] { opacity: 1; }
 .sp-node[data-now] { border-color: var(--sp-query); box-shadow: inset 3px 0 0 var(--k), 0 0 0 3px var(--accent-soft), 0 6px 16px rgba(36, 84, 198, .16); transform: translateY(-2px); }
 .sp-node[data-dim] { opacity: .22; }
+.sp-map-stage[data-tracing] .sp-node[data-lit]:not([data-trace]):not([data-dim]) { opacity: .4; }
 .sp-node:hover { border-color: var(--k); background: #fbfcff; }
-.sp-node[data-hot] { border-color: var(--sp-query); box-shadow: inset 3px 0 0 var(--k), 0 0 0 3px var(--accent-soft); }
+.sp-node[data-ring] { border-color: var(--sp-query); box-shadow: inset 3px 0 0 var(--k), 0 0 0 3px var(--accent-soft), 0 6px 16px rgba(36, 84, 198, .12); }
+.sp-node[data-folded] { visibility: hidden; opacity: 0; pointer-events: none; transition: none; }
+.sp-node[data-unfolded] { animation: sp-pop .34s var(--ease-out) backwards; animation-delay: calc(var(--i, 0) * 40ms); }
+@keyframes sp-pop { from { opacity: 0; transform: translateY(6px) scale(.97); } }
 .sp-node[aria-pressed="true"] { border: 2px solid var(--sp-query); box-shadow: inset 3px 0 0 var(--k), 0 0 0 3px var(--accent-soft), 0 8px 20px rgba(36, 84, 198, .14); }
 .sp-node b { font-size: 14px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.sp-node small { font-size: 12px; color: var(--sp-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .sp-node-status { position: absolute; top: -8px; right: 8px; padding: 0 6px; border-radius: 999px; border: 1px solid color-mix(in srgb, var(--k) 35%, transparent); background: var(--k-soft); color: var(--k); font-size: 10.5px; font-weight: 750; font-style: normal; line-height: 15px; }
-.sp-node-badge { position: absolute; left: 8px; bottom: -10px; padding: 1px 7px; border-radius: 6px; font-size: 11px; font-weight: 750; font-style: normal; white-space: nowrap; box-shadow: var(--shadow-1); }
-.sp-node-badge[data-at="top"] { top: -10px; bottom: auto; }
+.sp-node-badge { position: absolute; left: 8px; bottom: -11px; padding: 1px 7px; border-radius: 6px; font-size: 11px; font-weight: 750; font-style: normal; white-space: nowrap; box-shadow: var(--shadow-1); }
+.sp-node-badge[data-at="top"] { top: -11px; bottom: auto; }
 .sp-node-badge[data-kind="measure"] { background: var(--ok-soft); color: var(--ok); border: 1px solid color-mix(in srgb, var(--ok) 35%, transparent); }
 .sp-node-badge[data-kind="ask"] { background: var(--warn-soft); color: var(--warn); border: 1px solid color-mix(in srgb, var(--warn) 35%, transparent); }
+
+/* 접은 줄: 단계 이름이 이어진 캡슐. 흐름이 켜질 때 이름이 차례로 밝아진다. */
+.sp-capsule {
+  position: absolute; display: flex; align-items: center; gap: 10px; padding: 0 10px 0 12px; text-align: left; border-radius: 10px; color: var(--sp-ink-2);
+  border: 1px dashed var(--rule-strong); background: color-mix(in srgb, var(--surface) 92%, transparent); box-shadow: var(--shadow-1);
+  opacity: .35; transition: opacity .3s var(--ease-out), border-color var(--dur-2) var(--ease-out), background-color var(--dur-2) var(--ease-out), box-shadow var(--dur-2) var(--ease-out);
+}
+.sp-capsule[data-lit] { opacity: 1; }
+.sp-capsule:not([data-shown]) { visibility: hidden; opacity: 0; pointer-events: none; transition: none; }
+.sp-capsule[data-shown] { animation: sp-fade .3s var(--ease-out) backwards; }
+@keyframes sp-fade { from { opacity: 0; } }
+.sp-capsule[data-dim] { opacity: .22; }
+.sp-map-stage[data-tracing] .sp-capsule[data-shown][data-lit]:not([data-trace]):not([data-dim]) { opacity: .45; }
+.sp-capsule:hover { border-color: var(--sp-query); background: var(--accent-soft); }
+.sp-capsule[data-trace] { border-style: solid; border-color: var(--sp-query); box-shadow: 0 0 0 3px var(--accent-soft); }
+.sp-capsule-steps { flex: 1; min-width: 0; display: flex; align-items: center; gap: 3px; overflow: hidden; white-space: nowrap; }
+.sp-capsule-steps > svg { flex: none; color: var(--ink-4); }
+.sp-capsule-steps > span { display: inline-flex; align-items: center; gap: 5px; padding: 3px 8px; border-radius: 6px; background: var(--surface-2); color: var(--ink-4); font-size: 12.5px; font-weight: 650; transition: color .3s var(--ease-out), background-color .3s var(--ease-out); }
+.sp-capsule-steps > span::before { content: ""; width: 6px; height: 6px; flex: none; border-radius: 50%; background: var(--k); opacity: .5; }
+.sp-capsule-steps > span[data-status="open"]::before { background: transparent; box-shadow: inset 0 0 0 1.5px var(--k); }
+.sp-capsule-steps > span[data-lit] { color: var(--sp-ink); background: var(--surface-3); }
+.sp-capsule-steps > span[data-lit]::before { opacity: 1; }
+.sp-capsule-open { flex: none; display: inline-flex; align-items: center; gap: 3px; font-size: 12px; font-weight: 650; color: var(--sp-muted); }
+.sp-capsule:hover .sp-capsule-open { color: var(--sp-query); }
+
+/* 단계에 올렸을 때의 작은 카드 */
+.sp-hovercard {
+  position: absolute; z-index: 5; width: 264px; padding: 10px 12px; border-radius: 10px; color: var(--sp-ink-2);
+  border: 1px solid var(--rule); background: var(--surface); box-shadow: var(--shadow-float); pointer-events: none;
+  animation: sp-card .16s var(--ease-out) backwards;
+}
+.sp-hovercard[data-place="above"] { transform: translateY(-100%); }
+@keyframes sp-card { from { opacity: 0; translate: 0 4px; } }
+.sp-hovercard header { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 6px; }
+.sp-hovercard header b { font-size: 13.5px; color: var(--sp-ink); }
+.sp-hovercard header small { font-size: 11.5px; color: var(--sp-muted); }
+.sp-hovercard .sp-pill { padding: 1px 7px; font-size: 11px; }
+.sp-hovercard p { margin: 6px 0 0; font-size: 13px; line-height: 1.5; color: var(--sp-ink); word-break: keep-all; }
+.sp-hovercard dl { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 2px 8px; margin: 8px 0 0; padding-top: 7px; border-top: 1px solid var(--rule); font-size: 12px; }
+.sp-hovercard dt { font-weight: 700; color: var(--sp-muted); }
+.sp-hovercard dd { margin: 0; color: var(--sp-ink-2); word-break: keep-all; }
+.sp-hovercard-hint { display: block; margin-top: 7px; font-size: 11px; color: var(--ink-4); }
 
 /* ── 고른 단계 ─────────────────────────────────────────────── */
 .sp-inspect { padding: 15px 22px 17px; border-top: 1px solid var(--rule); background: var(--surface); color: var(--sp-ink-2); animation: sp-in .25s var(--ease-out); }
@@ -95,7 +154,8 @@
 .sp-inspect-empty p { margin: 0; font-size: 13px; color: var(--sp-muted); }
 .sp-inspect-empty p b { color: var(--sp-ink); }
 .sp-legend { display: flex; flex-wrap: wrap; gap: 14px; margin: 0; padding: 0; list-style: none; font-size: 12.5px; color: var(--sp-ink-2); }
-.sp-legend li { display: flex; align-items: center; gap: 6px; }
+.sp-legend li { display: flex; align-items: center; gap: 6px; padding: 3px 6px; border-radius: 6px; cursor: default; transition: background-color var(--dur-1) var(--ease-out); }
+.sp-legend li:hover, .sp-legend li:focus-visible { background: var(--surface); box-shadow: var(--shadow-1); }
 .sp-legend i { width: 14px; height: 10px; border-radius: 3px; border: 1.5px solid var(--k); background: var(--k-soft); }
 .sp-legend li[data-status="open"] i { border-style: dashed; }
 .sp-legend b { color: var(--sp-ink); font-variant-numeric: tabular-nums; }
@@ -106,13 +166,19 @@
 .sp-pill[data-status="open"] { border-style: dashed; }
 .sp-go { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; min-height: 32px; padding: 0 12px; border-radius: 7px; border: 1px solid var(--rule-strong); background: var(--surface); color: var(--sp-ink-2); font-size: 12.5px; font-weight: 650; }
 .sp-go:hover { background: var(--accent-soft); border-color: #bbc7f6; color: var(--action-pressed); }
+.sp-close { display: grid; place-items: center; width: 32px; height: 32px; margin-left: auto; border: 1px solid transparent; border-radius: 7px; background: none; color: var(--sp-muted); }
+.sp-go + .sp-close { margin-left: 0; }
+.sp-close:hover { background: var(--surface-3); color: var(--sp-ink); }
+.sp-around { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 6px; margin: 0; font-size: 13px; color: var(--sp-ink-2); }
+.sp-around svg { color: var(--ink-4); }
+.sp-around b { color: var(--sp-query); }
 .sp-does { margin: 7px 0 12px; font-size: 15px; font-weight: 650; color: var(--sp-ink); }
 .sp-facets { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px 22px; }
 .sp-facets > div > span { display: block; margin-bottom: 6px; font-size: 11.5px; font-weight: 700; color: var(--sp-muted); }
 .sp-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; padding: 0; list-style: none; }
 .sp-chips li { padding: 4px 10px; border-radius: 7px; font-size: 13px; line-height: 1.45; }
 .sp-chips[data-kind="option"] li { border: 1px solid color-mix(in srgb, var(--sp-cand) 25%, transparent); background: var(--comparison-surface); color: var(--sp-cand); }
-.sp-chips[data-kind="measure"] li { border: 1px solid color-mix(in srgb, var(--ok) 30%, transparent); background: var(--ok-soft); color: var(--ok); font-family: var(--sp-mono); font-size: 12.5px; }
+.sp-chips[data-kind="measure"] li { border: 1px solid color-mix(in srgb, var(--ok) 30%, transparent); background: var(--ok-soft); color: var(--ok); font-weight: 650; font-variant-numeric: tabular-nums; }
 .sp-chips[data-kind="ask"] li { border: 1px dashed color-mix(in srgb, var(--warn) 55%, transparent); background: var(--warn-soft); color: var(--warn); }
 .sp-more { display: inline-flex; align-items: center; gap: 5px; margin-top: 12px; padding: 0; border: 0; background: none; color: var(--sp-muted); font-size: 12.5px; font-weight: 650; }
 .sp-more:hover { color: var(--sp-query); }
@@ -166,7 +232,7 @@
 .sp-funnel i { width: 24px; height: 24px; display: grid; place-items: center; border-radius: 50%; background: var(--sp-query); color: #fff; font-size: 12px; font-weight: 800; font-style: normal; }
 .sp-funnel b { display: block; font-size: 14px; color: var(--sp-ink); }
 .sp-funnel span { display: block; font-size: 12px; color: var(--sp-muted); word-break: keep-all; }
-.sp-funnel em { font-style: normal; font-family: var(--sp-mono); font-size: 11.5px; font-weight: 700; color: var(--ok); background: var(--ok-soft); border: 1px solid color-mix(in srgb, var(--ok) 30%, transparent); padding: 1px 7px; border-radius: 6px; white-space: nowrap; }
+.sp-funnel em { font-style: normal; font-size: 11.5px; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--ok); background: var(--ok-soft); border: 1px solid color-mix(in srgb, var(--ok) 30%, transparent); padding: 1px 7px; border-radius: 6px; white-space: nowrap; }
 
 .sp-asks { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
 .sp-asks li { display: flex; align-items: center; gap: 10px; padding: 9px 12px; border-radius: 9px; border: 1px dashed color-mix(in srgb, var(--warn) 50%, transparent); background: color-mix(in srgb, var(--warn-soft) 55%, var(--surface)); }
