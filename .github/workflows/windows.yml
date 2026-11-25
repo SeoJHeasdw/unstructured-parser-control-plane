@@ -32,7 +32,7 @@ jobs:
           node-version: '22'
       - name: Start from source
         shell: cmd
-        run: start.cmd --base --check
+        run: start.cmd --lite --check
       - name: Test frontend
         working-directory: frontend
         run: npm test
@@ -51,7 +51,7 @@ jobs:
         run: |
           Expand-Archive offline/unstructured-parser-control-plane-windows.zip "$env:RUNNER_TEMP\배포 확인"
           Set-Location "$env:RUNNER_TEMP\배포 확인\unstructured-parser-control-plane"
-          python scripts/windows_launcher.py --offline --check
+          python scripts/windows_launcher.py --offline --lite --check
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           python backend/docops.py init-workspace "$env:RUNNER_TEMP\agent workspace" --roots "$env:RUNNER_TEMP\samples"
       - uses: actions/upload-artifact@v4

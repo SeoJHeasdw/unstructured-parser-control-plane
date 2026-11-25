@@ -12,7 +12,7 @@ pip install -r requirements.lock.txt   # 정확한 버전(권장). 범위 지정
 uvicorn main:app --host 127.0.0.1 --port 8000
 ```
 
-기본 설치는 TXT, CSV, MD, LOG를 파이썬 표준 라이브러리로 읽습니다. Docling이 필요한 경우 별도로 설치합니다.
+보통은 루트의 `start.cmd`·`run.sh`가 이 과정을 대신하며, 기본 모드에서 Docling까지 같은 `.venv`에 설치합니다(`--lite`는 Docling 제외). 아래는 손으로 설치하는 방법입니다. 기본 잠금 파일만으로 TXT, CSV, MD, LOG를 파이썬 표준 라이브러리로 읽습니다. PDF·Office에는 Docling을 추가로 설치합니다(Python 3.12).
 
 ```bash
 pip install -r requirements-docling.lock.txt   # Windows 포함 정확한 버전

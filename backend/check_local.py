@@ -27,8 +27,9 @@ def check(settings: Settings, docling: bool) -> None:
         from docling.document_converter import DocumentConverter  # noqa: F401
         missing = missing_files(settings.docling_artifacts)
         if missing:
-            print("[주의] PDF 모델 파일을 준비해 주세요. Office 파싱은 별도로 사용할 수 있습니다.")
-            print("       docling-tools models download layout tableformer")
+            tools = Path(sys.executable).with_name("docling-tools.exe" if os.name == "nt" else "docling-tools")
+            print("[주의] PDF 모델 파일이 없습니다. 처음 한 번 아래 명령으로 받아 주세요(인터넷 필요). Office 파싱은 지금도 됩니다.")
+            print(f'       "{tools}" models download layout tableformer')
 
     settings.runtime_dir.mkdir(parents=True, exist_ok=True)
     with TemporaryDirectory(dir=settings.runtime_dir, prefix=".setup-check-") as temp:

@@ -1,4 +1,8 @@
-"""Start the Windows x64 app from either a source ZIP or a prepared bundle."""
+"""Start the Windows x64 app from either a source ZIP or a prepared bundle.
+
+Default mode installs everything, Docling included, into backend\\.venv (Python 3.12).
+--lite skips Docling: only TXT/CSV/MD/LOG parsing, any Python 3.12-3.15.
+"""
 import argparse
 import json
 import os
@@ -12,7 +16,10 @@ ROOT = Path(__file__).resolve().parents[1]
 BACKEND = ROOT / "backend"
 FRONTEND = ROOT / "frontend"
 OFFLINE = ROOT / "offline"
+VENV = BACKEND / ".venv"
+LEGACY_DOCLING_VENV = BACKEND / ".venv-docling"
 PYTHON_INSTALL = "winget install --exact --id Python.Python.3.12 --architecture x64"
+LITE_HINT = "To start without PDF/Office parsing, run: start.cmd --lite"
 DOCS = "See README.md > Windows PC setup."
 PROBE = """\
 import importlib.metadata
@@ -21,8 +28,8 @@ import sys
 import sysconfig
 import fastapi, pydantic_core, python_multipart, uvicorn
 
-docling = sys.argv[2] == "docling"
-supported = sys.version_info[:2] == (3, 12) if docling else (3, 12) <= sys.version_info[:2] <= (3, 15)
+full = sys.argv[2] == "full"
+supported = sys.version_info[:2] == (3, 12) if full else (3, 12) <= sys.version_info[:2] <= (3, 15)
 if sysconfig.get_platform() != "win-amd64" or not supported:
     raise SystemExit("Unsupported virtual environment interpreter.")
 for name, version in json.loads(sys.argv[1]).items():
@@ -93,36 +100,46 @@ def ensure_frontend(offline):
         raise SetupError("Frontend build did not produce a complete frontend/dist directory.")
 
 
-def packages_ready(python, requirements, docling):
-    cmd = [python, "-c", PROBE, json.dumps(locked_versions(requirements)),
-           "docling" if docling else "base"]
+def packages_ready(python, requirements, full):
+    cmd = [python, "-c", PROBE, json.dumps(locked_versions(requirements)), "full" if full else "lite"]
     return subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False).returncode == 0
 
 
-def ensure_python(offline, docling):
-    requirements = BACKEND / ("requirements-docling.lock.txt" if docling else "requirements.lock.txt")
-    environment = BACKEND / (".venv-docling" if docling else ".venv")
-    python = environment / "Scripts" / "python.exe"
-    if docling and sys.version_info[:2] != (3, 12):
-        raise SetupError(f"Install Python 3.12 x64 for Docling:\n    {PYTHON_INSTALL}")
+def venv_version(python):
+    probe = "import sys, sysconfig; print(f'{sys.version_info.major}.{sys.version_info.minor}'); raise SystemExit(sysconfig.get_platform() != 'win-amd64')"
+    result = subprocess.run([python, "-c", probe], capture_output=True, text=True, check=False)
+    return result.stdout.strip() if result.returncode == 0 else None
+
+
+def ensure_python(offline, full):
+    """Prepare backend\\.venv. Full mode adds Docling to the same environment; lite mode accepts a full one."""
+    requirements = BACKEND / ("requirements-docling.lock.txt" if full else "requirements.lock.txt")
+    python = VENV / "Scripts" / "python.exe"
     if python.is_file():
-        probe = "import sys, sysconfig; print(f'{sys.version_info.major}.{sys.version_info.minor}'); raise SystemExit(sysconfig.get_platform() != 'win-amd64')"
-        result = subprocess.run([python, "-c", probe], capture_output=True, text=True, check=False)
-        valid_versions = {"3.12"} if docling else {"3.12", "3.13", "3.14", "3.15"}
-        if result.returncode != 0 or result.stdout.strip() not in valid_versions:
-            raise SetupError(f"Cannot use {environment}. Rename this virtual environment and run start.cmd again.")
-        if packages_ready(python, requirements, docling):
+        version = venv_version(python)
+        if version is None or version not in ({"3.12"} if full else {"3.12", "3.13", "3.14", "3.15"}):
+            if full and version:
+                raise SetupError(f"backend\\.venv uses Python {version}, but Docling needs Python 3.12. "
+                                 f"Rename backend\\.venv (for example to .venv-py{version.replace('.', '')}) and run start.cmd again.\n{LITE_HINT}")
+            raise SetupError("Cannot use backend\\.venv. Rename this virtual environment and run start.cmd again.")
+        if packages_ready(python, requirements, full):
             return python
+    elif full and sys.version_info[:2] != (3, 12):
+        raise SetupError(f"Docling (PDF/Office parsing) needs Python 3.12 x64:\n    {PYTHON_INSTALL}\n"
+                         f"Open a new terminal after installation.\n{LITE_HINT}")
 
     wheel_dirs = [OFFLINE / "wheels"]
-    if docling:
+    if full:
         wheel_dirs.append(OFFLINE / "wheels-docling")
     have_wheels = all(any(directory.glob("*.whl")) for directory in wheel_dirs)
     if offline and not have_wheels:
+        if full and any((OFFLINE / "wheels").glob("*.whl")):
+            raise SetupError("This bundle has no Docling wheels. Run start.cmd --offline --lite, "
+                             f"or use the -docling Windows ZIP for PDF/Office parsing. {DOCS}")
         raise SetupError(f"Required offline wheels are missing. Use the matching prepared Windows ZIP. {DOCS}")
     if not python.is_file():
-        print(f"[setup] creating {environment.name} with Python {sys.version.split()[0]}", flush=True)
-        run([sys.executable, "-m", "venv", environment], timeout=90)
+        print(f"[setup] creating backend\\.venv with Python {sys.version.split()[0]}", flush=True)
+        run([sys.executable, "-m", "venv", VENV], timeout=90)
     pip = [python, "-m", "pip", "install", "--disable-pip-version-check", "--only-binary=:all:",
            "--retries", "1", "--timeout", "15", "-r", requirements]
     if have_wheels:
@@ -131,25 +148,31 @@ def ensure_python(offline, docling):
         for directory in wheel_dirs:
             pip.extend(["--find-links", directory])
     else:
-        print("[setup] installing from the configured Python package index", flush=True)
+        print("[setup] installing from the configured Python package index"
+              + (" (Docling is large; the first install can take several minutes)" if full else ""), flush=True)
         for directory in wheel_dirs:
             if directory.is_dir():
                 pip.extend(["--find-links", directory])
     try:
-        run(pip, env=offline_pip_env() if have_wheels else None, timeout=1800 if docling else 180)
+        run(pip, env=offline_pip_env() if have_wheels else None, timeout=1800 if full else 180)
         run([python, "-m", "pip", "check"], timeout=60)
     except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as exc:
-        raise SetupError(f"Python package setup failed. Check pip output or use a complete prepared Windows ZIP for this mode. {DOCS}") from exc
-    if not packages_ready(python, requirements, docling):
+        raise SetupError(f"Python package setup failed. Check pip output and run start.cmd again (finished packages are kept), "
+                         f"or use a complete prepared Windows ZIP for this mode. {DOCS}") from exc
+    if not packages_ready(python, requirements, full):
         raise SetupError("Installed packages could not be imported. Check Python architecture and package versions.")
     return python
 
 
 def start(args):
-    docling = not args.base and (args.docling or any((OFFLINE / "wheels-docling").glob("*.whl")))
+    full = not args.lite
+    print(f"[setup] mode: {'full (Docling: PDF/Office parsing)' if full else 'lite (no Docling: TXT/CSV/MD/LOG only)'}", flush=True)
+    if LEGACY_DOCLING_VENV.is_dir():
+        print("[setup] backend\\.venv-docling is no longer used. Docling now installs into backend\\.venv; "
+              "delete backend\\.venv-docling when you no longer need it.", flush=True)
     # 파이썬 환경(venv)을 먼저 만든다. 화면 빌드(npm)가 막혀도 venv와 패키지는 남아 다음 실행에서 이어진다.
     print("[setup] 1/2 Python venv and packages", flush=True)
-    python = ensure_python(args.offline, docling)
+    python = ensure_python(args.offline, full)
     print("[setup] 2/2 frontend", flush=True)
     ensure_frontend(args.offline)
     env_file = ROOT / ".env"
@@ -157,7 +180,7 @@ def start(args):
     if not env_file.exists() and example.is_file():
         shutil.copyfile(example, env_file)
     if args.check:
-        run([python, "check_local.py", *(["--docling"] if docling else [])], cwd=BACKEND, timeout=180)
+        run([python, "check_local.py", *(["--docling"] if full else [])], cwd=BACKEND, timeout=180)
         return 0
 
     process = subprocess.Popen(
@@ -169,18 +192,25 @@ def start(args):
         return process.wait()
 
 
-def main():
-    parser = argparse.ArgumentParser(description=__doc__)
+def parse_args(argv=None):
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("port", nargs="?", type=int, default=8000)
     parser.add_argument("--offline", action="store_true", help="Use only installed packages or bundled wheels and prebuilt assets")
     mode = parser.add_mutually_exclusive_group()
-    mode.add_argument("--docling", action="store_true", help="Set up optional PDF and Office parsing in a Python 3.12 environment")
-    mode.add_argument("--base", action="store_true", help="Use the base environment when Docling wheels are bundled")
+    mode.add_argument("--lite", "--base", dest="lite", action="store_true",
+                      help="Skip Docling: TXT/CSV/MD/LOG only, any Python 3.12-3.15")
+    # 예전 옵션. 이제 Docling이 기본이라 아무 일도 하지 않는다.
+    mode.add_argument("--docling", action="store_true", help=argparse.SUPPRESS)
     parser.add_argument("--check", action="store_true", help="Check setup without starting a server")
     parser.add_argument("--no-browser", action="store_true")
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
     if not 1 <= args.port <= 65535:
         parser.error("port must be between 1 and 65535")
+    return args
+
+
+def main():
+    args = parse_args()
     try:
         return start(args)
     except (SetupError, OSError, subprocess.SubprocessError) as exc:

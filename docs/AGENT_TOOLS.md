@@ -33,7 +33,7 @@ flowchart LR
 
 ## 3. 고객사 PC 설치
 
-1. 콘솔을 평소처럼 띄운다(Git Bash에서 `./run.sh --docling`).
+1. 콘솔을 평소처럼 띄운다(Git Bash에서 `./run.sh`, cmd에서 `start.cmd`. 기본 모드에 Docling이 들어 있다).
 2. 작업 폴더를 **저장소 밖에** 만든다. 경로는 이 PC 기준으로 자동으로 채워진다.
 
    ```bash

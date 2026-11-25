@@ -21,7 +21,7 @@
 
 - 프론트: `frontend/`에서 `npm test`, `npm run build`.
 - 백엔드: `backend/`에서 `.venv/bin/python -m pytest -q`(개발 의존성이 설치된 경우).
-- Docling은 선택적 의존성이며 PDF 모델은 미리 준비된 로컬 캐시가 필요하다. 실행 방식과 제한은 `README.md`, `backend/README.md`를 확인한다.
+- Docling은 실행기(`start.cmd`·`run.sh`)의 기본 모드에 포함되고 `--lite`에서만 빠진다. 가상환경은 `backend/.venv` 하나다. PDF 모델은 미리 준비된 로컬 캐시가 필요하다. 실행 방식과 제한은 `README.md`, `backend/README.md`를 확인한다.
 - 도메인이나 API를 바꾸면 관련 계약과 실행 안내도 함께 갱신하고, 구현된 것과 계획한 것을 구분한다.
 - 정보 밀도가 있고 완성도 높은 UI와 실제로 동작하는 조작을 유지한다. 드래그에는 키보드 대안을 유지하고, 예시와 실제 파일 처리의 구분을 화면에 명확히 표시한다.
 

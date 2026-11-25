@@ -35,7 +35,7 @@ if not errorlevel 1 (
   goto :finished
 )
 
-echo [setup] Windows x64 Python 3.12-3.15 is required. Use 3.12 for Docling.
+echo [setup] Windows x64 Python 3.12 is required (start.cmd --lite also accepts 3.13-3.15).
 echo     winget install --exact --id Python.Python.3.12 --architecture x64
 echo Open a new terminal after installation.
 popd
@@ -43,8 +43,12 @@ if "%~1"=="" pause
 exit /b 1
 
 :help
-echo Usage: start.cmd [port] [--offline] [--docling or --base] [--check] [--no-browser]
-echo Default port: 8000. See README.md for Windows setup.
+echo Usage: start.cmd [port] [--lite] [--offline] [--check] [--no-browser]
+echo   default     full mode: Docling PDF/Office parsing, Python 3.12, backend\.venv
+echo   --lite      no Docling: TXT/CSV/MD/LOG only, Python 3.12-3.15
+echo   --offline   prepared Windows ZIP: bundled wheels and screen only
+echo   --check     set up and self-test without starting the server
+echo Default port: 8000. See README.md.
 popd
 exit /b 0
 

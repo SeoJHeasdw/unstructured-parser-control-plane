@@ -2,9 +2,17 @@
 
 > **기준 시점: 2026-11-12.** 이 문서는 인수인계 시점의 스냅샷이다. 코드·실행 상태·의존성·데이터는 바뀔 수 있으므로 새 세션에서는 아래 확인 순서부터 진행한다. 이 문서는 요구사항이나 고객 환경이 확정되었다는 뜻이 아니다.
 
+## 2026-11-25 실행 모드 정리 (기본 = Docling 포함, `--lite`)
+
+- **사용자 결정:** 사용자 2명이 시험하는 단계라 Docling이 기본이어야 한다. 가상환경을 둘로 나누는 방식은 헷갈린다. 고객사 PC는 PyPI·npm 접속이 열려 있다. 근거와 영향은 [결정](DECISIONS.md)의 "실행 모드"에 적었다.
+- **바뀐 것:** `start.cmd`·`run.sh`는 옵션이 없으면 `backend/.venv`(Python 3.12)에 `requirements-docling.lock.txt`까지 설치한다. `--lite`(옛 `--base`)는 기본 잠금 파일만 설치하고 Python 3.12~3.15를 받는다. 전체 모드로 설치한 `.venv`는 `--lite`에서 다시 설치하지 않는다. `--docling`은 받아들이되 아무 일도 하지 않는다. `run.sh`의 `.venv/.lock-stamp`는 이제 `모드:지문` 형식이다.
+- **기존 설치 PC:** `backend/.venv`가 3.12면 첫 실행에서 Docling 패키지를 그 안에 더 설치한다. 3.13 이상이면 실행기가 멈추고 이름을 바꾸라고 안내한다. `backend/.venv-docling`은 쓰지 않으며 지우지도 않는다(실행할 때 안내만 함). 오프라인 기본 묶음은 `start.cmd --offline --lite`로 실행한다.
+- **그 밖의 정리:** `.env.example`에서 효과가 없는 EasyOCR 항목(`DOCOPS_OCR`, `DOCOPS_OCR_MODELS`)을 뺐다. `check_local.py`는 PDF 모델이 없을 때 이 PC의 `docling-tools` 경로를 그대로 보여 준다. README를 사람이 읽는 순서(빠른 시작 → 옵션 → 모델 연결 → 제약 → 문제 해결 → 오프라인 → 개발)로 다시 썼다.
+- **검증:** 백엔드 테스트 193개 통과, 8개 건너뜀(Docling 실측 등). 새 `tests/test_windows_launcher.py` 6개는 옵션 해석과, 3.12가 없거나 Docling 휠이 없는 묶음에서 `--lite`를 안내하는지 확인한다. Linux에서 `./run.sh --lite --check`의 첫 설치와 재실행, 전체 모드 지문이 있는 `.venv`를 lite가 재설치 없이 쓰는 것, 3.13 `.venv`에서 전체 모드가 멈추는 것을 확인했다. **Windows 실기기와 전체 모드 실제 설치(Docling·torch)는 이 변경 뒤 돌려보지 않았다.**
+
 ## 2026-11-25 고객 PC 실행
 
-- Windows 소스 ZIP은 `start.cmd --check` 후 `start.cmd`, 준비된 기본 ZIP은 두 명령에 `--offline`을 붙인다. `--check`는 해당 데이터 경로에서 임시 SQLite 저장소·한글 CSV 파싱·청킹을 확인한다. 기존 문서함에 시험 기록을 넣지 않는다.
+- Windows 소스 ZIP은 `start.cmd --check` 후 `start.cmd`, 준비된 ZIP은 두 명령에 `--offline`을 붙인다(Docling 휠이 없는 기본 ZIP은 `--offline --lite`, 위 실행 모드 정리 참고). `--check`는 해당 데이터 경로에서 임시 SQLite 저장소·한글 CSV 파싱·청킹을 확인한다. 기존 문서함에 시험 기록을 넣지 않는다.
 - Windows와 Bash 실행기가 같은 포트 선택 코드를 사용한다. 포트가 겹치면 실행 창에 표시된 실제 주소로 접속한다. GitHub 소스 ZIP 첫 설치의 네트워크 요건 및 Docling 설치 옵션은 프로젝트 README에 있다.
 - PDF 모델 일부만 옮긴 PC에서는 파서 플로우의 PDF 설치 안내를 펼쳐 빠진 파일을 확인한다. 파일 확인은 모델 가중치의 무결성 검사나 OCR 게이트웨이 접속 시험까지 수행하지 않는다.
 
@@ -170,7 +178,7 @@ Mock API 오류나 로딩 중에도 실제 처리 탭으로 이동할 수 있으
 - `TXT`, `CSV`, `MD`, `LOG`는 기본 파이썬 파서 경로가 있다. 텍스트 디코딩은 UTF-8 BOM 포함 또는 CP949를 시도한다. CSV는 Markdown 표로 출력한다.
 - `PDF`, `DOCX`, `PPTX`, `XLSX`는 선택적으로 설치한 Docling 경로로 연결된다. 이전 개발 세션에서는 **합성 DOCX와 텍스트 PDF**를 Docling 2.150.0으로 시험했다. PPTX·XLSX는 어댑터가 있으나 실제 문서에 대한 품질 검증이 필요하다.
 - 경로는 확장자로 고르지만, 파서 전에 내용 서명으로 DRM·암호·형식 불일치를 걸러 `error_code`로 남긴다(2026-11-19). DOCX·XLSX·PPTX는 기호 글꼴·첨자 사본 보정과 원문 대조(`fidelity`)를 거친다. 복잡한 표와 원문 페이지·시트·셀 위치가 정확하게 추출된다고 보장하지 않는다.
-- 로컬 EasyOCR 한국어·영어 모델이 준비되면 PDF의 이미지 영역, Office에서 참조한 그림, PNG·JPEG·BMP·TIFF·GIF·WebP 및 SVG 내부 그림을 읽습니다. 활성화 여부는 각 실행 이력에서 확인한다.
+- 스캔 쪽과 그림의 글자는 연결한 문서 OCR 모델(OpenAI 호환 비전 API)로만 읽는다(2026-11-24 결정, 라이브러리 OCR 없음). 대상은 PDF의 글자 층 없는 쪽과 큰 그림, Office·SVG 속 그림, PNG·JPEG·BMP·TIFF·GIF·WebP다. 적용 여부는 각 실행 이력에서 확인한다.
 - HWP/HWPX·ZIP 내부 분리·메일 첨부·kordoc·Excel 외부 참조 연결·검색 인덱싱은 실제 파서에 연결되지 않았다. 지원하지 않는 형식은 `unsupported`로 드러난다.
 
 ### 파일과 로컬 상태

@@ -370,7 +370,7 @@ class Ops:
         counts = Counter(doc["status"] for doc in docs)
         problems = []
         if not parsers["docling_installed"]:
-            problems.append("Docling 미설치: PDF·Office 파싱 불가(start.cmd --docling 또는 ./run.sh --docling)")
+            problems.append("Docling 미설치: PDF·Office 파싱 불가(--lite로 띄웠다면 옵션 없이 start.cmd 또는 ./run.sh 로 다시 실행)")
         elif not parsers["pdf_model_directory"]:
             problems.append("PDF 모델 폴더 없음: PDF 파싱 불가")
         elif parsers.get("pdf_models_ready") is False:
