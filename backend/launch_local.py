@@ -1,4 +1,4 @@
-"""Start the local console for run.sh and start.cmd, or open its existing instance."""
+"""Start the local console for run.cmd and run.sh (via scripts/console.py run), or open its existing instance."""
 
 import errno
 from http.client import HTTPConnection, HTTPException

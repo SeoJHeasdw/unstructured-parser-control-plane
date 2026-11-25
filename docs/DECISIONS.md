@@ -31,14 +31,14 @@
 | 영향 | EasyOCR 경로를 껐다. OCR 모델은 고객사 게이트웨이에 서빙을 요청할 예정이라 OpenAI 호환 비전 API로 연결한다. 후보: GLM-OCR, PaddleOCR-VL-1.6, Schift schift-ocr-1-beta(한국어 특화) 등. |
 | 남은 위험 | 게이트웨이에 OCR 모델이 언제 올라갈지 미정. 그 전까지 스캔·이미지 글자는 추출되지 않는다. 후보 모델의 한국어·표·숫자 품질은 이 Mac 시험과 고객 문서로 확인해야 한다. |
 
-### 실행 모드: 기본은 전체, 가벼운 실행은 `--lite` (2026-11-25, 사용자 결정)
+### 설치·실행: `setup` / `run`, 기본은 전체, 가벼운 설치는 `--lite` (2026-11-25, 사용자 결정)
 
 | 항목 | 내용 |
 |---|---|
-| 결정 | `start.cmd`·`run.sh`의 기본 모드에 Docling(PDF·Office 파싱)을 포함한다. Docling 없이 띄우는 것은 `--lite`로 한다. 가상환경은 `backend/.venv` 하나다. |
-| 근거 | 사용자는 구축팀 2명(사용자와 부장님)이고 시험 단계라 PDF·Office를 포함한 모든 제약을 봐야 한다. 이전처럼 `--docling`을 매번 붙이고 가상환경을 둘로 나누는 방식은 헷갈린다는 사용자 의견. 고객사 PC는 PyPI·npm 접속이 열려 있다(사용자 확인). |
-| 영향 | 기본 모드는 Python 3.12가 필요하고, 첫 설치에 Docling(torch 포함)이 들어가 시간이 걸린다. `--docling`은 받아들이되 아무 일도 하지 않고, `--base`는 `--lite`와 같다. 예전 `backend/.venv-docling`은 쓰지 않으며 지우지도 않는다(실행기가 안내만 함). 오프라인 기본 묶음(Docling 휠 없음)은 `start.cmd --offline --lite`로 실행한다. |
-| 남은 위험 | Windows 실기기에서 전체 모드 첫 설치를 이 변경 후 다시 돌려보지 않았다. CI(`windows.yml`)는 시간 때문에 `--lite`로 점검한다. |
+| 결정 | 설치(`setup.cmd`·`setup.sh`)와 실행(`run.cmd`·`run.sh`)을 나눈다. 진입점은 Python만 찾는 얇은 래퍼이고, 로직은 `scripts/console.py` 하나에 둔다. setup의 기본 모드에 Docling(PDF·Office 파싱)과 PDF 모델 받기를 포함하고, Docling 없이 설치할 때는 `--lite`를 쓴다. 가상환경은 `backend/.venv` 하나다. run은 설치하거나 네트워크를 쓰지 않는다. |
+| 근거 | 사용자는 구축팀 2명(사용자와 부장님)이고, 시험 단계라 PDF·Office를 포함한 모든 제약을 봐야 한다. `--docling`을 매번 붙이고 가상환경을 둘로 나누는 방식은 헷갈리고, "사용자는 setup·run만 알면 된다"는 사용자 의견이다. Windows용(Python)과 bash용 설치 로직이 이중으로 있어 고칠 때마다 두 곳을 맞춰야 했다. 고객사 PC는 PyPI·npm 접속이 열려 있다(사용자 확인). |
+| 영향 | 기본 setup은 Python 3.12가 필요하고, 첫 설치에 Docling(torch 포함)이 들어가 시간이 걸린다. 코드를 업데이트한 뒤에는 setup을 다시 실행해야 하며, run이 이를 알려 준다. `start.cmd`는 없앴다. 예전 `backend/.venv-docling`은 쓰지 않으며 지우지도 않는다. 오프라인 기본 묶음(Docling 휠 없음)은 `setup.cmd --offline --lite`로 설치한다. |
+| 남은 위험 | Windows 실기기에서 새 진입점과 전체 모드 첫 설치를 돌려보지 않았다. 고객사에서 `huggingface.co`가 막혀 있으면 PDF 모델은 따로 옮겨야 한다(setup은 경고만 하고 계속함). CI(`windows.yml`)는 시간 때문에 `--lite`로 점검한다. |
 
 ## 2. 현재 프로토타입의 구현 선택
 

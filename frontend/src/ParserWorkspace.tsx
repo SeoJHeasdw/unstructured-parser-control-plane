@@ -48,7 +48,7 @@ function Environment({ engine, format, catalog }: { engine: string; format: stri
     <span>문서 파싱 1개씩 · 단일 워커</span></p>
     {format === 'PDF' && catalog.pdf_models_ready === false && <details className="pr-model-help">
       <summary>PDF 모델 설치 필요{catalog.pdf_missing_files?.length ? ` · 누락 ${catalog.pdf_missing_files.length}개` : ''}</summary>
-      <p>Docling 환경에서 아래 명령으로 레이아웃·표 모델을 준비한 뒤 콘솔을 다시 실행하세요.</p>
+      <p>콘솔을 끄고 setup을 다시 실행하면 레이아웃·표 모델을 받습니다(huggingface.co 접속 필요). 직접 받을 때는 Docling 환경에서 아래 명령을 실행한 뒤 콘솔을 다시 시작하세요.</p>
       <code>docling-tools models download layout tableformer</code>
       {!!catalog.pdf_missing_files?.length && <ul>{catalog.pdf_missing_files.map(file => <li key={file}>{file}</li>)}</ul>}
     </details>}

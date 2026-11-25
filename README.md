@@ -2,56 +2,53 @@
 
 문서를 로컬에 저장해 파싱하고, 추출 결과를 원문과 대조·검수하는 작업 화면입니다. PC 한 대에서 쓰는 **로컬 프로토타입**이며 인증·권한 기능은 없습니다.
 
-## 빠른 시작 (Windows)
+## 빠른 시작
 
-**1. 준비물 설치 (처음 한 번)**
+사용자는 **`setup`**(설치·갱신)과 **`run`**(실행) 두 가지만 알면 됩니다. Windows는 `setup.cmd`·`run.cmd`, macOS·Linux·Git Bash는 `./setup.sh`·`./run.sh`를 씁니다.
+
+**1. 준비물 설치 (Windows, 처음 한 번)**
 
 ```cmd
 winget install --exact --id Python.Python.3.12 --architecture x64
 winget install --exact --id OpenJS.NodeJS.LTS
 ```
 
-설치 후 **새 터미널**을 엽니다. Node.js는 화면을 빌드할 때만 필요합니다(20.19 이상 또는 22.12 이상). [오프라인 ZIP](#인터넷이-없는-pc-오프라인-zip)을 받았다면 설치하지 않아도 됩니다.
+설치한 뒤 **새 터미널**을 엽니다. Node.js(20.19 이상 또는 22.12 이상)는 화면을 빌드할 때만 필요하며, [오프라인 ZIP](#인터넷이-없는-pc-오프라인-zip)에는 빌드된 화면이 들어 있어 없어도 됩니다.
 
-**2. 설치와 점검 (처음 한 번, 몇 분 걸림)**
-
-```cmd
-start.cmd --check
-```
-
-Python 패키지(Docling 포함)와 화면을 설치한 뒤, 합성 CSV로 파싱·청킹을 시험합니다. 시험은 임시 저장소에서 하므로 문서함에는 아무것도 남지 않습니다.
-
-**3. PDF 모델 받기 (처음 한 번)**
+**2. 설치: 처음 한 번, 그리고 코드를 업데이트할 때마다**
 
 ```cmd
-backend\.venv\Scripts\docling-tools.exe models download layout tableformer
+setup.cmd
 ```
 
-PDF 파싱에 쓰는 레이아웃·표 모델을 `%USERPROFILE%\.cache\docling\models`에 받습니다. 파싱하는 중에는 모델을 내려받지 않으므로, 이 단계를 건너뛰면 PDF 파싱이 실패합니다. Office 문서는 이 모델 없이도 파싱됩니다.
+다음을 한 번에 처리합니다. 처음에는 Docling 때문에 몇 분 걸리고, 다시 실행하면 바뀐 것만 처리하므로 금방 끝납니다.
 
-**4. 실행**
+1. Python 가상환경 `backend\.venv`를 만들고 패키지를 설치합니다(Docling 포함).
+2. 화면을 빌드하고, `.env`가 없으면 `.env.example`로 만듭니다.
+3. PDF 모델(레이아웃·표)을 받습니다. `huggingface.co`에 접속해야 하며, 받지 못하면 경고만 남기고 계속합니다. 이 경우 PDF만 파싱되지 않습니다.
+4. 합성 CSV로 파싱과 청킹을 시험합니다. 시험은 임시 저장소에서 하므로 문서함에는 아무것도 남지 않습니다.
+
+**3. 실행: 매번**
 
 ```cmd
-start.cmd
+run.cmd
 ```
 
-브라우저에서 `http://127.0.0.1:8000/`이 열립니다. 종료할 때는 실행 창에서 `Ctrl+C`를 누릅니다.
+브라우저에서 `http://127.0.0.1:8000/`이 열리고, 종료는 실행 창에서 `Ctrl+C`로 합니다. `run`은 설치나 네트워크 접속을 하지 않고 준비 상태만 확인합니다. 코드가 바뀌어 다시 설치해야 하면 "setup을 다시 실행하세요"라고 알려 줍니다.
 
-> **macOS·Linux·Git Bash**에서는 `start.cmd` 대신 `./run.sh`를 같은 옵션으로 씁니다. 3단계 명령은 `backend/.venv/bin/docling-tools`이고, Windows의 Git Bash에서는 `backend/.venv/Scripts/docling-tools.exe`입니다.
+## 옵션
 
-## 실행 옵션
+| 명령 | 옵션 | 하는 일 |
+|---|---|---|
+| setup | (없음) | **전체 모드.** Docling을 넣어 PDF·DOCX·PPTX·XLSX와 TXT·CSV·MD·LOG를 모두 파싱합니다. Python 3.12가 필요합니다. |
+| setup | `--lite` | **가벼운 모드.** Docling 없이 TXT·CSV·MD·LOG만 파싱합니다. Python 3.12~3.15에서 되며, 화면만 볼 때나 3.12가 없는 PC용입니다. |
+| setup | `--offline` | 준비된 ZIP에 든 휠과 화면 빌드만 씁니다(네트워크 없음). |
+| run | `8010` | 시작 포트를 지정합니다(기본 8000). 쓰는 중이면 다음 빈 포트로 넘어가며 최대 20개까지 찾습니다. |
+| run | `--no-browser` | 브라우저를 열지 않습니다. |
 
-| 옵션 | 하는 일 |
-|---|---|
-| (없음) | **전체 모드.** Docling까지 설치해 PDF·DOCX·PPTX·XLSX와 TXT·CSV·MD·LOG를 모두 파싱합니다. Python 3.12가 필요합니다. |
-| `--lite` | **가벼운 모드.** Docling 없이 TXT·CSV·MD·LOG만 파싱합니다. Python 3.12~3.15에서 동작하며, 화면만 볼 때나 3.12가 없는 PC에서 씁니다. |
-| `--check` | 서버는 띄우지 않고 설치와 점검만 합니다. |
-| `8010` | 시작 포트를 지정합니다(기본 8000). 이미 쓰는 포트면 다음 빈 포트를 찾고, 최대 20개까지 시도합니다. |
-| `--no-browser` | 브라우저를 열지 않습니다. |
-| `--offline` | 준비된 ZIP에 든 파일로만 설치합니다(`start.cmd` 전용). |
-| `--rebuild` | 화면을 다시 빌드합니다(`run.sh` 전용). |
-
-두 모드는 같은 가상환경 `backend\.venv`를 씁니다. 전체 모드로 설치한 뒤 `--lite`로 띄우면 다시 설치하지 않습니다. 두 번째 실행부터는 바뀐 것만 설치하므로 금방 뜹니다.
+- 모드는 setup에서 정하고 기록되므로 run에는 모드 옵션이 없습니다.
+- 가상환경은 `backend\.venv` 하나입니다. 전체 모드로 설치한 뒤 `setup --lite`를 실행하면 다시 설치하지 않습니다.
+- 콘솔이 켜져 있으면 setup이 멈춥니다. Windows에서는 실행 중인 파일이 잠겨 설치가 중간에 깨질 수 있기 때문입니다.
 
 ## 화면
 
@@ -98,41 +95,44 @@ start.cmd
 
 | 증상 | 해결 |
 |---|---|
-| `Docling ... needs Python 3.12` | Python 3.12를 설치하고 새 터미널에서 다시 실행합니다. 당장 화면만 띄우려면 `--lite`를 씁니다. |
-| `backend\.venv uses Python 3.13` | 예전에 다른 버전으로 만든 환경입니다. `backend\.venv` 이름을 바꾸고(예: `.venv-py313`) 다시 실행합니다. |
-| `backend\.venv-docling is no longer used` | 예전 방식의 환경이라 이제 쓰지 않습니다. 확인한 뒤 지워도 됩니다. |
+| `아직 설치되지 않았습니다` | `setup.cmd`를 먼저 실행합니다. |
+| `패키지 목록이 바뀌었습니다` / `화면 코드가 바뀌었습니다` | 코드를 업데이트한 뒤에 나옵니다. `setup.cmd`를 다시 실행합니다(lite로 쓰던 PC는 `--lite`). |
+| `콘솔이 실행 중입니다` | 콘솔 실행 창에서 `Ctrl+C`로 끈 뒤 setup을 다시 실행합니다. |
+| `Docling(PDF·Office 파싱)에는 Python 3.12가 필요합니다` | Python 3.12를 설치하고 새 터미널에서 다시 실행합니다. 당장 화면만 띄우려면 `setup.cmd --lite`를 씁니다. |
+| `backend/.venv 는 Python 3.13 입니다` | 예전에 다른 버전으로 만든 환경입니다. `backend\.venv` 이름을 바꾸고(예: `.venv-py313`) setup을 다시 실행합니다. |
+| `backend/.venv-docling 은 더 이상 쓰지 않습니다` | 예전 방식의 환경입니다. 확인한 뒤 지워도 됩니다. |
+| PDF만 실패하고 '모델 파일 누락'이 뜸 | `huggingface.co`에 접속되는 상태에서 setup을 다시 실행합니다. 안 되면 다른 PC에서 받은 모델 폴더를 `%USERPROFILE%\.cache\docling\models`에 두거나, 다른 위치를 `.env`의 `DOCOPS_DOCLING_ARTIFACTS`로 지정합니다. |
 | 인증서 오류(`UNABLE_TO_VERIFY_LEAF_SIGNATURE`, pip SSL) | npm은 `NODE_EXTRA_CA_CERTS=<사내 루트 CA 파일>`(Node 22.15 이상이면 `NODE_OPTIONS=--use-system-ca`도 가능), pip는 `PIP_CERT=<같은 파일>`을 설정합니다. |
 | 사내 패키지 미러를 써야 함 | `npm_config_registry`와 `PIP_INDEX_URL`을 설정합니다. |
-| 설치 도중 끊기거나 시간이 초과됨 | 다시 실행합니다. 끝난 부분은 남아 있어 이어서 설치합니다. |
-| PDF만 실패하고 '모델 파일 누락'이 뜸 | [3단계](#빠른-시작-windows)에서 모델을 받습니다. 모델을 다른 위치에 두었다면 `DOCOPS_DOCLING_ARTIFACTS`를 설정합니다. |
+| 설치 도중 끊기거나 시간이 초과됨 | setup을 다시 실행하면 끝난 부분은 남아 있어 이어서 설치합니다. |
 | 다른 PC에서 접속이 안 됨 | 이 PC에서만 접속하도록 만들어져 있습니다(위 제약 참고). |
 | 주소의 포트가 8000이 아님 | 실행 창에 표시된 주소로 접속합니다. 같은 데이터 폴더를 쓰는 콘솔이 이미 떠 있으면 그 주소가 열립니다. |
-| 코드를 업데이트했는데 반영되지 않음 | `Ctrl+C`로 끄고 다시 실행합니다. 화면 코드가 바뀌었다면 `frontend\dist`를 지우고 실행합니다(`run.sh`는 `--rebuild`). |
 
 ## 인터넷이 없는 PC (오프라인 ZIP)
 
-인터넷이 되는 PC에서 ZIP을 만들어 대상 PC로 옮깁니다. 만드는 PC에는 Node.js와 Python 3.12가 필요합니다. macOS·Linux에서는 `scripts/prepare-offline.sh`에 같은 옵션을 줍니다.
+인터넷이 되는 PC에서 ZIP을 만들어 대상 PC로 옮깁니다. 만드는 PC에는 Node.js와 Python 3.12가 필요하고, macOS·Linux에서는 `scripts/prepare-offline.sh`에 같은 옵션을 줍니다.
 
-| 만드는 명령 | 결과 ZIP | 대상 PC에서 실행 |
+| 만드는 명령 | 결과 ZIP | 대상 PC에서 설치 |
 |---|---|---|
-| `py -3.12 scripts\prepare-offline.py --with-docling-models` (권장, 먼저 [3단계](#빠른-시작-windows)로 모델을 받아 둠) | `…-windows-docling-models.zip`: Docling과 PDF 모델 포함 | `start.cmd --offline` |
-| `py -3.12 scripts\prepare-offline.py --with-docling` | `…-windows-docling.zip`: Docling 포함, PDF 모델 제외 | `start.cmd --offline` |
-| `py -3.12 scripts\prepare-offline.py` | `…-windows.zip`: 기본 묶음, Docling 없음 | `start.cmd --offline --lite` |
+| `py -3.12 scripts\prepare-offline.py --with-docling-models` (권장, 이 PC에서 먼저 setup으로 모델을 받아 둠) | `…-windows-docling-models.zip`: Docling·PDF 모델 포함 | `setup.cmd --offline` |
+| `py -3.12 scripts\prepare-offline.py --with-docling` | `…-windows-docling.zip`: Docling 포함, PDF 모델 제외 | `setup.cmd --offline` |
+| `py -3.12 scripts\prepare-offline.py` | `…-windows.zip`: 기본 묶음, Docling 없음 | `setup.cmd --offline --lite` |
 
-ZIP은 `offline\` 폴더에 만들어집니다. 대상 PC에는 Python만 있으면 됩니다. Docling을 쓰는 묶음은 3.12, 기본 묶음은 3.12~3.15가 필요합니다. Node, npm, PyPI 접속은 필요 없습니다. 처음에는 실행 명령 끝에 `--check`를 붙여 점검합니다.
-
-`--from-cache`를 주면 이미 설치된 `node_modules`와 기존 `offline\wheels*` 폴더로 다시 만듭니다.
+- ZIP은 `offline\` 폴더에 만들어집니다.
+- 대상 PC에는 Python만 있으면 됩니다. Docling을 쓰는 묶음은 3.12, 기본 묶음은 3.12~3.15가 필요하며, Node·npm·PyPI 접속은 필요 없습니다.
+- 설치한 뒤 실행은 똑같이 `run.cmd`입니다.
+- `--from-cache`를 주면 이미 설치된 `node_modules`와 기존 `offline\wheels*` 폴더로 다시 만듭니다.
 
 ## 개발자용
 
-**개발 서버**(화면 핫 리로드). `.venv`는 먼저 `./run.sh --check`로 준비합니다. Windows에서는 `backend\.venv\Scripts\python.exe`를 씁니다.
+**개발 서버**(화면 핫 리로드)는 먼저 `./setup.sh`로 `.venv`를 준비한 뒤 띄웁니다. Windows에서는 `backend\.venv\Scripts\python.exe`를 씁니다.
 
 ```bash
 cd backend && .venv/bin/python -m uvicorn main:app --host 127.0.0.1 --port 8000   # 터미널 1
-cd frontend && npm ci && npm run dev                                              # 터미널 2 → http://127.0.0.1:5173/
+cd frontend && npm run dev                                                        # 터미널 2 → http://127.0.0.1:5173/
 ```
 
-개발 서버는 `/api` 요청을 8000번 포트로 넘깁니다. `frontend/dist`가 있으면 백엔드만 띄워도 8000번에서 화면이 열립니다.
+개발 서버는 `/api` 요청을 8000번 포트로 넘깁니다. 설치와 실행 로직은 [`scripts/console.py`](scripts/console.py) 하나에 있고, `setup.*`·`run.*`는 Python을 찾아 이 파일을 부르기만 하는 얇은 래퍼입니다.
 
 **테스트**
 

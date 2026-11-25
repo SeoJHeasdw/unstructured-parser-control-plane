@@ -9,7 +9,8 @@ on:
       - 'mock-data/**'
       - 'opencode-workspace/**'
       - 'scripts/*.py'
-      - 'start.cmd'
+      - 'setup.cmd'
+      - 'run.cmd'
       - '.github/workflows/windows.yml'
 
 permissions:
@@ -30,9 +31,13 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Start from source
+      # 전체 모드(Docling·torch) 첫 설치는 시간이 오래 걸려 CI에서는 lite로 설치·점검한다.
+      - name: Set up from source
         shell: cmd
-        run: start.cmd --lite --check
+        run: setup.cmd --lite
+      - name: Run readiness after setup
+        shell: cmd
+        run: backend\.venv\Scripts\python -c "import sys; sys.path.insert(0, 'scripts'); import console; print(console.check_ready())"
       - name: Test frontend
         working-directory: frontend
         run: npm test
@@ -51,7 +56,7 @@ jobs:
         run: |
           Expand-Archive offline/unstructured-parser-control-plane-windows.zip "$env:RUNNER_TEMP\배포 확인"
           Set-Location "$env:RUNNER_TEMP\배포 확인\unstructured-parser-control-plane"
-          python scripts/windows_launcher.py --offline --lite --check
+          python scripts/console.py setup --offline --lite
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           python backend/docops.py init-workspace "$env:RUNNER_TEMP\agent workspace" --roots "$env:RUNNER_TEMP\samples"
       - uses: actions/upload-artifact@v4
