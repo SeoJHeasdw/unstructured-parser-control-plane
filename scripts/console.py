@@ -4,7 +4,8 @@
 
 setup  backend/.venv, Python 패키지, 화면 빌드, .env, PDF 모델, 자체 점검. 네트워크를 쓴다(--offline이면 묶음 안의 파일만).
        기본은 Docling(PDF·Office 파싱)까지 넣는 전체 모드(Python 3.12). --lite는 Docling 없이 TXT·CSV·MD·LOG만(3.12~3.15).
-       끝나면 backend/.venv/docops-setup.json에 모드와 설치 기준(잠금 파일·화면 소스 지문)을 남긴다.
+       끝나면 backend/.venv/docops-setup.json에 모드와 설치 기준(잠금 파일·화면 소스 지문)을 남기고,
+       설치되지 않은 것(예: 받지 못한 PDF 모델)을 마지막 요약에 다시 보여 준다.
 run    그 기록과 지금 코드가 맞는지만 확인하고 서버를 띄운다. 설치하지 않고 네트워크도 쓰지 않는다.
 
 Windows·macOS·Linux 공통이고 Python 3.9 이상에서 돈다. 표준 라이브러리만 쓴다.
@@ -23,6 +24,7 @@ import shutil
 import subprocess
 import sys
 import sysconfig
+import tempfile
 
 ROOT = Path(__file__).resolve().parents[1]
 BACKEND = ROOT / "backend"
@@ -30,7 +32,6 @@ FRONTEND = ROOT / "frontend"
 OFFLINE = ROOT / "offline"
 VENV = BACKEND / ".venv"
 STATE = VENV / "docops-setup.json"
-LEGACY_DOCLING_VENV = BACKEND / ".venv-docling"
 BASE_LOCK = BACKEND / "requirements.lock.txt"
 FULL_LOCK = BACKEND / "requirements-docling.lock.txt"
 FULL_PY = ("3.12",)
@@ -378,8 +379,6 @@ def setup(args):
     if folder or port:
         where = f"http://127.0.0.1:{port}/" if port else f"데이터 폴더 {folder}"
         raise SetupError(f"콘솔이 실행 중입니다({where}). 실행 창에서 Ctrl+C로 끈 뒤 다시 실행하세요.")
-    if LEGACY_DOCLING_VENV.is_dir():
-        say("backend/.venv-docling 은 더 이상 쓰지 않습니다(이제 backend/.venv 하나). 필요 없으면 지워도 됩니다.")
     previous = read_state()
     say("1/3 Python 환경")
     python = ensure_python(full, args.offline)
@@ -390,16 +389,39 @@ def setup(args):
         shutil.copyfile(example, env_file)
         say(".env 를 .env.example 에서 만들었습니다. 모델 주소는 화면의 설정 › 모델 연결에서 넣어도 됩니다.")
     say("3/3 " + ("PDF 모델 확인과 자체 점검" if full else "자체 점검"))
-    check = [python, "check_local.py"]
-    if full:
-        check += ["--docling"] + ([] if args.offline else ["--fetch-models"])
-    try:
-        run(check, cwd=BACKEND, timeout=3600)
-    except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as exc:
-        raise SetupError("자체 점검에 실패했습니다. 위 메시지를 확인하세요.") from exc
-    write_state({"mode": "full" if full else "lite", "packages": lock_hash(full), "frontend": frontend})
-    print(f"\n[ok] 설치 완료. 이제 {'run.cmd' if WINDOWS else './run.sh'} 로 실행하세요.", flush=True)
+    with tempfile.TemporaryDirectory() as temp:
+        report = Path(temp) / "check.json"
+        check = [python, "check_local.py", "--report", report]
+        if full:
+            check += ["--docling"] + ([] if args.offline else ["--fetch-models"])
+        try:
+            run(check, cwd=BACKEND, timeout=3600)
+        except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as exc:
+            raise SetupError("자체 점검에 실패했습니다. 위 메시지를 확인하세요.") from exc
+        try:
+            warnings = json.loads(report.read_text(encoding="utf-8")).get("warnings", [])
+        except (OSError, ValueError):
+            warnings = []
+    write_state({"mode": "full" if full else "lite", "packages": lock_hash(full), "frontend": frontend,
+                 "warnings": warnings})
+    print(summary(full, warnings), flush=True)
     return 0
+
+
+def summary(full, warnings):
+    """setup의 마지막 몇 줄. 설치되지 않은 것이 있으면 여기서 다시 보여 준다(중간 로그는 지나가 버린다)."""
+    mode = "전체 (Docling: PDF·DOCX·PPTX·XLSX 파싱 포함)" if full else "lite (Docling 없음: PDF·Office 파싱 안 함)"
+    lines = ["", "=" * 72]
+    if warnings:
+        lines.append(f"[주의] 설치는 끝났지만 준비되지 않은 것이 {len(warnings)}건 있습니다. 모드: {mode}")
+        for item in warnings:
+            lines += [f"  - {item.get('item')}: {item.get('problem')}",
+                      f"    영향: {item.get('effect')}",
+                      f"    해결: {item.get('fix')}"]
+    else:
+        lines.append(f"[ok] 설치 완료. 모드: {mode}")
+    lines += [f"이제 {'run.cmd' if WINDOWS else './run.sh'} 로 실행하세요.", "=" * 72]
+    return "\n".join(lines)
 
 
 # ---------------------------------------------------------------- run
@@ -437,7 +459,7 @@ def start(args):
 
 # ---------------------------------------------------------------- 명령줄
 
-SETUP_ONLY = {"--lite", "--base", "--docling", "--offline", "--check"}
+SETUP_ONLY = {"--lite", "--offline"}
 
 
 def parse_args(argv=None):
@@ -448,18 +470,13 @@ def parse_args(argv=None):
     parser = argparse.ArgumentParser(prog="console.py", description="비정형 관리 콘솔 설치(setup)와 실행(run)")
     commands = parser.add_subparsers(dest="command", required=True)
     setup_parser = commands.add_parser("setup", help="설치·갱신과 자체 점검. 코드 업데이트 뒤에도 실행")
-    setup_parser.add_argument("--lite", "--base", dest="lite", action="store_true",
+    setup_parser.add_argument("--lite", action="store_true",
                               help="Docling 없이 설치: TXT·CSV·MD·LOG만, Python 3.12~3.15")
     setup_parser.add_argument("--offline", action="store_true", help="준비된 ZIP 안의 휠과 화면 빌드만 사용")
-    # 예전 옵션. 이제 Docling이 기본이고 점검은 항상 하므로 아무 일도 하지 않는다.
-    setup_parser.add_argument("--docling", action="store_true", help=argparse.SUPPRESS)
-    setup_parser.add_argument("--check", action="store_true", help=argparse.SUPPRESS)
     run_parser = commands.add_parser("run", help="서버 실행 (설치하지 않음)")
     run_parser.add_argument("port", nargs="?", type=int, default=8000, help="시작 포트 (기본 8000, 쓰고 있으면 다음 빈 포트)")
     run_parser.add_argument("--no-browser", action="store_true", help="브라우저를 열지 않음")
     args = parser.parse_args(argv)
-    if args.command == "setup" and args.lite and args.docling:
-        parser.error("--lite 와 --docling 은 함께 쓸 수 없습니다.")
     if args.command == "run" and not 1 <= args.port <= 65535:
         parser.error("포트는 1~65535 사이여야 합니다.")
     return args

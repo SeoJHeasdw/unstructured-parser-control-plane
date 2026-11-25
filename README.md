@@ -25,7 +25,7 @@ setup.cmd
 
 1. Python 가상환경 `backend\.venv`를 만들고 패키지를 설치합니다(Docling 포함).
 2. 화면을 빌드하고, `.env`가 없으면 `.env.example`로 만듭니다.
-3. PDF 모델(레이아웃·표)을 받습니다. `huggingface.co`에 접속해야 하며, 받지 못하면 경고만 남기고 계속합니다. 이 경우 PDF만 파싱되지 않습니다.
+3. PDF 모델(레이아웃·표)을 받습니다. `huggingface.co`에 접속해야 하며, 받지 못해도 설치는 계속합니다. 이 경우 PDF만 파싱되지 않습니다. 받지 못한 것은 **setup 마지막 요약에 `[주의]`로 다시 표시**되고, `run`을 띄울 때도 한 줄로 알려 줍니다.
 4. 합성 CSV로 파싱과 청킹을 시험합니다. 시험은 임시 저장소에서 하므로 문서함에는 아무것도 남지 않습니다.
 
 **3. 실행: 매번**
@@ -100,8 +100,7 @@ run.cmd
 | `콘솔이 실행 중입니다` | 콘솔 실행 창에서 `Ctrl+C`로 끈 뒤 setup을 다시 실행합니다. |
 | `Docling(PDF·Office 파싱)에는 Python 3.12가 필요합니다` | Python 3.12를 설치하고 새 터미널에서 다시 실행합니다. 당장 화면만 띄우려면 `setup.cmd --lite`를 씁니다. |
 | `backend/.venv 는 Python 3.13 입니다` | 예전에 다른 버전으로 만든 환경입니다. `backend\.venv` 이름을 바꾸고(예: `.venv-py313`) setup을 다시 실행합니다. |
-| `backend/.venv-docling 은 더 이상 쓰지 않습니다` | 예전 방식의 환경입니다. 확인한 뒤 지워도 됩니다. |
-| PDF만 실패하고 '모델 파일 누락'이 뜸 | `huggingface.co`에 접속되는 상태에서 setup을 다시 실행합니다. 안 되면 다른 PC에서 받은 모델 폴더를 `%USERPROFILE%\.cache\docling\models`에 두거나, 다른 위치를 `.env`의 `DOCOPS_DOCLING_ARTIFACTS`로 지정합니다. |
+| setup 요약에 `[주의] PDF 모델`이 뜸, 또는 PDF만 실패함 | `huggingface.co`에 접속되는 상태에서 setup을 다시 실행합니다. 안 되면 다른 PC에서 받은 모델 폴더를 `%USERPROFILE%\.cache\docling\models`에 두거나, 다른 위치를 `.env`의 `DOCOPS_DOCLING_ARTIFACTS`로 지정합니다. |
 | 인증서 오류(`UNABLE_TO_VERIFY_LEAF_SIGNATURE`, pip SSL) | npm은 `NODE_EXTRA_CA_CERTS=<사내 루트 CA 파일>`(Node 22.15 이상이면 `NODE_OPTIONS=--use-system-ca`도 가능), pip는 `PIP_CERT=<같은 파일>`을 설정합니다. |
 | 사내 패키지 미러를 써야 함 | `npm_config_registry`와 `PIP_INDEX_URL`을 설정합니다. |
 | 설치 도중 끊기거나 시간이 초과됨 | setup을 다시 실행하면 끝난 부분은 남아 있어 이어서 설치합니다. |

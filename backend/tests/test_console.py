@@ -49,15 +49,14 @@ def test_setup_is_full_mode_by_default():
     assert args.command == "setup" and not args.lite and not args.offline
 
 
-@pytest.mark.parametrize("flag", ["--lite", "--base"])
-def test_setup_lite_and_old_base_alias(flag):
-    assert console.parse_args(["setup", flag]).lite
+def test_setup_lite():
+    assert console.parse_args(["setup", "--lite"]).lite
 
 
-def test_old_setup_flags_are_accepted():
-    assert not console.parse_args(["setup", "--docling", "--check"]).lite
+@pytest.mark.parametrize("flag", ["--base", "--docling", "--check"])
+def test_old_setup_flags_are_gone(flag):
     with pytest.raises(SystemExit):
-        console.parse_args(["setup", "--lite", "--docling"])
+        console.parse_args(["setup", flag])
 
 
 def test_run_takes_port_and_no_browser_only():
@@ -123,6 +122,18 @@ def test_frontend_is_not_rebuilt_when_unchanged(project, monkeypatch):
     monkeypatch.setattr(console, "npm_command", lambda: pytest.fail("npm must not run"))
     current = console.frontend_hash()
     assert console.ensure_frontend(False, {"frontend": current}) == current
+
+
+def test_summary_repeats_what_was_not_installed():
+    text = console.summary(True, [{"item": "PDF 모델", "problem": "받지 못했습니다(huggingface.co 접속 필요)",
+                                   "effect": "PDF 파싱이 안 됩니다", "fix": "setup을 다시 실행"}])
+    last = text.strip().splitlines()
+    assert "[주의]" in text and "1건" in text and "PDF 모델: 받지 못했습니다" in text and "해결: setup을 다시 실행" in text
+    assert last[-2].startswith("이제 ") and "[ok]" not in text
+
+
+def test_summary_when_everything_is_ready():
+    assert "[ok] 설치 완료. 모드: lite" in console.summary(False, [])
 
 
 # ---------------------------------------------------------------- run
