@@ -93,13 +93,13 @@ class DocumentRepository:
     def _event(conn: sqlite3.Connection, document_id: str, status: str, message: str) -> None:
         conn.execute("INSERT INTO document_events (document_id, created_at, status, message) VALUES (?, ?, ?, ?)", (document_id, now(), status, message))
 
-    def create(self, doc_id: str, name: str, format: str, size: int, source_file: str) -> dict[str, Any]:
+    def create(self, doc_id: str, name: str, format: str, size: int, source_file: str, message: str | None = None) -> dict[str, Any]:
         timestamp = now()
         with self.connect() as conn:
             conn.execute("INSERT INTO documents (id,name,format,size_bytes,status,created_at,updated_at,source_file,seq) "
                          "VALUES (?,?,?,?,?,?,?,?,(SELECT COALESCE(MAX(seq), 0) + 1 FROM documents))",
                          (doc_id,name,format,size,"uploaded",timestamp,timestamp,source_file))
-            self._event(conn, doc_id, "uploaded", "파일을 로컬에 저장했습니다. 아직 처리하지 않았습니다.")
+            self._event(conn, doc_id, "uploaded", message or "파일을 로컬에 저장했습니다. 아직 처리하지 않았습니다.")
         return self.get(doc_id)  # type: ignore[return-value]
 
     def get(self, doc_id: str) -> dict[str, Any] | None:

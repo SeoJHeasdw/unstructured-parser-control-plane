@@ -7,6 +7,7 @@
 - 프론트엔드 개발 서버는 기본 `http://127.0.0.1:5173`이고 `/api`를 로컬 FastAPI의 `http://127.0.0.1:8000`으로 프록시한다. 직접 호출할 때 주소만 다르고 경로는 아래와 같다.
 - **Mock 경로:** `GET /api/data`의 고정 예시 데이터로 대시보드·문서 탐색·파이프라인 시뮬레이션·관계도를 표현한다. Mock 파일 선택은 브라우저 메모리에 파일명·크기·확장자만 추가한다. 파일 내용은 서버로 보내지 않는다. 화면의 Mock `status`, 파서명, 관계와 시각화 설정은 실제 처리 상태가 아니다.
 - **실제 로컬 경로:** `POST /api/live/documents`로 선택한 파일 바이트가 서버로 전송되어 로컬에 저장된다. 파싱은 업로드와 별개인 `POST .../{id}/process` 요청을 받은 후에만 시작된다. 실제 문서 목록·결과는 Mock 목록이나 Mock 대시보드에 자동 반영되지 않는다.
+- **허용 폴더 경로(2026-11-25):** `POST /api/live/import`는 파일 바이트를 받지 않는다. 화면은 허용 폴더 기준 상대 경로만 보내고, 서버가 그 파일을 직접 읽어 업로드와 같은 규칙으로 저장한다. 브라우저 파일 첨부·전송이 보안 프로그램으로 막힌 PC용이다. 허용 폴더는 `DOCOPS_AGENT_ROOTS`(작업 도구와 같은 이름, 서버는 `.env`·환경 변수에서 읽음)로만 정하고 API로 바꿀 수 없다. 비우면 저장소의 `samples/`. 저장만 하고 파싱은 시작하지 않는다.
 - 다음 표의 **문서**는 실제 로컬 경로의 `LiveDocument`다. 파일에서 확인한 확장자에 따른 처리 후보일 뿐, 파일 내용·품질·문서 업무 분류가 검증됐다는 뜻은 아니다.
 - 런타임은 단일 로컬 서버·단일 사용자용 실험 구성이다. 접근 제어, 다중 사용자·원천 연동·영속 작업 큐·검색 인덱스·게이트웨이 API는 현재 구현 범위가 아니다.
 - **검색 준비 경로(2026-11-17 추가):** `/api/retrieval`(청킹 벤치·임베딩 평가)과 `/api/vectordb`(Milvus 조회)는 측정·확인용이다. 색인을 만들거나 Milvus에 쓰지 않는다. 임베딩 모델 호출은 사용자가 토큰 측정이나 평가 실행을 누를 때만 나가고, Milvus에는 연결이 설정돼 있을 때 조회 요청만 보낸다. 문서 계보(`/api/lineage`)는 저장된 구조 분석 결과로 계산만 한다.
@@ -22,6 +23,9 @@
 | `GET /api/live/parsers` | `routes`는 서버에 등록된 확장자 → 파서 ID 매핑(이미지는 `ocr-model`). `docling_installed`, `pdf_model_directory`는 패키지·폴더 확인값. `pdf_models_ready`는 필수 레이아웃·표 파일 5개가 존재하고 0바이트보다 큰지 확인한 값이며, `pdf_missing_files`는 누락·빈 파일의 모델 폴더 기준 상대 경로 목록. `ocr_models_found`는 OCR 모델 연결이 **설정됐는지**(2026-11-24부터, 호출해 보지 않음), `ocr_model`은 `{label, model_id, mode, configured}`. 조회는 모델 로딩·호출이나 파싱을 실행하지 않는다. | `200` | |
 | `GET /api/live/documents` | 로컬 문서 목록, `{ "documents": [...] }` | `200` | 현재 필터·페이지네이션 없음 |
 | `POST /api/live/documents` | `multipart/form-data`의 `file` **1개**. 저장만 수행 | `201`, `LiveDocument` | `400` 파일명 오류/길이 정보 문제, `403` 허용되지 않은 Origin, `413` 크기 초과, `422` 필수 파일 필드 누락 등 |
+| `GET /api/live/import/roots` | 허용 폴더 `{roots:[{index,path,name}], notes, default, setting, max_bytes}`. `notes`는 없거나 열 수 없는 설정 항목, `default`는 `samples/` 기본값 사용 여부 | `200` | `403` 허용되지 않은 Origin |
+| `GET /api/live/import/entries?root=&path=&recursive=` | 허용 폴더 안 한 폴더의 하위 폴더와 파일. `recursive=true`면 하위 폴더 파일까지 평평하게(최대 5,000개, 넘으면 `truncated`). 파일마다 `state`(`ready` 파서 있음, `no_parser` 저장만, `empty`, `too_large`)와 이름·크기가 같은 기존 문서 `existing:[{id,seq,status}]` | `200`, `ImportListing` | `400` 허용 폴더 밖·숨김·없는 경로, `404` 허용 폴더 번호 없음 |
+| `POST /api/live/import` | JSON `{root, paths:[상대 경로 1~1000개]}`. 파일마다 복사해 저장하고, 이름·크기·SHA-256이 같은 원본이 있으면 그 문서를 돌려준다. 파싱하지 않음 | `200`, `{items:[{path, outcome:"imported"\|"reused"\|"failed", document?, reason?}]}` | 파일별 실패는 `failed`와 `reason`(밖·숨김·빈 파일·크기 초과·읽기 실패). `404` 허용 폴더 번호 없음, `422` 경로 목록 형식 |
 | `GET /api/live/documents/{id}` | 해당 문서 상태 | `200`, `LiveDocument` | `404` ID 형식이 틀렸거나 없는 문서 |
 | `POST /api/live/documents/{id}/process` | 기존 원본에 대한 처리 요청. 요청 바디 불필요 | `202`, 접수 시 `status: "processing"` | `404` 문서 없음, `409` 이미 처리/대기 중, `503` 대기열 만석 또는 작업자 사용 불가 |
 | `GET /api/live/documents/{id}/result` | 마지막 성공 결과 | `200`, `ParseResult` | `404` 문서 없음, `409` 성공 결과 없음 **또는 결과 포인터·파일·메타데이터 오류** |
@@ -285,6 +289,7 @@ Docling 실행 시 `HF_HUB_OFFLINE=1`, `TRANSFORMERS_OFFLINE=1`을 설정하며 
 - 개발 실행은 `127.0.0.1` 바인딩을 전제로 한다. `Origin` 헤더가 있는 `/api/live/` 요청은 scheme이 HTTP(S)이고 hostname이 `localhost`, `127.0.0.1`, `::1`인 경우만 허용한다. **Origin 헤더가 없는 요청은 통과**한다. 이 검사는 인증·인가가 아니다.
 - 업로드의 최종 경로는 서버 생성 ID 기반이고, 원본 파일명은 표시 메타데이터로만 사용한다. 임시/최종 파일은 서버 생성 이름을 사용한다. 예외 로그에는 원문·파일명·예외 상세를 출력하지 않도록 한다.
 - `fcntl` 기반 잠금과 로컬 파일시스템·SQLite를 사용하는 현재 구현은 단일 프로세스 실행을 전제한다. 다중 서버, 공유 배포, Windows, 네트워크 파일시스템, 보안 격리 환경의 지원 여부는 별도로 검증해야 한다.
+- 허용 폴더 가져오기(`/api/live/import`)도 `/api/live/` 아래라 같은 Origin 검사를 받는다. 경로는 허용 폴더 기준 상대 경로만 받고, `..`·절대 경로·드라이브 문자·`:`를 거부한다. 링크·정션은 실제 경로로 풀어 허용 폴더 밖이면 목록에서도 빼고 가져오지도 않는다. `.`·`$`·`~$`로 시작하는 이름과 `__MACOSX`, `thumbs.db`·`desktop.ini`는 숨긴다. 목록에는 파일 이름·크기·수정 시각만 나가고 내용은 가져올 때 서버가 읽는다. 호스트 헤더를 검사하지 않으므로 DNS 재바인딩에 대한 보호는 다른 `/api/live/` 경로와 같은 수준이다(인증 없음).
 - 브라우저에서 실제 파일 업로드를 하면 이 컴퓨터의 백엔드 저장소에 실제 내용이 남는다. 모델 인증값·고객 문서·결과를 저장소 또는 외부 서비스로 임의 전송하지 않는다.
 
 ## 9. 이어서 결정해야 할 계약 — 미구현
@@ -298,7 +303,7 @@ Docling 실행 시 `HF_HUB_OFFLINE=1`, `TRANSFORMERS_OFFLINE=1`을 설정하며 
 
 ## 10. 확인할 코드·테스트
 
-- API 조립·Mock: `backend/main.py`, 실제 라우터: `backend/app/routers/live.py`, 공개 모델: `backend/app/models.py`.
+- API 조립·Mock: `backend/main.py`, 실제 라우터: `backend/app/routers/live.py`, 허용 폴더 가져오기: `backend/app/routers/folder_import.py`·`backend/app/folder_import.py`(테스트 `backend/tests/test_folder_import.py`), 공개 모델: `backend/app/models.py`.
 - 처리·오류·결과: `backend/app/service.py`, DB·마이그레이션: `backend/app/repository.py`, 보호: `backend/app/middleware.py`, 설정: `backend/app/config.py`.
 - 형식별 선택·파싱: `backend/app/adapters/registry.py`, `text.py`, `docling.py`, 공통 결과 `base.py`.
 - 파싱 전 형식·DRM 판별: `backend/app/format_gate.py`. 사본 보정·원문 대조: `backend/app/fidelity/`(`prepare.py`, `probe.py`, `report.py`). 문자 도우미(기호 글꼴 표·첨자·대비·파일명 키): `backend/app/textnorm.py`.

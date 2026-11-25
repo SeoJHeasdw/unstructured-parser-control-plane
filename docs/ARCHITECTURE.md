@@ -87,6 +87,7 @@ flowchart LR
 | `GET /api/data` | 대시보드와 문서·관계 화면용 예시 데이터 | `mock-data/data.json` |
 | `GET /api/live/documents` | 실제 로컬 문서 목록 | SQLite |
 | `POST /api/live/documents` | 파일 1건을 로컬에 업로드 | 원본 파일 + SQLite |
+| `GET /api/live/import/roots`·`/entries`, `POST /api/live/import` | 허용 폴더(`DOCOPS_AGENT_ROOTS`, 기본 `samples/`)의 목록 조회와 서버가 직접 읽어 저장(브라우저 파일 전송 없음, 파싱 안 함) | 허용 폴더 읽기 → 원본 파일 + SQLite |
 | `GET /api/live/documents/{id}` | 실제 로컬 문서 상태 조회 | SQLite |
 | `POST /api/live/documents/{id}/process` | 대기열에 접수하면 202·`processing` 반환. 중복 409, 대기열 만석·워커 불가 503 | 메모리 대기열 + SQLite 이력 |
 | `GET /api/live/documents/{id}/result` | 마지막 성공 결과, 파서 정보, `is_stale`, `warnings` 조회. 성공 이력 없음 또는 결과를 읽을 수 없으면 409 | Markdown 산출물 + SQLite 메타데이터 |

@@ -1,4 +1,5 @@
 """Local storage and single-worker processing orchestration."""
+import hashlib
 import json
 import logging
 import os
@@ -189,6 +190,45 @@ class DocumentService:
         finally:
             temp_path.unlink(missing_ok=True)
             await file.close()
+
+    def store_local(self, source: Path, origin: str) -> dict:
+        """이 컴퓨터의 파일을 서버가 직접 읽어 저장한다(허용 폴더에서 가져오기). 업로드와 같은 저장 규칙을 따른다."""
+        name, extension = clean_name(source.name)
+        doc_id = uuid4().hex
+        suffix = f".{extension.lower()}" if extension else ""
+        final_name = doc_id + suffix
+        final_path = self.settings.uploads / final_name
+        temp_path = self.settings.uploads / f"{doc_id}.part"
+        total = 0
+        fd = os.open(temp_path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        try:
+            with os.fdopen(fd, "wb") as out, source.open("rb") as handle:
+                while chunk := handle.read(1024 * 1024):
+                    total += len(chunk)
+                    if total > self.settings.max_upload_bytes:
+                        raise TooLarge()
+                    out.write(chunk)
+            os.replace(temp_path, final_path)
+            try:
+                return self.repo.create(doc_id, name, extension, total, final_name,
+                                        f"허용 폴더에서 가져와 로컬에 저장했습니다({origin}). 아직 처리하지 않았습니다.")
+            except BaseException:
+                final_path.unlink(missing_ok=True)
+                raise
+        finally:
+            temp_path.unlink(missing_ok=True)
+
+    def same_original(self, source: Path, candidates: list[dict], digest: str) -> dict | None:
+        """이름·크기가 같은 기존 문서 중 저장된 원본의 SHA-256까지 같은 것. 같은 파일을 두 번 저장하지 않는다."""
+        for doc in candidates:
+            try:
+                path = self._source_path(doc)
+                with path.open("rb") as handle:
+                    if hashlib.file_digest(handle, "sha256").hexdigest() == digest:
+                        return doc
+            except (Conflict, OSError):
+                continue
+        return None
 
     def begin(self, doc_id: str) -> tuple[dict, str]:
         doc = self.get(doc_id)

@@ -113,3 +113,35 @@ export async function getLiveStructure(id:string, signal?:AbortSignal):Promise<L
 export async function getStructureOverview():Promise<StructureOverview> {
  return readResponse<StructureOverview>(await fetch('/api/live/structure-summary'));
 }
+
+/* ----- 허용 폴더에서 가져오기. 브라우저는 허용 폴더 기준 상대 경로만 보내고, 서버가 이 컴퓨터의 파일을 직접 읽어 저장한다. ----- */
+export type ImportRoot = { index: number; path: string; name: string };
+/** default: 설정이 비어 프로젝트 samples 폴더를 쓰는 중. setting: 허용 폴더를 정하는 .env 항목 이름 */
+export type ImportRoots = { roots: ImportRoot[]; notes: string[]; default: boolean; setting: string; max_bytes: number };
+/** ready: 파서 있음 · no_parser: 저장만(파싱 경로 없음) · empty·too_large: 가져오지 않음 */
+export type ImportFileState = 'ready' | 'no_parser' | 'empty' | 'too_large';
+export type ImportExisting = { id: string; seq: number | null; status: string };
+export type ImportFile = { path: string; name: string; format: string; size_bytes: number; modified_at: string; state: ImportFileState; existing: ImportExisting[] };
+export type ImportListing = { root: number; path: string; parent: string | null; recursive: boolean; folders: {name: string; path: string}[]; files: ImportFile[]; truncated: boolean };
+export type ImportItem = { path: string; outcome: 'imported' | 'reused' | 'failed'; document?: LiveDoc | null; reason?: string | null };
+const IMPORT_URL = '/api/live/import';
+
+export async function getImportRoots(signal?: AbortSignal): Promise<ImportRoots> {
+ const body = await readResponse<ImportRoots>(await fetch(`${IMPORT_URL}/roots`, {signal}));
+ if (!Array.isArray(body.roots)) throw new Error('허용 폴더 응답 형식을 확인할 수 없습니다.');
+ return body;
+}
+
+export async function listImportEntries(root: number, path: string, recursive: boolean, signal?: AbortSignal): Promise<ImportListing> {
+ const params = new URLSearchParams({root: String(root), path, recursive: String(recursive)});
+ const body = await readResponse<ImportListing>(await fetch(`${IMPORT_URL}/entries?${params}`, {signal}));
+ if (!Array.isArray(body.files) || !Array.isArray(body.folders)) throw new Error('폴더 목록 응답 형식을 확인할 수 없습니다.');
+ return body;
+}
+
+/** 고른 파일을 로컬 저장소에 복사한다. 파싱은 시작하지 않는다. */
+export async function importFromFolder(root: number, paths: string[]): Promise<ImportItem[]> {
+ const body = await readResponse<{items: ImportItem[]}>(await fetch(IMPORT_URL, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({root, paths})}));
+ if (!Array.isArray(body.items)) throw new Error('가져오기 응답 형식을 확인할 수 없습니다.');
+ return body.items;
+}

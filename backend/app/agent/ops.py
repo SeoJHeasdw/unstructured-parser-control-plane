@@ -26,6 +26,7 @@ import unicodedata
 from app.agent import codes
 from app.agent.client import Api, ApiError, ServerDown
 from app.filelock import try_lock, unlock
+from app.folder_import import resolve_roots, root_candidates
 
 PROJECT = Path(__file__).resolve().parents[3]
 APP_DIR = Path(__file__).resolve().parents[1]
@@ -244,24 +245,10 @@ class Ops:
     # ------------------------------------------------------------------ 기반
     @staticmethod
     def _roots(given: list[Path] | None) -> tuple[list[Path], list[str]]:
+        # 화면의 '허용 폴더에서 가져오기'와 같은 규칙(app/folder_import.py)을 쓴다.
         if given is None:
-            raw = os.environ.get("DOCOPS_AGENT_ROOTS", "")
-            parts = [part.strip().strip('"') for chunk in raw.splitlines() for part in chunk.split(os.pathsep)]
-            given = [Path(part).expanduser() for part in parts if part]
-            if not given and (PROJECT / "samples").is_dir():
-                given = [PROJECT / "samples"]
-        roots, notes = [], []
-        for root in given:
-            try:
-                resolved = root.resolve()
-            except OSError:
-                notes.append(f"허용 폴더를 열 수 없음: {root}")
-                continue
-            if resolved.is_dir():
-                roots.append(resolved)
-            else:
-                notes.append(f"허용 폴더가 없음: {root}")
-        return roots, notes
+            given, _ = root_candidates()
+        return resolve_roots(given)
 
     def parsers(self, refresh: bool = False) -> dict:
         if self._parsers is None or refresh:

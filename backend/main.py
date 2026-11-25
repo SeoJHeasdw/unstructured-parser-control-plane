@@ -12,6 +12,7 @@ from app import connection_store
 from app.connection_store import ConnectionStore
 from app.middleware import LocalRequestGuard, RuntimeHeader
 from app.routers.agent import router as agent_router
+from app.routers.folder_import import router as folder_import_router
 from app.routers.live import router as live_router, summary_router as live_summary_router
 from app.routers.models import router as models_router
 from app.routers.lineage import router as lineage_router
@@ -48,6 +49,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.add_middleware(RuntimeHeader, runtime_id=settings.runtime_id)
     app.include_router(live_summary_router)
     app.include_router(live_router)
+    app.include_router(folder_import_router)
     app.include_router(models_router)
     app.include_router(lineage_router)
     app.include_router(retrieval_router)

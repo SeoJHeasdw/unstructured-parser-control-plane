@@ -63,6 +63,7 @@
 .lw-workspace h1:focus { outline: none; }
 .lw-inbox-head,.lw-detail-head { display: flex; align-items: center; gap: 18px; margin-bottom: 26px; }
 .lw-inbox-head { justify-content: space-between; }
+.lw-head-actions { display: flex; align-items: center; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
 .lw-inbox-head p { margin: 10px 0 0; color: var(--lw-muted); font-size: 14px; line-height: 1.65; word-break: keep-all; }
 .lw-btn,.lw-icon-btn,.lw-back,.lw-source,.lw-workspace .live-primary { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 38px; flex-shrink: 0; border: 1px solid var(--lw-border); border-radius: 7px; background: white; padding: 0 14px; color: var(--ink-1); font: inherit; font-size: 14px; font-weight: 600; white-space: nowrap; transition: background-color 120ms; }
 .lw-btn.is-primary,.lw-workspace .live-primary { border-color: var(--accent); background: var(--accent); color: white; }

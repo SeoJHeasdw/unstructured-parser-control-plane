@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { ArrowUpRight, Scissors, Workflow, CheckCircle2, CircleAlert, Clock3, FilePlus2, FolderOpen, ListFilter, LoaderCircle, RefreshCw, Search } from 'lucide-react';
+import { ArrowUpRight, Scissors, Workflow, CheckCircle2, CircleAlert, Clock3, FilePlus2, FolderInput, FolderOpen, ListFilter, LoaderCircle, RefreshCw, Search } from 'lucide-react';
 import { LiveRequestError, getLiveDocument, getLiveResult, listLiveDocuments, processLiveDocument, uploadLiveDocument } from './api/live';
 import type { LiveDoc, LiveResult } from './api/live';
 import LiveDocumentView, { DocNumber, displayDate, displaySize, displayStatus, FileGlyph, isNoTextImage, matchesDocQuery, statusNote, StatusBadge } from './LiveDocumentView';
@@ -8,6 +8,7 @@ import { ArrowLeft } from 'lucide-react';
 import { DocumentRuns } from './compare/LiveCompare';
 import { workspaceHref, type WorkspaceRoute } from './navigation';
 import { WorkspaceLink } from './WorkspaceLink';
+import FolderImport from './FolderImport';
 import './live.css';
 
 type Filter = 'all' | 'attention' | DisplayStatus;
@@ -49,6 +50,8 @@ export default function LiveWorkspace({ active = true, route, onRoute, onFamily,
  const [uploading,setUploading]=useState(false);
  const [uploadProgress,setUploadProgress]=useState({done:0,total:0});
  const [dragging,setDragging]=useState(false);
+ const [folderOpen,setFolderOpen]=useState(false);
+ const [bulkProcessing,setBulkProcessing]=useState(false);
  const [filter,setFilter]=useState<Filter>(() => filterOptions.find(f => f.id === history.state?.inbox?.filter)?.id ?? 'all');
  const [query,setQuery]=useState<string>(() => history.state?.inbox?.query ?? '');
  const [localRoute, setLocalRoute] = useState<WorkspaceRoute>({page:'live'});
@@ -255,6 +258,35 @@ export default function LiveWorkspace({ active = true, route, onRoute, onFamily,
   } catch(error){if(mounted.current)setActionError(displayError(error))}
   finally{if(mounted.current)setProcessingId(null)}
  }
+ /** 허용 폴더에서 가져온 문서를 목록에 넣는다. 파싱은 하지 않는다. */
+ function addImported(docs: LiveDoc[]) {
+  if (!mounted.current || !docs.length) return;
+  mutationVersion.current += 1;
+  const ids = new Set(docs.map(doc => doc.id));
+  setDocuments(prev => [...docs, ...prev.filter(item => !ids.has(item.id))]);
+  setFilter('all'); setQuery(''); setActionError('');
+  setNotice(`${docs.length}개 문서를 허용 폴더에서 가져와 이 컴퓨터의 로컬 저장소에 두었습니다. 파싱은 별도로 실행해 주세요.`);
+ }
+ /** 가져오기 결과에서 사용자가 누른 일괄 파싱. 하나씩 접수하고, 접수하지 못한 문서는 이유를 모아 보여 준다. */
+ async function processMany(docs: LiveDoc[]) {
+  if (bulkProcessing || !docs.length) return;
+  setBulkProcessing(true); setActionError(''); setNotice('');
+  pollCount.current = 0; setPollExhausted(false);
+  const errors: string[] = []; let accepted = 0;
+  for (const doc of docs) {
+   if (!mounted.current) return;
+   try {
+    const updated = await processLiveDocument(doc.id);
+    accepted++;
+    mutationVersion.current += 1;
+    setDocuments(prev => prev.map(item => item.id === updated.id ? updated : item));
+   } catch (error) { errors.push(`${doc.name} · ${displayError(error)}`); }
+  }
+  if (!mounted.current) return;
+  setBulkProcessing(false);
+  if (accepted) setNotice(`${accepted}개 문서의 파싱을 접수했습니다. 대기 또는 처리 상태를 자동으로 확인합니다.`);
+  if (errors.length) setActionError(`${errors.length}개 문서는 파싱을 접수하지 못했습니다. 문서 상세에서 다시 실행해 주세요.\n${errors.slice(0, 5).join('\n')}${errors.length > 5 ? `\n… 외 ${errors.length - 5}개` : ''}`);
+ }
  const canDrop = (event: React.DragEvent) => event.dataTransfer.types.includes('Files');
  const pickFiles = () => inputRef.current?.click();
  const onDrop = (event: React.DragEvent) => {
@@ -274,12 +306,16 @@ export default function LiveWorkspace({ active = true, route, onRoute, onFamily,
   {actionError && <div className="lw-message is-error" role="alert"><CircleAlert size={17}/><span>{actionError}</span><button aria-label="오류 닫기" onClick={() => setActionError('')}>×</button></div>}
   {!!failedFiles.length && <div className="lw-message is-error" role="alert"><CircleAlert size={17}/><div><strong>{failedFiles.length}개 파일 저장 실패</strong><ul>{failedFiles.map(({file, reason}, i) => <li key={i}>{file.name} · {reason}</li>)}</ul><button onClick={() => void upload(failedFiles.map(f => f.file))}>실패한 파일만 다시 저장</button></div></div>}
   {pollExhausted && <div className="lw-message is-warning" role="status"><Clock3 size={17}/><span>자동 상태 확인이 멈췄습니다.</span><button onClick={() => void refresh(true)}>상태 새로고침</button></div>}
+  {bulkProcessing && <div className="lw-progress" role="status"><LoaderCircle size={16} className="live-spin"/>가져온 문서의 파싱을 접수하는 중입니다.</div>}
   {uploading && <div className="lw-progress" role="status"><LoaderCircle size={16} className="live-spin"/>파일 저장 중 · {uploadProgress.done}/{uploadProgress.total}<progress aria-label="파일 업로드 진행률" value={uploadProgress.done} max={uploadProgress.total}/></div>}
   {listError && (documents.length > 0 || current) && <div className="lw-message is-warning" role="alert"><CircleAlert size={17}/><span>마지막 조회 결과입니다. {listError}</span><button onClick={() => void refresh(true)}>다시 시도</button></div>}
   {!selectedId && <section className="lw-inbox" aria-labelledby="lw-inbox-title">
     <header className="lw-inbox-head">
       <div><h1 id="lw-inbox-title" tabIndex={-1}>문서함</h1><p>파일을 이 컴퓨터에 저장하고, 문서를 열어 파싱을 실행하세요.</p></div>
-      <button className="lw-btn is-primary" onClick={pickFiles} disabled={uploading}><FilePlus2 size={18} />파일 추가</button>
+      <div className="lw-head-actions">
+        <button className="lw-btn" onClick={() => setFolderOpen(true)} disabled={uploading || bulkProcessing} data-tip="브라우저로 파일을 보내지 않고, 콘솔 서버가 이 컴퓨터의 허용 폴더에서 직접 읽어 옵니다. 브라우저 파일 첨부가 막힌 PC에서 씁니다."><FolderInput size={18} />폴더에서 가져오기</button>
+        <button className="lw-btn is-primary" onClick={pickFiles} disabled={uploading}><FilePlus2 size={18} />파일 추가</button>
+      </div>
     </header>
     {onNavigate && <nav className="lw-shortcuts" aria-label="문서 처리 바로가기">
       <WorkspaceLink to={{page:'parsers'}} onNavigate={onNavigate}><span><Workflow size={21}/></span><span><b>파서 플로우</b><small>형식별 파서와 처리 경로</small></span><ArrowUpRight size={17}/></WorkspaceLink>
@@ -299,7 +335,7 @@ export default function LiveWorkspace({ active = true, route, onRoute, onFamily,
         {loading ? <p className="lw-placeholder" role="status">문서 목록을 불러오는 중입니다.</p> :
          listError && !documents.length ? <div className="lw-empty" role="alert"><CircleAlert size={26}/><h2>문서 목록을 확인할 수 없습니다</h2><p>{listError}</p><button className="lw-btn" onClick={() => void refresh(true)}>다시 시도</button></div> :
          !filtered.length ? <div className="lw-empty"><FolderOpen size={30} strokeWidth={1.5}/><h2>{documents.length ? '조건에 맞는 문서가 없습니다' : '업로드된 문서가 없습니다'}</h2>
-           <p>{documents.length ? '다른 검색어나 처리 상태로 찾아보세요.' : '파일 추가를 누르거나 여기에 파일을 끌어 놓으세요.'}</p>
+           <p>{documents.length ? '다른 검색어나 처리 상태로 찾아보세요.' : '파일 추가를 누르거나 여기에 파일을 끌어 놓으세요. 브라우저 파일 첨부가 막힌 PC는 폴더에서 가져오기를 쓰세요.'}</p>
            {!!documents.length && <button className="lw-btn" onClick={resetFilters}>검색 및 필터 초기화</button>}</div> :
          <>
            <div className="lw-columns lw-grid" aria-hidden="true"><span>문서명</span><span>처리 상태</span><span>마지막 변경</span></div>
@@ -329,5 +365,6 @@ export default function LiveWorkspace({ active = true, route, onRoute, onFamily,
     tab={liveRoute.tab ?? 'result'} onTab={tab => changeRoute({page:'live', doc:current.id, tab})}
     onCompare={() => changeRoute({page:'live', doc:current.id, review:'source'})} onFamily={onFamily && (() => onFamily(current.id))}
     onPickFile={pickFiles} onNavigate={onNavigate} />}
+  {folderOpen && <FolderImport onClose={() => setFolderOpen(false)} onImported={addImported} onParse={docs => void processMany(docs)}/>}
  </div>;
 }

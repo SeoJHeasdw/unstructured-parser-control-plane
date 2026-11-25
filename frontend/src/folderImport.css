@@ -1,0 +1,76 @@
+/* 허용 폴더에서 가져오기(FolderImport). 토큰은 ui/ui.css 값만 쓴다. */
+.fi-root { display: flex; flex-direction: column; min-height: 0; flex: 1; }
+.fi-root svg, .fi-foot svg, .fi-result svg { flex: none; }
+.fi-root :is(button, input, select):focus-visible, .fi-foot button:focus-visible, .fi-result button:focus-visible { outline: 2px solid var(--accent-ring); outline-offset: 2px; }
+.fi-where { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; padding: 12px 24px; border-bottom: 1px solid var(--rule); background: var(--surface-2); color: var(--ink-3); font-size: var(--fs-sm); }
+.fi-where code, .fi-where select { min-width: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink-1); font: 600 12.5px/1.4 ui-monospace, SFMono-Regular, Consolas, monospace; }
+.fi-where select { height: 30px; padding: 0 8px; border: 1px solid var(--rule-strong); border-radius: var(--r-1); background: var(--surface); }
+.fi-setting { display: inline-flex; align-items: center; gap: 5px; margin-left: auto; padding: 2px 8px; border-radius: 999px; background: var(--surface-3); color: var(--ink-2); font-size: var(--fs-xs); white-space: nowrap; }
+.fi-tools { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px 16px; padding: 10px 24px; border-bottom: 1px solid var(--rule); }
+.fi-crumbs { display: flex; align-items: center; flex-wrap: wrap; min-width: 0; gap: 2px; font-size: var(--fs-md); }
+.fi-crumbs span { display: inline-flex; align-items: center; gap: 2px; color: var(--ink-4); }
+.fi-crumbs button { max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 4px 6px; border: 0; border-radius: var(--r-1); background: none; color: var(--accent); font-weight: 600; }
+.fi-crumbs button[aria-current] { color: var(--ink-1); font-weight: 700; }
+.fi-row-tools { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.fi-search { display: inline-flex; align-items: center; gap: 6px; width: 230px; max-width: 100%; height: 32px; padding: 0 8px; border: 1px solid var(--rule-strong); border-radius: var(--r-1); background: var(--surface); color: var(--ink-3); }
+.fi-search input { flex: 1; min-width: 0; border: 0; outline: 0; background: none; font: inherit; font-size: var(--fs-sm); color: var(--ink-1); }
+.fi-search button, .fi-icon { display: inline-grid; place-items: center; border: 0; background: none; color: var(--ink-3); border-radius: var(--r-1); }
+.fi-icon { width: 32px; height: 32px; border: 1px solid var(--rule-strong); background: var(--surface); }
+.fi-check { display: inline-flex; align-items: center; gap: 6px; color: var(--ink-2); font-size: var(--fs-sm); white-space: nowrap; }
+.fi-check input, .fi-cell-check input { width: 16px; height: 16px; margin: 0; accent-color: var(--accent); }
+.fi-list { flex: 1; min-height: 240px; overflow: auto; }
+.fi-grid { display: grid; grid-template-columns: 40px minmax(0, 1fr) 150px 150px; align-items: center; gap: 0 10px; padding: 0 24px 0 14px; }
+.fi-head { position: sticky; top: 0; z-index: 1; min-height: 36px; border-bottom: 1px solid var(--rule); background: var(--surface); color: var(--ink-3); font-size: var(--fs-xs); font-weight: 700; }
+.fi-cell-check { display: grid; place-items: center; height: 100%; }
+.fi-folder, .fi-file { width: 100%; min-height: 44px; border: 0; border-bottom: 1px solid var(--surface-3); background: var(--surface); color: var(--ink-1); font: inherit; font-size: var(--fs-md); text-align: left; cursor: pointer; }
+.fi-file.is-selected { background: var(--accent-soft); }
+.fi-file.is-disabled { cursor: default; color: var(--ink-3); }
+.fi-name { display: flex; align-items: center; gap: 9px; min-width: 0; }
+.fi-name > span { display: flex; flex-direction: column; min-width: 0; }
+.fi-name b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+.fi-name small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink-3); font-size: var(--fs-xs); }
+.fi-name .lw-file-glyph { width: 30px; height: 32px; }
+.fi-folder .fi-name svg { color: var(--accent); }
+.fi-size { color: var(--ink-3); font-size: var(--fs-sm); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.fi-open { display: inline-flex; align-items: center; gap: 2px; justify-self: end; color: var(--accent); font-size: var(--fs-sm); font-weight: 600; }
+.fi-states { display: flex; flex-wrap: wrap; gap: 4px; }
+.fi-state { display: inline-flex; align-items: center; gap: 4px; padding: 2px 7px; border-radius: 999px; font-size: var(--fs-xs); font-weight: 600; white-space: nowrap; }
+.fi-state .lw-seq { padding: 0 3px; background: transparent; }
+.fi-state.is-known { color: var(--evidence-ink); background: var(--evidence-surface); }
+.fi-state.is-warn { color: var(--warn); background: var(--warn-soft); }
+.fi-state.is-off { color: var(--ink-3); background: var(--surface-3); }
+.fi-placeholder { display: flex; align-items: center; gap: 8px; margin: 0; padding: 28px 24px; color: var(--ink-3); font-size: var(--fs-md); }
+.fi-alert { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin: 10px 24px 0; padding: 9px 12px; border-radius: var(--r-1); font-size: var(--fs-sm); line-height: 1.5; }
+.fi-alert.is-error { color: var(--bad); background: var(--bad-soft); }
+.fi-alert.is-warn { color: var(--warn); background: var(--warn-soft); }
+.fi-link { padding: 0 4px; border: 0; background: none; color: inherit; font: inherit; font-weight: 600; text-decoration: underline; }
+.fi-empty { display: grid; justify-items: center; gap: 8px; padding: 36px 24px; text-align: center; color: var(--ink-3); }
+.fi-empty h3 { margin: 0; color: var(--ink-1); font-size: var(--fs-lg); }
+.fi-empty p { margin: 0; max-width: 560px; line-height: 1.6; word-break: keep-all; }
+.fi-note { margin: 0; padding: 10px 24px; border-top: 1px solid var(--rule); color: var(--ink-3); font-size: var(--fs-xs); line-height: 1.5; }
+.fi-foot { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; width: 100%; color: var(--ink-2); font-size: var(--fs-sm); }
+.fi-foot > span, .fi-foot > div { display: flex; align-items: center; gap: 8px; }
+.fi-primary { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 34px; padding: 0 14px; border: 1px solid var(--accent); border-radius: 6px; background: var(--accent); color: #fff; font: inherit; font-size: 12.5px; font-weight: 650; white-space: nowrap; }
+.fi-primary:hover:not(:disabled) { background: var(--action-hover); }
+.fi-primary:disabled { opacity: .55; cursor: default; }
+.fi-result { display: grid; gap: 18px; }
+.fi-result h3 { margin: 0 0 6px; color: var(--ink-2); font-size: var(--fs-sm); }
+.fi-summary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin: 0; }
+.fi-summary div { padding: 12px 14px; border: 1px solid var(--rule); border-radius: var(--r-2); background: var(--surface-2); }
+.fi-summary dt { color: var(--ink-3); font-size: var(--fs-xs); font-weight: 600; }
+.fi-summary dd { margin: 4px 0 0; color: var(--ink-1); font-size: var(--fs-xl); font-weight: 700; font-variant-numeric: tabular-nums; }
+.fi-summary .is-bad dd { color: var(--bad); }
+.fi-outcomes { display: grid; gap: 2px; max-height: 300px; margin: 0; padding: 0; overflow: auto; list-style: none; }
+.fi-outcomes li { display: flex; align-items: flex-start; gap: 8px; padding: 6px 2px; border-bottom: 1px solid var(--surface-3); font-size: var(--fs-sm); }
+.fi-outcomes li > span { display: flex; flex-direction: column; min-width: 0; }
+.fi-outcomes b { font-weight: 600; overflow-wrap: anywhere; }
+.fi-outcomes small { color: var(--ink-3); overflow-wrap: anywhere; }
+.fi-outcomes .is-ok { color: var(--ok); margin-top: 2px; }
+.fi-outcomes .is-bad { color: var(--bad); margin-top: 2px; }
+@media (max-width: 760px) {
+  .fi-grid { grid-template-columns: 34px minmax(0, 1fr) auto; padding: 4px 16px 4px 8px; }
+  .fi-head span:nth-child(3), .fi-size { display: none; }
+  .fi-where, .fi-tools { padding-inline: 16px; }
+  .fi-setting { margin-left: 0; white-space: normal; }
+  .fi-search { width: 100%; }
+}

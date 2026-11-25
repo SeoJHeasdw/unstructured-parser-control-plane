@@ -2,6 +2,20 @@
 
 > **기준 시점: 2026-11-12.** 이 문서는 인수인계 시점의 스냅샷이다. 코드·실행 상태·의존성·데이터는 바뀔 수 있으므로 새 세션에서는 아래 확인 순서부터 진행한다. 이 문서는 요구사항이나 고객 환경이 확정되었다는 뜻이 아니다.
 
+## 2026-11-25 허용 폴더에서 가져오기 (브라우저 파일 첨부가 막힌 고객사 PC)
+
+- **상황(사용자 보고):** 고객사 PC에서 문서함 파일 추가 때 "보안정책에 의거 파일첨부 ActiveX 실행 및 파일전송이 통제됩니다"가 뜬다. 콘솔 코드의 문구가 아니다(저장소 전체 검색). 보안 프로그램이 브라우저의 파일 선택·전송을 막는 것으로 보이며, OpenCode Desktop은 파일을 잘 읽었다.
+- **결정(사용자):** 보안팀과는 확인하지 못한 채 진행. 화면에서 브라우저 통제를 우회(다른 파일 API·base64 전송 등)하거나 Electron으로 감싸지 않고, 서버가 허용 폴더에서 직접 읽는 경로를 붙였다. 고객사 보안 정책이 이 방식을 허용하는지는 **미확인**이다.
+- **구현:**
+  - `backend/app/folder_import.py`: 허용 폴더 해석(`DOCOPS_AGENT_ROOTS`, 비우면 `samples/`), 상대 경로 검사(밖·절대·`:`·숨김 거부, 링크는 풀어서 밖이면 거부), 폴더 목록. 작업 도구 `Ops._roots`도 이 함수를 쓴다.
+  - `backend/app/routers/folder_import.py`: `GET /api/live/import/roots`, `GET /api/live/import/entries`, `POST /api/live/import`. 계약은 [API·데이터 계약](API_AND_DATA_CONTRACT.md) §1·§2·§8.
+  - `DocumentService.store_local`: 업로드와 같은 저장 규칙(서버 생성 이름, 임시 파일 후 교체, 크기 제한)으로 복사. 처리 이력 첫 줄이 "허용 폴더에서 가져와 로컬에 저장했습니다(<원본 경로>)"가 된다(`repository.create`에 `message` 인자 추가). 이름·크기·SHA-256이 같은 원본이 있으면 새 문서를 만들지 않는다(작업 도구의 재사용 규칙과 같음).
+  - 화면 `FolderImport.tsx`(+`folderImport.css`), 문서함 머리 버튼, 결과 창의 일괄 파싱 접수(`processMany`). 화면 계약은 [프론트·화면 계약](FRONTEND_AND_INTERACTION_CONTRACT.md) §5-3.
+  - 가져오기는 저장만 한다. 파싱은 결과 창의 **N개 파싱 실행**이나 문서 상세에서 사용자가 누를 때만 접수한다.
+- **고객사 설정:** 프로젝트 위치 `C:\Users\USER\Desktop\vswrk\unstructured-parser-control-plane`(사용자 제공). `.env`를 비워 두면 그 아래 `samples`가 허용 폴더다. 합성 말뭉치 56개는 `samples\generated\corpus`에 이미 풀려 있다. `corpus_phase1~3.zip`에만 있는 것은 정답 JSON과 생성 기록뿐이라 풀 필요가 없다. 말뭉치로 바로 열려면 `DOCOPS_AGENT_ROOTS=C:\Users\USER\Desktop\vswrk\unstructured-parser-control-plane\samples\generated\corpus`.
+- **검증:** 백엔드 235개 통과, 11개 건너뜀(새 `test_folder_import.py` 19개: 기본값·작업 도구와 같은 폴더, 숨김·밖·링크 거부, 복사·이력, 재사용과 내용 변경, 빈 파일·크기 초과, Origin 거부). 프론트 148개 통과(새 `folder-import.test.tsx` 2개). Linux에서 lite 설치로 서버를 띄우고 Chromium으로 `samples/generated/corpus`를 하위 폴더 포함으로 열어 49개 가져오기 → 결과 창 → 49개 파싱 접수, 다시 열면 `문서함에 있음` 표시까지 확인했다(콘솔 오류 없음). Windows 실기기와 고객사 보안 프로그램 아래에서는 확인하지 않았다.
+- **남은 것:** 대기열(기본 64) 이상을 한 번에 파싱 접수하면 넘친 문서는 오류 줄에 남아 상세에서 다시 눌러야 한다. 작업 도구처럼 기다렸다 이어 넣는 일괄 접수는 없다. 허용 폴더 변경은 `.env` 수정 후 콘솔 재시작이 필요하다.
+
 ## 2026-11-25 고객사에서 화면이 옛 버전으로 뜬 문제: 빌드 기록으로 옛 `frontend/dist` 차단
 
 - **증상(사용자 보고):** 고객사 PC에서 새 코드를 받아 서버를 띄웠는데 11-23·11-24 프론트 개선(3·4·5차, D번호·에이전트 작업·OCR 모델 연결 탭)이 없는 옛 화면이 떴다. 그 커밋들은 `main`에 들어 있었다(최근 커밋이 많아 9~21번째 뒤로 밀려 있었을 뿐).

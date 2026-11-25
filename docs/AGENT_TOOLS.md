@@ -49,7 +49,7 @@ flowchart LR
 |---|---|---|
 | `mcp.docops.timeout` | `120000` | OpenCode의 MCP 요청 시간 제한 기본값이 5초다(1.18.31 스키마로 확인). |
 | `DOCOPS_AGENT_WAIT_SECONDS` | `40` | `parse`·`wait`가 한 번에 기다리는 시간. 설정이 없으면 4초(기본 시간 제한 5초 안). |
-| `DOCOPS_AGENT_ROOTS` | 문서 폴더 | 이 폴더 밖의 파일은 읽지 않는다. 없으면 저장소의 `samples/`만 허용. |
+| `DOCOPS_AGENT_ROOTS` | 문서 폴더 | 이 폴더 밖의 파일은 읽지 않는다. 없으면 저장소의 `samples/`만 허용. 콘솔 화면의 '허용 폴더에서 가져오기'도 같은 규칙(`app/folder_import.py`)을 쓰지만, 콘솔 서버는 `.env`의 값을 읽는다. |
 | `permission`, `tools` | 편집·셸·웹·파일 읽기 끔 | 실험·보고만 한다. 고를 도구가 적을수록 중형 모델이 덜 헤맨다. |
 | `share` | `disabled` | OpenCode의 세션 공유(대화를 OpenCode 서버에 올려 링크를 만드는 기능)를 끈다. 모델 위치와 무관한 OpenCode 자체 기능이다. 내부망에서 외부가 막혀 있으면 실제 위험은 거의 없다. |
 
