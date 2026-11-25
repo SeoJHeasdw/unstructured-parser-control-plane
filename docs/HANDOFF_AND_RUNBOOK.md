@@ -2,9 +2,56 @@
 
 > **기준 시점: 2026-11-12.** 이 문서는 인수인계 시점의 스냅샷이다. 코드·실행 상태·의존성·데이터는 바뀔 수 있으므로 새 세션에서는 아래 확인 순서부터 진행한다. 이 문서는 요구사항이나 고객 환경이 확정되었다는 뜻이 아니다.
 
+## 2026-11-25 설치·실행 정리: `setup` / `run`, 기본 = Docling 포함
+
+- **사용자 결정:**
+  - 사용자 2명이 시험하는 단계라 Docling이 기본이어야 한다.
+  - 가상환경을 둘로 나누는 방식은 헷갈린다.
+  - 설치와 실행을 나눈다. 사용자는 `setup`·`run`만 알면 된다. 진입점은 얇은 래퍼면 충분하다.
+  - 고객사 PC는 PyPI·npm 접속이 열려 있다. `huggingface.co` 접속 여부는 확인하지 못했다.
+  - 근거와 영향은 [결정](DECISIONS.md)의 "설치·실행"에 적었다.
+- **진입점:**
+  - `setup.cmd`·`setup.sh`는 Python을 찾아 `scripts/console.py setup`을 부른다.
+  - `run.cmd`·`run.sh`는 `backend/.venv`의 Python으로 `scripts/console.py run`을 부른다.
+  - 로직은 `console.py` 하나(표준 라이브러리, Python 3.9 이상)에 있다. `start.cmd`와 `scripts/windows_launcher.py`는 지웠고, 예전 bash 설치 로직도 없앴다.
+- **setup:**
+  1. 콘솔이 실행 중이면 멈춘다. 데이터 폴더의 `server.lock`과 8000~8019 포트로 확인한다.
+  2. `backend/.venv`를 준비한다. 전체 모드는 Python 3.12와 `requirements-docling.lock.txt`, `--lite`는 3.12~3.15와 기본 잠금 파일을 쓴다. 지금 Python이 맞지 않으면 `py -3.12`나 `python3.12`를 찾는다.
+  3. 화면을 빌드한다. 소스 지문이 지난 setup과 같으면 건너뛴다.
+  4. `.env`가 없으면 만든다.
+  5. `check_local.py --docling --fetch-models --report <임시 파일>`을 부른다. 빠진 PDF 모델은 `docling-tools models download layout tableformer`로 받는다. `DOCOPS_DOCLING_ARTIFACTS`를 지정했으면 받지 않는다. 이어서 자체 점검을 한다.
+  6. 받지 못해도 설치는 계속하되, 받지 못한 것은 보고 파일에 남긴다(사용자 요청). setup은 그 내용을 맨 끝 요약(`====` 사이)에 `[주의] … N건`과 영향·해결 방법으로 다시 보여 준다.
+  7. `backend/.venv/docops-setup.json`에 모드, 잠금 파일 지문, 화면 소스 지문, 그 경고를 남긴다.
+  - 사용자가 혼자 쓰는 단계라 호환용 옵션(`--base`·`--docling`·`--check`)과 `.venv-docling` 안내는 없앴다(사용자 결정). run을 띄울 때 `launch_local.py`가 지금 파일 상태를 보고 PDF 모델이 없으면 한 줄로 알린다.
+- **run:**
+  - 기록이 없으면 "setup 먼저"라고 알린다.
+  - 잠금 파일이나 화면 소스 지문이 다르면 "setup 다시"라고 알린다. 줄바꿈 차이는 같은 것으로 본다.
+  - 둘 다 맞으면 `launch_local.py`를 띄운다. 설치하거나 네트워크를 쓰지 않는다.
+  - 모드 옵션을 주면 setup에서 정하라고 안내한다.
+- **기존 설치 PC:**
+  - 처음에는 `run`이 "setup 먼저"라고 멈춘다(기록 파일이 없으므로). `setup.cmd`를 한 번 실행한다.
+  - `backend/.venv`가 3.12면 Docling을 더 설치하고, 3.13 이상이면 이름을 바꾸라고 안내한다.
+  - 예전 `backend/.venv-docling`은 쓰지 않는다. 남아 있으면 직접 지운다(실행기는 건드리지 않음).
+  - 오프라인 기본 묶음은 `setup.cmd --offline --lite`로 설치한다.
+- **그 밖의 정리:**
+  - `.env.example`에서 효과가 없는 EasyOCR 항목(`DOCOPS_OCR`, `DOCOPS_OCR_MODELS`)을 뺐다.
+  - README를 빠른 시작(setup → run) → 옵션 → 모델 연결 → 제약 → 문제 해결 → 오프라인 → 개발 순서로 다시 썼다.
+  - PDF 모델이 없을 때 화면·작업 도구·파서 오류 안내에 "setup 다시 실행"을 넣었다.
+  - CI(`windows.yml`)는 `setup.cmd --lite`, `console.check_ready()`, 오프라인 묶음 `setup --offline --lite`로 점검한다.
+- **검증:**
+  - 백엔드 테스트 210개 통과, 8개 건너뜀(Docling 실측 등). 새 `tests/test_console.py` 23개가 옵션, 모드, 실행 중 감지(잠금·포트), 코드 업데이트 감지, 줄바꿈, Windows 전용 고정 버전, 마지막 요약을 확인한다.
+  - 프론트 테스트 146개 통과.
+  - Linux에서 실제로 확인한 것:
+    - `./run.sh`(setup 전 거부) → `./setup.sh --lite`(첫 설치·재실행 1.3초) → `./run.sh`(서버 응답)
+    - 8030번 포트로 띄운 콘솔이 있을 때 setup이 멈추는 것, 화면 소스를 바꾸면 run이 멈추는 것
+    - 3.13으로 실행해도 3.12 가상환경을 만드는 것, 3.13 `.venv`에서 전체 모드가 멈추는 것
+    - 가짜 `docling-tools`로 모델 받기의 성공·실패 경로. 실패하면 setup 맨 끝 요약에 `[주의] … 1건`과 해결 방법이 나오고, run 시작 화면에도 한 줄이 나오는 것
+    - 오프라인 기본 묶음(`prepare-offline.py`)에 새 진입점이 들어가는 것
+  - **Windows 실기기, 전체 모드 실제 설치(Docling·torch), 실제 `huggingface.co` 모델 받기는 돌려보지 않았다.**
+
 ## 2026-11-25 고객 PC 실행
 
-- Windows 소스 ZIP은 `start.cmd --check` 후 `start.cmd`, 준비된 기본 ZIP은 두 명령에 `--offline`을 붙인다. `--check`는 해당 데이터 경로에서 임시 SQLite 저장소·한글 CSV 파싱·청킹을 확인한다. 기존 문서함에 시험 기록을 넣지 않는다.
+- (위 정리로 바뀜) Windows 소스 ZIP은 `setup.cmd` 후 `run.cmd`, 준비된 ZIP은 `setup.cmd --offline`(Docling 휠이 없는 기본 ZIP은 `--offline --lite`) 후 `run.cmd`. setup의 자체 점검은 해당 데이터 경로의 임시 SQLite 저장소에서 한글 CSV 파싱·청킹을 확인한다. 기존 문서함에 시험 기록을 넣지 않는다.
 - Windows와 Bash 실행기가 같은 포트 선택 코드를 사용한다. 포트가 겹치면 실행 창에 표시된 실제 주소로 접속한다. GitHub 소스 ZIP 첫 설치의 네트워크 요건 및 Docling 설치 옵션은 프로젝트 README에 있다.
 - PDF 모델 일부만 옮긴 PC에서는 파서 플로우의 PDF 설치 안내를 펼쳐 빠진 파일을 확인한다. 파일 확인은 모델 가중치의 무결성 검사나 OCR 게이트웨이 접속 시험까지 수행하지 않는다.
 
@@ -170,7 +217,7 @@ Mock API 오류나 로딩 중에도 실제 처리 탭으로 이동할 수 있으
 - `TXT`, `CSV`, `MD`, `LOG`는 기본 파이썬 파서 경로가 있다. 텍스트 디코딩은 UTF-8 BOM 포함 또는 CP949를 시도한다. CSV는 Markdown 표로 출력한다.
 - `PDF`, `DOCX`, `PPTX`, `XLSX`는 선택적으로 설치한 Docling 경로로 연결된다. 이전 개발 세션에서는 **합성 DOCX와 텍스트 PDF**를 Docling 2.150.0으로 시험했다. PPTX·XLSX는 어댑터가 있으나 실제 문서에 대한 품질 검증이 필요하다.
 - 경로는 확장자로 고르지만, 파서 전에 내용 서명으로 DRM·암호·형식 불일치를 걸러 `error_code`로 남긴다(2026-11-19). DOCX·XLSX·PPTX는 기호 글꼴·첨자 사본 보정과 원문 대조(`fidelity`)를 거친다. 복잡한 표와 원문 페이지·시트·셀 위치가 정확하게 추출된다고 보장하지 않는다.
-- 로컬 EasyOCR 한국어·영어 모델이 준비되면 PDF의 이미지 영역, Office에서 참조한 그림, PNG·JPEG·BMP·TIFF·GIF·WebP 및 SVG 내부 그림을 읽습니다. 활성화 여부는 각 실행 이력에서 확인한다.
+- 스캔 쪽과 그림의 글자는 연결한 문서 OCR 모델(OpenAI 호환 비전 API)로만 읽는다(2026-11-24 결정, 라이브러리 OCR 없음). 대상은 PDF의 글자 층 없는 쪽과 큰 그림, Office·SVG 속 그림, PNG·JPEG·BMP·TIFF·GIF·WebP다. 적용 여부는 각 실행 이력에서 확인한다.
 - HWP/HWPX·ZIP 내부 분리·메일 첨부·kordoc·Excel 외부 참조 연결·검색 인덱싱은 실제 파서에 연결되지 않았다. 지원하지 않는 형식은 `unsupported`로 드러난다.
 
 ### 파일과 로컬 상태

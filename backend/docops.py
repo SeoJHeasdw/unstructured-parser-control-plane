@@ -1,4 +1,4 @@
-"""작업 도구 진입점. 콘솔 서버(run.sh·start.cmd)가 켜져 있어야 한다.
+"""작업 도구 진입점. 콘솔 서버(run.cmd·run.sh)가 켜져 있어야 한다.
 
   python docops.py init-workspace <폴더> --roots "<문서 폴더>"   OpenCode 작업 폴더 만들기
   python docops.py mcp                       OpenCode 등 MCP 클라이언트용 stdio 서버

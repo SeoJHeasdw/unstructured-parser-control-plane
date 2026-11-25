@@ -8,7 +8,7 @@ import sys
 import tempfile
 from zipfile import ZIP_DEFLATED, ZipFile
 
-from windows_launcher import ROOT, BACKEND, FRONTEND, OFFLINE, SetupError, frontend_ready, locked_versions, offline_pip_env
+from console import ROOT, BACKEND, FRONTEND, OFFLINE, SetupError, frontend_ready, locked_versions, offline_pip_env
 
 CORE_PY = ("3.12", "3.13", "3.14", "3.15")
 DOCLING_PY = "3.12"
@@ -69,10 +69,10 @@ def tree_files(top, suffixes=None):
 
 def source_files():
     fixed = (
-        "start.cmd", "run.sh", "opencode-workspace/AGENTS.md", ".env.example", "README.md", "AGENTS.md", ".gitattributes", ".gitignore",
+        "setup.cmd", "run.cmd", "setup.sh", "run.sh", "opencode-workspace/AGENTS.md", ".env.example", "README.md", "AGENTS.md", ".gitattributes", ".gitignore",
         "backend/main.py", "backend/launch_local.py", "backend/check_local.py", "backend/docops.py", "backend/README.md", "frontend/index.html",
         "frontend/package.json", "frontend/package-lock.json", "frontend/tsconfig.json",
-        "frontend/vite.config.ts", "scripts/windows_launcher.py", "scripts/prepare-offline.py",
+        "frontend/vite.config.ts", "scripts/console.py", "scripts/prepare-offline.py",
         "scripts/prepare-offline.sh", "samples/GPT_SAMPLE_GENERATION_PROMPT.md",
     )
     yield from (ROOT / name for name in fixed)
@@ -93,7 +93,7 @@ def source_files():
 def build_archive(path, wheelhouses, models):
     prefix = "unstructured-parser-control-plane"
     required = {
-        "start.cmd", "scripts/windows_launcher.py", "backend/main.py", "backend/requirements.lock.txt",
+        "setup.cmd", "run.cmd", "scripts/console.py", "backend/main.py", "backend/requirements.lock.txt",
         "frontend/dist/index.html", "mock-data/data.json",
     }
     with ZipFile(path, "w", ZIP_DEFLATED, compresslevel=3) as archive:

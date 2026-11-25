@@ -1,7 +1,8 @@
-"""Start the local console for run.sh and start.cmd, or open its existing instance."""
+"""Start the local console for run.cmd and run.sh (via scripts/console.py run), or open its existing instance."""
 
 import errno
 from http.client import HTTPConnection, HTTPException
+from importlib.util import find_spec
 import socket
 import subprocess
 import sys
@@ -12,6 +13,7 @@ import webbrowser
 import uvicorn
 
 from app.config import Settings
+from app.docling_models import missing_files
 
 
 HOST = "127.0.0.1"
@@ -100,6 +102,10 @@ def launch(requested_port, browser):
             webbrowser.open(url)
         return 0
 
+    if find_spec("docling") is not None and missing_files(settings.docling_artifacts):
+        # setup에서 모델을 받지 못한 채 쓰는 경우. 설치 기록이 아니라 지금 파일 상태를 본다.
+        print("[주의] PDF 모델이 없어 PDF 파싱은 안 됩니다(Office·텍스트는 됩니다). "
+              "huggingface.co 에 접속되는 상태에서 setup을 다시 실행하세요.", flush=True)
     listener, port = reserve_listener(ports)
     with listener:
         url = f"http://{HOST}:{port}/"

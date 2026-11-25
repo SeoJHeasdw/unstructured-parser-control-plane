@@ -49,7 +49,7 @@ RUNTIME_HEADER = b"x-docops-runtime"
 
 
 class RuntimeHeader:
-    """모든 응답에 저장소 표식을 붙인다. run.sh·start.cmd 어느 쪽으로 띄워도 실행기와 작업 도구(MCP)가 같은 서버를 찾는다."""
+    """모든 응답에 저장소 표식을 붙인다. run.cmd·run.sh 어느 쪽으로 띄워도 실행기와 작업 도구(MCP)가 같은 서버를 찾는다."""
 
     def __init__(self, app, runtime_id: str):
         self.app = app

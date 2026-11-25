@@ -75,7 +75,7 @@ class Api:
             # 표식을 붙이기 전 버전의 서버. 같은 저장소인지 확인할 수 없다.
             self.note = "서버가 저장소 표식을 보내지 않아 같은 runtime인지 확인하지 못했습니다(이전 버전 서버)."
             return legacy
-        raise ServerDown("콘솔 서버를 찾지 못했습니다(127.0.0.1:8000~8019). run.sh 또는 start.cmd로 콘솔을 먼저 띄워 주세요.")
+        raise ServerDown("콘솔 서버를 찾지 못했습니다(127.0.0.1:8000~8019). run.cmd(또는 ./run.sh)로 콘솔을 먼저 띄워 주세요.")
 
     def _call(self, method: str, path: str, body: bytes | None = None, headers: dict | None = None, timeout: float | None = None, digest: bool = False):
         for attempt in (0, 1):

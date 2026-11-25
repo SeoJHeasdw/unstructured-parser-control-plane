@@ -182,7 +182,7 @@ class DoclingAdapter:
             missing = missing_files(self.settings.docling_artifacts)
             if missing:
                 raise ParserError("PDF 모델 파일이 빠져 있거나 비어 있습니다: " + ", ".join(missing) +
-                                  ". docling-tools models download layout tableformer 로 준비해 주세요.", code="parser_unavailable")
+                                  ". setup을 다시 실행하거나 docling-tools models download layout tableformer 로 준비해 주세요.", code="parser_unavailable")
             converter = self._pdf()
         else:
             fmt = {"DOCX": InputFormat.DOCX, "PPTX": InputFormat.PPTX, "XLSX": InputFormat.XLSX}[extension]
