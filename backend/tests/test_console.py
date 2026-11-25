@@ -85,7 +85,36 @@ def test_run_takes_port_and_no_browser_only():
         console.parse_args(["run", "--lite"])
 
 
+def test_setup_models_bundle_option(tmp_path):
+    bundle = tmp_path / "docling pdf models.zip"
+    bundle.write_bytes(b"PK")
+    args = console.parse_args(["setup", "--models", str(bundle)])
+    assert console.model_bundle(args.models, full=True) == bundle.resolve()
+    assert console.model_bundle(None, full=True) is None
+    with pytest.raises(console.SetupError, match="lite"):
+        console.model_bundle(str(bundle), full=False)
+    with pytest.raises(console.SetupError, match="없습니다"):
+        console.model_bundle(str(tmp_path / "missing.zip"), full=True)
+    with pytest.raises(console.SetupError, match="setup"):
+        console.parse_args(["run", "--models", str(bundle)])
+
+
 # ---------------------------------------------------------------- setup
+
+def test_setup_passes_bundle_to_check_instead_of_downloading(project, monkeypatch, tmp_path):
+    bundle = tmp_path / "models.zip"
+    bundle.write_bytes(b"PK")
+    commands = []
+    monkeypatch.setattr(console, "data_folder_in_use", lambda: None)
+    monkeypatch.setattr(console, "running_console", lambda: None)
+    monkeypatch.setattr(console, "ensure_python", lambda full, offline: Path("python"))
+    monkeypatch.setattr(console, "ensure_frontend", lambda offline: None)
+    monkeypatch.setattr(console, "run", lambda command, **kwargs: commands.append([str(part) for part in command]))
+    console.setup(console.parse_args(["setup", "--models", str(bundle)]))
+    assert commands[-1][-3:] == ["--docling", "--models-from", str(bundle.resolve())]
+    console.setup(console.parse_args(["setup"]))
+    assert commands[-1][-2:] == ["--docling", "--fetch-models"]
+
 
 def test_full_mode_without_python_312_points_to_lite(project, monkeypatch):
     shutil.rmtree(console.VENV)

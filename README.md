@@ -25,7 +25,7 @@ setup.cmd
 
 1. Python 가상환경 `backend\.venv`를 만들고 패키지를 설치합니다(Docling 포함).
 2. 화면을 빌드하고, `.env`가 없으면 `.env.example`로 만듭니다.
-3. PDF 모델(레이아웃·표)을 받습니다. `huggingface.co`에 접속해야 하며, 받지 못해도 설치는 계속합니다. 이 경우 PDF만 파싱되지 않습니다. 받지 못한 것은 **setup 마지막 요약에 `[주의]`로 다시 표시**되고, `run`을 띄울 때도 한 줄로 알려 줍니다.
+3. PDF 모델(레이아웃·표)을 받습니다. `huggingface.co`에 접속해야 합니다. 받기 전에 10초 안에 접속되는지 확인하고, 막혀 있으면 받지 않고 원인을 한 줄로 알려 줍니다. 받지 못해도 설치는 계속하며 이 경우 PDF만 파싱되지 않습니다. 받지 못한 것은 **setup 마지막 요약에 `[주의]`로 다시 표시**되고, `run`을 띄울 때도 한 줄로 알려 줍니다. `huggingface.co`가 막힌 PC는 [아래 절](#huggingfaceco가-막힌-pc-pdf-모델-zip으로-옮기기)처럼 다른 PC에서 만든 모델 ZIP으로 설치합니다.
 4. 합성 CSV로 파싱과 청킹을 시험합니다. 시험은 임시 저장소에서 하므로 문서함에는 아무것도 남지 않습니다.
 
 **3. 실행: 매번**
@@ -40,15 +40,41 @@ run.cmd
 
 | 명령 | 옵션 | 하는 일 |
 |---|---|---|
-| setup | (없음) | **전체 모드.** Docling을 넣어 PDF·DOCX·PPTX·XLSX와 TXT·CSV·MD·LOG를 모두 파싱합니다. Python 3.12가 필요합니다. |
+| setup | (없음) | **전체 모드.** Docling을 넣어 PDF·DOCX·PPTX·XLSX·XLSM과 TXT·CSV·MD·LOG를 모두 파싱합니다. Python 3.12가 필요합니다. |
 | setup | `--lite` | **가벼운 모드.** Docling 없이 TXT·CSV·MD·LOG만 파싱합니다. Python 3.12~3.15에서 되며, 화면만 볼 때나 3.12가 없는 PC용입니다. |
 | setup | `--offline` | 준비된 ZIP에 든 휠과 화면 빌드만 씁니다(네트워크 없음). |
+| setup | `--models <ZIP>` | PDF 모델을 받지 않고, 다른 PC에서 만든 모델 ZIP(또는 모델 폴더)을 검증해 설치합니다. `huggingface.co`가 막힌 PC용입니다. |
 | run | `8010` | 시작 포트를 지정합니다(기본 8000). 쓰는 중이면 다음 빈 포트로 넘어가며 최대 20개까지 찾습니다. |
 | run | `--no-browser` | 브라우저를 열지 않습니다. |
 
 - 모드는 setup에서 정하고 기록되므로 run에는 모드 옵션이 없습니다.
 - 가상환경은 `backend\.venv` 하나입니다. 전체 모드로 설치한 뒤 `setup --lite`를 실행하면 다시 설치하지 않습니다.
 - 콘솔이 켜져 있으면 setup이 멈춥니다. Windows에서는 실행 중인 파일이 잠겨 설치가 중간에 깨질 수 있기 때문입니다.
+
+## huggingface.co가 막힌 PC: PDF 모델 ZIP으로 옮기기
+
+PDF 파싱에 쓰는 Docling 레이아웃·표 모델은 `huggingface.co`에서 받습니다. PyPI·npm은 열려 있어도 `huggingface.co`만 막힌 PC에서는 setup 요약에 `[주의] PDF 모델: https://huggingface.co 에 접속되지 않습니다(…)`가 뜹니다. DOCX·PPTX·XLSX·XLSM·텍스트 파싱은 모델이 없어도 됩니다.
+
+**1. `huggingface.co`에 접속되는 PC에서 모델 ZIP 만들기** (이 프로젝트를 setup한 PC. 모델은 setup 때 받아 둡니다)
+
+```cmd
+backend\.venv\Scripts\python.exe scripts\prepare-offline.py --models-only
+```
+
+macOS·Linux는 `backend/.venv/bin/python scripts/prepare-offline.py --models-only`입니다. `offline\docling-pdf-models.zip`이 생깁니다. 모델 파일과 파일별 SHA-256을 적은 `manifest.json`이 들어 있습니다. 화면 빌드나 휠은 만들지 않습니다.
+
+**2. ZIP을 막힌 PC로 옮겨 설치하기**
+
+```cmd
+setup.cmd --models C:\경로\docling-pdf-models.zip
+```
+
+- 평소 setup과 같고, 모델만 받지 않고 ZIP에서 설치합니다. 이미 setup을 마친 PC면 바뀐 것만 처리하므로 금방 끝납니다.
+- 파일마다 크기와 SHA-256을 확인합니다. 옮기다 깨진 ZIP은 설치하지 않습니다.
+- 설치 위치는 콘솔이 모델을 찾는 폴더입니다: `.env`의 `DOCOPS_DOCLING_ARTIFACTS` → 프로젝트의 `offline\docling-models`(있을 때) → `%USERPROFILE%\.cache\docling\models`. 보통은 마지막 위치이며, 사용자 폴더 아래라 프로젝트 폴더를 지우고 다시 받아도 남습니다.
+- 그 폴더에 **내용이 다른 모델 파일**이 이미 있으면 덮어쓰지 않고 멈춥니다. 같은 파일은 건너뛰고, 받다 만 빈 파일만 바꿔 씁니다.
+- 모델 캐시 폴더(`.cache\docling\models`)를 손으로 압축한 ZIP이나 그 폴더 경로를 줘도 됩니다. 이때는 SHA-256 기록이 없어 크기만 확인합니다.
+- 사내에 Hugging Face 미러(프록시 저장소)가 있으면 `.env`에 `HF_ENDPOINT=<미러 주소>`를 넣고 setup을 다시 실행하는 방법도 있습니다. 미러 여부는 고객사에 확인이 필요합니다.
 
 ## 화면
 
@@ -93,10 +119,11 @@ run.cmd
 - 실제 원본·결과·이력은 `runtime/`에 저장됩니다(`DOCOPS_RUNTIME_DIR`로 바꿀 수 있음). Git에는 올리지 않습니다.
 
 **파싱**
-- 파서는 확장자로 고릅니다. TXT·CSV·MD·LOG는 내장 파서, PDF·DOCX·PPTX·XLSX는 Docling, 이미지는 OCR 모델이 맡습니다. HWP/HWPX, ZIP 안 파일, 메일 첨부는 본문을 파싱하지 않고 구조 분석에서 목록만 보여 줍니다. 지원하지 않는 형식은 `unsupported`가 됩니다.
+- 파서는 확장자로 고릅니다. TXT·CSV·MD·LOG는 내장 파서, PDF·DOCX·PPTX·XLSX·XLSM은 Docling, 이미지는 OCR 모델이 맡습니다. HWP/HWPX, ZIP 안 파일, 메일 첨부는 본문을 파싱하지 않고 구조 분석에서 목록만 보여 줍니다. 지원하지 않는 형식은 `unsupported`가 됩니다.
 - **파싱 성공이 품질 보증은 아닙니다.** Docling 결과는 합성 문서로만 확인했고, 실제 고객 문서 품질은 아직 평가하지 않았습니다. 복잡한 표나 원문 위치가 정확하다고 보장하지 않습니다.
 - 파서를 부르기 전에 내용 서명을 확인합니다. DRM, 암호, 확장자 불일치는 사유 코드(`error_code`)를 붙여 실패로 남깁니다. DRM은 판별만 하므로 해제본이 필요합니다.
-- DOCX·XLSX·PPTX는 사본에서 기호 글꼴과 첨자를 보정한 뒤 파싱합니다. 원문과 대조해 특수기호 손실, 병합 셀, 흰색 글자, 읽지 않은 그림을 경고합니다.
+- DOCX·XLSX·XLSM·PPTX는 사본에서 기호 글꼴과 첨자를 보정한 뒤 파싱합니다. 원문과 대조해 특수기호 손실, 병합 셀, 흰색 글자, 읽지 않은 그림을 경고합니다.
+- **XLSM(매크로 사용 통합문서)** 은 셀과 표를 XLSX와 같이 읽습니다. **매크로는 실행하지 않고** 코드도 결과 본문에 넣지 않습니다. 코드가 든 VBA 모듈이 있으면 모듈 수·줄 수와 "셀 값은 파일에 마지막으로 저장된 값"이라는 경고를 남기고, 열 때 자동 실행되는 프로시저(`Workbook_Open`·`Auto_Open` 등)가 있으면 함께 알립니다. 모듈 목록과 매크로 코드 속 경로·URL·문서번호 후보는 문서 상세의 **구조 분석**에서 봅니다.
 - 재처리 중이거나 실패한 뒤에도 마지막 성공본을 볼 수 있으며, 이때 `is_stale`로 표시됩니다.
 
 **처리 한도**
@@ -122,7 +149,8 @@ run.cmd
 | `콘솔이 실행 중입니다` | 콘솔 실행 창에서 `Ctrl+C`로 끈 뒤 setup을 다시 실행합니다. |
 | `Docling(PDF·Office 파싱)에는 Python 3.12가 필요합니다` | Python 3.12를 설치하고 새 터미널에서 다시 실행합니다. 당장 화면만 띄우려면 `setup.cmd --lite`를 씁니다. |
 | `backend/.venv 는 Python 3.13 입니다` | 예전에 다른 버전으로 만든 환경입니다. `backend\.venv` 이름을 바꾸고(예: `.venv-py313`) setup을 다시 실행합니다. |
-| setup 요약에 `[주의] PDF 모델`이 뜸, 또는 PDF만 실패함 | `huggingface.co`에 접속되는 상태에서 setup을 다시 실행합니다. 안 되면 다른 PC에서 받은 모델 폴더를 `%USERPROFILE%\.cache\docling\models`에 두거나, 다른 위치를 `.env`의 `DOCOPS_DOCLING_ARTIFACTS`로 지정합니다. |
+| setup 요약에 `[주의] PDF 모델`이 뜸, 또는 PDF만 실패함 | `huggingface.co`가 막혀 있으면(요약에 `접속되지 않습니다`) 다른 PC에서 만든 모델 ZIP을 `setup.cmd --models <ZIP>`으로 설치합니다([위 절](#huggingfaceco가-막힌-pc-pdf-모델-zip으로-옮기기)). 접속되는 PC라면 setup을 다시 실행합니다. 다른 위치의 모델 폴더를 쓰려면 `.env`의 `DOCOPS_DOCLING_ARTIFACTS`로 지정합니다. |
+| `setup --models` 가 `내용이 다른 모델 파일이 이미 있어` 멈춤 | 설치 위치에 다른 버전의 모델이 있습니다. 콘솔은 그 파일을 지우지 않습니다. 직접 옮기거나 지운 뒤 다시 실행하거나, `.env`의 `DOCOPS_DOCLING_ARTIFACTS`로 빈 폴더를 지정합니다. |
 | 인증서 오류(`UNABLE_TO_VERIFY_LEAF_SIGNATURE`, pip SSL) | npm은 `NODE_EXTRA_CA_CERTS=<사내 루트 CA 파일>`(Node 22.15 이상이면 `NODE_OPTIONS=--use-system-ca`도 가능), pip는 `PIP_CERT=<같은 파일>`을 설정합니다. |
 | 사내 패키지 미러를 써야 함 | `npm_config_registry`와 `PIP_INDEX_URL`을 설정합니다. |
 | 설치 도중 끊기거나 시간이 초과됨 | setup을 다시 실행하면 끝난 부분은 남아 있어 이어서 설치합니다. |
@@ -140,6 +168,7 @@ run.cmd
 | `py -3.12 scripts\prepare-offline.py` | `…-windows.zip`: 기본 묶음, Docling 없음 | `setup.cmd --offline --lite` |
 
 - ZIP은 `offline\` 폴더에 만들어집니다.
+- PyPI·npm은 되는데 `huggingface.co`만 막힌 PC는 전체 ZIP 대신 모델만 묶는 `--models-only`가 간단합니다([위 절](#huggingfaceco가-막힌-pc-pdf-모델-zip으로-옮기기)).
 - 대상 PC에는 Python만 있으면 됩니다. Docling을 쓰는 묶음은 3.12, 기본 묶음은 3.12~3.15가 필요하며, Node·npm·PyPI 접속은 필요 없습니다.
 - 설치한 뒤 실행은 똑같이 `run.cmd`입니다.
 - `--from-cache`를 주면 이미 설치된 `node_modules`와 기존 `offline\wheels*` 폴더로 다시 만듭니다.

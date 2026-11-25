@@ -3,6 +3,7 @@ import { cleanup, render, screen, waitFor, within } from '@testing-library/react
 import userEvent from '@testing-library/user-event';
 import LiveWorkspace from '../LiveWorkspace';
 import ParserWorkspace from '../ParserWorkspace';
+import { StructurePanel } from '../StructurePanel';
 import { parseDocNumber } from '../LiveDocumentView';
 
 /* 합성 문서만 쓴다. seq가 없는 문서는 예전 서버의 응답이다. */
@@ -151,7 +152,8 @@ describe('파서 플로우의 OCR 모델', () => {
     const summary = await screen.findByText('PDF 모델 설치 필요 · 누락 1개');
     await userEvent.setup().click(summary);
     expect(screen.getByText(missing)).toBeTruthy();
-    expect(screen.getByText('docling-tools models download layout tableformer')).toBeTruthy();
+    expect(screen.getByText('python scripts/prepare-offline.py --models-only')).toBeTruthy();
+    expect(screen.getByText('setup.cmd --models <ZIP 경로>')).toBeTruthy();
     expect(screen.queryByText('PDF 모델 파일 확인')).toBeNull();
   });
 
@@ -160,5 +162,28 @@ describe('파서 플로우의 OCR 모델', () => {
     render(<ParserWorkspace format="PNG" onNavigate={vi.fn()} />);
     expect(await screen.findByText('OCR 모델 미연결')).toBeTruthy();
     expect(document.querySelector('.pr-ocr-model')).toBeNull();
+  });
+});
+
+describe('XLSM(매크로 사용 통합문서)', () => {
+  const book: Doc = { ...base, id: 'x9', name: '점검기록.xlsm', format: 'XLSM', status: 'completed', seq: 31 };
+  it('파서 플로우에서 Docling 워크시트 경로와 매크로 미실행을 보여 준다', async () => {
+    serve([book], path => path === '/api/live/parsers' ? json({ routes: { XLSM: 'docling' }, docling_installed: true, pdf_model_directory: true, ocr_enabled: true, ocr_models_found: false }) : undefined);
+    render(<ParserWorkspace format="XLSM" onNavigate={vi.fn()} />);
+    expect(await screen.findByText('워크시트 추출 · 매크로 미실행')).toBeTruthy();
+    expect(screen.getByText('Docling 설치됨')).toBeTruthy();
+  });
+
+  it('구조 분석에서 매크로 모듈 수와 자동 실행을 표시하고 매크로 속 경로를 링크 후보로 보인다', async () => {
+    const root = { name: book.name, ext: 'XLSM', size: 2048, kind: 'file', location: '', detected: 'xlsx', flags: ['macro', 'macro-autorun'],
+      stats: { sheets: 1, macro: { modules: 2, code_modules: 1, code_lines: 5, auto_run: ['Auto_Open'], stripped_modules: 0, items: [] } },
+      links: [{ kind: 'unc-path', target: '\\\\fs01\\qc\\점검표.xlsx', location: '매크로 점검자동화 5행', evidence: '' }], children: [], hash: null, duplicate_of: null };
+    serve([book], path => path === '/api/live/documents/x9/structure' ? json({ id: book.id, name: book.name, format: 'XLSM', inspected_at: '2026-11-25T00:00:00Z', root,
+      summary: { documents: 1, derived: 0, max_depth: 0, links: 1, by_child_kind: {}, by_link_kind: { 'unc-path': 1 }, flags: { macro: 1, 'macro-autorun': 1 }, detected: { xlsx: 1 } } }) : undefined);
+    render(<StructurePanel doc={{ ...book, size_bytes: 2048 } as never} />);
+    expect(await screen.findByText('매크로 모듈 1 · 5줄')).toBeTruthy();
+    expect(screen.getAllByText(/열 때 자동 실행 매크로/).length).toBeGreaterThan(0);
+    await userEvent.setup().click(screen.getByRole('tab', { name: /링크 · 참조/ }));
+    expect(screen.getByText('매크로 점검자동화 5행')).toBeTruthy();
   });
 });

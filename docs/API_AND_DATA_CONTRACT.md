@@ -32,7 +32,7 @@
 | `GET /api/live/documents/{id}/runs` | 같은 원본의 성공 실행 이력. 실행마다 파서·버전·OCR 여부와 처리 시간 `duration_ms`(2026-11-17부터 기록, 이전 실행은 `null`) | `200`, `{ "runs": [...] }` | `404` 문서 없음 |
 | `GET /api/live/documents/{id}/runs/{run_id}` | 선택한 성공 실행의 Markdown·경고·위치 | `200`, `StoredParseRun` | `404` 문서 또는 실행 없음, `409` 결과 읽기 오류 |
 | `GET /api/live/documents/{id}/source` | 저장된 원본 | `200`, PDF는 인라인, 나머지는 첨부 다운로드 | `404` 문서 없음, `409` 원본 오류 |
-| `GET /api/live/documents/{id}/source-preview` | 텍스트 첫 60,000자 또는 XLSX의 `sheet`·`cell` 주변 값 | `200`, `kind`가 `text` 또는 `sheet` | `404` 문서 없음, `409` 미지원 또는 원본 오류 |
+| `GET /api/live/documents/{id}/source-preview` | 텍스트 첫 60,000자 또는 XLSX·XLSM의 `sheet`·`cell` 주변 값 | `200`, `kind`가 `text` 또는 `sheet` | `404` 문서 없음, `409` 미지원 또는 원본 오류 |
 | `GET /api/live/documents/{id}/history` | 상태 변경·접수 실패 이벤트 | `200`, `{ "id": ..., "history": [...] }` | `404` 문서 없음 |
 | `POST /api/live/documents/{id}/structure` | 원본 구조 분석(하위 문서·링크·플래그). 원본·처리 상태는 바꾸지 않고 `runtime/structure/{id}.json`에 저장 | `200`, `{id,name,format,inspected_at,root,summary}` | `404` 문서 없음, `409` 저장 경로 확인 불가, `403` 허용되지 않은 Origin |
 | `GET /api/live/documents/{id}/structure` | 마지막 구조 분석 결과 | `200` | `404` 문서 없음, `409` 분석 결과 없음·읽기 실패 |
@@ -134,12 +134,13 @@ Content-Type: text/plain
 }
 ```
 
-- `markdown`은 마지막으로 **성공해 현재 연결된** 결과 파일의 텍스트다. 구조화 페이지/시트/셀 위치의 완전 보존을 보장하지 않는다. DOCX·XLSX·PPTX에서 파서 결과에 없던 글상자·SVG 글자를 찾으면 끝에 `<!-- docops:supplement -->`와 `## 보충 추출: 파서 결과에 없던 원본 글자` 구획을 덧붙인다. 각 줄은 `- [글상자 · 시트!B3:D5 도형] 글자` 형식이며 **원래 위치가 아니다**. XLSX 글상자 줄은 `locations`에 시트·행·열이 남는다.
-- `fidelity`(2026-11-19 추가)는 DOCX·XLSX·PPTX 성공 결과의 원문 충실도 보고서다. 다른 형식이나 이전 결과는 `null`이다. 아래 '원문 충실도 보고서'를 본다.
+- `markdown`은 마지막으로 **성공해 현재 연결된** 결과 파일의 텍스트다. 구조화 페이지/시트/셀 위치의 완전 보존을 보장하지 않는다. DOCX·XLSX·XLSM·PPTX에서 파서 결과에 없던 글상자·SVG 글자를 찾으면 끝에 `<!-- docops:supplement -->`와 `## 보충 추출: 파서 결과에 없던 원본 글자` 구획을 덧붙인다. 각 줄은 `- [글상자 · 시트!B3:D5 도형] 글자` 형식이며 **원래 위치가 아니다**. XLSX·XLSM 글상자 줄은 `locations`에 시트·행·열이 남는다.
+- `fidelity`(2026-11-19 추가)는 DOCX·XLSX·XLSM·PPTX 성공 결과의 원문 충실도 보고서다. 다른 형식이나 이전 결과는 `null`이다. 아래 '원문 충실도 보고서'를 본다.
 - `parser`, `parser_version`은 이 **성공 결과를 만든 파서와 버전**이다. 현재/최신 시도의 파서값인 `LiveDocument.parser`와 별도로 취급한다.
 - `is_stale: false`는 문서의 현재 상태가 `completed`임을 뜻한다. `true`는 현재 상태가 완료가 아닌데도 **과거 성공 결과**가 있어서 반환했다는 뜻이다. 예를 들어 재처리 대기·실행 중이나 재처리 실패 후 이전 결과를 보여준다. `is_stale`은 결과 품질 평가나 원천 최신성 검증이 아니다.
 - `warnings`는 결과 관련 문자열 배열이다. OCR 없이 처리한 PDF는 미적용 경고를 유지한다. 본문·표가 추출되지 않은 PDF 페이지 번호를 별도로 기록한다. `ocr_enabled`는 PDF 변환 설정, 이미지·Office 그림은 OCR 적용 여부다.
-- DOCX·XLSX·PPTX 결과의 `warnings`에는 원문 대조 경고가 붙는다: 특수기호 손실(`특수기호 N건이 결과에서 빠짐(원문 M건): ≥×2…`), 바꿀 수 없는 첨자·기호 글꼴, 흰색에 가까운 글자 포함, 숨김 글자 포함, 병합 셀 값 반복 가능, 보충 추출, OCR 없이 읽지 않은 래스터 그림 수. 사본 보정이나 점검이 실패하면 그 사실도 경고로 남는다.
+- DOCX·XLSX·XLSM·PPTX 결과의 `warnings`에는 원문 대조 경고가 붙는다: 특수기호 손실(`특수기호 N건이 결과에서 빠짐(원문 M건): ≥×2…`), 바꿀 수 없는 첨자·기호 글꼴, 흰색에 가까운 글자 포함, 숨김 글자 포함, 병합 셀 값 반복 가능, 보충 추출, OCR 없이 읽지 않은 래스터 그림 수. 사본 보정이나 점검이 실패하면 그 사실도 경고로 남는다.
+- 매크로(VBA 프로젝트 `vbaProject.bin`)가 든 통합문서 결과(2026-11-25, XLSM과 이름만 `.xlsx`로 바꾼 매크로 통합문서)의 `warnings`: 코드가 든 모듈이 있으면 `매크로 포함: VBA 모듈 N개(코드 M줄)는 실행하지 않았고 결과 본문에 넣지 않았습니다. 셀 값은 파일에 마지막으로 저장된 값입니다.`로 시작하는 한 줄. 열거나 닫을 때 자동 실행되는 프로시저(`Auto_Open`, `Workbook_Open`, `Document_Open` 등 이름 기준)가 있으면 같은 줄에 이름을 덧붙인다. 소스가 없는 모듈(실행 코드만 남았거나 손상)은 따로 한 줄, 프로젝트를 읽지 못하면 `매크로(VBA) 프로젝트가 있지만 읽지 못했습니다…` 한 줄. 빈 시트·통합문서 모듈만 있으면 경고가 없다. 매크로 코드는 `markdown`에 넣지 않는다.
 - 현재 응답에는 결과 생성 시각, 결과별 실행 ID, 결과 원본 버전, 구조화 위치, 페이지별 품질이나 이전 결과 목록이 없다. 여러 번 성공했을 때 공개 API는 마지막 성공 결과만 가리킨다.
 
 ### 원문 충실도 보고서 (`fidelity`)
@@ -188,11 +189,11 @@ Content-Type: text/plain
 | `name`, `ext`, `size`, `location` | 표시 이름, 이름의 확장자, 바이트 수, 상위 문서 안 위치(압축 경로·`첨부: 이름`·내장 경로) |
 | `kind` | `file`(원본) · `archive-entry` · `attachment` · `embedded` |
 | `detected` | 파일 앞부분으로 판별한 실제 형식(`docx`, `xlsx`, `pptx`, `doc`, `xls`, `ppt`, `msg`, `mime`, `pdf`, `zip`, `hwp`, `hwpx`, `html`, `text`, `xml`, `image`, `encrypted-ooxml`, `ole`, `unknown`) |
-| `flags` | `encrypted`, `drm-suspect`(Office·PDF 확장자인데 형식을 알 수 없음), `format-mismatch`, `macro`, `has-images`, `image-only`, `duplicate`(같은 내용이 이미 나옴), `unreadable`, `truncated`(한도 초과), `too-large` |
-| `links[]` | `{kind, target, location, evidence}`. `kind`: `hyperlink`, `url`, `unc-path`, `file-path`, `doc-number`(후보), `external-workbook`, `field-link`, `linked-object`, `template`, `linked-image`, `subdocument`, `pdf-remote`, `external`. `location`은 `시트!셀`, `본문 문단 N`, `슬라이드 N`, `N행` 등 |
-| `children[]`, `stats`, `hash`, `duplicate_of` | 하위 문서, 이미지·페이지·시트 수 등, 내용 해시 앞 16자, 중복일 때 처음 나온 위치 |
+| `flags` | `encrypted`, `drm-suspect`(Office·PDF 확장자인데 형식을 알 수 없음), `format-mismatch`, `macro`, `macro-autorun`(열거나 닫을 때 자동 실행되는 프로시저), `has-images`, `image-only`, `duplicate`(같은 내용이 이미 나옴), `unreadable`, `truncated`(한도 초과), `too-large` |
+| `links[]` | `{kind, target, location, evidence}`. `kind`: `hyperlink`, `url`, `unc-path`, `file-path`, `doc-number`(후보), `external-workbook`, `field-link`, `linked-object`, `template`, `linked-image`, `subdocument`, `pdf-remote`, `external`. `location`은 `시트!셀`, `본문 문단 N`, `슬라이드 N`, `N행`, `매크로 <모듈> N행` 등 |
+| `children[]`, `stats`, `hash`, `duplicate_of` | 하위 문서, 이미지·페이지·시트 수 등, 내용 해시 앞 16자, 중복일 때 처음 나온 위치. 매크로가 있는 Office 문서의 `stats.macro`는 `{modules, code_modules, code_lines, auto_run[], stripped_modules, items[{name, kind: standard\|document, code_lines, auto_run?}]}`(모듈 50개까지), 읽지 못하면 `stats.macro_error` |
 
-한도(기본): 깊이 8, 노드 1,500, 메모리로 여는 하위 문서 합계 300MB·개당 100MB, 링크 3,000. 하위 문서는 메모리에서만 열고 디스크에 풀지 않는다. 문서번호 후보 정규식은 `DOCOPS_DOCNUMBER_PATTERN`으로 바꿀 수 있다. 레거시 DOC·XLS·PPT 본문은 형식을 완전히 해석하지 않고 UTF-16·CP949로 훑어 후보만 찾는다(`stats.crude_text`). PDF 본문 텍스트 안의 문서번호는 아직 찾지 않는다(링크 주석·실행 동작·첨부만).
+한도(기본): 깊이 8, 노드 1,500, 메모리로 여는 하위 문서 합계 300MB·개당 100MB, 링크 3,000. 하위 문서는 메모리에서만 열고 디스크에 풀지 않는다. 문서번호 후보 정규식은 `DOCOPS_DOCNUMBER_PATTERN`으로 바꿀 수 있다. 레거시 DOC·XLS·PPT 본문은 형식을 완전히 해석하지 않고 UTF-16·CP949로 훑어 후보만 찾는다(`stats.crude_text`). PDF 본문 텍스트 안의 문서번호는 아직 찾지 않는다(링크 주석·실행 동작·첨부만). 매크로 코드는 [MS-OVBA] 압축을 풀어 읽기만 하고 실행하지 않는다. 경로·URL·문서번호 후보를 찾을 때 `Attribute VB_` 줄은 건너뛴다. 소스를 지우고 실행 코드(p-code)만 남긴 모듈은 내용을 보지 못한다(`stripped_modules`).
 
 ## 4. 결과가 없을 때와 오류 계약
 
@@ -276,13 +277,14 @@ stateDiagram-v2
 | SVG | XML 텍스트 + OCR 모델(인라인 그림, 연결 시) | 최대 10 MiB. 벡터 글자와 인라인 그림을 읽는다. 원격 참조는 가져오지 않는다. |
 | `.docx` | 사본 보정 → 선택 설치 Docling → 원문 대조 | Docling 2.150.0의 합성 DOCX 검증. 엣지 케이스 실측(아래)은 합성 문서 기준이며 복잡한 실제 문서 품질은 별도 검증 필요 |
 | `.xlsx`, `.pptx` | 사본 보정 → 선택 설치 Docling 경로 → 원문 대조 | XLSX는 합성 문서로 첨자·병합 셀·글상자·흰회색 글자를 실측. PPTX는 합성 그림 슬라이드에서 OCR을 확인했다. 캐시 값이 없는 보이는 시트의 셀은 수식 원문·셀 위치를 보충한다. 외부 문서 참조와 수식 재계산은 별도 범위 |
-| HWP/HWPX, ZIP, 메일 및 그 밖의 형식 | 현재 미지원 | 업로드 후 처리 요청 시 `unsupported`. Mock 파이프라인의 예시 구성과 실제 지원은 별개 |
+| `.xlsm` (2026-11-25) | XLSX와 같은 경로(사본 보정 → Docling 워크시트 → 원문 대조) + 매크로 목록 | 매크로는 실행하지 않는다. 셀 값은 파일에 저장된 값(Docling은 `data_only`로 읽음)이라 매크로가 열 때 채우는 값은 저장 시점 것만 있다. 매크로 경고는 위 `warnings` 절. 합성 XLSM(합성 `vbaProject.bin`, cp949 모듈 이름)으로 셀·시트 행 위치·원본 셀 미리보기·구조 분석을 확인했고, Excel이 실제로 저장한 XLSM과 고객 문서로는 아직 확인하지 않았다 |
+| HWP/HWPX, ZIP, 메일, DOCM·PPTM 및 그 밖의 형식 | 현재 미지원 | 업로드 후 처리 요청 시 `unsupported`. Mock 파이프라인의 예시 구성과 실제 지원은 별개 |
 
 **Docling 2.150.0 엣지 케이스 실측(합성 DOCX·XLSX, `backend/tests/edge_case_files.py`):** 유니코드로 저장된 `℃ ≥ ± ∓ ≤ −`는 보존된다. Word '기호 삽입'(Symbol 글꼴 `w:sym`)은 글자가 빠지고(`압력 ≥ 10`→`압력  10`), 위·아래첨자 서식은 평탄화된다(`m²`→`m2`, `10⁻³`→`10-3`, `CO₂`→`CO2`). 병합 셀 값은 칸마다 반복되고, XLSX 도형 글상자와 SVG 안 글자는 빠지며, 흰색에 가까운 글자는 표시 없이 본문에 들어간다. 사본 보정 후에는 앞의 두 손실이 사라지고(특수기호 215건 문서 208→215건), 글상자·SVG 글자는 보충 추출로, 나머지는 경고로 드러난다.
 
-공통 업로드는 파일당 기본 100 MiB, multipart 본문 제한은 파일 한도 + 1 MiB이다. 각 파일을 스트리밍하면서도 실제 파일 크기를 확인한다. PDF·DOCX·PPTX 변환에는 최대 500페이지 제한을 전달한다. XLSX는 시트당 한 페이지로 세므로 별도의 한도를 전달한다. Office 컨테이너는 ZIP 내부 항목 최대 10,000개, 압축 해제 합계 최대 250 MiB이며 내부 경로·암호화 여부·압축 비율도 검사한다. XLSX에서 내부 항목 수는 시트 XML뿐 아니라 스타일·그림·관계 파일까지 포함한다. 이 검사는 악성코드 검사나 모든 파일 안전성 보장이 아니다.
+공통 업로드는 파일당 기본 100 MiB, multipart 본문 제한은 파일 한도 + 1 MiB이다. 각 파일을 스트리밍하면서도 실제 파일 크기를 확인한다. PDF·DOCX·PPTX 변환에는 최대 500페이지 제한을 전달한다. XLSX·XLSM은 시트당 한 페이지로 세므로 별도의 한도를 전달한다. Office 컨테이너는 ZIP 내부 항목 최대 10,000개, 압축 해제 합계 최대 250 MiB이며 내부 경로·암호화 여부·압축 비율도 검사한다. XLSX에서 내부 항목 수는 시트 XML뿐 아니라 스타일·그림·관계 파일까지 포함한다. 이 검사는 악성코드 검사나 모든 파일 안전성 보장이 아니다.
 
-Docling 실행 시 `HF_HUB_OFFLINE=1`, `TRANSFORMERS_OFFLINE=1`을 설정하며 PDF에서 원격 서비스·외부 플러그인을 비활성화한다. PDF 모델 경로 우선순위는 `DOCOPS_DOCLING_ARTIFACTS` → `DOCLING_ARTIFACTS_PATH` → 존재 시 `~/.cache/docling/models`다. Docling 패키지 설치는 선택 사항이며 미설치·모델 미준비는 명시적 실패로 처리한다. 패키지 설치 자체와 미리 모델을 준비하는 절차에는 별도의 네트워크가 필요할 수 있다.
+Docling 실행 시 `HF_HUB_OFFLINE=1`, `TRANSFORMERS_OFFLINE=1`을 설정하며 PDF에서 원격 서비스·외부 플러그인을 비활성화한다. PDF 모델 경로 우선순위는 `DOCOPS_DOCLING_ARTIFACTS` → `DOCLING_ARTIFACTS_PATH` → 존재 시 프로젝트의 `offline/docling-models`(오프라인 ZIP) → 존재 시 `~/.cache/docling/models`다. 폴더가 있어도 필수 파일이 빠졌거나 비었으면 PDF는 `parser_unavailable`로 실패한다. Docling 패키지 설치는 선택 사항이며 미설치·모델 미준비는 명시적 실패로 처리한다. 모델 준비는 setup이 맡는다: `huggingface.co`(또는 `HF_ENDPOINT`)에 10초 안에 접속되는지 먼저 확인한 뒤 `docling-tools models download layout tableformer`로 받고, 막힌 PC는 `setup --models <ZIP|폴더>`로 다른 PC에서 만든 묶음(`prepare-offline.py --models-only`, `manifest.json`에 파일별 크기·SHA-256)을 검증해 위 우선순위의 폴더에 설치한다. 설치는 다른 내용의 기존 파일을 덮어쓰지 않는다(`app/model_bundle.py`).
 
 ## 8. 로컬 요청 보호와 한계
 

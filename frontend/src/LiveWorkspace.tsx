@@ -349,7 +349,7 @@ export default function LiveWorkspace({ active = true, route, onRoute, onFamily,
          </>}
       </div>
     </div>
-    <details className="lw-disclosure"><summary>지원 형식 안내</summary><p>TXT·CSV·MD·LOG는 기본 환경에서 처리합니다. PDF·DOCX·PPTX·XLSX는 Docling이 필요합니다. 설정의 모델 연결에서 OCR 모델을 연결하면 이미지와 스캔 PDF의 글자도 읽습니다. SVG 벡터 글자는 기본 환경에서 읽습니다.</p></details>
+    <details className="lw-disclosure"><summary>지원 형식 안내</summary><p>TXT·CSV·MD·LOG는 기본 환경에서 처리합니다. PDF·DOCX·PPTX·XLSX·XLSM은 Docling이 필요합니다(XLSM 매크로는 실행하지 않습니다). 설정의 모델 연결에서 OCR 모델을 연결하면 이미지와 스캔 PDF의 글자도 읽습니다. SVG 벡터 글자는 기본 환경에서 읽습니다.</p></details>
   </section>}
   {current && detail?.error && <div className="lw-message is-warning" role="alert">마지막 조회 결과입니다. {detail.error}<button onClick={() => setDetailRevision(n => n + 1)}>다시 시도</button></div>}
   {selectedId && !current && <section className="lw-empty">

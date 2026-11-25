@@ -12,6 +12,7 @@ from app.adapters import ocr
 from app.adapters.base import ParserError
 from app.adapters.text import TextAdapter
 from app.config import Settings
+from app.docling_models import missing_files
 from app.fidelity.probe import probe
 from app.format_gate import check
 from main import create_app
@@ -213,8 +214,8 @@ def test_office_pictures_and_scanned_pdf_pages_use_ocr_model(tmp_path, monkeypat
     pytest.importorskip("docling.document_converter")
     from PIL import ImageDraw, ImageFont
     settings = Settings(tmp_path, docling_artifacts=Settings.from_env().docling_artifacts)
-    if not settings.docling_artifacts:
-        pytest.skip("local Docling PDF layout models required")
+    if not settings.docling_artifacts or missing_files(settings.docling_artifacts):
+        pytest.skip("local Docling PDF layout models required")  # 받기에 실패하면 빈 모델 폴더만 남는다
     fake = FakeOcr(lambda prompt, png: "REPORT 4729" if _ink(png) else "")
     fake.env(monkeypatch, mode="page")
     image = pil.new("RGB", (720, 320), "white")
@@ -317,8 +318,8 @@ def test_large_pictures_on_digital_pdf_pages_are_read_by_ocr_model(tmp_path, mon
     pytest.importorskip("docling.document_converter")
     from PIL import ImageDraw
     settings = Settings(tmp_path, docling_artifacts=Settings.from_env().docling_artifacts)
-    if not settings.docling_artifacts:
-        pytest.skip("local Docling PDF layout models required")
+    if not settings.docling_artifacts or missing_files(settings.docling_artifacts):
+        pytest.skip("local Docling PDF layout models required")  # 받기에 실패하면 빈 모델 폴더만 남는다
     chart = pil.new("RGB", (400, 300), "white")
     draw = ImageDraw.Draw(chart)
     draw.rectangle((40, 60, 120, 260), fill="black")

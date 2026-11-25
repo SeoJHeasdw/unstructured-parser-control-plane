@@ -136,7 +136,7 @@ function SourceOriginal({ doc, active, location, onLocation }: {
   const href = liveSourceUrl(id);
   const pdf = format === 'PDF';
   const sheet = location?.sheet ?? undefined, cell = location?.cell;
-  const canPreview = ['TXT', 'LOG', 'CSV', 'MD', 'XLSX'].includes(format);
+  const canPreview = ['TXT', 'LOG', 'CSV', 'MD', 'XLSX', 'XLSM'].includes(format);
   const imageType = IMAGE_MIME[format];
   const [retry, setRetry] = useState(0);
   const [imageUrl, setImageUrl] = useState<string>();
@@ -169,10 +169,10 @@ function SourceOriginal({ doc, active, location, onLocation }: {
   const fallback = error || imageFailed ? <div role="alert"><p>{error ?? '브라우저에서 이 이미지를 표시할 수 없어요.'}</p>
     {error && <button type="button" className="button-secondary" onClick={() => setRetry(value => value + 1)}>다시 시도</button>}</div>
     : canPreview || imageType ? <p role="status">원본을 불러오는 중…</p>
-    : <div><strong>전용 앱에서 원본을 확인하세요</strong><p>{['DOCX', 'PPTX', 'XLS', 'XLSM'].includes(format)
+    : <div><strong>전용 앱에서 원본을 확인하세요</strong><p>{['DOCX', 'PPTX', 'XLS'].includes(format)
       ? '원본을 다운로드하면 전용 앱에서 페이지 배치와 서식을 그대로 확인할 수 있어요.'
       : '원본 파일을 내려받아 열 수 있어요.'}</p></div>;
 
-  return <OriginalPane name={doc.name} label={format === 'XLSX' ? 'XLSX 셀 값' : format || '원본 파일'}
+  return <OriginalPane name={doc.name} label={format === 'XLSX' || format === 'XLSM' ? `${format} 셀 값` : format || '원본 파일'}
     href={pdf ? `${href}#page=${page}` : href} downloadName={pdf ? undefined : doc.name} preview={renderPreview} fallback={fallback} />;
 }

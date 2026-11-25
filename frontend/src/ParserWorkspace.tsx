@@ -22,6 +22,7 @@ function extraction(format: string, engine: string) {
     case 'docling':
       if (format === 'PDF') return ['페이지 분석', '페이지의 본문·표를 추출합니다. 스캔 쪽은 OCR 모델을 연결한 뒤 읽습니다.'];
       if (format === 'XLSX') return ['워크시트 추출', '시트의 셀과 표를 읽고 원본 행·열 위치를 대조합니다.'];
+      if (format === 'XLSM') return ['워크시트 추출 · 매크로 미실행', '셀과 표를 XLSX와 같이 읽습니다. 매크로는 실행하지 않고, 모듈 수와 자동 실행 여부를 경고로 남깁니다.'];
       return ['Office 구조 추출', '본문·표를 변환하고 원본의 기호, 첨자와 내장 그림을 점검합니다.'];
     case 'ocr-model': return ['이미지 문자 인식', '문서 OCR 모델로 글자를 읽습니다. 모델이 연결되지 않으면 처리하지 않습니다.'];
     case 'easyocr': return ['이미지 문자 인식(사용 중단)', '이전 실행 기록입니다. 라이브러리 OCR은 더 이상 쓰지 않습니다.'];
@@ -48,8 +49,9 @@ function Environment({ engine, format, catalog }: { engine: string; format: stri
     <span>문서 파싱 1개씩 · 단일 워커</span></p>
     {format === 'PDF' && catalog.pdf_models_ready === false && <details className="pr-model-help">
       <summary>PDF 모델 설치 필요{catalog.pdf_missing_files?.length ? ` · 누락 ${catalog.pdf_missing_files.length}개` : ''}</summary>
-      <p>콘솔을 끄고 setup을 다시 실행하면 레이아웃·표 모델을 받습니다(huggingface.co 접속 필요). 직접 받을 때는 Docling 환경에서 아래 명령을 실행한 뒤 콘솔을 다시 시작하세요.</p>
-      <code>docling-tools models download layout tableformer</code>
+      <p>콘솔을 끄고 setup을 다시 실행하면 레이아웃·표 모델을 받습니다(huggingface.co 접속 필요). huggingface.co가 막힌 PC는 접속되는 PC에서 첫 번째 명령으로 모델 ZIP을 만들어 옮긴 뒤, 이 PC에서 두 번째 명령으로 설치하고 콘솔을 다시 시작하세요.</p>
+      <code>python scripts/prepare-offline.py --models-only</code>
+      <code>setup.cmd --models &lt;ZIP 경로&gt;</code>
       {!!catalog.pdf_missing_files?.length && <ul>{catalog.pdf_missing_files.map(file => <li key={file}>{file}</li>)}</ul>}
     </details>}
     </>;

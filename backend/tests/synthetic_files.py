@@ -90,6 +90,52 @@ def cfb(tree: dict) -> bytes:
     return header + body
 
 
+def ovba_compress(data: bytes) -> bytes:
+    """[MS-OVBA] 2.4.1 압축 컨테이너. 복사 토큰 없이 글자 토큰만 쓴다(꽉 찬 4096바이트 조각은 비압축 조각)."""
+    out = bytearray(b"\x01")
+    for start in range(0, len(data), 4096):
+        block = data[start:start + 4096]
+        if len(block) == 4096:
+            out += struct.pack("<H", 0x3FFF) + block
+            continue
+        body = bytearray()
+        for index in range(0, len(block), 8):
+            body += b"\x00" + block[index:index + 8]
+        if len(body) + 2 > 4098:
+            raise ValueError("마지막 조각이 너무 깁니다.")
+        out += struct.pack("<H", 0xB000 | (len(body) + 2 - 3)) + body
+    return bytes(out)
+
+
+def vba_project(modules: dict, codepage: int = 949, strip: tuple = ()) -> bytes:
+    """{모듈 이름: (소스, 'standard'|'document')} → vbaProject.bin. strip에 든 모듈은 소스를 지운다(p-code만 남은 경우)."""
+    codec = f"cp{codepage}"
+
+    def record(ident, value=b""):
+        return struct.pack("<HI", ident, len(value)) + value
+
+    def text(ident, unicode_ident, value):
+        return record(ident, value.encode(codec)) + record(unicode_ident, value.encode("utf-16-le"))
+
+    directory = (record(0x0001, struct.pack("<I", 1)) + record(0x0002, struct.pack("<I", 0x0412)) + record(0x0014, struct.pack("<I", 0x0412))
+                 + record(0x0003, struct.pack("<H", codepage)) + record(0x0004, b"VBAProject") + text(0x0005, 0x0040, "")
+                 + text(0x0006, 0x003D, "") + record(0x0007, struct.pack("<I", 0)) + record(0x0008, struct.pack("<I", 0))
+                 + struct.pack("<HIIH", 0x0009, 4, 0x5B, 0x0002) + text(0x000C, 0x003C, "")
+                 + text(0x0016, 0x003E, "stdole") + record(0x000D, b"*\\G{00020430-0000-0000-C000-000000000046}#2.0#0#stdole2.tlb#OLE Automation")
+                 + record(0x000F, struct.pack("<H", len(modules))) + record(0x0013, struct.pack("<H", 0xFFFF)))
+    streams = {}
+    for index, (name, (source, kind)) in enumerate(modules.items()):
+        stream = f"Mod{index}" if name.isascii() else f"M{index}"
+        cache = bytes(range(16)) * 8  # 성능 캐시 자리(MODULEOFFSET 앞부분)
+        streams[stream] = cache + (b"" if name in strip else ovba_compress(source.replace("\n", "\r\n").encode(codec)))
+        directory += (text(0x0019, 0x0047, name) + text(0x001A, 0x0032, stream) + text(0x001C, 0x0048, "")
+                      + record(0x0031, struct.pack("<I", len(cache))) + record(0x001E, struct.pack("<I", 0))
+                      + record(0x002C, struct.pack("<H", 0xFFFF)) + record(0x0021 if kind == "standard" else 0x0022) + record(0x002B))
+    directory += record(0x0010)
+    return cfb({"VBA": {"dir": ovba_compress(directory), "_VBA_PROJECT": b"\xcc\x61\xff\xff\x00\x00\x00", **streams},
+                "PROJECT": b'ID="{00000000-0000-0000-0000-000000000000}"\r\n', "PROJECTwm": b"\0\0"})
+
+
 def ole_package(filename: str, payload: bytes) -> bytes:
     name = filename.encode("cp949")
     native = struct.pack("<H", 2) + name + b"\0" + b"C:\\temp\\" + name + b"\0" + struct.pack("<II", 0x00030000, 0) + b"C:\\temp\\" + name + b"\0" + struct.pack("<I", len(payload)) + payload

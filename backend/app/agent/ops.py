@@ -361,7 +361,7 @@ class Ops:
         elif not parsers["pdf_model_directory"]:
             problems.append("PDF 모델 폴더 없음: PDF 파싱 불가")
         elif parsers.get("pdf_models_ready") is False:
-            problems.append("PDF 모델 파일 누락: 콘솔을 끄고 setup 다시 실행(또는 docling-tools models download layout tableformer)")
+            problems.append("PDF 모델 파일 누락: 콘솔을 끄고 setup 다시 실행. huggingface.co가 막힌 PC는 다른 PC에서 만든 모델 ZIP을 setup --models <ZIP>으로 설치")
         if not parsers["ocr_models_found"]:
             problems.append("OCR 모델 미연결: 스캔 쪽·이미지·문서 속 그림의 글자를 읽지 않음(콘솔 '모델 연결'에서 OCR 모델 설정)")
         if not self.roots:

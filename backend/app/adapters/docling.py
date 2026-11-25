@@ -22,6 +22,9 @@ PICTURE_SHARE = 0.10  # 디지털 쪽에서 이 비율 이상을 차지하는 �
 MAX_PICTURES = 40     # 문서 하나에서 OCR할 그림 수 상한(처리 시간)
 PICTURE_LABEL = "[그림 속 글자]"
 MAX_OFFICE_ENTRIES = 10_000
+# 워크시트 형식. XLSM(매크로 사용 통합문서)도 본문은 XLSX와 같은 SpreadsheetML이라 같은 Docling 경로로 읽는다.
+WORKBOOKS = {"XLSX", "XLSM"}
+OFFICE = {"DOCX", "PPTX", *WORKBOOKS}
 
 
 def _pdf_pages(path: Path, scale: float) -> int:
@@ -137,7 +140,7 @@ class DoclingAdapter:
 
     def _convert(self, converter, path, extension):
         # Docling counts each Excel sheet as a page. Each sheet is already an Office ZIP part.
-        page_limit = MAX_OFFICE_ENTRIES if extension == "XLSX" else MAX_PDF_PAGES
+        page_limit = MAX_OFFICE_ENTRIES if extension in WORKBOOKS else MAX_PDF_PAGES
         result = converter.convert(path, max_file_size=self.settings.max_upload_bytes, max_num_pages=page_limit)
         if getattr(result.status, "value", str(result.status)) != "success":
             raise ParserError("Docling이 문서를 완전히 변환하지 못했습니다. 원본 상태를 확인해 주세요.")
@@ -172,7 +175,7 @@ class DoclingAdapter:
             version = importlib.metadata.version("docling")
         except importlib.metadata.PackageNotFoundError:
             version = "unknown"
-        if extension in {"DOCX", "PPTX", "XLSX"}:
+        if extension in OFFICE:
             self.check_office_archive(path)
         if extension == "PDF":
             if not self.settings.docling_artifacts or not self.settings.docling_artifacts.is_dir():
@@ -182,10 +185,10 @@ class DoclingAdapter:
             missing = missing_files(self.settings.docling_artifacts)
             if missing:
                 raise ParserError("PDF 모델 파일이 빠져 있거나 비어 있습니다: " + ", ".join(missing) +
-                                  ". setup을 다시 실행하거나 docling-tools models download layout tableformer 로 준비해 주세요.", code="parser_unavailable")
+                                  ". setup을 다시 실행해 주세요. huggingface.co가 막힌 PC는 다른 PC에서 만든 모델 ZIP을 setup --models <ZIP 경로> 로 설치합니다.", code="parser_unavailable")
             converter = self._pdf()
         else:
-            fmt = {"DOCX": InputFormat.DOCX, "PPTX": InputFormat.PPTX, "XLSX": InputFormat.XLSX}[extension]
+            fmt = {"DOCX": InputFormat.DOCX, "PPTX": InputFormat.PPTX, "XLSX": InputFormat.XLSX, "XLSM": InputFormat.XLSX}[extension]
             converter = DocumentConverter(allowed_formats=[fmt])
         warnings = []
         try:
@@ -197,7 +200,7 @@ class DoclingAdapter:
                 # 글자 층이 없는 PDF(전체 스캔)와 그림만 있는 Office 문서. PDF는 아래에서 OCR 모델로 읽는다.
                 markdown = ""
             locations = []
-            if markdown and extension in {"PDF", "XLSX"}:
+            if markdown and (extension == "PDF" or extension in WORKBOOKS):
                 try:
                     locations = markdown_locations(result.document, markdown, extension)
                 except Exception as exc:

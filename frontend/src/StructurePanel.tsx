@@ -10,7 +10,7 @@ export const LINK_KIND: Record<string, string> = {
 };
 export const FLAG: Record<string, { label: string; tone: 'warn' | 'error' | 'info' }> = {
   encrypted: { label: '암호화', tone: 'error' }, 'drm-suspect': { label: 'DRM·암호화 의심', tone: 'error' }, unreadable: { label: '분석 실패', tone: 'error' },
-  'format-mismatch': { label: '확장자와 실제 형식 다름', tone: 'warn' }, macro: { label: '매크로 포함', tone: 'warn' }, truncated: { label: '한도 초과 · 일부만 분석', tone: 'warn' },
+  'format-mismatch': { label: '확장자와 실제 형식 다름', tone: 'warn' }, macro: { label: '매크로 포함', tone: 'warn' }, 'macro-autorun': { label: '열 때 자동 실행 매크로', tone: 'warn' }, truncated: { label: '한도 초과 · 일부만 분석', tone: 'warn' },
   'too-large': { label: '크기 초과', tone: 'warn' }, duplicate: { label: '중복 내용', tone: 'info' }, 'has-images': { label: '이미지 포함 · OCR 검토', tone: 'info' }, 'image-only': { label: '이미지 파일', tone: 'info' },
 };
 const DETECTED: Record<string, string> = {
@@ -20,8 +20,13 @@ const DETECTED: Record<string, string> = {
 const size = (bytes: number) => bytes < 1024 ? `${bytes} B` : bytes < 1048576 ? `${(bytes / 1024).toFixed(1)} KB` : `${(bytes / 1048576).toFixed(1)} MB`;
 const iconFor = (node: StructNode) => node.detected === 'zip' ? FileArchive : node.detected === 'mime' || node.detected === 'msg' ? Mail : node.kind === 'attachment' ? Paperclip : FileText;
 
+function macroLabel(stats: Record<string, unknown>) {
+  const macro = stats.macro as { code_modules?: number; code_lines?: number } | undefined;
+  return macro && typeof macro.code_modules === 'number' ? `매크로 모듈 ${macro.code_modules} · ${macro.code_lines ?? 0}줄` : FLAG.macro.label;
+}
+
 function Flags({ flags, stats }: { flags: string[]; stats: Record<string, unknown> }) {
-  return <>{flags.map(flag => <span key={flag} className={`st-flag is-${FLAG[flag]?.tone ?? 'info'}`}>{flag === 'has-images' && typeof stats.images === 'number' ? `이미지 ${stats.images} · OCR 검토` : FLAG[flag]?.label ?? flag}</span>)}</>;
+  return <>{flags.map(flag => <span key={flag} className={`st-flag is-${FLAG[flag]?.tone ?? 'info'}`}>{flag === 'has-images' && typeof stats.images === 'number' ? `이미지 ${stats.images} · OCR 검토` : flag === 'macro' ? macroLabel(stats) : FLAG[flag]?.label ?? flag}</span>)}</>;
 }
 
 function TreeRow({ node, depth, open, toggle, onSelect, selected }: { node: StructNode; depth: number; open: Set<StructNode>; toggle: (node: StructNode) => void; onSelect: (node: StructNode) => void; selected: StructNode | null }) {

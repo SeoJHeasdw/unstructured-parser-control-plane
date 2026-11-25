@@ -56,7 +56,7 @@ TOOLS = [
      "inputSchema": {"type": "object", "required": ["id"], "properties": {
          "id": {"type": "string", "description": "문서 번호. 예: D12"},
          "page": {"type": "integer", "description": "쪽 번호(PDF)"},
-         "sheet": {"type": "string", "description": "시트 이름(XLSX)"},
+         "sheet": {"type": "string", "description": "시트 이름(XLSX·XLSM)"},
          "find": {"type": "string", "description": "찾을 글자"}}}, "annotations": _READ},
     {"name": "compare", "title": "이전 실행과 비교",
      "description": "같은 문서의 직전 성공 실행과 최신 실행의 글자·표·숫자·경고 변화를 비교합니다.",

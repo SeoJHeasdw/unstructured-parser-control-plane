@@ -269,8 +269,9 @@ def _drawing(text_boxes: list[tuple[str, tuple[int, int, int, int]]], picture_an
 
 
 def xlsx(rows: dict, *, merges: list[str] = (), text_boxes: list = (), picture_at: tuple[int, int] | None = None,
-         sheet: str = "시험 조건") -> bytes:
-    """rows: {'A1': 값}. 값은 문자열, 숫자, 서식 조각 목록, 또는 ('흰회색', 문자열)."""
+         sheet: str = "시험 조건", vba: bytes | None = None) -> bytes:
+    """rows: {'A1': 값}. 값은 문자열, 숫자, 서식 조각 목록, 또는 ('흰회색', 문자열).
+    vba를 주면 매크로 사용 통합문서(XLSM)로 만든다: 본문 형식과 xl/vbaProject.bin."""
     strings: list = []
     cells_by_row: dict[int, list[str]] = {}
     for ref, value in rows.items():
@@ -314,6 +315,14 @@ def xlsx(rows: dict, *, merges: list[str] = (), text_boxes: list = (), picture_a
         if picture_at:
             files["xl/drawings/_rels/drawing1.xml.rels"] = _rels([("rIdImg", IMAGE_REL, "../media/image1.png")])
             files["xl/media/image1.png"] = png()
+    if vba is not None:
+        overrides["/xl/workbook.xml"] = "application/vnd.ms-excel.sheet.macroEnabled.main+xml"
+        overrides["/xl/vbaProject.bin"] = "application/vnd.ms-office.vbaProject"
+        files["xl/_rels/workbook.xml.rels"] = _rels([("rId1", R + "/worksheet", "worksheets/sheet1.xml"),
+                                                     ("rId2", R + "/sharedStrings", "sharedStrings.xml"),
+                                                     ("rId3", R + "/styles", "styles.xml"),
+                                                     ("rId4", "http://schemas.microsoft.com/office/2006/relationships/vbaProject", "vbaProject.bin")])
+        files["xl/vbaProject.bin"] = vba
     files["[Content_Types].xml"] = _types(overrides)
     return _package(files)
 

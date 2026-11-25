@@ -44,10 +44,12 @@ if "%~1"=="" pause
 exit /b 1
 
 :help
-echo Usage: setup.cmd [--lite] [--offline]
-echo   default    full mode: Docling PDF/Office parsing, Python 3.12
-echo   --lite     no Docling: TXT/CSV/MD/LOG only, Python 3.12-3.15
-echo   --offline  prepared Windows ZIP: use only the bundled wheels and screen
+echo Usage: setup.cmd [--lite] [--offline] [--models ZIP]
+echo   default       full mode: Docling PDF/Office parsing, Python 3.12
+echo   --lite        no Docling: TXT/CSV/MD/LOG only, Python 3.12-3.15
+echo   --offline     prepared Windows ZIP: use only the bundled wheels and screen
+echo   --models ZIP  huggingface.co blocked: install PDF models from a ZIP made on another PC
+echo                 (python scripts\prepare-offline.py --models-only)
 echo Run setup.cmd again after updating the code. Start the console with run.cmd.
 popd
 exit /b 0

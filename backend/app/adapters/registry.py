@@ -8,7 +8,7 @@ from app.formats import IMAGE_FORMATS, TEXT_FORMATS
 from app.adapters.text import TextAdapter
 from app.config import Settings
 
-DOCLING_FORMATS = {"PDF", "DOCX", "PPTX", "XLSX"}
+DOCLING_FORMATS = {"PDF", "DOCX", "PPTX", "XLSX", "XLSM"}  # XLSM: 매크로 사용 통합문서. 셀만 읽고 매크로는 실행하지 않는다.
 
 PARSER_BY_EXTENSION = {
     **dict.fromkeys(sorted(DOCLING_FORMATS), "docling"),

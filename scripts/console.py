@@ -4,6 +4,7 @@
 
 setup  backend/.venv, Python 패키지, 화면 빌드, .env, PDF 모델, 자체 점검. 네트워크를 쓴다(--offline이면 묶음 안의 파일만).
        기본은 Docling(PDF·Office 파싱)까지 넣는 전체 모드(Python 3.12). --lite는 Docling 없이 TXT·CSV·MD·LOG만(3.12~3.15).
+       PDF 모델은 huggingface.co에서 받는다. 막힌 PC는 다른 PC에서 만든 모델 ZIP을 --models <ZIP 또는 폴더>로 넣는다.
        끝나면 backend/.venv/docops-setup.json에 모드와 설치 기준(잠금 파일 지문)을 남기고,
        설치되지 않은 것(예: 받지 못한 PDF 모델)을 마지막 요약에 다시 보여 준다.
        화면을 빌드하면 frontend/dist/docops-build.json에 그 빌드를 만든 화면 소스의 파일별 지문을 남긴다.
@@ -435,9 +436,22 @@ def running_console():
         return next((port for port in pool.map(probe, CONSOLE_PORTS) if port), None)
 
 
+def model_bundle(value, full):
+    """--models 값 확인. 설치는 가상환경의 check_local.py가 한다(그쪽이 콘솔과 같은 규칙으로 모델 폴더를 정한다)."""
+    if value is None:
+        return None
+    if not full:
+        raise SetupError("--models 는 PDF 모델용이라 전체 모드에서만 씁니다(--lite 와 함께 쓸 수 없음).")
+    path = Path(value).expanduser().resolve()  # check_local.py는 backend 폴더에서 돈다.
+    if not path.exists():
+        raise SetupError(f"--models 로 지정한 ZIP이나 폴더가 없습니다: {path}")
+    return path
+
+
 def setup(args):
     full = not args.lite
-    say("모드: " + ("전체 (Docling: PDF·DOCX·PPTX·XLSX 파싱 포함)" if full else "lite (Docling 없음: TXT·CSV·MD·LOG만)"))
+    bundle = model_bundle(args.models, full)  # 오래 걸리는 설치 전에 경로부터 확인한다.
+    say("모드: " + ("전체 (Docling: PDF·DOCX·PPTX·XLSX·XLSM 파싱 포함)" if full else "lite (Docling 없음: TXT·CSV·MD·LOG만)"))
     # 실행 중에 패키지를 바꾸면 Windows에서는 파일 잠금으로 설치가 중간에 깨진다.
     folder, port = data_folder_in_use(), running_console()
     if folder or port:
@@ -456,7 +470,7 @@ def setup(args):
         report = Path(temp) / "check.json"
         check = [python, "check_local.py", "--report", report]
         if full:
-            check += ["--docling"] + ([] if args.offline else ["--fetch-models"])
+            check += ["--docling"] + (["--models-from", bundle] if bundle else [] if args.offline else ["--fetch-models"])
         try:
             run(check, cwd=BACKEND, timeout=3600)
         except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as exc:
@@ -472,7 +486,7 @@ def setup(args):
 
 def summary(full, warnings):
     """setup의 마지막 몇 줄. 설치되지 않은 것이 있으면 여기서 다시 보여 준다(중간 로그는 지나가 버린다)."""
-    mode = "전체 (Docling: PDF·DOCX·PPTX·XLSX 파싱 포함)" if full else "lite (Docling 없음: PDF·Office 파싱 안 함)"
+    mode = "전체 (Docling: PDF·DOCX·PPTX·XLSX·XLSM 파싱 포함)" if full else "lite (Docling 없음: PDF·Office 파싱 안 함)"
     lines = ["", "=" * 72]
     if warnings:
         lines.append(f"[주의] 설치는 끝났지만 준비되지 않은 것이 {len(warnings)}건 있습니다. 모드: {mode}")
@@ -529,7 +543,7 @@ def start(args):
 
 # ---------------------------------------------------------------- 명령줄
 
-SETUP_ONLY = {"--lite", "--offline"}
+SETUP_ONLY = {"--lite", "--offline", "--models"}
 
 
 def parse_args(argv=None):
@@ -543,6 +557,8 @@ def parse_args(argv=None):
     setup_parser.add_argument("--lite", action="store_true",
                               help="Docling 없이 설치: TXT·CSV·MD·LOG만, Python 3.12~3.15")
     setup_parser.add_argument("--offline", action="store_true", help="준비된 ZIP 안의 휠과 화면 빌드만 사용")
+    setup_parser.add_argument("--models", metavar="ZIP", help="PDF 모델을 받지 않고 이 ZIP(또는 폴더)에서 검증해 설치. "
+                              "huggingface.co가 막힌 PC용. ZIP은 다른 PC에서 prepare-offline.py --models-only 로 만든다")
     run_parser = commands.add_parser("run", help="서버 실행 (설치하지 않음)")
     run_parser.add_argument("port", nargs="?", type=int, default=8000, help="시작 포트 (기본 8000, 쓰고 있으면 다음 빈 포트)")
     run_parser.add_argument("--no-browser", action="store_true", help="브라우저를 열지 않음")

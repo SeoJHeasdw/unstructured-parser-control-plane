@@ -24,6 +24,8 @@ pip install -r requirements-docling.lock.txt   # Windows 포함 정확한 버전
 export DOCOPS_DOCLING_ARTIFACTS=/path/to/prepared/models
 ```
 
+`huggingface.co`가 막힌 PC는 모델을 받을 수 없습니다(2026-11-25 고객사 PC에서 확인). 접속되는 PC에서 `scripts/prepare-offline.py --models-only`로 모델 ZIP을 만들어 옮긴 뒤 `setup --models <ZIP>`으로 설치합니다. 묶기·검증·설치 로직은 `app/model_bundle.py`, setup 쪽 호출은 `check_local.py --models-from`입니다. setup은 받기 전에 `huggingface.co`(또는 `HF_ENDPOINT`)에 접속되는지 10초 안에 확인합니다.
+
 **OCR은 문서 OCR 모델만 씁니다(2026-11-24 결정).** 라이브러리 OCR(EasyOCR 등)은 쓰지 않습니다. 콘솔 '모델 연결'이나 `.env`의 `OCR_BASE_URL`·`OCR_MODEL`·`OCR_MODE`로 OpenAI 호환 비전 API의 OCR 모델(고객사 게이트웨이 서빙 예정, 개발 중에는 llama.cpp·Ollama)을 연결하면 PDF의 글자 층 없는 쪽과 쪽 면적 10% 이상 그림, 이미지 파일(PNG·JPEG·BMP·TIFF·GIF·WebP), Office·SVG 안 그림을 읽습니다. `region` 방식은 Docling 레이아웃 영역마다, `page` 방식은 쪽 전체를 한 번 호출합니다. OCR로 읽은 결과에는 항상 원본 대조 경고가 붙습니다. 연결 전에는 스캔 PDF는 텍스트 층만 읽고 `OCR 미적용` 경고를 남기며(글자 층이 없으면 `no_text`), 이미지 파일은 'OCR 모델 미연결'(`parser_unavailable`)로 처리하지 않습니다. 후보 모델 비교는 [OCR 모델 비교](../docs/reports/ocr-bench/README.md)에 있습니다.
 
 ## API
@@ -40,8 +42,9 @@ export DOCOPS_DOCLING_ARTIFACTS=/path/to/prepared/models
 ### 파싱 전 판별과 원문 충실도 (2026-11-19)
 
 - 처리 요청 시 파서보다 먼저 **내용 서명**을 본다. DRM으로 감싼 파일(`drm_protected`/`drm_suspected`), 암호 문서(`encrypted`), 확장자와 내용이 다른 파일(`format_mismatch`)은 파서를 부르지 않고 `failed`와 `error_code`로 남긴다. DRM은 판별만 하며 복호화하지 않는다. 제품 머리말은 `DOCOPS_DRM_SIGNATURES`로 등록한다(`.env.example` 참고).
-- DOCX·XLSX·PPTX는 `runtime/work/`에 임시 사본을 만들어 Word '기호 삽입'(Symbol 글꼴)·위/아래첨자를 유니코드(`≥`, `m²`, `CO₂`)로 바꾼 뒤 파싱한다. 원본은 바꾸지 않고 사본은 처리 후 지운다. `DOCOPS_OOXML_PREPARE=0`이면 끈다.
+- DOCX·XLSX·XLSM·PPTX는 `runtime/work/`에 임시 사본을 만들어 Word '기호 삽입'(Symbol 글꼴)·위/아래첨자를 유니코드(`≥`, `m²`, `CO₂`)로 바꾼 뒤 파싱한다. 원본은 바꾸지 않고 사본은 처리 후 지운다. `DOCOPS_OOXML_PREPARE=0`이면 끈다.
 - 파싱 뒤 원본 XML을 직접 읽어 결과와 대조한다: 특수기호 손실 수, 병합 셀, 흰색에 가까운 글자·숨김 글자, OCR 없이 읽지 않은 그림 수. 결과에 없던 글상자·SVG 글자는 결과 끝 `## 보충 추출`에 원문 위치와 함께 덧붙인다. 보고서는 `result`·`runs/{run_id}` 응답의 `fidelity`, 요약은 `warnings`.
+- XLSM은 XLSX와 같은 Docling 워크시트 경로(위치 대조·원본 셀 미리보기·원문 대조 포함)로 읽는다. 매크로는 실행하지 않는다. `app/vba.py`가 `vbaProject.bin`의 모듈 목록과 소스를 읽어([MS-OVBA] 압축 해제) 결과 `warnings`에 모듈·줄 수와 자동 실행 프로시저를 남기고, 구조 분석에 모듈 목록(`stats.macro`)과 매크로 코드 속 경로·URL·문서번호 후보를 넣는다. 코드는 결과 본문에 넣지 않는다. 테스트는 `tests/test_xlsm.py`.
 - 엣지 케이스 회귀 테스트는 `tests/test_edge_cases.py`. Docling 실측 테스트 1개는 Docling이 설치된 가상환경에서만 돈다.
 
 원본, SQLite DB, 결과는 프로젝트의 `runtime/`에 남으며 Git 대상에서 제외됩니다. 파일명은 메타데이터로만 사용하고 실제 경로는 서버가 생성한 ID를 사용합니다. 기본 업로드 한도는 100 MiB이며 표준 텍스트 파서는 100 MiB, CSV는 최대 100만 행입니다. 단일 서버와 전용 단일 파싱 워커를 전제로 하며, 최대 64건의 요청을 추가로 대기합니다. 서버 종료 시 대기 작업은 실패 상태로 기록되며, 갑작스러운 종료로 남은 진행 중 상태는 다음 시작 시 실패 상태로 복구됩니다. 마지막 성공 결과는 재처리 실패나 중단 이후에도 보존합니다. 이 서비스는 운영용 인증·권한 시스템을 포함하지 않습니다.

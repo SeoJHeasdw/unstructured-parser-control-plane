@@ -22,6 +22,7 @@ from app.cfb import SIGNATURE as CFB_SIGNATURE, CompoundFile, CfbError
 
 from app.formats import raster_format
 from app.text_encoding import text_sample
+from app.vba import VbaError, from_package
 
 # ---------------------------------------------------------------- limits
 
@@ -336,8 +337,9 @@ REL_KIND = {"hyperlink": "hyperlink", "externalLinkPath": "external-workbook", "
 def _ooxml(node: dict, archive: zipfile.ZipFile, names: set, depth: int, budget: Budget) -> None:
     kind = "docx" if "word/document.xml" in names else "xlsx" if "xl/workbook.xml" in names else "pptx" if "ppt/presentation.xml" in names else "ooxml"
     node["detected"] = kind
-    if any(name.endswith("vbaProject.bin") for name in names):
+    if any(name.lower().endswith("vbaproject.bin") for name in names):
         _flag(node, "macro")
+        _macros(node, archive, budget)
     media = [name for name in names if "/media/" in name]
     if media:
         node["stats"]["images"] = len(media)
@@ -367,6 +369,26 @@ def _ooxml(node: dict, archive: zipfile.ZipFile, names: set, depth: int, budget:
         _scan(node, budget, ((f"슬라이드 {int(re.search(r'(\d+)', s).group(1))}", _texts(_read(archive, s), "a:t")) for s in slides))
     elif kind == "xlsx":
         _xlsx(node, archive, names, rels_by_part, budget)
+
+
+def _macros(node: dict, archive: zipfile.ZipFile, budget: Budget) -> None:
+    """VBA 모듈 목록과 매크로 코드 속 경로·URL·문서번호 후보. 매크로는 실행하지 않는다."""
+    try:
+        project = from_package(archive)
+    except (VbaError, zipfile.BadZipFile, OSError, KeyError, ValueError):
+        node["stats"]["macro_error"] = "VBA 프로젝트를 읽지 못했습니다."
+        return
+    if project is None:
+        return
+    node["stats"]["macro"] = project.summary()
+    if project.auto_run:
+        _flag(node, "macro-autorun")
+    segments = []
+    for module in project.modules:
+        for number, line in enumerate(module.source.splitlines(), start=1):
+            if line.strip() and not line.lstrip().startswith("Attribute VB_"):
+                segments.append((f"매크로 {module.name} {number}행", line))
+    _scan(node, budget, segments)
 
 
 def _part_label(part: str) -> str:

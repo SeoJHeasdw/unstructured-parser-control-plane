@@ -1,4 +1,8 @@
-"""Build and verify a Windows x64 bundle from a checkout or a source ZIP."""
+"""Build and verify a Windows x64 bundle from a checkout or a source ZIP.
+
+--models-only: PDF 모델만 묶는다(offline/docling-pdf-models.zip). huggingface.co에 접속되는 PC에서 만들고,
+막힌 PC에서는 setup --models <ZIP>으로 검증해 설치한다. 화면 빌드·휠은 만들지 않는다.
+"""
 import argparse
 import os
 from pathlib import Path
@@ -15,6 +19,7 @@ CORE_PY = ("3.12", "3.13", "3.14", "3.15")
 DOCLING_PY = "3.12"
 sys.path.insert(0, str(BACKEND))
 from app.docling_models import LAYOUT_DIR, TABLE_DIR, missing_files
+from app.model_bundle import BundleError, pack
 
 
 def npm_build(from_cache):
@@ -58,8 +63,29 @@ def model_source():
     root = Path(value).expanduser() if value else Path.home() / ".cache" / "docling" / "models"
     missing = missing_files(root)
     if missing:
-        raise SetupError(f"Docling PDF model files missing: {', '.join(missing)}. Run docling-tools models download layout tableformer.")
+        raise SetupError(f"Docling PDF model files missing in {root}: {', '.join(missing)}. "
+                         "Run setup (or docling-tools models download layout tableformer) on a PC that can reach huggingface.co.")
     return root
+
+
+def models_only():
+    """PDF 모델만 담은 ZIP. 가중치와 파일별 SHA-256(manifest.json)이 들어간다."""
+    source = model_source()
+    try:
+        from importlib.metadata import version
+        docling = version("docling")
+    except Exception:
+        docling = None
+    OFFLINE.mkdir(exist_ok=True)
+    output = OFFLINE / "docling-pdf-models.zip"
+    print(f"[1/1] Packing PDF models from {source}", flush=True)
+    try:
+        manifest = pack(source, output, docling)
+    except BundleError as exc:
+        raise SetupError(str(exc)) from exc
+    print(f"{output} ({output.stat().st_size / 1024**2:.1f} MiB, {len(manifest['files'])} files)")
+    print("다음: 이 ZIP을 huggingface.co가 막힌 PC로 옮긴 뒤 그 PC의 프로젝트 폴더에서 "
+          "setup.cmd --models <ZIP 경로>  (macOS·Linux·Git Bash: ./setup.sh --models <ZIP 경로>)")
 
 
 def tree_files(top, suffixes=None):
@@ -174,8 +200,14 @@ def main():
     parser.add_argument("--with-docling", action="store_true", help="Include Python 3.12 wheels for PDF/Office parsing")
     parser.add_argument("--with-docling-models", action="store_true", help="Include Docling wheels and the local PDF model files")
     parser.add_argument("--from-cache", action="store_true", help="Build with installed node_modules and existing offline wheel directories")
+    parser.add_argument("--models-only", action="store_true",
+                        help="Pack only the local PDF model files into offline/docling-pdf-models.zip (for PCs that cannot reach huggingface.co)")
     try:
-        prepare(parser.parse_args())
+        args = parser.parse_args()
+        if args.models_only:
+            models_only()
+        else:
+            prepare(args)
     except (SetupError, OSError, subprocess.SubprocessError) as exc:
         print(f"[error] Packaging failed: {exc}", file=sys.stderr)
         return 1

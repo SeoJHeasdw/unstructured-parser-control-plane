@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # 비정형 관리 콘솔 설치·갱신 (macOS·Linux·Git Bash). 실행은 ./run.sh
-#   ./setup.sh [--lite] [--offline]      자세한 옵션: ./setup.sh --help
+#   ./setup.sh [--lite] [--offline] [--models ZIP]   자세한 옵션: ./setup.sh --help
 # 로직은 모두 scripts/console.py 에 있다. 이 파일은 그것을 돌릴 Python만 찾는다
 # (가상환경용 Python 3.12는 console.py가 다시 찾는다).
 set -euo pipefail

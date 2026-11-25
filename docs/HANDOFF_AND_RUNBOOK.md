@@ -2,6 +2,26 @@
 
 > **기준 시점: 2026-11-12.** 이 문서는 인수인계 시점의 스냅샷이다. 코드·실행 상태·의존성·데이터는 바뀔 수 있으므로 새 세션에서는 아래 확인 순서부터 진행한다. 이 문서는 요구사항이나 고객 환경이 확정되었다는 뜻이 아니다.
 
+## 2026-11-25 huggingface.co 차단 대응(PDF 모델 ZIP)과 XLSM 파서
+
+- **사용자 보고:** 고객사 PC에서 `huggingface.co` 접속이 막혀 있다(PDF 모델을 받지 못함). XLSM 파서도 필요하다.
+- **재현:** 이 저장소의 클라우드 개발 환경도 `huggingface.co`가 막혀 있다(프록시 403). 전체 모드 `./setup.sh`가 `docling-tools`의 긴 오류 추적(`httpx.ProxyError: 403`)을 쏟은 뒤 요약에 `[주의] PDF 모델: 받지 못했습니다`를 남기는 것을 확인했다. 받기에 실패하면 빈 `~/.cache/docling/models` 폴더가 남는다.
+- **PDF 모델(바꾼 것):**
+  - `check_local.py`: 받기 전에 `huggingface.co`(또는 `HF_ENDPOINT`)의 레이아웃 모델 정보를 10초 제한으로 조회한다. 막혀 있으면 `docling-tools`를 부르지 않고 원인(`프록시가 연결을 막았습니다(403)`, `프록시 인증이 필요합니다(407)`, 시간 초과, 인증서 실패)을 한 줄로 알린다. 이 환경에서 setup 재실행은 5초에 끝난다. `HF_ENDPOINT`가 빈 값이면 하위 프로세스에 넘기지 않는다.
+  - `app/model_bundle.py`(표준 라이브러리): `pack`은 레이아웃·표 모델 폴더와 `manifest.json`(파일별 크기·SHA-256)을 ZIP으로 묶는다. `install`은 ZIP·폴더를 받아 경로 안전성·필수 파일·크기를 쓰기 전에 확인하고, 임시 파일에 쓰며 SHA-256을 대조한 뒤 바꿔 넣는다. 같은 파일은 건너뛰고 빈 파일만 바꿔 쓰며, 내용이 다른 기존 파일이 있으면 아무것도 쓰지 않고 멈춘다. manifest 없이 손으로 압축한 모델 캐시도 받는다(크기만 확인).
+  - `scripts/prepare-offline.py --models-only` → `offline/docling-pdf-models.zip`. `setup --models <ZIP|폴더>`(`scripts/console.py`) → `check_local.py --models-from`. 설치 위치는 콘솔이 모델을 찾는 폴더(`DOCOPS_DOCLING_ARTIFACTS` → `offline/docling-models` → `~/.cache/docling/models`). 묶음 설치가 실패해도 이미 모델이 갖춰져 있으면 요약에 '안 됨'으로 올리지 않는다.
+  - 안내 문구: setup 요약·run 시작 화면·PDF 파서 오류·작업 도구 점검·파서 플로우 설치 안내를 모델 ZIP 경로로 바꿨다. `.env.example`에 `DOCOPS_DOCLING_ARTIFACTS`와 주석 처리한 `HF_ENDPOINT`를 넣었다. README에 'huggingface.co가 막힌 PC' 절.
+  - 테스트 `test_parser_resilience.py`의 PDF 실측 2건은 모델 폴더가 비어 있어도 건너뛰게 고쳤다(전에는 빈 폴더면 실패).
+- **XLSM(바꾼 것):**
+  - 라우팅(`registry.DOCLING_FORMATS`), Docling 워크시트 경로(`InputFormat.XLSX`로 변환, 시트 수 한도, 시트·행 위치), 원본 셀 미리보기, OOXML 사본 보정·원문 대조(`OOXML_FORMATS`)에 XLSM을 넣었다. Docling 2.150.0은 `xl/workbook.xml`로 형식을 판별하고 `.xlsm` 확장자도 받는다(실측).
+  - `app/vba.py`: `vbaProject.bin`(CFB)의 `VBA/dir`을 [MS-OVBA] 압축 해제로 읽어 모듈 이름·종류·소스·코드 줄 수(`Attribute VB_`·`Option` 줄 제외)·자동 실행 프로시저를 얻는다. 크기 상한(프로젝트 32 MiB, 모듈 소스 4 MiB, 모듈 500개). 매크로는 실행하지 않는다. 압축 해제는 명세 3.2.1·3.2.2 예제로 확인했다.
+  - 결과 `warnings`에 `매크로 포함: VBA 모듈 N개(코드 M줄)는 실행하지 않았고 결과 본문에 넣지 않았습니다. 셀 값은 파일에 마지막으로 저장된 값입니다.`(+ 자동 실행 이름). 빈 문서 모듈만 있으면 경고 없음. 코드는 본문에 넣지 않는다.
+  - 구조 분석: `stats.macro`(모듈 목록), 플래그 `macro-autorun`, 매크로 코드 속 UNC·파일 경로·URL·문서번호 후보(`매크로 <모듈> N행`). 화면은 `매크로 모듈 N · M줄`·`열 때 자동 실행 매크로`로 보인다.
+  - 화면: 파서 플로우 XLSM 설명, 원문 대조의 XLSM 셀 값 미리보기, 지원 형식 안내 문구.
+- **검증:** 백엔드 `pytest` 276개 통과, 2개 건너뜀(PDF 모델 없음). 새 `test_xlsm.py` 17개(명세 예제·잘못된 압축·출력 상한, 한글 모듈 이름 cp949, 소스 없는 모듈, 경고 문구, 형식 확인, API 경로·원문 대조·미리보기, 구조 분석 링크, 실제 Docling의 시트·행 위치), `test_model_bundle.py` 13개(묶기·검증·재실행·충돌·깨진 ZIP·손 압축·위험 경로·접속 확인·setup 연결), `test_console.py`에 `--models` 2개. 프론트 150개 통과(새 2개: XLSM 파서 플로우, 구조 분석 매크로 표시)·빌드. 이 환경에서 `./setup.sh`(접속 확인 후 건너뜀) → 가짜 모델로 `prepare-offline.py --models-only` → 공백 든 경로의 ZIP으로 `./setup.sh --models`(SHA-256 확인, 재실행 시 건너뜀)를 확인했다.
+- **확인하지 않은 것:** 실제 PDF 모델 파일로 묶기·설치(이 환경도 HF가 막혀 가짜 파일만), Windows 실기기의 `setup.cmd --models`, Excel이 저장한 실제 XLSM과 고객 XLSM, 고객사 HF 미러 유무와 ZIP 반입 허용 여부.
+- **다음:** 사용자 Mac(모델 있음)에서 `--models-only`로 ZIP을 만들어 고객사 PC에 `setup.cmd --models`로 설치하고 PDF 파싱 확인. 고객사 XLSM 몇 건으로 셀·매크로 경고 확인. DOCM·PPTM도 같은 방식으로 열지 결정.
+
 ## 2026-11-25 허용 폴더에서 가져오기 (브라우저 파일 첨부가 막힌 고객사 PC)
 
 - **상황(사용자 보고):** 고객사 PC에서 문서함 파일 추가 때 "보안정책에 의거 파일첨부 ActiveX 실행 및 파일전송이 통제됩니다"가 뜬다. 콘솔 코드의 문구가 아니다(저장소 전체 검색). 보안 프로그램이 브라우저의 파일 선택·전송을 막는 것으로 보이며, OpenCode Desktop은 파일을 잘 읽었다.
@@ -53,7 +73,7 @@
   2. `backend/.venv`를 준비한다. 전체 모드는 Python 3.12와 `requirements-docling.lock.txt`, `--lite`는 3.12~3.15와 기본 잠금 파일을 쓴다. 지금 Python이 맞지 않으면 `py -3.12`나 `python3.12`를 찾는다.
   3. 화면을 빌드한다. `frontend/dist/docops-build.json`의 빌드 기록이 지금 소스와 같으면 건너뛴다(위 절 참고).
   4. `.env`가 없으면 만든다.
-  5. `check_local.py --docling --fetch-models --report <임시 파일>`을 부른다. 빠진 PDF 모델은 `docling-tools models download layout tableformer`로 받는다. `DOCOPS_DOCLING_ARTIFACTS`를 지정했으면 받지 않는다. 이어서 자체 점검을 한다.
+  5. `check_local.py --docling --fetch-models --report <임시 파일>`을 부른다. 빠진 PDF 모델은 `docling-tools models download layout tableformer`로 받는다. `DOCOPS_DOCLING_ARTIFACTS`를 지정했으면 받지 않는다. 이어서 자체 점검을 한다. (같은 날 추가: 받기 전 접속 확인과 `--models` 묶음 설치, 맨 위 절)
   6. 받지 못해도 설치는 계속하되, 받지 못한 것은 보고 파일에 남긴다(사용자 요청). setup은 그 내용을 맨 끝 요약(`====` 사이)에 `[주의] … N건`과 영향·해결 방법으로 다시 보여 준다.
   7. `backend/.venv/docops-setup.json`에 모드, 잠금 파일 지문, 그 경고를 남긴다(화면 지문은 dist의 빌드 기록으로 옮겼다).
   - 사용자가 혼자 쓰는 단계라 호환용 옵션(`--base`·`--docling`·`--check`)과 `.venv-docling` 안내는 없앴다(사용자 결정). run을 띄울 때 `launch_local.py`가 지금 파일 상태를 보고 PDF 모델이 없으면 한 줄로 알린다.

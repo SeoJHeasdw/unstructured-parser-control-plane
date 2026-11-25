@@ -14,6 +14,7 @@ from uuid import uuid4
 
 from fastapi import UploadFile
 from app.adapters.base import ParserError, UnsupportedFormat
+from app.adapters.docling import WORKBOOKS
 from app.adapters.registry import ParserRegistry, TEXT_FORMATS
 from app.config import Settings
 from app.adapters.ocr import ModelOcr
@@ -25,6 +26,7 @@ from app.repository import DocumentRepository, now
 from app.source_preview import worksheet_preview
 from app.structure import Budget, inspect_file
 from app.textnorm import display_name
+from app.vba import parse_notes as macro_notes
 
 logger = logging.getLogger(__name__)
 _ID = re.compile(r"^[0-9a-f]{32}$")
@@ -300,6 +302,10 @@ class DocumentService:
                         except Exception as exc:
                             logger.warning("Fidelity check skipped (%s)", type(exc).__name__)
                             warnings.append(FIDELITY_FAILED_WARNING)
+                        if extension in WORKBOOKS:
+                            # 매크로는 실행하지 않는다. 있으면 셀 값이 저장 시점의 값이라는 것을 결과에 남긴다.
+                            # (이름만 .xlsx로 바꾼 매크로 통합문서도 같은 경고를 받는다)
+                            warnings.extend(macro_notes(path))
                         if not markdown.strip():
                             raise ParserError("Office 본문·그림에서 글자를 추출하지 못했습니다. " + " ".join(warnings[:2]), code="no_text")
                     output.write(markdown)
@@ -371,7 +377,7 @@ class DocumentService:
     def source_preview(self, doc_id: str, sheet: str | None, cell: str) -> dict:
         doc, path = self.original(doc_id)
         try:
-            if doc["format"] == "XLSX":
+            if doc["format"] in WORKBOOKS:
                 self.parsers.docling.check_office_archive(path)
                 return worksheet_preview(path, sheet, cell)
             if doc["format"] in TEXT_FORMATS:
