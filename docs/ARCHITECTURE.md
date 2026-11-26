@@ -140,7 +140,8 @@ Mock 모델과 로컬 API 상태명은 프로토타입 계약이다. 운영 계�
 | `backend/app/vectordb.py`, `routers/vectordb.py` | Milvus REST v2 읽기 전용 조회(`MILVUS_*`)와 예시 데이터 | 쓰기·삭제는 범위 밖 |
 | `backend/app/adapters/`, `backend/app/ocr_model.py` | 텍스트/CSV·선택적 Docling 파서와 확장자 기반 선택, 문서 OCR 모델 연결(OpenAI 호환 비전 API, 영역·쪽 방식, 출력 정리: 표 토큰·HTML 표 → Markdown, LaTeX 기호, 반복 폭주) | 실제 형식 판별, 위치가 있는 구조화 결과, 추가 파서와 OCR을 별도 어댑터로 확장 |
 | `backend/app/format_gate.py`, `fidelity/`, `textnorm.py` | 파서 전 내용 서명 판별(DRM·암호·불일치 → 실패 코드), OOXML 파싱용 사본 보정(기호 글꼴·첨자→유니코드), 원본 인벤토리와 결과 대조(기호 손실·병합 셀·글상자·흰회색·숨김·그림 종류)와 보충 추출, 기호 보존 파일명 키 | 판별 결과로 파서 자동 선택, 병합 셀 반복 제거, PDF 글자 층 대조, 영역 단위 OCR 연결 |
-| `backend/app/agent/`, `backend/docops.py` | 작업 에이전트 도구(2026-11-24): OpenCode용 stdio MCP 서버와 CLI. 실행 중인 콘솔 API를 HTTP로 부르는 클라이언트이며 저장소를 직접 열지 않는다. 묶음 진행·D번호·호출 기록·타이핑용 보고서는 `runtime/agent/`([작업 에이전트 도구](AGENT_TOOLS.md)) | 2단계 청킹·평가, 3단계 Milvus 적재(승인), 4단계 검색(읽기 전용 묶음으로 분리) |
+| `backend/app/agent/`, `backend/docops.py` | 작업 에이전트 도구(2026-11-24, 2026-11-26 검수 보조로 바뀜): OpenCode용 stdio MCP 서버와 CLI. 실행 중인 콘솔 API를 HTTP로 부르는 클라이언트이며 저장소를 직접 열지 않는다. 파싱 외에 원본 읽기·자동 대조·검수 요청 올리기·사람 판정 읽기. 묶음 진행·D번호·호출 기록은 `runtime/agent/`, 검수 요청은 서버 DB([작업 에이전트 도구](AGENT_TOOLS.md)) | 2단계 청킹·평가, 3단계 Milvus 적재(승인), 4단계 검색(읽기 전용 묶음으로 분리) |
+| `backend/app/source_text.py`, `verify.py`, `routers/reviews.py` | (2026-11-26) 원본 글자를 파서와 별개로 읽기(PDF 글자 층·Office XML·셀 값·텍스트), 결과와 자동 대조해 의심 지점(S번호) 고르기, 사람이 판정하는 검수 요청(V번호) 저장 | 실제 고객 문서로 대조 기준 다듬기, 표 구조·읽는 순서 대조, 그림 원본을 보는 모델 연결 |
 | `backend/app/middleware.py` | 로컬 API의 Origin 및 요청 크기 제한, 모든 응답의 저장소 표식(`x-docops-runtime`) | 인증·인가의 대체가 아님. 배포 경계와 운영 보안은 별도 설계 |
 | `mock-data/data.json` | 가상 문서·참조·활동 예시 | 실제 운영 데이터와 별개로 유지하고 스키마 검증 |
 | `.env.example` | 향후 게이트웨이 설정 이름 예시 | 서버 전용 설정 로딩과 비밀 관리. 실제 값은 저장소에 넣지 않음 |

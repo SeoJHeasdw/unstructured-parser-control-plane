@@ -41,7 +41,12 @@
 | `PUT /api/models/{primary\|secondary\|embedding}`, `DELETE /api/models/{…}/saved` | 화면에서 연결 저장 `{label, base_url, model_id \| models[], api_key?, clear_api_key?}` · 저장값 지우고 `.env`로 되돌리기. `<runtime>/settings/connections.json`(0600)에 두고 `.env`보다 우선, 다음 요청부터 반영. `api_key`를 보내지 않으면 저장된 키 유지 | `200` 갱신된 목록 | `400` 주소·글자 형식 오류(계정 정보가 든 URL 거부), `404` 없는 자리 |
 | `POST /api/models/draft/test`, `POST /api/models/draft/models`, `POST /api/models/embedding/test` | 저장하지 않고 입력 중인 값으로 확인 `{kind: chat\|embed, key, base_url, model_id \| models, api_key?}`(키를 비우면 저장된 키), 저장된 임베딩 연결로 짧은 문장 하나 임베딩(차원·지연) | `200` `{ok, status, latency_ms, …}` | `400` 입력 오류, `409` 미설정 |
 | `GET /api/models`의 `ocr`, `PUT /api/models/ocr`, `DELETE /api/models/ocr/saved`, `POST /api/models/ocr/test` (2026-11-24) | 문서 OCR 모델 연결 `{label, base_url, model_id, api_key?, clear_api_key?, mode: region\|page, text_prompt, table_prompt, page_prompt}`(지시문은 비우면 기본값 `OCR:`·`Table Recognition:`·`document parsing.`). 응답에 키 값 없음(`api_key_set`). 연결 확인은 'OCR TEST 12.5 mg/mL'이 든 시험 그림을 실제로 읽혀 `12.5`가 나오는지 본다(사용자가 누를 때만, **외부 모델 호출**). `POST /api/models/draft/test`에 `kind: ocr`로 저장 전 확인, `POST /api/models/draft/models`에 `kind: ocr`로 게이트웨이 모델 목록(모델 ID 없이도 됨, 키를 비우면 저장된 OCR 키) | `200` | `400` 입력 오류·방식 오류, `409` 연결 미설정 |
-| `GET /api/agent/activity?limit=` (2026-11-24) | 작업 에이전트(MCP·CLI)의 묶음·보고서·호출 기록. `runtime/agent/`를 읽기만 한다. 묶음의 문서는 `seq`(D번호)로 준다. 작업 도구는 Origin 없이 부르고, 브라우저는 로컬 화면 Origin만 허용 | `200`, `{available, batches, reports, calls}` | `403` 허용되지 않은 Origin |
+| `GET /api/live/documents/{id}/source-text` (2026-11-26) | **파서와 별개로 원본에서 직접 읽은 글자**(`app/source_text.py`). 기본은 단위 목록 `{format, method, notes, truncated, units:[{key,label,page,sheet,kind,note,chars,lines}]}`. `?unit=<key>`면 그 단위의 줄 `{unit:{…, lines:[{text, ref, row?, cells?}]}}`, `?find=<글자>`면 찾은 줄 최대 50개 `{hits:[{unit,label,page,sheet,ref,row,text}]}`. 단위는 PDF 쪽(`p3`, 글자 층 없는 쪽은 `kind: scan`, 깨진 글자 층은 `garbled`)·PPTX 슬라이드(`p3`, 숨김은 `hidden`)·XLSX·XLSM 시트(`sheet:<이름>`, 셀 `{cell, value, alts}`)·DOCX `body`·`headers`·`notes`·텍스트 `body`. 원본은 바뀌지 않으므로 서버가 문서 3개까지 잠시 둔다 | `200` | `404` 문서·단위 없음, `409` 읽을 글자 층이 없는 형식(이미지·SVG 등)·손상·암호·구성 요소 없음(문장으로 사유) |
+| `GET /api/live/documents/{id}/verify?run=` (2026-11-26) | **자동 대조**(`app/verify.py`): 파싱 결과(기본 최신 성공 실행)를 원본 글자와 비교해 사람이 볼 의심 지점을 고른다. 판정이 아니라 후보다. `{id, run_id, is_latest, document_status, method, format, parser, summary:{units, checked, source_chars, matched_chars, coverage, spots, high, medium, low, scan_units}, units:[{key,label,page,sheet,kind,state,coverage,numbers_missing,numbers_extra,spots,result_lines}], spots:[{key:'S1', severity, kind, message, unit, label, page, sheet, cell, ref, line, line_end, source, source_hit, result, result_hit, result_role}], spots_total, top, notes}`. S번호는 같은 실행이면 같다. 종류는 [작업 에이전트 도구](AGENT_TOOLS.md) §5. 이미지·SVG는 결과 전체를 `image_ocr` 지점 하나로 돌려준다. 실행마다 서버가 16개까지 잠시 둔다 | `200` | `404` 문서·실행 없음, `409` 성공 결과 없음·원본 글자를 읽을 수 없음 |
+| `GET /api/live/reviews?status=&doc=&limit=` (2026-11-26) | **검수 요청(V번호)** 목록, 최신 먼저. `status`는 `open`(확인 전)·`correct`(맞음)·`wrong`(틀림)·`unclear`(보류)·`all`, `doc`은 문서 ID. `counts`는 상태별 전체 수(거른 목록과 별개) | `200`, `{reviews:[Review], counts}` | `400` 상태 값 오류, `403` 허용되지 않은 Origin |
+| `POST /api/live/reviews` (2026-11-26) | 검수 요청 만들기 `ReviewCreate`. 작업 에이전트(`origin: agent`, 기본)는 `flag` 도구로, 화면(`origin: console`)은 원문 대조의 자동 대조 지점에 판정을 누를 때 만든다. `spot`(S번호)을 주면 서버가 그 실행의 자동 대조로 위치·원본/결과 글자·종류·심각도와 기본 `note`를 채우고, **같은 문서·실행·S번호는 하나만** 둔다(기존 것을 `created:false`로 돌려줌). `run_id`를 생략하면 최신 성공 실행. `spot`이 없으면 `note`가 필요하다 | `201`, `Review + {created}` | `404` 문서·실행 없음, `409` note 없음·없는 S번호·성공 결과 없음, `422` 형식 오류 |
+| `PATCH /api/live/reviews/{n}` (2026-11-26) | 사람의 판정과 메모 `{status?, comment?}`. 상태를 바꾸면 `decided_at`을 남기고, `open`으로 되돌리면 지운다 | `200`, `Review` | `400` 바꿀 값 없음, `404` 없는 번호 |
+| `GET /api/agent/activity?limit=` (2026-11-24, 2026-11-26 바뀜) | 작업 에이전트(MCP·CLI)의 묶음·호출 기록과 **에이전트가 다룬 문서**. `runtime/agent/`와 문서·검수 요청을 읽기만 한다. 묶음·호출의 문서는 `seq`(D번호)로 준다. `documents`: 묶음·도구 호출·에이전트 검수 요청에 나온 문서 `{id, seq, name, format, status, error_code, updated_at, last_agent_at, batches, calls, reviews:{open,correct,wrong,unclear}}`(최근 순). `calls`: `{ts, tool, args, kind, repeat, ms, result, text(에이전트가 받은 결과 앞 12,000자), docs, session(연결 표식)}`. 예전의 `reports`(타이핑용 보고서)는 2026-11-26에 뺐다. 작업 도구는 Origin 없이 부르고, 브라우저는 로컬 화면 Origin만 허용 | `200`, `{available, batches, documents, calls}` | `403` 허용되지 않은 Origin |
 | `GET /api/lineage?source=live\|example` | 문서 계보(판 묶음·최신 판단·포함·참조 연결 상태). `live`는 업로드 목록과 **이미 실행해 둔** 구조 분석 결과만 읽고 분석·파싱을 새로 시작하지 않는다. `example`은 `mock-data/lineage-example.json`으로 계산한다 | `200`, `LineageData` | `400` 출처 값 오류, `503` 예시 파일 읽기 실패 |
 | `GET /api/retrieval/config` | 임베딩 연결(`EMBED_*`와 주소가 있는 `MODEL_*`·`MODEL2_*`, 키 값 제외), 모델 사양, 청킹 전략 설명, 요청 한도, 벡터 캐시 크기 | `200` | `403` 허용되지 않은 Origin(이하 `/api/retrieval`, `/api/vectordb` 공통) |
 | `GET /api/retrieval/documents`, `GET /api/retrieval/samples` | 청킹 원문 후보: 성공 결과가 있는 실제 문서 / 합성 예시 3종(`sop` 절차서, `report` 그림 많은 점검 보고서, `coa` 표 많은 시험 성적서)과 요소 구성 | `200` | |
@@ -321,3 +326,22 @@ Docling 실행 시 `HF_HUB_OFFLINE=1`, `TRANSFORMERS_OFFLINE=1`을 설정하며 
 ### 작업 도구의 청킹 비교
 
 `POST /api/retrieval/chunk`는 선택적으로 `summary_only: true`를 받는다. 이때 source는 문서 식별 정보와 이전 성공본 여부만 포함한다. 성공한 전략별 응답은 id·kind·stats만 포함한다. 생략하면 기존 벤치 화면용 전체 응답을 반환한다. 작업 도구 `chunk`는 `embed: false`로 로컬 분할을 요청한다. 길이는 추정 토큰 수다.
+
+## 검수 요청(Review, 2026-11-26)
+
+`runtime/documents.sqlite3`의 `review_requests` 테이블(서버 시작 때 없으면 만든다. 기존 문서·실행은 건드리지 않는다). 사람이 원문 대조 화면에서 눈으로 확인할 곳과 그 판정이다. 수천 개 파일의 정답 텍스트를 사람이 만들 수 없으므로, 에이전트·자동 대조가 고른 곳에 사람이 맞음·틀림을 남기는 것이 정답셋을 대신한다.
+
+| 필드 | 뜻 |
+|---|---|
+| `id` | V번호(1부터, 바뀌지 않음) |
+| `document_id`, `document_seq`, `document_name`, `document_format`, `document_status` | 문서와 D번호(목록 표시용으로 함께 준다) |
+| `run_id`, `is_latest_run` | 검수 요청이 본 파싱 실행. 그 뒤 다시 파싱하면 `is_latest_run: false`(결과 줄 번호가 달라질 수 있음) |
+| `origin` | `agent`(작업 도구 `flag`) · `console`(원문 대조 화면) |
+| `spot`, `kind`, `severity` | 자동 대조 지점 S번호와 종류(`changed`·`missing`·`cell_changed` 등, 직접 올린 것은 `agent`·`manual`), 심각도(`high`·`medium`·`low`) |
+| `page`, `sheet`, `cell`, `line`, `line_end`, `ref` | 원본 위치(쪽·슬라이드·시트·셀)와 결과 줄 범위, 사람이 읽는 위치 이름(`문단 8`, `3쪽 2줄`) |
+| `note` | 무엇을 확인할지(에이전트·사람 문장, 2,000자) |
+| `source_text`, `source_hit`, `result_text`, `result_hit` | 원본·결과 문맥과 그중 다른 부분 |
+| `status`, `decided_at`, `comment` | 사람의 판정(`open`·`correct`·`wrong`·`unclear`)과 시각, 메모 |
+| `batch` | 에이전트 묶음 B번호(있으면) |
+
+원문 대조 주소는 `?view=live&doc=<ID>&review=source`에 `page`·`sheet`·`cell`·`line`·`check`(V·S번호)·`run`을 붙여 그 위치를 연다([프론트·화면 계약](FRONTEND_AND_INTERACTION_CONTRACT.md) §5-2).

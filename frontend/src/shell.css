@@ -1,5 +1,6 @@
 .shell-root {
   --sidebar-width: 208px;
+  --sidebar-full: 208px;
   --shell-gutter: clamp(20px, 2.3vw, 38px);
   --shell-top-height: 56px;
   --shell-header-height: var(--shell-top-height);
@@ -8,7 +9,7 @@
   min-height: 100dvh;
   background: var(--canvas);
 }
-.shell-root.shell-collapsed { --sidebar-width: 68px; }
+.shell-root.shell-collapsed { --sidebar-width: 52px; }
 .shell-root svg, .finder-search svg, .finder-list svg, .finder-keys svg { flex-shrink: 0; }
 .shell-root [hidden] { display: none !important; }
 .shell-skip {
@@ -19,13 +20,13 @@
 
 .shell-sidebar {
   position: fixed; z-index: 20; inset: 0 auto 0 0; width: var(--sidebar-width);
-  display: flex; flex-direction: column; padding: 0 12px 12px;
+  display: flex; flex-direction: column; padding: 0 6px 12px;
   background: var(--rail); color: var(--rail-ink); border-right: 1px solid var(--rule);
   overflow: hidden; transition: width var(--dur-3) var(--ease-out);
 }
-.shell-brand { position: relative; min-height: 76px; display: flex; align-items: center; gap: 9px; padding: 0 3px; }
+.shell-brand { position: relative; min-height: 76px; display: flex; align-items: center; gap: 9px; padding: 0 4px; }
 .shell-mark {
-  display: grid; place-items: center; width: 36px; height: 36px; flex: none;
+  display: grid; place-items: center; width: 32px; height: 32px; flex: none;
   border: 0; border-radius: 9px; color: white;
   background: var(--ink-1); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .12), 0 1px 2px rgba(22, 30, 48, .18);
   transition: opacity var(--dur-2) ease, scale var(--dur-2) var(--ease-out);
@@ -52,7 +53,7 @@
 .shell-chevron-closed { transform: rotate(-90deg); }
 .shell-nav-item {
   display: flex; position: relative; width: 100%; align-items: center; gap: 10px;
-  min-height: 39px; padding: 0 10px; margin: 2px 0; border: 1px solid transparent; border-radius: 8px;
+  min-height: 39px; padding: 0 9px; margin: 2px 0; border: 1px solid transparent; border-radius: 8px;
   background: transparent; color: var(--rail-ink); text-align: left; font-size: 13.5px; font-weight: 560;
 }
 .shell-nav-item span { flex: 1; white-space: nowrap; }
@@ -62,7 +63,7 @@
 .shell-nav-item.is-active::before { content: ''; position: absolute; width: 3px; inset: 10px auto 10px -1px; border-radius: 2px; background: var(--accent); }
 .shell-nav-item em { color: #ffdc9a; background: #4a4140; border-radius: 5px; padding: 2px 6px; font-size: 11px; font-weight: 650; font-style: normal; line-height: 1.4; }
 .shell-environment {
-  display: flex; align-items: center; gap: 9px; min-height: 45px; margin-top: 8px; padding: 6px 13px;
+  display: flex; align-items: center; gap: 9px; min-height: 45px; margin-top: 8px; padding: 6px 12px;
   border-top: 1px solid var(--rule); color: var(--ink-3); font-size: 12px; white-space: nowrap;
 }
 .shell-environment-icon { display: grid; width: 28px; height: 28px; flex: none; place-items: center; background: #23314a; border-radius: 7px; color: #b5c6eb; }
@@ -338,7 +339,7 @@
   opacity: 0; translate: -6px 0; pointer-events: none; transition-delay: 0s; transition-duration: .1s, var(--dur-2);
 }
 .shell-collapsed .shell-sidebar-toggle {
-  position: absolute; left: 3px; top: 50%; translate: 0 -50%; width: 36px; height: 36px; border-radius: 9px;
+  position: absolute; left: 4px; top: 50%; translate: 0 -50%; width: 32px; height: 32px; border-radius: 9px;
   background: var(--surface-3); color: var(--ink-1); opacity: 0;
 }
 .shell-collapsed .shell-sidebar-toggle:active { scale: .92; }
@@ -363,3 +364,26 @@
 .shell-sidebar-toggle:is(:hover, :focus-visible) .shell-glyph-arrow { translate: -1px 0; }
 .shell-collapsed .shell-sidebar-toggle:is(:hover, :focus-visible) .shell-glyph-bar { scale: 1 1; }
 .shell-collapsed .shell-sidebar-toggle:is(:hover, :focus-visible) .shell-glyph-arrow { translate: 1px 0; }
+
+/* ---------- 접힌 사이드바 엿보기 ----------
+ * 접힌 채로 마우스를 올리거나 키보드 초점이 들어가면 본문 위로 겹쳐 펼친다(본문 폭은 그대로 52px 기준).
+ * 고정이 아니어서 벗어나면 다시 접힌다. 고정하려면 머리의 단추(사이드바 펼친 채 고정)를 누른다. */
+.shell-collapsed.shell-peek .shell-sidebar { width: var(--sidebar-full); box-shadow: 6px 0 22px rgba(22, 30, 48, .16); }
+.shell-collapsed.shell-peek :is(.shell-brand-text, .shell-sidebar .shell-nav-item span, .shell-environment span) {
+  opacity: 1; translate: 0 0; pointer-events: auto; transition-delay: .05s; transition-duration: var(--dur-2), var(--dur-3);
+}
+.shell-collapsed.shell-peek .shell-sidebar-toggle { position: static; translate: none; width: 32px; height: 34px; border-radius: 7px; background: transparent; color: var(--ink-3); opacity: 1; }
+.shell-collapsed.shell-peek .shell-sidebar-toggle:is(:hover, :focus-visible) { background: var(--surface-3); color: var(--ink-1); }
+.shell-collapsed.shell-peek .shell-brand .shell-mark { opacity: 1; scale: 1; }
+.shell-collapsed.shell-peek .shell-glyph-bar { scale: .5 1; }
+
+/* ---------- 원문 대조: 화면 폭·높이를 다 쓴다 ----------
+ * 문서 상세의 '원문 대조·실행 비교'는 본문 최대 폭을 풀고, 머리 아래 남은 높이를 채운다(두 칸이 안에서 각각 스크롤). */
+.shell-content.is-review { max-width: none; height: calc(100dvh - var(--shell-header-height)); min-height: 520px;
+  padding: 8px clamp(8px, 1vw, 14px) 10px; display: flex; flex-direction: column; }
+.shell-content.is-review > :not([hidden]) { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+/* 문서함 화면의 최대 폭(1260px)과 가운데 정렬을 풀어 원문 대조가 남는 폭을 다 쓴다. */
+.shell-content.is-review .lw-workspace { flex: 1; min-height: 0; width: 100%; max-width: none; margin-inline: 0; display: flex; flex-direction: column; gap: 8px; }
+@media (max-height: 560px), (max-width: 800px) {
+  .shell-content.is-review { height: auto; min-height: 0; }
+}

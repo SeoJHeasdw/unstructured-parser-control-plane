@@ -196,6 +196,6 @@ cd frontend && npm test && npm run build
 cd backend && .venv/bin/python -m pip install -r requirements-dev.txt && .venv/bin/python -m pytest -q
 ```
 
-**OpenCode에서 첫 시험**은 설치 폴더 안의 `OpenCode`를 열고 “연결을 확인해줘”라고 요청하면 됩니다. 필요한 경우 [연결 진단과 파싱 실험](docs/AGENT_TOOLS.md)을 참고하세요.
+**OpenCode에서 첫 시험**은 설치 폴더 안의 `OpenCode`를 열고 “연결을 확인해줘”라고 요청하면 됩니다. 에이전트는 파싱 결과를 원본과 대조해 사람이 눈으로 볼 곳을 **검수 요청**으로 올립니다(“이 폴더 파싱하고 확인할 데 골라줘”). 올라온 곳은 콘솔 **에이전트 작업 → 검수 요청**에서 원문 대조로 열어 맞음·틀림을 누릅니다. 필요한 경우 [연결 진단과 검수 흐름](docs/AGENT_TOOLS.md)을 참고하세요.
 
 **문서**: 이어서 작업할 때는 [인수인계와 실행 안내](docs/HANDOFF_AND_RUNBOOK.md)부터 읽습니다. 구조는 [아키텍처](docs/ARCHITECTURE.md), API는 [백엔드 README](backend/README.md), 나머지는 [문서 안내](docs/README.md)에 있습니다.

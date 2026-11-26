@@ -17,6 +17,7 @@ from app.routers.live import router as live_router, summary_router as live_summa
 from app.routers.models import router as models_router
 from app.routers.lineage import router as lineage_router
 from app.routers.retrieval import MAX_PARALLEL_STRATEGIES, router as retrieval_router
+from app.routers.reviews import router as reviews_router
 from app.routers.vectordb import router as vectordb_router
 from app.service import DocumentService
 
@@ -49,6 +50,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.add_middleware(RuntimeHeader, runtime_id=settings.runtime_id)
     app.include_router(live_summary_router)
     app.include_router(live_router)
+    app.include_router(reviews_router)
     app.include_router(folder_import_router)
     app.include_router(models_router)
     app.include_router(lineage_router)

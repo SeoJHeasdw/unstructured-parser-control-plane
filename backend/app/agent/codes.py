@@ -1,7 +1,8 @@
-"""사람이 옮겨 적을 짧은 코드.
+"""실패·경고의 짧은 코드.
 
-보고서는 고객사 PC 화면을 보고 손으로 옮겨 친다. 그래서 코드는 ASCII 소문자와 하이픈만 쓰고(한/영 전환·Shift 없음),
-서로 헷갈리지 않게 짓는다. 표는 docs/AGENT_TOOLS.md와 같아야 한다(test_agent_tools가 대조).
+도구 결과와 콘솔 화면이 같은 코드로 부르고, 결과에는 코드마다 한 줄 설명(MEANINGS)을 함께 넣어 모델이 추측해 풀지 않게 한다.
+코드는 ASCII 소문자와 하이픈만 쓰고(사람이 옮겨 적을 때 한/영 전환이 없게) 서로 헷갈리지 않게 짓는다.
+표는 docs/AGENT_TOOLS.md와 같아야 한다(test_agent_tools가 대조).
 """
 import re
 
@@ -44,9 +45,15 @@ FIDELITY_CODES = {
 _WARNING_PREFIXES = (
     ("OCR 모델로 읽은", "ocr-read"),
     ("OCR 결과에서 같은 구절이", "ocr-repeat"),
+    ("큰 그림이 있는 PDF 쪽", "pic-skip"),
     ("큰 그림", "ocr-limit"),
     ("OCR 미적용", "ocr-off"),
     ("본문 글자나 표가 추출되지 않은 PDF 페이지", "empty-pg"),
+    ("본문 글자가 추출되지 않은 PDF 페이지", "empty-pg"),
+    ("PDF 레이아웃·표 모델 없이 글자 층만", "text-only"),
+    ("글자 층이 깨져 보이는 PDF 쪽", "text-broken"),
+    ("발표자 메모", "notes-added"),
+    ("표 맨 위의 전체 너비 병합 행", "title-row"),
     ("OCR을 포함한 변환이 실패", "ocr-fallback"),
     ("글자를 인식하지 못한 프레임", "ocr-empty"),
     ("OCR 신뢰도가 낮은 영역", "ocr-low"),
@@ -132,6 +139,11 @@ MEANINGS = {
     "ocr-limit": "PDF의 큰 그림이 많아 일부는 OCR 한도(문서당 40개)로 읽지 않음",
     "ocr-off": "OCR 모델이 연결되지 않아 스캔·그림 쪽의 글자를 읽지 않음(빠졌을 수 있음)",
     "empty-pg": "글자·표가 하나도 나오지 않은 PDF 쪽이 있음",
+    "pic-skip": "PDF 쪽의 큰 그림 속 글자를 OCR 모델이 연결되지 않아 읽지 않음(그림 안 글자가 결과에 없음)",
+    "text-only": "PDF 모델 없이 글자 층만 읽음(pdf-text). 표 칸 구조가 없고 여러 단의 읽는 순서가 섞일 수 있어 원본 대조가 필요함",
+    "text-broken": "PDF 글자 층이 깨진 쪽이 있음(글꼴 대응표 없음). 결과 글자를 믿을 수 없어 원본 대조가 필요함",
+    "notes-added": "PPTX 발표자 메모를 슬라이드 내용 끝에 덧붙임(파서가 넣지 않던 글자)",
+    "title-row": "XLSX 표 맨 위의 병합 제목 행을 표 위 문단으로 옮김(칸마다 반복하지 않게)",
     "ocr-fallback": "OCR을 포함한 변환이 실패해 PDF 텍스트 층만 읽음",
     "ocr-empty": "그림에서 글자를 찾지 못한 프레임이 있음",
     "ocr-low": "OCR 신뢰도가 낮은 영역이 있어 원본과 대조가 필요함",

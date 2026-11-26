@@ -6,8 +6,10 @@
   python docops.py --workspace <작업 폴더> files     MCP와 같은 폴더·서버로 CLI 실행
   python docops.py status                    준비 상태
   python docops.py parse "C:\\docs\\a.pdf"   첫 인자는 필수 인자, 나머지는 --이름 값
-  python docops.py read D12 --page 3
-  python docops.py report --scope last
+  python docops.py verify D12                원본과 자동 대조(의심 지점 S번호)
+  python docops.py source D12 --page 3       원본 글자(파서와 별개) / read D12 --page 3: 파싱 결과
+  python docops.py flag D12 --spot S3        사람이 원문 대조로 볼 곳(검수 요청 V번호)
+  python docops.py verdicts --state wrong    사람이 '틀림'으로 판정한 것
 
 표준 라이브러리만 쓰므로 가상환경 없이 Python 3.12 이상이면 실행된다.
 """

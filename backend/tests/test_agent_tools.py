@@ -78,12 +78,6 @@ def live(tmp_path, monkeypatch):
             ops.close()
 
 
-def typing_block(text: str) -> list[str]:
-    lines = text.splitlines()
-    start = lines.index("----- 타이핑용 -----") + 1
-    return lines[start:lines.index("-----", start)]
-
-
 def call(ops: Ops, name: str, **args) -> str:
     text, _ = ops.call(name, args)
     return text
@@ -144,43 +138,39 @@ def test_discovery_matches_runtime(live):
         client_module.PORTS = original
 
 
-def test_parse_folder_report_and_drilldown(live):
+def test_parse_folder_summary_and_drilldown(live):
     ops, docs = live["ops"], live["docs"]
-    assert "서버:" in call(ops, "status")
+    status = call(ops, "status")
+    assert "서버:" in status and "한 번에 12,000자" in status
     listing = call(ops, "files")
     assert "처리 가능한 파일 2개" in listing
     assert "lock1" in listing and "empty1" in listing and "ext-hwp1" in listing
 
     first = call(ops, "parse", target=str(docs))
-    assert first.startswith("결과: 경고 없이 끝남"), first
-    block = typing_block(first)
-    assert block[0].startswith("DOCOPS B1 ")
-    assert "sum 2 ok2" in block
-    assert any(line.startswith("skip ") and "ext-hwp1" in line for line in block)
-    for line in block:
-        assert line.isascii(), line
+    assert first.startswith("결과: B1 끝 — 2건: 경고 없음 2"), first
+    assert "verify" in first.splitlines()[1]  # 다음 할 일은 원본 대조
+    assert "건너뜀: " in first and "처리 경로 없는 확장자 hwp 1" in first and "Office 잠금 파일 1" in first
+    assert "D1 txt 경고 없음 · a.txt" in first and "D2 csv 경고 없음 · 온도기록.csv" in first
+    assert "타이핑용" not in first
 
     again = call(ops, "parse", path=str(docs))  # 인자 이름 변형도 받는다
-    assert "sum 2 ok2 reuse2" in typing_block(again)
+    assert "이미 처리해 다시 하지 않은 문서 2건" in again
     assert len(ops.documents()) == 2  # 같은 파일을 다시 올리지 않는다
 
     reparsed = call(ops, "parse", target="D1")
-    assert "diff 1 same1 chg0" in typing_block(reparsed)
-    assert "D1 diff same" in call(ops, "compare", id="d-1")
+    assert "이전 실행과 비교: 1건 중 같음 1, 바뀜 0" in reparsed
+    assert "두 실행의 본문과 경고가 같습니다" in call(ops, "compare", id="d-1")
 
     detail = call(ops, "doc", document_id="1")
     assert detail.startswith("결과: D1 경고 없음")
-    assert typing_block(detail)[0].startswith("D1 txt ")
+    assert "원문 대조: http://127.0.0.1:" in detail and "review=source" in detail
     by_name = call(ops, "doc", id="온도기록")
     assert by_name.startswith("결과: D2")
     found = call(ops, "read", id="D1", find="허용 오차")
-    assert "[줄 2]" in found and "±0.5" in found
+    assert "\n2: 허용 오차 ±0.5 °C" in found
 
-    report = call(ops, "report")
-    lines = typing_block(report)
-    assert lines[0].startswith("DOCOPS R1 today")
-    assert any(line.startswith("agent call") for line in lines)
-    assert (live["runtime"] / "agent" / "reports" / "R1.txt").read_text(encoding="utf-8").startswith("DOCOPS R1")
+    gone = call(ops, "report")
+    assert gone.startswith("결과: 실패 (bad-arg)") and "verdicts" in gone  # 보고서 도구는 없앴다
 
 
 def test_errors_are_coded_and_logged(live):
@@ -191,14 +181,13 @@ def test_errors_are_coded_and_logged(live):
     assert call(ops, "parse").startswith("결과: 실패 (bad-arg)")
     assert call(ops, "nonexistent").startswith("결과: 실패 (bad-arg)")
     call(ops, "doc", id="D99")
-    repeated = call(ops, "doc", id="D99")  # 바로 앞과 같은 호출
-    assert repeated.startswith("주의: 방금과 같은 요청입니다")
+    repeated = call(ops, "doc", id="D99")  # 바로 앞과 같은 호출: 막거나 경고하지 않고 기록에만 남긴다
+    assert repeated.startswith("결과: 실패 (not-found)")
     entries = [json.loads(line) for line in (live["runtime"] / "agent" / "calls.jsonl").read_text(encoding="utf-8").splitlines()]
     kinds = [entry["kind"] for entry in entries]
     assert kinds == ["outside", "not-found", "bad-arg", "bad-arg", "not-found", "not-found"]
     assert entries[-1]["repeat"] is True
-    report = call(ops, "report", scope="all")
-    assert report.startswith("결과: 실패 (not-found)")  # 문서가 없으면 보고서를 만들지 않는다
+    assert entries[-1]["text"] == repeated and entries[-1]["session"] == ops.session and entries[-1]["docs"] == []
 
 
 def test_preview_before_large_batch(live):
@@ -208,7 +197,7 @@ def test_preview_before_large_batch(live):
     assert preview.startswith("결과: 미리보기")
     assert ops.documents() == []
     started = call(ops, "parse", target=str(live["docs"]), confirm="true")
-    assert "DOCOPS B1" in started
+    assert started.startswith("결과: B1 끝")
 
 
 def test_decomposed_korean_names_are_reused(live):
@@ -327,7 +316,7 @@ def test_same_name_size_and_mtime_still_require_matching_bytes(live):
     assert ops.api.get(f"/api/live/documents/{rows[2]['id']}/result")["markdown"] == "sample C"
 
 
-def test_named_batches_keep_their_first_report_and_resume_once(live, monkeypatch):
+def test_named_batches_summarize_and_resume_once(live, monkeypatch):
     from concurrent.futures import ThreadPoolExecutor
 
     ops = live["ops"]
@@ -344,13 +333,13 @@ def test_named_batches_keep_their_first_report_and_resume_once(live, monkeypatch
         with ThreadPoolExecutor(2) as pool:
             first = pool.submit(ops.wait, "B1")
             last = pool.submit(second.wait, "B2")
-            first_block = typing_block(first.result(timeout=15))
-            assert first_block[0].startswith("DOCOPS B1")
-            assert typing_block(last.result(timeout=15))[0].startswith("DOCOPS B2")
+            assert first.result(timeout=15).startswith("결과: B1 끝 — 1건")
+            assert last.result(timeout=15).startswith("결과: B2 끝 — 1건")
         assert len(ops.documents()) == 2
         assert all(len(ops.runs(d["id"])) == 1 for d in ops.documents())
         call(ops, "parse", target="D1")
-        assert typing_block(second.report("B1")) == first_block
+        again = second.wait("B1")
+        assert again.startswith("참고: 이미 끝난 묶음입니다") and "결과: B1 끝" in again
         assert ops.call("wait", {"batch": "B999"})[1]
     finally:
         second.close()
@@ -365,10 +354,9 @@ def test_uncertain_request_is_recovered_without_replaying(live):
     marker = {**item, "state": "error", "note": "upload-unknown"}
     (ops.store.dir / "pump.jsonl").write_text(json.dumps([1, 0, marker]) + "\n[1,", encoding="utf-8")
     text = ops.wait("B1")
-    assert text.startswith("결과: 등록·처리 요청 오류 1건")
-    assert "req-error upload-unknown1" in typing_block(text)
+    assert text.startswith("결과: B1 끝 — 0건 / 등록·처리 요청 오류 1건")
+    assert "요청 오류: upload-unknown 1" in text
     assert ops.documents() == []
-    assert "req-error upload-unknown1" in typing_block(ops.report("all"))
 
 
 def test_file_resolution_paging_and_confirmation_for_document_numbers(live):
@@ -414,10 +402,10 @@ def test_long_line_match_chunk_stats_and_probe(live):
     assert "구매 승인 번호 759" in ops.read("D1", find="구매 승인")
     assert "가" * 100 in ops.read("D1")
     assert ops.call("read", {"id": "D1", "find": "가", "page": 1})[1]
-    lines = typing_block(ops.chunk("D1", size=64))
-    assert lines[0] == "D1 chunk target=64 stale=0"
-    assert [line.split()[0] for line in lines[1:]] == ["fixed", "recursive", "element"]
-    assert all("table-split=" in line for line in lines[1:])
+    lines = ops.chunk("D1", size=64).splitlines()
+    assert lines[0] == "결과: D1 청킹 비교(목표 64 추정 토큰)"
+    assert [line.split(":")[0] for line in lines[2:]] == ["fixed", "recursive", "element"]
+    assert all("나뉜 표" in line for line in lines[2:])
     assert ops.call("chunk", {"id": "D1", "strategy": "semantic"})[1]
     assert ops.call("chunk", {"id": "D1", "size": 0})[1]
 
@@ -476,8 +464,9 @@ def test_large_confirmed_batch_runs_all_upload_rounds(live):
         (folder / f"{index:03}.txt").write_text(f"합성 문서 {index}", encoding="utf-8")
     assert "미리보기" in ops.parse(str(folder))
     ops.wait_seconds = 60
-    block = typing_block(ops.parse(str(folder), confirm=True))
-    assert "sum 75 ok75" in block
+    summary = ops.parse(str(folder), confirm=True)
+    assert summary.startswith("결과: B1 끝 — 75건: 경고 없음 75")
+    assert "… 외 25건은 docs 로 보세요." in summary
     assert len(ops.documents()) == 75
     assert "before=D36" in ops.docs()
     assert "D35 " in ops.docs(before="D36")
@@ -492,4 +481,68 @@ def test_page_read_excludes_interleaved_locations(live, monkeypatch):
                       {"page": 1, "start_line": 3, "end_line": 3}]
     })
     excerpt = ops.read("D1", page=1)
-    assert "[줄 1-1]" in excerpt and "첫 쪽 보충" in excerpt and "둘째 쪽 내용" not in excerpt
+    assert "\n1: 첫 쪽 제목" in excerpt and "\n3: 첫 쪽 보충" in excerpt and "둘째 쪽 내용" not in excerpt
+
+
+def test_verify_source_flag_and_verdicts_close_the_review_loop(live):
+    """에이전트가 원본과 대조해 사람이 볼 곳을 올리고, 사람이 판정한 결과를 다시 읽는다."""
+    ops = live["ops"]
+    call(ops, "parse", target="a.txt")
+    clean = call(ops, "verify", id="D1")
+    assert clean.startswith("결과: D1 원본 대조 — 의심 0곳, 원본 글자의 100%를 결과에서 찾음"), clean
+    # 파서가 기호를 잃은 상황을 결과 파일로 흉내 낸다(임시 저장소).
+    result = next((live["runtime"] / "results").glob("*.md"))
+    result.write_text(result.read_text(encoding="utf-8").replace("±0.5", "0.5"), encoding="utf-8")
+    call(ops, "parse", target="D1")  # 다시 파싱하면 원래대로 돌아오므로, 새 실행 결과를 다시 흉내 낸다
+    latest = max((live["runtime"] / "results").glob("*.md"), key=lambda path: path.stat().st_mtime)
+    latest.write_text(latest.read_text(encoding="utf-8").replace("±0.5", "0.5"), encoding="utf-8")
+    flagged = call(ops, "verify", id="D1")
+    assert "의심 1곳(높음 1" in flagged and "S1 [높음] 2줄 → 결과 줄 2" in flagged, flagged
+    assert "원본: 허용 오차 ±0.5 °C" in flagged and "결과: 허용 오차 0.5 °C" in flagged
+    original = call(ops, "source", id="D1", find="±0.5")
+    assert "[2줄] 허용 오차 ±0.5 °C" in original
+    paired = call(ops, "source", id="D1")
+    assert "\n2줄: 허용 오차 ±0.5 °C" in paired and 'read(id="D1")' in paired
+    missing = call(ops, "read", id="D1", find="±")
+    assert "결과 본문에 '±'가 없습니다" in missing and 'source(id="D1", find="±")' in missing
+
+    created = call(ops, "flag", id="D1", spot="s1", note="±가 결과에서 빠짐")
+    assert created.startswith("결과: 검수 요청을 올렸습니다 — V1 · D1 결과 줄 2"), created
+    assert "check=V1" in created and "line=2" in created
+    assert call(ops, "flag", id="D1", spot="S1").startswith("결과: 이미 올린 검수 요청 V1입니다")
+    assert call(ops, "flag", id="D1").startswith("결과: 실패 (bad-arg)")
+    assert call(ops, "flag", id="D1", spot="S9").startswith("결과: 실패 (not-found)")
+    call(ops, "parse", target="*.csv")
+    manual = call(ops, "flag", id="D2", line=3, note="09:00 행의 온도 부호 확인", source_text="-70.1", result_text="-70.1")
+    assert "V2 · D2 결과 줄 3" in manual
+    assert "S1 [높음]" in call(ops, "verify", id="D1") and "[이미 V1 확인 전]" in call(ops, "verify", id="D1")
+
+    opened = call(ops, "verdicts")
+    assert opened.startswith("결과: 검수 요청 확인 전 2")
+    ops.api._call("PATCH", "/api/live/reviews/1", json.dumps({"status": "wrong", "comment": "± 손실 맞음"}).encode(),
+                  {"Content-Type": "application/json"})
+    wrong = call(ops, "verdicts", state="틀림")
+    assert wrong.startswith("결과: 검수 요청 틀림 1건 (전체: 확인 전 1, 틀림 1)") and "V1 D1 줄 2 [틀림]" in wrong and "사람 메모: ± 손실 맞음" in wrong
+    assert "V2" not in wrong
+    assert call(ops, "verdicts", id="D2").startswith("결과: D2 검수 요청 확인 전 1")
+
+    activity = ops.api.get("/api/agent/activity")
+    handled = {item["seq"]: item for item in activity["documents"]}
+    assert handled[1]["reviews"] == {"open": 0, "correct": 0, "wrong": 1, "unclear": 0} and handled[2]["reviews"]["open"] == 1
+    assert "reports" not in activity
+    verify_call = next(entry for entry in activity["calls"] if entry["tool"] == "verify")
+    assert verify_call["docs"] == [1] and verify_call["text"].startswith("결과: D1 원본 대조") and verify_call["session"] == ops.session
+
+
+def test_source_errors_point_to_human_review(live):
+    ops = live["ops"]
+    image = live["docs"] / "명판.png"
+    from tests.edge_case_files import png
+    image.write_bytes(png())
+    call(ops, "parse", target="명판.png")
+    text = call(ops, "source", id="D1")
+    assert text.startswith("결과: 실패 (no-source)") and "flag" in text
+    assert call(ops, "verify", id="D1").startswith("결과: 실패 (no-source)")  # 파싱 실패(OCR 미연결)라 대조할 결과가 없다
+    call(ops, "parse", target="a.txt")
+    assert call(ops, "source", id="D2", page=3).startswith("결과: 실패 (not-found)")
+    assert call(ops, "source", id="D2", page="p1", sheet="x").startswith("결과: 실패 (bad-arg)")

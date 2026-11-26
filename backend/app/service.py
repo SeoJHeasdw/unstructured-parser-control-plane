@@ -1,4 +1,5 @@
 """Local storage and single-worker processing orchestration."""
+from collections import OrderedDict
 import hashlib
 import json
 import logging
@@ -22,8 +23,11 @@ from app.fidelity.pictures import PictureOcr
 from app.fidelity import OOXML_FORMATS, assess, prepare_copy, prepared_copy_path, probe
 from app.filelock import try_lock, unlock
 from app.format_gate import check as check_format
+from app.formats import IMAGE_FORMATS
 from app.repository import DocumentRepository, now
 from app.source_preview import worksheet_preview
+from app.source_text import SourceText, SourceUnavailable, read_source
+from app.verify import image_only, verify as verify_result
 from app.structure import Budget, inspect_file
 from app.textnorm import display_name
 from app.vba import parse_notes as macro_notes
@@ -70,6 +74,10 @@ class DocumentService:
         self._stopping = threading.Event()
         self._jobs: Queue[tuple[str, str] | None] = Queue(maxsize=max(1, settings.max_pending_jobs))
         self._worker: threading.Thread | None = None
+        # 원본 글자(원본은 문서마다 바뀌지 않는다)와 자동 대조(실행마다 바뀌지 않는다) 결과를 잠시 둔다.
+        self._cache_lock = threading.Lock()
+        self._sources: OrderedDict[str, SourceText] = OrderedDict()
+        self._verified: OrderedDict[tuple[str, str], dict] = OrderedDict()
 
     def start(self) -> None:
         self.settings.runtime_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
@@ -388,6 +396,96 @@ class DocumentService:
         except (ParserError, OSError) as exc:
             raise Conflict(str(exc) if isinstance(exc, ParserError) else "저장된 원본을 읽을 수 없습니다.") from exc
         raise Conflict("이 형식은 원본 파일로 열어 확인할 수 있습니다.")
+
+    # ------------------------------------------------------------ 원본 글자·자동 대조
+    def source_text(self, doc_id: str) -> tuple[dict, SourceText]:
+        """파서와 별개로 읽은 원본 글자(app/source_text.py). 읽을 수 없는 형식·손상 파일은 Conflict."""
+        doc, path = self.original(doc_id)
+        with self._cache_lock:
+            cached = self._sources.get(doc_id)
+            if cached is not None:
+                self._sources.move_to_end(doc_id)
+                return doc, cached
+        try:
+            if doc["format"] in OOXML_FORMATS:
+                self.parsers.docling.check_office_archive(path)  # 압축 폭탄·위험 경로
+            source = read_source(path, doc["format"], self.settings)
+        except SourceUnavailable as exc:
+            raise Conflict(str(exc)) from exc
+        except ParserError as exc:
+            raise Conflict(str(exc)) from exc
+        except OSError as exc:
+            raise Conflict("저장된 원본을 읽을 수 없습니다.") from exc
+        with self._cache_lock:
+            self._sources[doc_id] = source
+            while len(self._sources) > 3:
+                self._sources.popitem(last=False)
+        return doc, source
+
+    def _run_for(self, doc_id: str, run_id: str | None) -> dict:
+        runs = self.repo.parse_runs(doc_id)
+        if not runs:
+            raise Conflict("성공한 파싱 결과가 없어 원본과 대조할 수 없습니다.")
+        if run_id is None:
+            return next((run for run in runs if run["is_latest"]), runs[0])
+        run = next((run for run in runs if run["run_id"] == run_id), None)
+        if run is None:
+            raise MissingRun()
+        return run
+
+    def verify(self, doc_id: str, run_id: str | None = None) -> dict:
+        """파싱 결과를 원본 글자와 자동 대조한 의심 지점(S번호). 판정이 아니라 사람이 볼 곳의 후보다."""
+        doc = self.get(doc_id)
+        run = self._run_for(doc_id, run_id)
+        key = (doc_id, run["run_id"])
+        with self._cache_lock:
+            cached = self._verified.get(key)
+            if cached is not None:
+                self._verified.move_to_end(key)
+                return {**cached, "is_latest": bool(run["is_latest"]), "document_status": doc["status"]}
+        stored = self.parse_run(doc_id, run["run_id"])
+        if doc["format"] in IMAGE_FORMATS or doc["format"] == "SVG":
+            result = image_only(stored["markdown"], doc["format"], stored["parser"])
+        else:
+            _, source = self.source_text(doc_id)
+            result = verify_result(source, stored["markdown"], stored["locations"], stored["parser"], doc["format"])
+        result = {"id": doc_id, "run_id": run["run_id"], "completed_at": run["completed_at"],
+                  "parser_version": run["parser_version"], **result}
+        with self._cache_lock:
+            self._verified[key] = result
+            while len(self._verified) > 16:
+                self._verified.popitem(last=False)
+        return {**result, "is_latest": bool(run["is_latest"]), "document_status": doc["status"]}
+
+    # ------------------------------------------------------------ 검수 요청(V번호)
+    def create_review(self, payload: dict) -> tuple[dict, bool]:
+        doc = self.get(payload["document_id"])
+        fields = dict(payload)
+        run_id = fields.get("run_id")
+        if run_id is None:
+            runs = self.repo.parse_runs(doc["id"])
+            latest = next((run for run in runs if run["is_latest"]), runs[0] if runs else None)
+            fields["run_id"] = latest["run_id"] if latest else None
+        elif not self.repo.parse_run(doc["id"], run_id):
+            raise MissingRun()
+        if fields.get("spot"):
+            if not fields["run_id"]:
+                raise Conflict("성공한 파싱 결과가 없어 자동 대조 지점을 찾을 수 없습니다.")
+            spots = self.verify(doc["id"], fields["run_id"])["spots"]
+            spot = next((entry for entry in spots if entry["key"] == fields["spot"]), None)
+            if spot is None:
+                raise Conflict(f"{fields['spot']} 자동 대조 지점이 없습니다. 자동 대조를 다시 확인하세요.")
+            for key, value in (("kind", spot["kind"]), ("severity", spot["severity"]), ("page", spot["page"]),
+                               ("sheet", spot["sheet"]), ("cell", spot["cell"]), ("line", spot["line"]), ("line_end", spot["line_end"]),
+                               ("ref", spot["ref"]), ("source_text", spot["source"]), ("source_hit", spot["source_hit"]),
+                               ("result_text", spot["result"]), ("result_hit", spot["result_hit"])):
+                if fields.get(key) in (None, "") and value not in (None, ""):
+                    fields[key] = value
+            fields["note"] = fields.get("note") or spot["message"]
+        if not (fields.get("note") or "").strip():
+            raise Conflict("무엇을 확인할지(note)를 적어 주세요.")
+        fields["kind"] = fields.get("kind") or ("agent" if fields.get("origin") == "agent" else "manual")
+        return self.repo.create_review(doc["id"], fields)
 
     def parse_runs(self, doc_id: str) -> list[dict]:
         self.get(doc_id)

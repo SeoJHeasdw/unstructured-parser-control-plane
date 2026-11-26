@@ -358,8 +358,13 @@ export default function LiveWorkspace({ active = true, route, onRoute, onFamily,
     <button className="lw-btn" onClick={() => selectFile(null)}>문서함으로</button>
     {detail?.error && !detail.missing && <button className="lw-btn" onClick={() => setDetailRevision(n => n + 1)}>다시 시도</button>}
   </section>}
-  {current && liveRoute.review && <section className="compare-space"><button className="workspace-back" onClick={() => changeRoute({page:'live',doc:current.id})}><ArrowLeft size={16}/>문서 상세로</button>
-    <h1 tabIndex={-1}>{current.name}</h1><DocumentRuns key={current.id} doc={current} active={active} mode={liveRoute.review} onMode={review => { if (liveRoute.review !== review) changeRoute({...liveRoute, review}); }}/></section>}
+  {current && liveRoute.review && <section className="compare-space is-live-review" aria-label="결과 검수">
+    <DocumentRuns key={current.id} doc={current} active={active} mode={liveRoute.review} focus={liveRoute.focus}
+      onMode={review => { if (liveRoute.review !== review) changeRoute({page:'live', doc:current.id, review}); }}
+      heading={<div className="review-head">
+        <button className="workspace-back" onClick={() => changeRoute({page:'live',doc:current.id})} data-tip="문서 상세로" aria-label="문서 상세로"><ArrowLeft size={16}/><span>상세</span></button>
+        <h1 tabIndex={-1} data-tip={current.name} data-tip-overflow><DocNumber seq={current.seq}/>{current.name}</h1>
+      </div>}/></section>}
   {current && !liveRoute.review && <LiveDocumentView key={current.id} doc={current} result={result?.id === current.id ? result : null} resultLoading={resultLoading}
     resultError={resultError} submittingId={processingId} onBack={() => selectFile(null)} onProcess={() => void process(current)}
     tab={liveRoute.tab ?? 'result'} onTab={tab => changeRoute({page:'live', doc:current.id, tab})}

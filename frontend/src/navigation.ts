@@ -3,7 +3,7 @@ import { BookOpen, Bot, Boxes, Database, FileSearch, FlaskConical, FolderOpen, G
 
 export const destinations = {
   live: { label: '문서함', group: '실제 문서', icon: FolderOpen, description: '파일 업로드와 파싱, 추출 결과 검수', alias: '실제 파일 처리' },
-  agent: { label: '에이전트 작업', group: '실제 문서', icon: Bot, description: '작업 에이전트가 실행한 묶음과 보고서, 도구 호출 기록을 확인합니다.', alias: 'OpenCode MCP 작업 도구 호출 기록 보고서 묶음 B번호 R번호 D번호' },
+  agent: { label: '에이전트 작업', group: '실제 문서', icon: Bot, description: '작업 에이전트가 올린 검수 요청과 다룬 문서, 묶음, 도구 호출 기록을 확인합니다.', alias: 'OpenCode MCP 작업 도구 검수 요청 V번호 원문 대조 호출 기록 묶음 B번호 D번호' },
   parsers: { label: '파서 플로우', group: '문서 처리', icon: Workflow, description: '파일 형식별 파서와 추출 단계, 처리 문서를 확인합니다.', alias: '파서 파이프라인 파서 관리 라우팅 OCR' },
   analysis: { label: '분석 도구', group: '분석 도구', icon: Boxes, description: '문서 분석과 검색 품질 평가', alias: '' },
   chunking: { label: '청킹 비교', group: '문서 처리', icon: Scissors, description: '같은 원문을 여러 전략으로 나누고 청크를 비교합니다.', alias: '청킹 벤치 전략 관리' },
@@ -20,9 +20,26 @@ export const destinations = {
 export type Page = keyof typeof destinations;
 export type DetailTab = 'result' | 'history' | 'structure';
 export type ReviewMode = 'source' | 'runs';
-export type WorkspaceRoute = { page: Page; doc?: string; tab?: DetailTab; review?: ReviewMode; familyDoc?: string; format?: string; mode?: 'design'; sample?: string };
+/** 원문 대조를 열 때 짚을 곳: 원본의 쪽(PDF)·슬라이드(PPTX)·시트·셀, 결과 줄, 검수 요청(V번호)·자동 대조 지점(S번호), 실행. */
+export type ReviewFocus = { page?: number; sheet?: string; cell?: string; line?: number; check?: string; run?: string };
+export type WorkspaceRoute = { page: Page; doc?: string; tab?: DetailTab; review?: ReviewMode; familyDoc?: string; format?: string; mode?: 'design'; sample?: string; focus?: ReviewFocus };
 export const toolsList: Page[] = ['embedding', 'relations', 'vectordb', 'search'];
 export const examples: Page[] = ['overview', 'documents', 'compare'];
+
+const positive = (value: string | null) => {
+  const number = value && /^\d{1,6}$/.test(value) ? Number(value) : NaN;
+  return number > 0 ? number : undefined;
+};
+function readFocus(params: URLSearchParams): ReviewFocus | undefined {
+  const focus: ReviewFocus = {
+    page: positive(params.get('page')), line: positive(params.get('line')),
+    sheet: params.get('sheet')?.slice(0, 64) || undefined,
+    cell: /^[A-Za-z]{1,3}\d{1,7}$/.test(params.get('cell') ?? '') ? params.get('cell')!.toUpperCase() : undefined,
+    check: /^[VS]\d{1,6}$/i.test(params.get('check') ?? '') ? params.get('check')!.toUpperCase() : undefined,
+    run: /^[0-9a-f]{32}$/.test(params.get('run') ?? '') ? params.get('run')! : undefined,
+  };
+  return Object.values(focus).some(value => value !== undefined) ? focus : undefined;
+}
 
 function readRoute(): WorkspaceRoute {
   const params = new URLSearchParams(window.location.search);
@@ -38,12 +55,13 @@ function readRoute(): WorkspaceRoute {
   if (page === 'relations') return { page, familyDoc: doc };
   if (page === 'compare') return { page, doc };
   if (page !== 'live' || !doc) return { page };
-  return { page, doc, tab: tab === 'history' || tab === 'structure' ? tab : 'result', review: review === 'source' || review === 'runs' ? review : undefined };
+  const mode = review === 'source' || review === 'runs' ? review : undefined;
+  return { page, doc, tab: tab === 'history' || tab === 'structure' ? tab : 'result', review: mode, focus: mode ? readFocus(params) : undefined };
 }
 
 export function workspaceHref(route: WorkspaceRoute) {
   const url = new URL(window.location.href);
-  for (const key of ['view', 'doc', 'tab', 'review', 'format', 'mode', 'sample']) url.searchParams.delete(key);
+  for (const key of ['view', 'doc', 'tab', 'review', 'format', 'mode', 'sample', 'page', 'sheet', 'cell', 'line', 'check', 'run']) url.searchParams.delete(key);
   url.searchParams.set('view', route.page);
   if (route.doc || route.familyDoc) url.searchParams.set('doc', (route.doc || route.familyDoc)!);
   if (route.format !== undefined) url.searchParams.set('format', route.format);
@@ -51,6 +69,12 @@ export function workspaceHref(route: WorkspaceRoute) {
   if (route.sample) url.searchParams.set('sample', route.sample);
   if (route.tab && route.tab !== 'result') url.searchParams.set('tab', route.tab);
   if (route.review) url.searchParams.set('review', route.review);
+  if (route.review && route.focus) {
+    for (const key of ['page', 'sheet', 'cell', 'line', 'check', 'run'] as const) {
+      const value = route.focus[key];
+      if (value !== undefined && value !== '') url.searchParams.set(key, String(value));
+    }
+  }
   return url.pathname + url.search;
 }
 

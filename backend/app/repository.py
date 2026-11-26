@@ -51,6 +51,18 @@ class DocumentRepository:
                 ocr_enabled INTEGER, warnings TEXT NOT NULL, locations TEXT NOT NULL, duration_ms INTEGER, fidelity TEXT,
                 PRIMARY KEY (document_id, run_id)
             );
+            CREATE TABLE IF NOT EXISTS review_requests (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                document_id TEXT NOT NULL REFERENCES documents(id),
+                run_id TEXT,
+                created_at TEXT NOT NULL, updated_at TEXT NOT NULL, decided_at TEXT,
+                origin TEXT NOT NULL, spot TEXT, kind TEXT NOT NULL, severity TEXT,
+                page INTEGER, sheet TEXT, cell TEXT, line INTEGER, line_end INTEGER, ref TEXT,
+                note TEXT NOT NULL, source_text TEXT, source_hit TEXT, result_text TEXT, result_hit TEXT,
+                status TEXT NOT NULL DEFAULT 'open', comment TEXT, batch INTEGER
+            );
+            CREATE INDEX IF NOT EXISTS reviews_document ON review_requests(document_id, id);
+            CREATE INDEX IF NOT EXISTS reviews_status ON review_requests(status, id);
             ''')
             # Upgrade existing databases in-place; preserve every existing document and event.
             conn.execute("BEGIN IMMEDIATE")
@@ -172,3 +184,79 @@ class DocumentRepository:
     def history(self, doc_id: str) -> list[dict[str, Any]]:
         with self.connect() as conn:
             return [dict(row) for row in conn.execute("SELECT created_at,status,message FROM document_events WHERE document_id=? ORDER BY id", (doc_id,))]
+
+    # ------------------------------------------------------------ 검수 요청(V번호)
+    # 사람이 원문 대조로 확인할 곳. 작업 에이전트(flag)나 화면(자동 대조 지점의 판정)이 만들고, 사람이 맞음·틀림·보류를 남긴다.
+    _REVIEW_COLUMNS = ("run_id", "origin", "spot", "kind", "severity", "page", "sheet", "cell", "line", "line_end", "ref",
+                       "note", "source_text", "source_hit", "result_text", "result_hit", "status", "comment", "batch")
+    _REVIEW_SELECT = """
+        SELECT r.*, d.seq AS document_seq, d.name AS document_name, d.format AS document_format, d.status AS document_status,
+            CASE WHEN r.run_id IS NULL THEN NULL ELSE COALESCE(d.result_file = d.id || '-' || r.run_id || '.md', 0) END AS is_latest_run
+        FROM review_requests r JOIN documents d ON d.id = r.document_id"""
+
+    def _review(self, conn: sqlite3.Connection, review_id: int) -> dict[str, Any] | None:
+        row = conn.execute(self._REVIEW_SELECT + " WHERE r.id=?", (review_id,)).fetchone()
+        return dict(row) if row else None
+
+    def review(self, review_id: int) -> dict[str, Any] | None:
+        with self.connect() as conn:
+            return self._review(conn, review_id)
+
+    def create_review(self, document_id: str, fields: dict[str, Any]) -> tuple[dict[str, Any], bool]:
+        """(검수 요청, 새로 만들었는지). 같은 실행의 같은 자동 대조 지점(S번호)은 하나만 둔다."""
+        timestamp = now()
+        values = {key: fields.get(key) for key in self._REVIEW_COLUMNS}
+        values["status"] = values["status"] or "open"
+        with self.connect() as conn:
+            conn.execute("BEGIN IMMEDIATE")
+            if values["spot"] and values["run_id"]:
+                row = conn.execute("SELECT id FROM review_requests WHERE document_id=? AND run_id=? AND spot=?",
+                                   (document_id, values["run_id"], values["spot"])).fetchone()
+                if row:
+                    return self._review(conn, row[0]), False  # type: ignore[return-value]
+            columns = ("document_id", "created_at", "updated_at", "decided_at", *self._REVIEW_COLUMNS)
+            row_values = (document_id, timestamp, timestamp, timestamp if values["status"] != "open" else None,
+                          *(values[key] for key in self._REVIEW_COLUMNS))
+            cursor = conn.execute(f"INSERT INTO review_requests ({', '.join(columns)}) VALUES ({', '.join('?' * len(columns))})", row_values)
+            return self._review(conn, cursor.lastrowid), True  # type: ignore[return-value]
+
+    def reviews(self, document_id: str | None = None, status: str | None = None, limit: int = 500) -> list[dict[str, Any]]:
+        where, params = [], []
+        if document_id:
+            where.append("r.document_id=?")
+            params.append(document_id)
+        if status:
+            where.append("r.status=?")
+            params.append(status)
+        query = self._REVIEW_SELECT + (" WHERE " + " AND ".join(where) if where else "") + " ORDER BY r.id DESC LIMIT ?"
+        with self.connect() as conn:
+            return [dict(row) for row in conn.execute(query, (*params, limit))]
+
+    def review_counts(self, document_id: str | None = None) -> dict[str, int]:
+        query = "SELECT status, COUNT(*) FROM review_requests" + (" WHERE document_id=?" if document_id else "") + " GROUP BY status"
+        with self.connect() as conn:
+            return {row[0]: row[1] for row in conn.execute(query, (document_id,) if document_id else ())}
+
+    def review_counts_by_document(self) -> dict[str, dict[str, int]]:
+        with self.connect() as conn:
+            result: dict[str, dict[str, int]] = {}
+            for document_id, status, count in conn.execute("SELECT document_id, status, COUNT(*) FROM review_requests GROUP BY document_id, status"):
+                result.setdefault(document_id, {})[status] = count
+            return result
+
+    def update_review(self, review_id: int, status: str | None = None, comment: str | None = None) -> dict[str, Any] | None:
+        timestamp = now()
+        with self.connect() as conn:
+            conn.execute("BEGIN IMMEDIATE")
+            current = conn.execute("SELECT status FROM review_requests WHERE id=?", (review_id,)).fetchone()
+            if not current:
+                return None
+            sets, params = ["updated_at=?"], [timestamp]
+            if status is not None:
+                sets += ["status=?", "decided_at=?"]
+                params += [status, timestamp if status != "open" else None]
+            if comment is not None:
+                sets.append("comment=?")
+                params.append(comment)
+            conn.execute(f"UPDATE review_requests SET {', '.join(sets)} WHERE id=?", (*params, review_id))
+            return self._review(conn, review_id)

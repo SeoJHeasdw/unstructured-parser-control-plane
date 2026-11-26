@@ -65,6 +65,26 @@ export async function getSourcePreview(id: string, signal: AbortSignal, sheet?: 
  return readResponse<SourcePreview>(await fetch(`${documentUrl(id)}/source-preview?${params}`, {signal}));
 }
 
+/** 자동 대조(GET …/verify): 원본 글자와 결과를 비교한 의심 지점(S번호). 판정이 아니라 사람이 볼 곳의 후보다. */
+export type VerifySpot = {
+ key: string; severity: 'high' | 'medium' | 'low'; kind: string; message: string; unit: string; label: string;
+ page: number | null; sheet: string | null; cell: string | null; ref: string; line: number | null; line_end: number | null;
+ source: string; source_hit: string; result: string; result_hit: string; result_role?: 'same' | 'before';
+};
+export type VerifyUnit = { key: string; label: string; page: number | null; sheet: string | null; kind: string; note: string; source_chars: number;
+ matched_chars: number; coverage: number | null; numbers_missing: number; numbers_extra: number; spots: number; state: string; result_lines: number[] };
+export type VerifyResult = {
+ id: string; run_id: string; is_latest: boolean; method: string; format: string; parser: string;
+ summary: { units: number; checked: number; source_chars: number; matched_chars: number; coverage: number | null; spots: number; high: number; medium: number; low: number; scan_units: number };
+ units: VerifyUnit[]; spots: VerifySpot[]; spots_total: number; top: string[]; notes: string[];
+};
+export async function getVerify(id: string, run: string | undefined, signal?: AbortSignal): Promise<VerifyResult> {
+ const query = run ? `?run=${encodeURIComponent(run)}` : '';
+ const body = await readResponse<VerifyResult>(await fetch(`${documentUrl(id)}/verify${query}`, signal ? {signal} : undefined));
+ if (!Array.isArray(body.spots)) throw new Error('자동 대조의 응답 형식을 확인할 수 없습니다.');
+ return body;
+}
+
 export async function getLiveDocument(id:string, signal:AbortSignal):Promise<LiveDoc> {
  return readResponse<LiveDoc>(await fetch(documentUrl(id),{signal}));
 }

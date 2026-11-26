@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useRef, useState } from 'react';
-import type { MouseEvent, ReactNode } from 'react';
+import type { FocusEvent, KeyboardEvent as ReactKeyboardEvent, MouseEvent, PointerEvent, ReactNode } from 'react';
 import { AlertCircle, ArrowLeft, ArrowRight, Boxes, ChevronRight, FlaskConical, FolderOpen, Layers3, Maximize2, Minimize2, Menu, Search, Server, Settings2 } from 'lucide-react';
 import Dashboard from './Dashboard';
 import LiveWorkspace from './LiveWorkspace';
@@ -35,6 +35,19 @@ function SidebarGlyph() {
 }
 
 const finderItems = (Object.keys(destinations) as Page[]).map(id => ({ id, ...destinations[id] }));
+/** 사이드바를 접어 두었는지(이 브라우저에만 기억). 저장소를 못 쓰면 펼친 상태로 시작한다. */
+const SIDEBAR_KEY = 'docops.sidebar';
+function readSidebarOpen() {
+  try { return localStorage.getItem(SIDEBAR_KEY) !== 'collapsed'; } catch { return true; }
+}
+function keyboardFocusInside(element: HTMLElement) {
+  const focused = document.activeElement;
+  if (!focused || !element.contains(focused)) return false;
+  try { return focused.matches(':focus-visible'); } catch { return false; }
+}
+function saveSidebarOpen(open: boolean) {
+  try { localStorage.setItem(SIDEBAR_KEY, open ? 'open' : 'collapsed'); } catch { /* 기억하지 못해도 동작은 같다 */ }
+}
 const shortcut = /Mac|iPhone|iPad/.test(navigator.platform) ? '⌘ K' : 'Ctrl K';
 
 export default function App() {
@@ -50,7 +63,11 @@ export default function App() {
     <FullscreenIcon size={16} aria-hidden="true"/><span>{fullscreenLabel}</span></button>;
   const example = examples.includes(active) || active === 'pipeline';
   const [visited, setVisited] = useState<Page[]>([active]);
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarOpen, setSidebarOpenState] = useState(readSidebarOpen);
+  // 접힌 사이드바에 마우스를 올리거나 키보드 초점이 들어가면 본문을 밀지 않고 겹쳐 펼친다(고정 아님). 벗어나면 다시 접힌다.
+  const [peek, setPeek] = useState(false);
+  const peekTimer = useRef<number | undefined>(undefined);
+  const peekBlocked = useRef(false);
   const [mobileMenu, setMobileMenu] = useState(false);
   const [finderOpen, setFinderOpen] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -64,6 +81,43 @@ export default function App() {
   const lastPage = useRef(active);
   const focusContent = useRef(false);
   const current = data?.documents.find(doc => doc.id === selected);
+  const expanded = sidebarOpen || peek;
+  const reviewing = active === 'live' && !!route.doc && !!route.review;
+  function setSidebarOpen(open: boolean) {
+    setSidebarOpenState(open);
+    saveSidebarOpen(open);
+    window.clearTimeout(peekTimer.current);
+    setPeek(false);
+    // 접기 단추를 누른 직후에는 마우스가 아직 사이드바 위에 있다: 밖으로 나갔다 들어올 때까지 엿보기를 쉰다.
+    peekBlocked.current = !open;
+  }
+  const schedulePeek = (open: boolean, delay: number) => {
+    window.clearTimeout(peekTimer.current);
+    peekTimer.current = window.setTimeout(() => setPeek(open), delay);
+  };
+  useEffect(() => () => window.clearTimeout(peekTimer.current), []);
+  const peekHandlers = sidebarOpen ? {} : {
+    onPointerEnter: (event: PointerEvent<HTMLElement>) => {
+      if (event.pointerType === 'touch' || event.pointerType === 'pen' || peekBlocked.current) return;
+      schedulePeek(true, 120);
+    },
+    onPointerLeave: (event: PointerEvent<HTMLElement>) => {
+      peekBlocked.current = false;
+      if (event.pointerType === 'touch' || event.pointerType === 'pen') return;
+      if (keyboardFocusInside(event.currentTarget)) return; // 키보드로 메뉴를 고르는 중이면 그대로 둔다
+      schedulePeek(false, 220);
+    },
+    onFocus: () => { window.clearTimeout(peekTimer.current); setPeek(true); },
+    onBlur: (event: FocusEvent<HTMLElement>) => {
+      if (!event.currentTarget.contains(event.relatedTarget as Node | null)) schedulePeek(false, 0);
+    },
+    onKeyDown: (event: ReactKeyboardEvent<HTMLElement>) => {
+      if (event.key !== 'Escape' || !peek) return;
+      event.stopPropagation();
+      setPeek(false);
+      (document.activeElement as HTMLElement | null)?.blur?.();
+    },
+  };
 
   useEffect(() => { setVisited(prev => prev.includes(active) ? prev : [...prev, active]); }, [active]);
   useEffect(() => {
@@ -129,16 +183,17 @@ export default function App() {
   function changeLive(next: WorkspaceRoute) {
     if (active === 'live') go(next);
   }
-  return <div className={'shell-root' + (sidebarOpen ? '' : ' shell-collapsed') + (flowPage ? ' shell-flow-page' : '') + (fullscreen.expanded ? ' shell-flow-fullscreen' : '')}>
+  const toggleLabel = sidebarOpen ? '사이드바 접기' : peek ? '사이드바 펼친 채 고정' : '사이드바 펼치기';
+  return <div className={'shell-root' + (sidebarOpen ? '' : ' shell-collapsed') + (!sidebarOpen && peek ? ' shell-peek' : '') + (flowPage ? ' shell-flow-page' : '') + (fullscreen.expanded ? ' shell-flow-fullscreen' : '')}>
     <a className="shell-skip" href="#workspace-content">본문으로 건너뛰기</a>
-    <aside className="shell-sidebar" aria-label="주 탐색 메뉴">
-      <div className="shell-brand"><span className="shell-mark"><Layers3 size={24} aria-hidden="true"/></span>
-        <div className="shell-brand-text" aria-hidden={!sidebarOpen || undefined}><strong>비정형 관리 콘솔</strong></div>
-        <button className="shell-sidebar-toggle" aria-expanded={sidebarOpen} aria-label={sidebarOpen ? '사이드바 접기' : '사이드바 펼치기'}
-          data-tip={sidebarOpen ? '사이드바 접기' : '사이드바 펼치기'} data-tip-side={sidebarOpen ? 'bottom' : 'right'} onClick={() => setSidebarOpen(!sidebarOpen)}>
+    <aside className="shell-sidebar" aria-label="주 탐색 메뉴" {...peekHandlers}>
+      <div className="shell-brand"><span className="shell-mark"><Layers3 size={21} aria-hidden="true"/></span>
+        <div className="shell-brand-text" aria-hidden={!expanded || undefined}><strong>비정형 관리 콘솔</strong></div>
+        <button className="shell-sidebar-toggle" aria-expanded={sidebarOpen} aria-label={toggleLabel}
+          data-tip={toggleLabel} data-tip-side={expanded ? 'bottom' : 'right'} onClick={() => setSidebarOpen(!sidebarOpen)}>
           <SidebarGlyph/></button></div>
-      {nav(sidebarOpen)}
-      <div className="shell-environment" data-tip={sidebarOpen ? undefined : '로컬 워크스페이스'} data-tip-side="right"><Server size={16} aria-hidden="true"/><span aria-hidden={!sidebarOpen || undefined}>로컬 워크스페이스</span></div>
+      {nav(expanded)}
+      <div className="shell-environment" data-tip={expanded ? undefined : '로컬 워크스페이스'} data-tip-side="right"><Server size={16} aria-hidden="true"/><span aria-hidden={!expanded || undefined}>로컬 워크스페이스</span></div>
     </aside>
     <main className="shell-main">
       <header className="shell-header"><div className="shell-topbar">
@@ -148,10 +203,10 @@ export default function App() {
           {example && <span className="workspace-source"><FlaskConical size={15}/>예시 데이터</span>}
           <button className="shell-finder-trigger" aria-label="화면 찾기" aria-keyshortcuts="Meta+K Control+K" onClick={() => setFinderOpen(true)}><Search size={17}/><span>화면 찾기</span><kbd>{shortcut}</kbd></button></div>
       </div></header>
-      <div id="workspace-content" ref={content} tabIndex={-1} className={'shell-content' + (active === 'pipeline' ? ' is-fill' : '')}>
+      <div id="workspace-content" ref={content} tabIndex={-1} className={'shell-content' + (active === 'pipeline' ? ' is-fill' : '') + (reviewing ? ' is-review' : '')}>
         {toolsList.includes(active) && <a className="workspace-back" href={workspaceHref({page:'analysis'})} onClick={e => link(e, 'analysis')}><ArrowLeft size={15}/>분석 도구로</a>}
         {examples.includes(active) && <nav className="example-nav" aria-label="예시 둘러보기">{examples.map(page => <a key={page} href={workspaceHref({page})} aria-current={active === page ? 'page' : undefined} onClick={e => link(e, page)}>{destinations[page].label}</a>)}</nav>}
-        {active !== 'live' && active !== 'pipeline' && <div className="shell-title-row"><div><h1 tabIndex={-1}>{info.label}</h1>{active === 'parsers' && <p>파일 형식별 처리 경로와 로컬 문서의 파싱 상태를 확인하세요.</p>}{active === 'chunking' && <p>같은 원문에서 전략을 바꿔 가며 청크의 크기와 표·그림 보존 결과를 비교하세요.</p>}{active === 'agent' && <p>작업 에이전트(OpenCode 등)가 도구로 실행한 파싱 묶음과 보고서, 호출 기록을 읽기 전용으로 확인하세요.</p>}</div>
+        {active !== 'live' && active !== 'pipeline' && <div className="shell-title-row"><div><h1 tabIndex={-1}>{info.label}</h1>{active === 'parsers' && <p>파일 형식별 처리 경로와 로컬 문서의 파싱 상태를 확인하세요.</p>}{active === 'chunking' && <p>같은 원문에서 전략을 바꿔 가며 청크의 크기와 표·그림 보존 결과를 비교하세요.</p>}{active === 'agent' && <p>작업 에이전트(OpenCode 등)가 원본과 대조해 올린 검수 요청을 원문 대조로 확인하고, 다룬 문서·묶음·호출 기록을 보세요.</p>}</div>
           {active === 'parsers' && <div className="shell-flow-actions"><WorkspaceLink className="button-secondary" to={{page:'pipeline', mode:'design'}} onNavigate={openRoute}><FlaskConical size={16}/>모의 플로우 설계</WorkspaceLink>{fullscreenButton}</div>}</div>}
         {active === 'analysis' && <div className="tools-directory">{toolsList.map(page => {
           const tool = destinations[page], Icon = tool.icon;

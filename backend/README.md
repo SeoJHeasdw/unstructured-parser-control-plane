@@ -38,6 +38,12 @@ export DOCOPS_DOCLING_ARTIFACTS=/path/to/prepared/models
 - `POST /api/live/documents/{id}/process`: 처리 요청 접수. 응답은 `202`와 `processing` 상태입니다. `processing`은 실제 처리 중 또는 대기 중을 뜻합니다. 중복 요청은 `409`, 대기열 만석은 `503`입니다.
 - `GET /api/live/documents/{id}/result`: 마지막 성공 결과와 파서 정보, `is_stale`, `warnings`를 반환합니다. 재처리 중이거나 실패한 경우에도 이전 성공 결과가 있으면 `is_stale: true`로 반환하고, 성공 이력이 없으면 `409`입니다. OCR 없이 처리한 PDF에는 미적용 경고를 남깁니다.
 - `GET /api/live/documents/{id}/history`: 로컬 처리 이력
+- `GET /api/live/documents/{id}/source-text`: 파서와 별개로 원본에서 직접 읽은 글자(단위 목록, `?unit=`, `?find=`). 이미지·SVG처럼 글자 층이 없으면 `409`
+- `GET /api/live/documents/{id}/verify?run=`: 결과와 원본 글자의 자동 대조. 사람이 원문 대조로 볼 의심 지점(S번호)이며 판정이 아닙니다
+- `GET·POST /api/live/reviews`, `PATCH /api/live/reviews/{n}`: 검수 요청(V번호)과 사람의 판정(맞음·틀림·보류·메모). 작업 에이전트의 `flag`와 원문 대조 화면이 만듭니다
+- `GET /api/agent/activity`: 작업 에이전트의 묶음·호출 기록(결과 전체 포함)과 에이전트가 다룬 문서
+
+전체 계약은 [API·데이터 계약](../docs/API_AND_DATA_CONTRACT.md)에 있습니다.
 
 ### 파싱 전 판별과 원문 충실도 (2026-11-19)
 

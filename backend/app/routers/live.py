@@ -146,3 +146,36 @@ def get_structure(doc_id: str, request: Request):
         raise HTTPException(404, "문서를 찾을 수 없습니다.")
     except Conflict as exc:
         raise HTTPException(409, str(exc))
+
+
+@router.get("/{doc_id}/source-text")
+def get_source_text(doc_id: str, request: Request, unit: str | None = Query(None, max_length=300),
+                    find: str | None = Query(None, max_length=200)):
+    """파서와 별개로 읽은 원본 글자. 기본은 단위 목록(쪽·슬라이드·시트·본문)이고, unit=키면 그 단위의 줄, find=글자면 찾은 줄."""
+    try:
+        doc, source = request.app.state.documents.source_text(doc_id)
+    except MissingDocument:
+        raise HTTPException(404, "문서를 찾을 수 없습니다.")
+    except Conflict as exc:
+        raise HTTPException(409, str(exc))
+    if find:
+        return {"id": doc_id, "format": source.format, "method": source.method, "find": find, "hits": source.find(find)}
+    if unit:
+        found = source.unit(unit)
+        if found is None:
+            raise HTTPException(404, "원본 단위를 찾을 수 없습니다.")
+        return {"id": doc_id, "format": source.format, "method": source.method, "unit": source.unit_dict(found)}
+    return {"id": doc_id, **source.index()}
+
+
+@router.get("/{doc_id}/verify")
+def verify_document(doc_id: str, request: Request, run: str | None = Query(None, max_length=32)):
+    """파싱 결과를 원본 글자와 자동 대조한 의심 지점(S번호). 판정이 아니라 사람이 원문 대조로 볼 곳의 후보다."""
+    try:
+        return request.app.state.documents.verify(doc_id, run)
+    except MissingDocument:
+        raise HTTPException(404, "문서를 찾을 수 없습니다.")
+    except MissingRun:
+        raise HTTPException(404, "파싱 실행 결과를 찾을 수 없습니다.")
+    except Conflict as exc:
+        raise HTTPException(409, str(exc))

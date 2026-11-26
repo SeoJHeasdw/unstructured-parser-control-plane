@@ -5,7 +5,8 @@ import type { LucideIcon } from 'lucide-react';
 import { getParseRun, getSourcePreview, listParseRuns, liveSourceUrl } from '../api/live';
 import type { LiveDoc, ParseRun, StoredParseRun } from '../api/live';
 import { ReviewDesk } from './ReviewDesk';
-import type { ReviewMode } from '../navigation';
+import { ReviewChecks } from './ReviewChecks';
+import type { ReviewFocus, ReviewMode } from '../navigation';
 import { RunSummary } from './RunSummary';
 import { OriginalPane, PdfSource, TextSource, WorksheetSource } from './SourceViewer';
 import type { RunSide } from './RunSummary';
@@ -47,12 +48,15 @@ export function CompareState({ icon: Icon = FileSearch, title, message, actions,
   </section>;
 }
 
-export function DocumentRuns({ doc, active, mode, onMode }: {
+export function DocumentRuns({ doc, active, mode, onMode, focus, heading }: {
   doc: LiveDoc; active: boolean; mode: ReviewMode; onMode: (mode: ReviewMode) => void;
+  /** 주소로 받은 위치(검수 요청·에이전트 링크): 원본 쪽·시트·셀, 결과 줄, 실행, V·S번호 */
+  focus?: ReviewFocus; heading?: ReactNode;
 }) {
-  const [sourceRun, setSourceRun] = useState('');
+  const [sourceRun, setSourceRun] = useState(focus?.run ?? '');
   const [selection, setSelection] = useState<{ left: string; right: string }>();
-  const [location, setLocation] = useState<ReviewLocation>();
+  const [location, setLocation] = useState<ReviewLocation | undefined>(() => focus?.page || focus?.sheet
+    ? { page: focus.page ?? null, sheet: focus.sheet ?? null, cell: focus.cell } : undefined);
   const [retry, setRetry] = useState(0);
   const { id } = doc;
   const revision = retry;
@@ -61,7 +65,7 @@ export function DocumentRuns({ doc, active, mode, onMode }: {
   const runs = available?.data ?? [];
   const left = selection?.left ?? runs[runs.length > 1 ? 1 : 0]?.run_id ?? '';
   const right = selection?.right ?? runs[0]?.run_id ?? '';
-  const sourceId = sourceRun || right;
+  const sourceId = (sourceRun && runs.some(run => run.run_id === sourceRun) ? sourceRun : '') || right;
   const needsPair = active && mode === 'runs' && runs.length > 1;
   const loadLeft = useCallback((signal: AbortSignal) => getParseRun(id, left, signal), [id, left]);
   const loadRight = useCallback((signal: AbortSignal) => getParseRun(id, right, signal), [id, right]);
@@ -96,11 +100,15 @@ export function DocumentRuns({ doc, active, mode, onMode }: {
   const errorPanel = (message: string) => <CompareState icon={TriangleAlert} tone="error" title="실행 결과를 읽을 수 없습니다" message={message}
     actions={<button className="button-secondary" onClick={() => setRetry(n => n + 1)}>다시 시도</button>}/>;
   const pending = <CompareState title="실행 결과를 불러오는 중" tone="loading"/>;
-  if (available?.error) return errorPanel(available.error);
-  if (!available) return pending;
+  const framed = (body: ReactNode) => heading ? <div className="review-desk is-fill"><div className="review-mode-bar">{heading}</div>{body}</div> : body;
+  if (available?.error) return framed(errorPanel(available.error));
+  if (!available) return framed(pending);
   const pairError = baseline?.error || candidate?.error;
-  if (!runs.length) return <CompareState title="성공한 파싱 실행이 없습니다" message="문서 상세에서 처리 상태와 이력을 확인하세요."/>;
+  if (!runs.length) return framed(<CompareState title="성공한 파싱 실행이 없습니다" message="문서 상세에서 처리 상태와 이력을 확인하세요."/>);
   return <ReviewDesk key={left + '/' + right} mode={mode} onMode={onMode} canCompare={runs.length > 1}
+    heading={heading} fill={!!heading} initialLine={focus?.line && (!focus.run || focus.run === sourceId) ? focus.line : undefined}
+    checks={show => <ReviewChecks doc={doc} runId={sourceId} runs={runs} onRun={run => { setSourceRun(run); setLocation(undefined); }}
+      focus={focus} show={show} pageUnit={doc.format === 'PPTX' ? 'slide' : 'page'} />}
     baseline={runPane(baseline?.data, doc)} candidate={runPane(candidate?.data, doc)}
     pairStatus={pairError ? errorPanel(pairError) : !baseline?.data || !candidate?.data ? pending : undefined}
     sourceStatus={sourceResult?.error ? errorPanel(sourceResult.error) : !sourceResult?.data ? pending : undefined}

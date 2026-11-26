@@ -125,3 +125,75 @@ class HistoryEntry(BaseModel):
 class DocumentHistory(BaseModel):
     id: str
     history: list[HistoryEntry]
+
+
+# ----- 검수 요청(V번호, 2026-11-26). 사람이 원문 대조로 확인할 곳과 그 판정.
+ReviewStatus = Literal["open", "correct", "wrong", "unclear"]
+_HEX32 = r"^[0-9a-f]{32}$"
+
+class ReviewCreate(BaseModel):
+    document_id: str = Field(pattern=_HEX32)
+    # 대조한 파싱 실행. 생략하면 지금 결과(최신 성공 실행)
+    run_id: str | None = Field(None, pattern=_HEX32)
+    origin: Literal["agent", "console"] = "agent"
+    # 자동 대조 지점(S번호). 주면 위치·원본/결과 글자를 서버가 그 지점으로 채운다(같은 실행의 같은 지점은 하나만).
+    spot: str | None = Field(None, pattern=r"^S\d{1,5}$")
+    kind: str | None = Field(None, max_length=40)
+    severity: Literal["high", "medium", "low"] | None = None
+    page: int | None = Field(None, ge=1, le=100_000)
+    sheet: str | None = Field(None, max_length=64)
+    cell: str | None = Field(None, max_length=16)
+    line: int | None = Field(None, ge=1)
+    line_end: int | None = Field(None, ge=1)
+    ref: str | None = Field(None, max_length=200)
+    note: str | None = Field(None, max_length=2000)
+    source_text: str | None = Field(None, max_length=2000)
+    source_hit: str | None = Field(None, max_length=500)
+    result_text: str | None = Field(None, max_length=2000)
+    result_hit: str | None = Field(None, max_length=500)
+    status: ReviewStatus = "open"
+    comment: str | None = Field(None, max_length=2000)
+    batch: int | None = Field(None, ge=1)
+
+class ReviewUpdate(BaseModel):
+    status: ReviewStatus | None = None
+    comment: str | None = Field(None, max_length=2000)
+
+class Review(BaseModel):
+    id: int
+    document_id: str
+    document_seq: int | None = None
+    document_name: str
+    document_format: str
+    document_status: str
+    run_id: str | None = None
+    # 검수 요청이 본 실행이 지금 결과(최신 성공 실행)인지. 다시 파싱하면 false가 된다.
+    is_latest_run: bool | None = None
+    created_at: str
+    updated_at: str
+    decided_at: str | None = None
+    origin: str
+    spot: str | None = None
+    kind: str
+    severity: str | None = None
+    page: int | None = None
+    sheet: str | None = None
+    cell: str | None = None
+    line: int | None = None
+    line_end: int | None = None
+    ref: str | None = None
+    note: str
+    source_text: str | None = None
+    source_hit: str | None = None
+    result_text: str | None = None
+    result_hit: str | None = None
+    status: ReviewStatus
+    comment: str | None = None
+    batch: int | None = None
+
+class ReviewSaved(Review):
+    created: bool
+
+class ReviewList(BaseModel):
+    reviews: list[Review]
+    counts: dict[str, int]
