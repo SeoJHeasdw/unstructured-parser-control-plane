@@ -1,8 +1,6 @@
 """실제 파일 구조 분석: 숨은 문서(압축 항목·메일 첨부·내장 개체)와 다른 문서를 가리키는 링크를 찾는다.
 
-- 확장자가 아니라 파일 앞부분(시그니처)으로 실제 형식을 판별한다.
-- 하위 문서는 메모리에서만 열고 디스크에 풀지 않는다. 깊이·개수·용량 한도를 둔다.
-- 문서번호 패턴과 경로·URL 탐지는 '후보'다. 실제 대상 문서와의 연결 확인은 별도 단계다.
+하위 문서는 메모리에서만 열고 디스크에 풀지 않는다. 문서번호·경로·URL은 후보이며 대상 문서와의 연결 확인은 별도 단계다.
 표준 라이브러리만 사용한다.
 """
 from dataclasses import dataclass, field
@@ -35,7 +33,7 @@ class Budget:
     max_entry: int = 100 * 1024 * 1024
     max_links: int = 3000
     max_scan: int = 8 * 1024 * 1024
-    signatures: tuple = ()  # format_gate.DrmSignature: 실제 파일에서 확인해 등록한 DRM 머리말
+    signatures: tuple = ()  # format_gate.DrmSignature
     nodes: int = 0
     bytes: int = 0
     links: int = 0
@@ -198,7 +196,7 @@ def _inspect(data: bytes, name: str, kind: str, location: str, depth: int, budge
         elif detected == "unknown" and family in OFFICE_LIKE:
             _flag(node, "drm-suspect")
             node["stats"]["header"] = data[:16].hex(" ")
-    except Exception as exc:  # 손상·비표준 파일은 분석 실패로 표시하고 계속 진행한다.
+    except Exception as exc:
         _flag(node, "unreadable")
         node["stats"]["error"] = type(exc).__name__
     actual = node["detected"]
@@ -344,7 +342,6 @@ def _ooxml(node: dict, archive: zipfile.ZipFile, names: set, depth: int, budget:
     if media:
         node["stats"]["images"] = len(media)
         _flag(node, "has-images")
-    # 외부 관계(하이퍼링크, 외부 통합문서, 연결된 개체·템플릿)
     rels_by_part: dict[str, dict] = {}
     for rels_name in sorted(name for name in names if name.endswith(".rels") and "/_rels/" in name):
         folder = rels_name.split("/_rels/")[0]
@@ -358,7 +355,6 @@ def _ooxml(node: dict, archive: zipfile.ZipFile, names: set, depth: int, budget:
             if kind == "xlsx" and rel_type == "hyperlink" and "/worksheets/" in source:
                 continue  # 시트 하이퍼링크는 셀 위치와 함께 아래에서 기록
             _add_link(node, budget, REL_KIND.get(rel_type, "external"), attrs.get("Target", ""), _part_label(source), rel_type)
-    # 내장 개체
     for name in sorted(n for n in names if "/embeddings/" in n and not n.endswith("/")):
         _embedded(node, archive.read(name), posixpath.basename(name), name, depth, budget)
     if kind == "docx":

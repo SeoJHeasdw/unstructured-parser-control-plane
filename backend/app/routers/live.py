@@ -18,14 +18,13 @@ def parser_catalog(request: Request):
     ocr = load_ocr()
     missing = missing_files(settings.docling_artifacts)
     return {
-        # PDF 모델이 없으면 PDF는 글자 층 파서(pdf-text)로 간다. 고정 표(PARSER_BY_EXTENSION)가 아니라 지금 경로를 돌려준다.
         "routes": request.app.state.documents.parsers.routes(),
         "docling_installed": find_spec("docling") is not None,
         "pdf_model_directory": bool(settings.docling_artifacts and settings.docling_artifacts.is_dir()),
         "pdf_models_ready": not missing,
         "pdf_missing_files": missing,
         "ocr_enabled": settings.ocr_enabled,
-        # OCR 모델(OpenAI 호환 비전 API) 연결이 설정됐는지. 라이브러리 OCR은 쓰지 않는다. 호출해 보지는 않는다.
+        # 설정 여부만 본다(호출하지 않음). 라이브러리 OCR은 쓰지 않는다.
         "ocr_models_found": ocr.configured,
         "ocr_model": {key: value for key, value in ocr.public().items() if key in ("label", "model_id", "mode", "configured")},
     }
@@ -50,10 +49,7 @@ def list_documents(request: Request, q: str | None = Query(None, max_length=200)
                    format: str | None = Query(None, max_length=400), sort: str | None = Query(None, pattern="^(recent|updated|name)$"),
                    cursor: str | None = Query(None, max_length=600), limit: int | None = Query(None, ge=1, le=500),
                    ids: str | None = Query(None, max_length=33 * 200)):
-    """조건이 하나도 없으면 예전처럼 전체 목록(파서 화면·에이전트·구조 분석이 쓴다). 조건이 있으면 한 쪽과 전체 수·확장자/상태별 수.
-
-    q: 이름·확장자·ID·D번호 · status: all·attention·uploaded·processing·completed·failed·unsupported·no_text ·
-    format: 확장자 목록(쉼표, 확장자 없음은 '-') · sort: recent(올린 순)·updated·name · cursor: 앞 응답의 next_cursor · ids: 문서 ID 목록(쉼표)."""
+    """문서 목록. 조건이 없으면 전체 목록, 조건이 있으면 한 쪽과 전체 수·확장자/상태별 수."""
     service = request.app.state.documents
     if ids is not None:
         return {"documents": service.documents_by_id([value for value in ids.split(",") if value][:200])}
@@ -200,9 +196,7 @@ def verify_document(doc_id: str, request: Request, run: str | None = Query(None,
                     kind: str | None = Query(None, max_length=200), order: str = Query("priority", pattern="^(priority|document)$"),
                     offset: int = Query(0, ge=0, le=1_000_000), limit: int = Query(400, ge=1, le=1000),
                     unreviewed: bool = Query(False)):
-    """파싱 결과를 원본 글자와 자동 대조한 원장. 의심점(S번호)은 우선순위 순으로 한 쪽씩(page.next로 이어 받음).
-    severity=high,medium · unit=p3 · kind=changed,missing · order=document · unreviewed=true(사람이 아직 판정하지 않은 것만).
-    판정이 아니라 사람이 원문 대조로 볼 곳의 후보이고, gate는 사람 판정까지 합친 문서 상태다."""
+    """파싱 결과를 원본 글자와 자동 대조한 원장(판정이 아니라 사람이 볼 곳의 후보). 의심점(S번호)은 한 쪽씩 준다."""
     severities = [value for value in (severity or "").split(",") if value]
     if any(value not in ("high", "medium", "low") for value in severities):
         raise HTTPException(400, "severity는 high, medium, low를 쉼표로 이어 씁니다.")

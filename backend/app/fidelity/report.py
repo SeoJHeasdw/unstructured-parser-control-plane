@@ -1,8 +1,4 @@
-"""원본 인벤토리와 파싱 결과를 대조해 손실을 보고하고, 본문에서 빠진 도형·SVG 글자를 끝에 보충한다.
-
-보충은 원래 위치가 아니라 결과 끝에 '보충 추출' 구획으로 붙인다(원문 위치 정보는 함께 남긴다).
-파싱 성공이 품질 보증이 아니라는 원칙에 따라, 고친 것과 고치지 못한 것을 모두 드러낸다.
-"""
+"""원본 인벤토리와 파싱 결과를 대조해 손실을 보고하고, 본문에서 빠진 도형·SVG 글자를 결과 끝 '보충 추출' 구획에 붙인다."""
 import re
 import unicodedata
 
@@ -66,7 +62,7 @@ def assess(inventory: dict, markdown: str, prepared: dict | None = None) -> tupl
         gap = count - found.get(ch, 0)
         if gap <= 0:
             continue
-        # '℃'→'°C', 'µ'→'μ'처럼 기호가 남는 변환만 '바뀜'으로 본다. '²'→'2'처럼 ASCII로 내려앉으면 뜻이 사라진 손실이다.
+        # 호환 형태가 비ASCII로 남으면('℃'→'°C') '바뀜', ASCII로 내려앉으면('²'→'2') 손실.
         compat = compatibility_form(ch)
         if compat and not compat.isascii() and compat in final:
             normalized[ch] = gap

@@ -16,7 +16,6 @@ from app.service import Conflict, MissingDocument
 
 
 def _local_only(request: Request) -> None:
-    """실제 문서와 외부 모델을 다루므로 로컬 화면에서 온 요청만 받는다(/api/live 와 같은 규칙)."""
     origin = request.headers.get("origin")
     if not origin:
         return
@@ -31,7 +30,7 @@ def _local_only(request: Request) -> None:
 
 router = APIRouter(prefix="/api/retrieval", tags=["chunking and embedding bench"], dependencies=[Depends(_local_only)])
 _STATE_LOCK = threading.Lock()
-MAX_COMPARE = 6  # 청킹 벤치 비교표에 한 번에 올리는 전략 수
+MAX_COMPARE = 6
 MAX_PARALLEL_STRATEGIES = 4
 MAX_MEASURE_TEXTS = 16
 MAX_MEASURE_CHARS = 60_000
@@ -79,7 +78,7 @@ def documents(request: Request):
 
 @router.get("/sample")
 def sample():
-    """예전 화면 호환: 절차서 예시 원문."""
+    """절차서 예시 원문."""
     return {"name": SAMPLE_NAME, "text": SAMPLE_MARKDOWN}
 
 
@@ -109,7 +108,6 @@ def _load_source(source, request: Request) -> tuple[Source, dict]:
         except Conflict as exc:
             raise HTTPException(409, str(exc)) from None
         text, pages = result["markdown"], line_pages(result.get("locations"), result["markdown"])
-        # 청크가 어느 실행·본문에서 나왔는지 남긴다(원장 의심점·원본 영역을 청크에 잇는 기준).
         meta = {"doc_id": doc["id"], "sample": None, "name": doc["name"], "is_stale": result["is_stale"],
                 "run_id": result.get("run_id"), "text_sha256": text_hash(text), "_locations": result.get("locations") or []}
     else:
@@ -125,7 +123,7 @@ def _load_source(source, request: Request) -> tuple[Source, dict]:
 
 
 def _semantic_target(params: dict) -> tuple:
-    """의미 기반 전략의 (연결, 모델 ID, 문제). 모델을 비워 두면 연결의 첫 모델을 쓴다."""
+    """의미 기반 전략의 (연결, 모델 ID, 문제)."""
     params = params if isinstance(params, dict) else {}
     conn = find_connection(str(params.get("connection") or "embed"))
     if not conn or not conn.configured:
@@ -137,7 +135,6 @@ def _semantic_target(params: dict) -> tuple:
 
 
 def _embedder_for(request: Request, allow_calls: bool):
-    """평가 계획·실행용: 의미 기반 프리셋마다 캐시를 쓰는 임베더를 만든다."""
     def build(preset: dict):
         conn, model, problem = _semantic_target(preset.get("params"))
         if problem:
@@ -158,7 +155,6 @@ def chunk(request: Request, body: dict = Body(...)):
     limit = body.get("limit_tokens")
     limit = int(limit) if isinstance(limit, (int, float)) and not isinstance(limit, bool) and limit > 0 else None
 
-    # 의미 기반 전략은 캐시에 있는 문장 임베딩만 쓴다. 사용자가 '나누기'를 눌러 embed=true로 보낸 요청에서만 모델을 부른다.
     allow_calls = body.get("embed") is True
 
     def evaluate(index):
@@ -183,7 +179,7 @@ def chunk(request: Request, body: dict = Body(...)):
         except ChunkingError as exc:
             return {"id": sid, "error": str(exc), **empty}
 
-    # One source index per request. The shared pool bounds simultaneous comparison work across tabs.
+    # 공유 풀(main.py)이 여러 탭의 동시 비교 작업 수를 묶는다.
     results = []
     for start in range(0, len(strategies), parallelism):
         batch = range(start, min(start + parallelism, len(strategies)))
@@ -258,7 +254,7 @@ def put_questions(request: Request, body: dict = Body(...)):
 
 @router.get("/questions/example")
 def example_questions():
-    """합성 예시 문서에 맞춘 예시 질문. 저장하지 않는다."""
+    """합성 예시 문서에 맞춘 예시 질문."""
     return {"questions": [dict(q) for q in EXAMPLE_QUESTIONS]}
 
 
@@ -270,7 +266,7 @@ def _doc_names(request: Request) -> dict[str, str]:
 
 @router.post("/questions/parse")
 def parse_questions(request: Request, body: dict = Body(...)):
-    """CSV/JSONL을 읽어 행으로 돌려준다. 저장은 화면에서 확인한 뒤 PUT으로 한다. 문서 ID가 없으면 문서 이름으로 찾는다."""
+    """CSV/JSONL을 읽어 행으로 돌려준다. 문서 ID가 없으면 문서 이름으로 찾는다."""
     try:
         rows, errors = parse_import(str(body.get("format") or ""), body.get("text"))
     except QuestionError as exc:

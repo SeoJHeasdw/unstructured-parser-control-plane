@@ -1,10 +1,6 @@
 """파싱 전 형식 확인: 확장자가 아니라 파일 내용으로 DRM·암호·형식 불일치를 먼저 가려낸다.
 
-- DRM 제품 서명은 공개 자료로 확정할 수 없어서 내장하지 않는다. 실제 파일에서 확인한 머리말을
-  `DOCOPS_DRM_SIGNATURES`로 등록한다. 예: `NASCA=ascii:<확인한 문자열>; 다른제품=hex:0A0B0C0D`
-  - `hex:` 파일 맨 앞(0번째 바이트)부터 일치, `ascii:` 앞 4 KiB 안 어디에서든 일치.
-- 서명이 없어도 Office 확장자인데 Office·ZIP·OLE 서명이 없고 본문이 암호문처럼 보이면 `drm_suspected`로 둔다.
-- 이 모듈은 판별만 한다. 복호화·우회는 하지 않는다. 해제는 DRM 제품의 공식 해제 경로에서 처리한다.
+DRM 제품 서명은 공개 자료로 확정할 수 없어 내장하지 않는다. 실제 머리말을 DOCOPS_DRM_SIGNATURES로 등록한다.
 """
 from collections import Counter
 from dataclasses import dataclass, field
@@ -41,7 +37,7 @@ class DrmSignature:
 
 
 def parse_signatures(raw: str | None) -> tuple[DrmSignature, ...]:
-    """'이름=hex:…; 이름=ascii:…' 형식. 잘못된 항목은 무시하지 않고 오류로 알린다(조용한 미탐 방지)."""
+    """'이름=hex:…; 이름=ascii:…' 형식."""
     result = []
     for item in (raw or "").split(";"):
         item = item.strip()
@@ -84,7 +80,7 @@ def entropy(data: bytes) -> float:
 
 @dataclass(frozen=True)
 class GateResult:
-    code: str | None  # None이면 파서로 보낸다
+    code: str | None
     detected: str
     message: str | None = None
     vendor: str | None = None
@@ -96,7 +92,7 @@ class GateResult:
 
 
 def main_part(archive: zipfile.ZipFile, names: set[str]) -> str | None:
-    """패키지 관계(_rels/.rels)가 가리키는 본문 부분. 'word/document2.xml'처럼 이름이 달라도 찾는다."""
+    """패키지 관계(_rels/.rels)가 가리키는 본문 부분. 이름이 word/document.xml이 아닐 수 있다."""
     if "_rels/.rels" in names:
         info = archive.getinfo("_rels/.rels")
         if not info.flag_bits & 1 and info.file_size <= 1024 * 1024:
@@ -149,7 +145,6 @@ def _mismatch(extension: str, detected: str, evidence: dict) -> GateResult:
 
 
 def _opaque(extension: str, head: bytes, evidence: dict) -> GateResult:
-    """알려진 서명이 없는 이진 파일: 암호문처럼 보이면 DRM 의심, 아니면 미확인."""
     sample = head[512:] if len(head) > 1024 else head
     bits = round(entropy(sample), 3)
     evidence = {**evidence, "entropy": bits}
@@ -172,7 +167,6 @@ def check(path: Path, extension: str, signatures: tuple[DrmSignature, ...] = (),
         return GateResult("drm_protected", "drm", f"{vendor} DRM으로 보호된 파일입니다. 표준 파서로 열 수 없으므로 DRM을 해제한 사본이 필요합니다.",
                           vendor=vendor, evidence=evidence)
     if extension in TEXT_FORMATS and text_sample(head, final=len(head) < _SAMPLE) is not None:
-        # 글자로 읽히는 파일은 내용이 'BMR-…'·'%PDF-' 같은 서명 문자열로 시작해도 텍스트다.
         return GateResult(None, "text", evidence=evidence)
     detected = sniff(head)
     if extension in OOXML_KIND:

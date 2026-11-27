@@ -1,7 +1,7 @@
 """Minimal read-only Compound File Binary (OLE2) reader.
 
 레거시 Office(DOC/XLS/PPT), Outlook MSG, HWP 5, 암호화된 OOXML, OLE 내장 개체가 이 형식이다.
-디렉터리 목록과 스트림 읽기만 지원한다. 손상·악의적 파일에 대비해 모든 체인 길이를 제한한다.
+손상·악의적 파일에 대비해 모든 체인 길이를 제한한다.
 """
 import struct
 

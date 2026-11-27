@@ -1,15 +1,6 @@
 """자동 대조(verify)의 원장 규칙: 규칙 버전, 의심점 식별자, 우선순위, 문서 판정 상태.
 
-판정 순서(파서 품질 검수 고도화 계획 §3.1)
-1. 실행 실패는 원인을 기록한다(문서 상태·이벤트 — 이 모듈 밖).
-2. 성공 실행에 대조가 아직 도달하지 않았으면 '미평가'(pending).
-3. 확인 안 된 의심점이나 열린 사람 검수가 있으면 '검수 필요'(needs_review).
-4. 필수 검사의 미완료·잘림·공유 원천·미지원 표현이 있으면 '판정 불가'(undetermined).
-5. 모든 필수 조건을 채운 형식군만 '통과 후보'(pass_candidate). 현장 검증 전이라 자동 통과는 하지 않고
-   사람 검수를 이어 간다(기록 모드). 지금 통과 후보 기준이 있는 형식은 구분자·인코딩이 확정된 직사각 CSV뿐이다.
-
-S번호는 화면 표시 순번(문서 순서)이라 규칙이 바뀌면 같은 번호가 다른 사실을 가리킬 수 있다. 저장·조회는
-(실행, 규칙 버전, finding ID)로 한다. finding ID는 종류·원본 단위·원본 주소·원문/결과 조각과 같은 서명의 발생 순번으로 만든다.
+S번호는 화면 표시 순번이라 규칙이 바뀌면 같은 번호가 다른 사실을 가리킬 수 있다. 저장·조회 키는 (실행, 규칙 버전, finding ID)다.
 """
 from __future__ import annotations
 
@@ -18,11 +9,9 @@ import hashlib
 import re
 import unicodedata
 
-# 사람이 읽는 규칙 이름. 원장의 실제 키는 rule_key()(이 이름 + 대조 코드·원본 읽기 라이브러리 지문)다.
-# 2026-11-27 두 번째 커밋에서 대조 규칙(숨은 글자 층·차트)이 바뀌었는데 이름을 올리지 않아, 첫 커밋 때 만든 원장이 그대로
-# 쓰였다(의심점 0). 그래서 이름에 기대지 않고 코드 지문으로 바뀜을 감지한다.
+# 사람이 읽는 규칙 이름. 원장의 실제 키는 rule_key()다.
 RULE_VERSION = "verify-2026.11.28"
-# 원장 결과에 영향을 주는 모듈(원본 읽기·대조·판정 규칙). 파서 모듈은 넣지 않는다(파싱 결과는 실행마다 저장돼 있다).
+# 원장 결과에 영향을 주는 모듈. 파서 모듈은 넣지 않는다(파싱 결과는 실행마다 저장돼 있다).
 _RULE_MODULES = ("qc.py", "verify.py", "source_text.py", "pdf_layers.py", "xlsx_charts.py", "textnorm.py",
                  "adapters/text.py", "adapters/eml.py", "fidelity/probe.py", "fidelity/report.py", "format_gate.py")
 _RULE_PACKAGES = ("pypdfium2", "openpyxl", "docling")
@@ -30,7 +19,7 @@ _rule_key: str | None = None
 
 
 def rule_key() -> str:
-    """원장 키: 'verify-2026.11.28+<지문 10자>'. 대조 코드나 원본 읽기 라이브러리 버전이 바뀌면 달라져, 기존 실행을 다시 대조한다."""
+    """원장 키: RULE_VERSION + 대조 코드·원본 읽기 라이브러리 버전의 지문 10자."""
     global _rule_key
     if _rule_key is None:
         import importlib.metadata
@@ -62,7 +51,7 @@ STATE_LABELS = {
     "pass_candidate": "통과 후보",
     "unavailable": "대조 불가",
 }
-# 사람이 남긴 판정 중 그 의심점을 '확인됨'으로 보는 것. 틀림은 오류가 확인된 것이라 검수 필요로 남는다.
+# 사람이 남긴 판정 중 그 의심점을 '확인됨'으로 보는 것.
 RESOLVED = {"correct"}
 
 
@@ -71,12 +60,12 @@ def _compact(text: str) -> str:
 
 
 def assign_ids(spots: list[dict]) -> None:
-    """의심점마다 finding ID(F + 12자리)를 붙인다. 같은 서명이 여럿이면 문서 순서의 발생 순번으로 구별한다."""
+    """의심점마다 finding ID(F + 12자리)를 붙인다."""
     seen: Counter = Counter()
     for spot in spots:
         where = spot.get("cell") or spot.get("ref") or ""
         if not spot.get("source_hit") and not spot.get("source"):
-            where = f"{where}|L{spot.get('line') or ''}"  # 결과에만 있는 것(숫자·깨진 글자·OCR 줄)은 결과 줄로 구별
+            where = f"{where}|L{spot.get('line') or ''}"  # 결과에만 있는 것은 결과 줄로 구별
         basis = "|".join((spot.get("kind") or "", spot.get("unit") or "", where,
                           _compact(spot.get("source_hit") or ""), _compact(spot.get("result_hit") or "")))
         seen[basis] += 1
@@ -84,7 +73,7 @@ def assign_ids(spots: list[dict]) -> None:
 
 
 def priority(spots: list[dict], unit_order: dict[str, int]) -> list[dict]:
-    """검수 우선순위: 심각도 → 원본 단위 순서 → 결과 줄 → 문서 순서. 각 의심점에 rank(0부터)를 매긴다."""
+    """검수 우선순위로 정렬하고 각 의심점에 rank(0부터)를 매긴다."""
     ordered = sorted(enumerate(spots), key=lambda pair: (SEVERITY_RANK.get(pair[1]["severity"], 3),
                                                          unit_order.get(pair[1].get("unit") or "", len(unit_order)),
                                                          pair[1].get("line") or 0, pair[0]))
@@ -94,7 +83,7 @@ def priority(spots: list[dict], unit_order: dict[str, int]) -> list[dict]:
 
 
 def reason(code: str, message: str, blocking: bool = True, **extra) -> dict:
-    """판정 근거 한 줄. blocking이면 그것만으로 통과 후보가 될 수 없다."""
+    """판정 근거 한 줄."""
     return {"code": code, "message": message, "blocking": blocking, **extra}
 
 
@@ -109,22 +98,19 @@ def machine_state(spots_total: int, reasons: list[dict]) -> str:
 
 def gate(spots: list[dict], reasons: list[dict], verdicts: dict[str, str], open_reviews: int, wrong_reviews: int,
          *, stale: bool = False, omitted: int = 0) -> dict:
-    """문서 판정 상태. verdicts: finding ID → 사람 판정(open·correct·wrong·unclear). open_reviews: 이 실행의 열린·보류 검수 요청 수.
-
-    중요 오류나 확인 안 된 필수 범위 하나가 문서 평균(일치율)에 묻히지 않도록 일치율은 쓰지 않는다."""
+    """문서 판정 상태. verdicts: finding ID → 사람 판정(open·correct·wrong·unclear). open_reviews: 이 실행의 열린·보류 검수 요청 수."""
     unresolved = [spot for spot in spots if verdicts.get(spot.get("id") or "") not in RESOLVED and verdicts.get(spot.get("id") or "") != "wrong"]
     high = sum(1 for spot in unresolved if spot["severity"] == "high")
     shown: list[dict] = []
     if unresolved:
         shown.append(reason("findings", f"확인하지 않은 의심점 {len(unresolved):,}곳" + (f"(높음 {high:,})" if high else "") + "이 있습니다."))
     if omitted:
-        # 찾았지만 상세를 남기지 못한 차이: 사람이 볼 수 없으니 해결될 수 없다. 남은 수만큼 통과 후보를 막는다.
         shown.append(reason("findings_omitted", f"찾았지만 상세를 남기지 못한 차이 {omitted:,}곳이 있습니다. 볼 수 없는 차이는 해결로 셀 수 없습니다."))
     if wrong_reviews:
         shown.append(reason("confirmed_wrong", f"사람이 '틀림'으로 확인한 곳 {wrong_reviews:,}건이 있습니다. 파서를 고치거나 다시 파싱해야 합니다."))
     if open_reviews:
         shown.append(reason("open_reviews", f"판정을 기다리는 검수 요청 {open_reviews:,}건이 있습니다."))
-    if shown:  # 확인 안 된 의심점·상세 없는 차이·틀림·열린 검수 요청
+    if shown:
         state = "needs_review"
     elif any(r.get("blocking") for r in reasons):
         state = "undetermined"

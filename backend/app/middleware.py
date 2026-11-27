@@ -6,12 +6,10 @@ from starlette.responses import JSONResponse
 class LocalRequestGuard:
     def __init__(self, app, max_upload_bytes: int):
         self.app = app
-        # Permit multipart headers in addition to file bytes. The service checks exact file size.
+        # 여유 1 MiB는 multipart 머리말 몫. 정확한 파일 크기는 서비스가 확인한다.
         self.max_body_bytes = max_upload_bytes + 1024 * 1024
 
     async def __call__(self, scope, receive, send):
-        # 실제 파일과 외부 모델 호출 경로는 로컬 화면에서 온 요청만 받는다.
-        # /api/agent: 작업 에이전트 기록(파일 경로·인자)이 들어 있어 같은 규칙을 적용한다.
         if scope["type"] != "http" or not scope["path"].startswith(("/api/live/", "/api/models", "/api/agent")):
             return await self.app(scope, receive, send)
         headers = dict(scope.get("headers", []))
@@ -49,7 +47,7 @@ RUNTIME_HEADER = b"x-docops-runtime"
 
 
 class RuntimeHeader:
-    """모든 응답에 저장소 표식을 붙인다. run.cmd·run.sh 어느 쪽으로 띄워도 실행기와 작업 도구(MCP)가 같은 서버를 찾는다."""
+    """모든 응답에 저장소 표식(x-docops-runtime)을 붙인다."""
 
     def __init__(self, app, runtime_id: str):
         self.app = app

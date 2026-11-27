@@ -1,24 +1,7 @@
 """청킹 벤치의 분할 전략. 표준 라이브러리만 쓰는 순수 함수다.
 
-공통 규칙
-- 모든 청크는 원문 문자 위치 start/end(파이썬 문자열 인덱스, end 미포함)를 가진다.
-- text는 원문[start:end]와 같다(앞뒤 공백은 걷어 내고 위치도 그만큼 옮긴다). 예외는 하나뿐이다:
-  문서 구조 전략이 큰 표를 행 단위로 나눌 때 두 번째 조각부터 머리행(머리+구분선)을 앞에 다시 붙인다.
-  그때 start/end는 실제 행 범위이고 flags에 table-split이 붙는다.
-- 요소 인식 전략(element·parent_child·page)은 원문을 요소(제목·문단·목록·표·그림·캡션·코드·반복 머리말)로
-  나눈 뒤 요소를 이어 붙여 text를 만든다. 버린 머리말·그림은 빠지고, 표는 머리행 반복·'열: 값' 문장으로 바뀔 수 있다.
-  이때 start/end는 청크가 덮는 원문 범위다.
-- 길이 단위는 글자(chars) 또는 추정 토큰(tokens)이다.
-
-토큰 추정(대상 PC에 토크나이저가 없어 근사한다. 화면에도 '추정'으로 표시한다)
-  한글 음절·자모, 한자·가나 1자      = 1토큰. 다국어 BPE/SentencePiece에서 한글은 대략 음절당 0.4~1.0토큰이다.
-                                      한도 초과를 놓치지 않도록 보수적으로 1을 쓴다(영문보다 훨씬 무겁다).
-  영문 단어 첫 글자 0.5, 이후 글자 0.25 = 영문 약 4글자당 1토큰, 짧은 단어도 최소 0.5토큰.
-  숫자 1자리                          = 0.5토큰. 토크나이저에 따라 한 자리씩 또는 몇 자리씩 묶는다.
-  문장부호·기호 1자                   = 1토큰, 바로 앞과 같은 기호가 이어지면 0.25('---', '|||' 등).
-  그 밖의 문자(라틴 확장·키릴 등)     = 0.5토큰, 공백·줄바꿈 = 0.
-  청크의 추정 토큰은 가중치 합의 올림이다. 특수 토큰(BOS/EOS, 지시문)은 넣지 않는다.
-  실제 값은 게이트웨이 응답의 usage.prompt_tokens로 표본을 재어 비교할 수 있다.
+토큰은 대상 PC에 토크나이저가 없어 문자별 가중치로 추정한다. 다국어 BPE/SentencePiece에서 한글은 음절당
+대략 0.4~1.0토큰인데, 한도 초과를 놓치지 않도록 한글·한자·가나는 보수적으로 1토큰으로 센다.
 """
 from bisect import bisect_left, bisect_right
 from collections import Counter
@@ -50,7 +33,7 @@ class ChunkingError(ValueError):
 
 
 class NeedsEmbedding(ChunkingError):
-    """의미 기반 청킹에 아직 캐시에 없는 문장 임베딩이 필요하다. 사용자가 누른 요청에서만 모델을 부른다."""
+    """의미 기반 청킹에 아직 캐시에 없는 문장 임베딩이 필요하다."""
 
     def __init__(self, missing: int, total: int):
         super().__init__(f"문장 창 {total:,}개 중 {missing:,}개의 임베딩이 아직 없습니다.")
@@ -68,7 +51,7 @@ def _cjk(o: int) -> bool:
 
 
 def token_weights(text: str) -> list[float]:
-    """문자별 추정 토큰 가중치(모듈 설명 참고). 합이 추정 토큰 수다."""
+    """문자별 추정 토큰 가중치. 합이 추정 토큰 수다."""
     out: list[float] = []
     append = out.append
     prev = ""
@@ -147,7 +130,7 @@ def _lines(text: str) -> list[tuple[int, int, str]]:
 
 
 def parse_blocks(text: str) -> list[Block]:
-    """ATX 제목, 코드 울타리, 파이프 표, 문단을 원문 위치와 함께 나눈다. 빈 줄은 블록 사이 간격이다."""
+    """ATX 제목, 코드 울타리, 파이프 표, 문단을 원문 위치와 함께 나눈다."""
     lines = _lines(text)
     n = len(lines)
     blocks: list[Block] = []
@@ -243,7 +226,7 @@ class Element:
     caption: str | None = None
     empty: bool | None = None
     alt: str = ""
-    block: Block | None = None   # table: 머리행·행 위치(parse_blocks와 같은 규칙)
+    block: Block | None = None   # table: 머리행·행 위치
     header: list = field(default_factory=list)  # table: 머리행 칸
     items: int = 0               # list: 항목 수
     level: int = 0               # heading: 단계
@@ -279,7 +262,7 @@ def _short(text: str, limit: int) -> str:
 
 
 def _line_kinds(lines: list) -> tuple[list[str], dict]:
-    """줄마다 종류를 정한다. 코드 울타리·$$ 수식 안은 code, 반복되는 짧은 일반 줄과 쪽 번호는 furniture."""
+    """줄마다 종류를 정한다."""
     n = len(lines)
     kinds = [""] * n
     code: dict[int, tuple[int, bool]] = {}
@@ -333,7 +316,7 @@ def _line_kinds(lines: list) -> tuple[list[str], dict]:
 
 
 def _line_pages(lines: list, kinds: list[str], line_pages: list | None) -> list:
-    """줄마다 쪽 번호. <!-- page N --> 표시가 있으면 그것을, 없으면 저장된 결과의 줄→쪽 정보를 앞으로 채워 쓴다."""
+    """줄마다 쪽 번호."""
     n = len(lines)
     pages: list = [None] * n
     marks = [i for i in range(n) if kinds[i] == "page"]
@@ -436,7 +419,7 @@ def parse_elements(text: str, pages_by_line: list | None = None) -> tuple[list[E
                 if nxt < n and kinds[nxt] == "item":
                     j, items = nxt, items + 1
                 elif nxt < n and kinds[nxt] == "plain":
-                    j = nxt  # 항목에 이어지는 줄
+                    j = nxt
                 elif nxt + 1 < n and kinds[nxt] == "blank" and kinds[nxt + 1] == "item":
                     j, items = nxt + 1, items + 1
                 else:
@@ -450,7 +433,7 @@ def parse_elements(text: str, pages_by_line: list | None = None) -> tuple[list[E
             add("text", i, j)
             i = j + 1
 
-    # 캡션: 표·그림 바로 앞뒤(빈 줄 하나 이내)의 짧은 '그림 N'·'표 N' 문단
+    # 캡션 연결
     def adjacent(a: Element, b: Element) -> bool:
         gap = text[a.end:b.start]
         return not gap.strip() and gap.count("\n") <= 2
@@ -484,7 +467,6 @@ def parse_elements(text: str, pages_by_line: list | None = None) -> tuple[list[E
                 stack.pop()
             stack.append((el.level, el.title))
         el.path = tuple(t for _, t in stack)
-    # 번호: 문서가 캡션으로 번호를 매겼으면 그 번호를 쓰고 캡션 없는 것은 번호 없이 둔다(겹침 방지). 캡션이 하나도 없으면 순서 번호.
     numbered = {kind: any(el.kind == kind and isinstance(el.caption, Element) for el in raw) for kind in counters}
     for el in raw:
         if el.kind in counters:
@@ -524,7 +506,7 @@ def parse_elements(text: str, pages_by_line: list | None = None) -> tuple[list[E
 # ---------------------------------------------------------------- 원문 분석
 
 class Source:
-    """한 문서의 분석 결과. 여러 전략이 함께 쓴다. 누적 합으로 구간 길이를 O(1)에 잰다."""
+    """한 문서의 분석 결과. 여러 전략이 함께 쓴다."""
 
     def __init__(self, text: str, pages_by_line: list | None = None):
         if not isinstance(text, str):
@@ -614,7 +596,7 @@ _ABBREVIATIONS = {"e.g", "i.e", "vs", "no", "rev", "fig", "dr", "mr", "ms", "st"
 
 
 def sentence_bounds(text: str, s: int, e: int) -> list[int]:
-    """한국어 문장 끝(다./요./?/!/. 뒤 공백)과 줄바꿈 위치. 목록 번호(1. )와 흔한 약어(Rev. 등)는 끊지 않는다."""
+    """한국어 문장 끝과 줄바꿈 위치."""
     out = []
     for m in _SENT.finditer(text, s, e):
         punct = text[m.start()]
@@ -626,7 +608,7 @@ def sentence_bounds(text: str, s: int, e: int) -> list[int]:
             word = text[j:k]
             line_start = text.rfind("\n", s, k) + 1 if text.rfind("\n", s, k) >= 0 else s
             if word.isdigit() and len(word) <= 3 and not text[max(line_start, s):j].strip():
-                continue  # "1. 항목" 형태의 목록 번호
+                continue
             if word.lower() in _ABBREVIATIONS or (len(word) == 1 and word.isupper()):
                 continue
         out.append(m.end())
@@ -801,16 +783,15 @@ class _SemUnit:
 
 
 def semantic_units(src: Source) -> list[_SemUnit]:
-    """문장 단위. 표·코드는 통째 한 단위로 두고 앞뒤를 경계로 삼는다. 제목(연달아 나온 제목 포함)은 다음 문장이나 표 앞에 붙고 새 절을 시작한다."""
+    """의미 기반 청킹의 문장 단위."""
     units: list[_SemUnit] = []
     heading_start: int | None = None
     for block in src.blocks:
         if block.kind == "heading":
-            if heading_start is None:  # 제목이 연달아 나오면(2장 → 2.1절) 함께 다음 문장 앞에 붙인다
+            if heading_start is None:
                 heading_start = block.start
             continue
         if block.kind in ("table", "code"):
-            # 표·코드 바로 위 제목은 표와 함께 둔다(제목만 따로 떨어진 청크를 만들지 않게).
             units.append(_SemUnit(heading_start if heading_start is not None else block.start, block.end, atomic=True, hard=True, block=block))
             heading_start = None
             continue
@@ -825,13 +806,11 @@ def semantic_units(src: Source) -> list[_SemUnit]:
             first = False
     if heading_start is not None:
         units.append(_SemUnit(heading_start, src.n, hard=True))
-    # 표 바로 위·아래 캡션('표 1. …')은 표와 한 덩어리로 둔다.
     is_caption = lambda u: not u.atomic and any(el.kind == "caption" for el in src.elements_near(u.s, u.e))  # noqa: E731
     merged: list[_SemUnit] = []
     for u in units:
         if u.atomic and u.block is not None and u.block.kind == "table":
-            # 표 위에 제목이 붙어 있으면(새 절) 그 앞 캡션은 앞 절의 것이다. 쪼개진 캡션('표 1.' / 설명)은 모두 붙이고,
-            # 제목에서 시작한 조각까지 붙이면 멈춘다.
+            # 표 위에 제목이 붙어 있으면 그 앞 캡션은 앞 절의 것이다. 쪼개진 캡션은 제목에서 시작한 조각까지 붙인다.
             if u.s >= u.block.start:
                 while merged and is_caption(merged[-1]):
                     prev = merged.pop()
@@ -846,14 +825,13 @@ def semantic_units(src: Source) -> list[_SemUnit]:
 
 
 def _noise(src: Source, u: _SemUnit) -> bool:
-    """쪽 표시(<!-- page N -->)와 반복 머리말·쪽 번호. 뜻 비교에서 빼고 앞 청크에 그대로 붙인다."""
+    """쪽 표시(<!-- page N -->)와 반복 머리말·쪽 번호."""
     el = src.element_at(u.s)
     return (el is not None and el.kind == "furniture") or bool(_PAGE_MARK.match(src.text[u.s:u.e]))
 
 
 def _windows(src: Source, units: list[_SemUnit], ids: list[int], buffer: int) -> tuple[list[str], list[int]]:
-    """내용 문장마다 같은 절 안의 앞뒤 buffer개 문장을 이은 글, 그리고 문장마다 절 번호.
-    표·코드·제목이 끼면 다른 절로 본다(창이 넘어가지 않는다)."""
+    """내용 문장마다 같은 절 안의 앞뒤 buffer개 문장을 이은 글, 그리고 문장마다 절 번호."""
     seg, current = [], 0
     for k, i in enumerate(ids):
         if k and any(units[m].hard or units[m].atomic for m in range(ids[k - 1] + 1, i + 1)):
@@ -896,8 +874,6 @@ def _semantic(src: Source, p: dict, embed) -> tuple[list[_Piece], dict]:
     vectors = embed(windows) if windows else []
     if len(vectors) != len(windows):
         raise ChunkingError("임베딩 응답 수가 문장 수와 다릅니다.")
-    # 같은 절 안에서 이어지는 두 내용 문장 사이의 거리. 경계는 뒤 문장 앞에 두고, 사이의 머리말은 앞 청크에 남는다.
-    # 그림과 캡션, 한 캡션의 조각('그림 1.' / 설명) 사이는 나누지 않는다.
     figure = {"image", "caption"}
     kind = {i: getattr(src.element_at(units[i].s), "kind", None) for i in text_ids}
     gaps: dict[int, float] = {}
@@ -924,8 +900,6 @@ def _semantic(src: Source, p: dict, embed) -> tuple[list[_Piece], dict]:
     if cur:
         groups.append((cur, False))
 
-    # 최소 크기보다 작은 묶음은 같은 절의 다음 묶음과, 안 되면 앞 묶음과 합친다(최대 크기를 넘지 않을 때만).
-    # 쪽 표시·반복 머리말만 든 묶음은 절·표와 상관없이 앞 묶음에(문서 맨 앞이면 뒤 묶음에) 붙인다.
     measure = lambda a, b: src.measure(a[0].s, b[-1].e, unit)  # noqa: E731
     noise_only = lambda group: all(_noise(src, u) for u in group)  # noqa: E731
     forward: list[tuple[list[_SemUnit], bool]] = []
@@ -958,7 +932,7 @@ def _semantic(src: Source, p: dict, embed) -> tuple[list[_Piece], dict]:
             piece = _Piece(s, e)
         elif len(group) == 1 and group[0].atomic and group[0].block is not None and group[0].block.kind == "table":
             table = group[0].block
-            if s < table.start:  # 표 위 제목
+            if s < table.start:
                 pieces.append(_Piece(s, table.start))
             pieces += _table_pieces(src, table, unit, size, size)
             _cap(pieces)
@@ -975,7 +949,7 @@ def _semantic(src: Source, p: dict, embed) -> tuple[list[_Piece], dict]:
 
 
 def _table_pieces(src: Source, table: Block, unit: str, size: float, first_limit: float) -> list[_Piece]:
-    """표를 행 단위로 나눈다. 두 번째 조각부터 머리행을 반복한다. 한 행이 너무 길면 그 행만 다시 나눈다."""
+    """표를 행 단위로 나눈다. 두 번째 조각부터 머리행을 반복한다."""
     rows = table.rows
     if not rows:
         return _recursive(src, table.start, table.end, unit, size, 0, level=1)
@@ -1046,7 +1020,7 @@ def _markdown(src: Source, unit: str, size: float, merge_small: bool, min_size: 
         for idx, block in enumerate(sec.blocks):
             limit = size
             if idx == 0 and head:
-                # 제목이 첫 조각과 함께 들어가도록 그만큼 덜어 낸다. 제목이 지나치게 길면 포기한다.
+                # 제목이 첫 조각과 함께 들어가도록 그만큼 덜어 낸다.
                 reserved = src.measure(head.start, block.start, unit)
                 limit = size - reserved if size - reserved >= size * 0.3 else size
             if src.measure(block.start, block.end, unit) <= limit:
@@ -1080,7 +1054,7 @@ def _markdown(src: Source, unit: str, size: float, merge_small: bool, min_size: 
     merged: list[_Piece] = []
     for p in pieces:
         prev = merged[-1] if merged else None
-        # 제목만 있는 절은 뒤의 하위 절과 합쳐지도록 본문이 있는 앞 청크에는 붙이지 않는다(제목끼리는 이어 붙인다).
+        # 제목만 있는 절은 본문이 있는 앞 청크에 붙이지 않는다(뒤의 하위 절과 합쳐지게).
         if prev is not None and prev.whole and p.whole and (p.content or not prev.content) and src.measure(prev.s, p.e, unit) <= size \
                 and (src.measure(prev.s, prev.e, unit) < min_size or src.measure(p.s, p.e, unit) < min_size):
             parent = prev.last_path[:-1]
@@ -1098,13 +1072,6 @@ def _markdown(src: Source, unit: str, size: float, merge_small: bool, min_size: 
 
 
 # ---------------------------------------------------------------- 요소 인식 전략
-#
-# 표: whole 통째 한 청크(캡션+머리행+행, size를 넘으면 rows처럼 나눈다) / rows 행 table_rows개씩, 조각마다 머리행 반복
-#     / row_text 행마다 '열이름: 값, …' 문장으로 바꿔 size까지 묶는다. attach_caption이면 조각마다 캡션을 붙인다.
-# 그림: drop 청크를 만들지 않는다(캡션은 일반 문단으로 남는다) / caption '[그림] 캡션·대체 텍스트' 청크.
-#     글자 없는 그림(대체 텍스트·캡션 없음)은 어느 쪽이든 청크가 없다.
-# 반복 머리말·쪽 번호: drop_furniture면 뺀다.
-# 표·그림은 문단과 한 청크에 섞지 않는다(element·parent_child). 바로 앞의 제목만은 표·그림 청크 앞에 붙인다.
 
 _ROLE_RANK = {"full": 4, "img": 3, "part-h": 2, "part": 1, "placeholder": 0}
 
@@ -1179,7 +1146,7 @@ def _table_unit(src: Source, el: Element, r0: int, r1: int, cap: Element | None,
 
 def _table_groups(src: Source, el: Element, policy: str, table_rows: int, unit: str, size: float, cap: Element | None,
                   lo: int, hi: int) -> list[tuple[int, int]]:
-    """표 행 범위 [lo, hi)를 정책에 맞는 행 묶음으로 나눈다. 한 행만으로 size를 넘으면 그 행 하나가 한 묶음이다."""
+    """표 행 범위 [lo, hi)를 정책에 맞는 행 묶음으로 나눈다."""
     if hi <= lo:
         return [(lo, hi)]
     text_mode = policy == "row_text"
@@ -1245,7 +1212,7 @@ def _element_units(src: Source, p: dict, size: float) -> tuple[list[_Unit], int]
 
 
 def _fit(src: Source, units: list[_Unit], p: dict, size: float) -> list[_Unit]:
-    """size를 넘는 단위를 나눈다. 문단은 재귀 분할, 표는 행 묶음(머리행 반복), 그림은 그대로 둔다."""
+    """size를 넘는 단위를 나눈다."""
     unit = p["unit"]
     out: list[_Unit] = []
     for u in units:
@@ -1279,7 +1246,7 @@ def _fit(src: Source, units: list[_Unit], p: dict, size: float) -> list[_Unit]:
 
 
 def _pack(units: list[_Unit], unit: str, size: float, overlap: float, by_kind: bool = True) -> list[list[_Unit]]:
-    """단위를 size까지 묶는다. by_kind면 표·그림은 따로 두고 제목이 나오면 새 청크를 연다(앞 청크가 제목뿐이면 이어 붙인다)."""
+    """단위를 size까지 묶는다."""
     groups: list[list[_Unit]] = []
     cur: list[_Unit] = []
     for u in units:
@@ -1381,7 +1348,7 @@ def _strip_span(text: str, s: int, e: int) -> tuple[int, int]:
 
 
 def _span_roles(src: Source, s: int, e: int, body: str, transformed: bool) -> dict:
-    """기준선 청크가 원문 범위로 덮는 요소와 그 정도. 표는 머리행이 함께 있는지, 그림은 캡션·대체 텍스트가 함께 있는지 본다."""
+    """기준선 청크가 원문 범위로 덮는 요소와 그 정도."""
     roles: dict[str, str] = {}
     for el in src.elements_near(s, e):
         if not src.has_text(max(s, el.start), min(e, el.end)):
@@ -1451,7 +1418,7 @@ def _int(value, default: int, name: str) -> int:
 
 
 def normalize_params(kind: str, params: dict | None) -> dict:
-    """범위를 벗어난 값은 가까운 허용값으로 맞춘다. 화면은 돌려받은 값을 그대로 보여 준다."""
+    """범위를 벗어난 값은 가까운 허용값으로 맞춘다."""
     if kind not in STRATEGY_KINDS:
         raise ChunkingError("알 수 없는 청킹 방식입니다.")
     params = params or {}
@@ -1639,7 +1606,7 @@ def summarize(src: Source, chunks: list[dict], limit_tokens: int | None = None) 
 
 
 def run_strategy(src: Source, spec: dict, limit_tokens: int | None = None, embed=None) -> dict:
-    """embed: 의미 기반 전략에만 쓰는 함수 texts → 벡터 목록. 없으면 의미 기반 전략은 오류를 낸다."""
+    """embed: 의미 기반 전략에만 쓰는 함수 texts → 벡터 목록."""
     strategy = normalize_strategy(spec)
     semantic = None
     if strategy["kind"] == "semantic":
@@ -1672,8 +1639,7 @@ def describe_source(src: Source) -> dict:
 # ---------------------------------------------------------------- 합성 예시
 #
 # Docling이 PDF·오피스 문서에서 뽑는 마크다운을 흉내 낸 가상의 문서다. 실제 조직·제품·설비·인물과 관계가 없다.
-# <!-- page N --> 는 쪽 경계(예시 전용 표기), <!-- image --> 는 Docling의 그림 자리 표시다(OCR이 꺼져 있으면 스캔 쪽도 빈 그림이 된다).
-# 쪽마다 머리말과 쪽 번호가 본문에 섞여 나오는 경우를 함께 넣었다.
+# <!-- page N --> 는 예시 전용 쪽 경계, <!-- image --> 는 Docling의 그림 자리 표시다(OCR이 꺼져 있으면 스캔 쪽도 빈 그림).
 
 _SOP_HEADER = "SOP-EX-0101 시료 보관 및 장비 점검 절차 Rev.3"
 SAMPLE_SOP = f"""<!-- page 1 -->
@@ -2079,7 +2045,7 @@ def _normalized(src: Source) -> tuple[str, list[int]]:
 
 
 def answer_offset(src: Source, answer: str) -> int | None:
-    """정답 문구가 처음 나오는 원문 위치(정답 문구 비교와 같은 정규화). 없으면 None."""
+    """정답 문구가 처음 나오는 원문 위치. 없으면 None."""
     phrase = _norm_phrase(answer)
     if not phrase:
         return None
@@ -2089,7 +2055,7 @@ def answer_offset(src: Source, answer: str) -> int | None:
 
 
 def infer_question_kind(src: Source, answer: str) -> str:
-    """정답이 표 안이면 table, 그림 대체 텍스트·그림 캡션이면 image, 그 밖(찾지 못한 경우 포함)은 text."""
+    """정답 위치로 질문 유형(table·image·text)을 정한다."""
     offset = answer_offset(src, answer)
     el = src.element_at(offset) if offset is not None else None
     if el is None:

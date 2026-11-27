@@ -1,11 +1,4 @@
-"""OpenAI 호환 모델 연결 설정과 연결 확인. 표준 라이브러리만 사용한다.
-
-설정은 환경변수(또는 프로젝트 루트의 .env)에서 읽는다.
-  MODEL_BASE_URL, MODEL_API_KEY, MODEL_ID, MODEL_LABEL      첫 번째 연결
-  MODEL2_BASE_URL, MODEL2_API_KEY, MODEL2_ID, MODEL2_LABEL  두 번째 연결(선택)
-  MODEL_CA_BUNDLE   사내 인증서 묶음 경로(선택), MODEL_TIMEOUT 초 단위(기본 30)
-API 키는 응답·로그에 내보내지 않는다.
-"""
+"""OpenAI 호환 모델 연결 설정과 연결 확인. 표준 라이브러리만 사용한다. 환경변수 설명은 .env.example."""
 from dataclasses import dataclass
 import json
 import os
@@ -105,7 +98,6 @@ def check_chat(conn: ModelConnection) -> dict:
 
 
 def list_models(conn: ModelConnection) -> dict:
-    """게이트웨이가 제공하면 사용할 수 있는 모델 ID 목록을 가져온다."""
     started = time.monotonic()
     try:
         status, text = _call(conn, "GET", "/models")

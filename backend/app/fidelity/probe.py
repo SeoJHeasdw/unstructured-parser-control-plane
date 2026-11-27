@@ -1,11 +1,7 @@
 """원본 OOXML(DOCX·XLSX·PPTX)을 직접 읽어 파서가 흔히 잃는 정보의 인벤토리를 만든다.
 
-센 것: 보이는 글자의 특수기호(의도된 표기 기준: 기호 글꼴→유니코드, 바꿀 수 있는 첨자→유니코드 첨자),
-기호 글꼴·첨자 변환 가능 여부, 병합 셀, 떠 있는 글상자(표 위 메모 등), 흰색에 가까운 글자, 숨김 글자,
-그림 종류(래스터·SVG·메타파일)와 겹침(그룹 안·글상자 안·SVG 속 래스터), SVG 안의 벡터 글자.
-
 한계(현재): 스타일에서 상속한 글자색·테마 색은 보지 않는다(직접 서식만). 머리말·꼬리말·각주의 그림은 세지 않는다.
-PPTX는 배경색을 알 수 없어 저대비 판정을 하지 않는다. 그림 '속' 글자는 OCR 없이는 알 수 없다.
+PPTX는 배경색을 알 수 없어 저대비 판정을 하지 않는다.
 """
 import base64
 import binascii
@@ -467,7 +463,7 @@ def _probe_docx(archive: zipfile.ZipFile, inv: Inventory) -> None:
                 if section is not None:
                     prefix = f"{label} {posixpath.basename(target)} "
                     _Docx(archive, inv, target).walk(section, {"prefix": prefix, "section": label})
-        # 각주·미주: Docling 2.150.0은 각주 본문을 결과에 넣지 않는다. 본문에서 참조한 순서로 번호를 매겨 대조한다.
+        # Docling 2.150.0은 각주 본문을 결과에 넣지 않는다. 본문에서 참조한 순서로 번호를 매긴다.
         for kind, label in (("footnote", "각주"), ("endnote", "미주")):
             numbers: dict[str, int] = {}
             for ref in body.iter(q("w", f"{kind}Reference")):
@@ -617,7 +613,7 @@ def _probe_xlsx(archive: zipfile.ZipFile, inv: Inventory) -> None:
             elif kind in (None, "n"):
                 v = c.find(q("x", "v"))
                 if v is not None and v.text:
-                    values[ref] = v.text  # 병합 범위의 값 표시용. 숫자에는 특수기호가 없다.
+                    values[ref] = v.text  # 병합 범위 값 표시용(숫자라 특수기호 집계에서 뺀다)
                 continue
             if not text:
                 continue

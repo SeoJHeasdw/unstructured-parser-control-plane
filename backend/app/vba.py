@@ -1,7 +1,5 @@
-"""매크로 사용 Office 문서(XLSM·DOCM·PPTM)의 VBA 프로젝트(vbaProject.bin)를 읽는다. 매크로는 실행하지 않는다.
+"""매크로 사용 Office 문서(XLSM·DOCM·PPTM)의 VBA 프로젝트(vbaProject.bin)를 [MS-OVBA]대로 읽는다. 매크로는 실행하지 않는다.
 
-[MS-OVBA]의 dir 스트림에서 모듈 목록을 얻고, 모듈 스트림의 압축된 소스를 풀어 모듈 이름·종류·코드 줄 수와
-문서를 열 때 자동으로 도는 프로시저를 알려 준다. 소스 글은 구조 분석이 경로·URL·문서번호 후보를 찾는 데만 쓴다.
 p-code만 남기고 소스를 지운 프로젝트(VBA stomping)는 소스가 없는 모듈로 보인다. 표준 라이브러리만 쓴다.
 """
 import codecs
@@ -15,12 +13,12 @@ from app.cfb import CfbError, CompoundFile
 MAX_PROJECT = 32 * 1024 * 1024   # vbaProject.bin 크기 상한
 MAX_SOURCE = 4 * 1024 * 1024     # 모듈 하나의 풀린 소스 상한
 MAX_MODULES = 500
-# 문서를 열거나 닫을 때 저절로 도는 프로시저. 셀 값이 저장 시점 이후 매크로로 바뀌는 문서를 가려내는 데 쓴다.
+# 문서를 열거나 닫을 때 저절로 도는 프로시저 이름.
 AUTO_RUN = ("Auto_Open", "Workbook_Open", "AutoOpen", "Document_Open", "AutoExec", "Auto_Close",
             "Workbook_BeforeClose", "AutoClose", "Document_Close", "Workbook_Activate")
 _AUTO = re.compile(r"^[ \t]*(?:(?:Public|Private|Friend)[ \t]+)?(?:Static[ \t]+)?(?:Sub|Function)[ \t]+(" +
                    "|".join(AUTO_RUN) + r")\b", re.I | re.M)
-# 코드 줄로 세지 않는 줄: 편집기가 넣는 속성 줄과 모듈 옵션(시트 모듈에도 자동으로 들어간다)
+# VBA 편집기가 자동으로 넣는 속성 줄과 모듈 옵션(시트 모듈에도 들어간다).
 _BOILERPLATE = re.compile(r"\s*(?:Attribute\s+VB_|Option\s+(?:Explicit|Base|Compare|Private\s+Module)\b)", re.I)
 
 
@@ -47,7 +45,7 @@ class Project:
 
     @property
     def code_modules(self) -> list[Module]:
-        """코드가 있는 모듈. Excel은 시트마다 빈 문서 모듈을 만들어 두므로 그런 모듈은 세지 않는다."""
+        """Excel은 시트마다 빈 문서 모듈을 만들어 둔다."""
         return [module for module in self.modules if module.code_lines]
 
     @property
@@ -137,7 +135,6 @@ def _codec(codepage: int) -> str:
 
 
 def read_project(data: bytes) -> Project:
-    """vbaProject.bin 바이트 → 모듈 목록과 소스."""
     if len(data) > MAX_PROJECT:
         raise VbaError("VBA 프로젝트가 크기 상한을 넘었습니다.")
     try:
@@ -199,7 +196,6 @@ def read_project(data: bytes) -> Project:
 
 
 def from_package(path_or_archive) -> Project | None:
-    """OOXML 패키지 안의 vbaProject.bin을 읽는다. 매크로 프로젝트가 없으면 None."""
     archive = path_or_archive if isinstance(path_or_archive, zipfile.ZipFile) else zipfile.ZipFile(path_or_archive)
     try:
         info = next((item for item in archive.infolist() if item.filename.lower().endswith("vbaproject.bin")), None)
@@ -214,7 +210,7 @@ def from_package(path_or_archive) -> Project | None:
 
 
 def parse_notes(path) -> list[str]:
-    """파싱 결과에 남길 매크로 경고. 매크로 코드는 결과 본문에 넣지 않는다(문서 내용이 아니라 동작이다)."""
+    """파싱 결과에 남길 매크로 경고."""
     try:
         project = from_package(path)
     except (VbaError, zipfile.BadZipFile, OSError, KeyError, ValueError):
@@ -223,7 +219,7 @@ def parse_notes(path) -> list[str]:
         return []
     stripped = sum(1 for module in project.modules if module.missing_source)
     if not project.code_modules and not stripped:
-        return []  # 빈 시트·통합문서 모듈만 있는 XLSM(매크로 없이 XLSM으로 저장한 파일)
+        return []
     note = (f"매크로 포함: VBA 모듈 {len(project.code_modules)}개(코드 {project.code_lines}줄)는 실행하지 않았고 결과 본문에 넣지 않았습니다. "
             "셀 값은 파일에 마지막으로 저장된 값입니다.")
     if project.auto_run:

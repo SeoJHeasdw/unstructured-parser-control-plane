@@ -1,15 +1,10 @@
-"""청크에 파싱 실행과 자동 대조 원장을 잇는다(파서 품질 검수 고도화 계획 §3.2.4).
-
-청크가 어느 실행의 어느 본문에서 나왔는지(run ID·본문 해시), 어느 원본 영역(쪽·시트)을 덮는지, 그 안에 해결되지 않은
-검수 항목이 있는지를 함께 남긴다. 사람의 판정은 청크까지 이어진다: '틀림'은 확인된 오류, '보류'는 미해결, '맞음'만 해결이다. '71 bar' 청크를 누르면 해당 원본 위치와 후보 값을 볼 수 있게 하는 근거다.
-청킹 벤치는 미검수 결과를 그대로 실험할 수 있다(막지 않는다). 검색용 발행 정책은 아직 정하지 않았다.
-"""
+"""청크에 파싱 실행과 자동 대조 원장을 잇는다."""
 from __future__ import annotations
 
 from bisect import bisect_right
 import hashlib
 
-MAX_FINDINGS = 2000      # 청크에 붙이는 의심점 수 상한(우선순위 순)
+MAX_FINDINGS = 2000      # 청크에 붙이는 의심점 수 상한
 MAX_PER_CHUNK = 12
 
 
@@ -33,8 +28,7 @@ def _span(starts: list[int], length: int, first: int, last: int) -> tuple[int, i
 
 
 def annotate(results: list[dict], text: str, findings: list[dict], locations: list[dict] | None) -> None:
-    """results(전략별 결과)의 청크마다 regions(쪽·시트)와 qc(겹치는 검수 항목: 의심점·검수 요청과 사람 판정)를 붙인다.
-    판정 '틀림'이 있으면 'confirmed-wrong', 보류·확인 전·판정 없음이 있으면 'unverified' 표시. '맞음'으로 해결된 것은 오지 않는다."""
+    """results(전략별 결과)의 청크마다 regions(쪽·시트)와 qc(겹치는 검수 항목과 사람 판정)를 붙인다."""
     starts = _line_starts(text)
     spans = []
     for spot in findings[:MAX_FINDINGS]:
@@ -68,9 +62,9 @@ def annotate(results: list[dict], text: str, findings: list[dict], locations: li
                                       "open": sum(1 for status in statuses if status not in ("wrong", "unclear"))}
                 flags = set(chunk["flags"])
                 if chunk["qc_counts"]["wrong"]:
-                    flags.add("confirmed-wrong")   # 사람이 원문 대조로 틀렸다고 확인한 곳
+                    flags.add("confirmed-wrong")
                 if chunk["qc_counts"]["unclear"] or chunk["qc_counts"]["open"]:
-                    flags.add("unverified")        # 보류·확인 전·판정 없음: 미해결
+                    flags.add("unverified")
                 chunk["flags"] = sorted(flags)
             covered: list[dict] = []
             for s, e, label in regions[:bisect_right(region_starts, end)]:

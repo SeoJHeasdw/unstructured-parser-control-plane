@@ -1,8 +1,4 @@
-"""모델 연결: 상태 보기, 화면에서 저장·되돌리기, 사용자가 누른 경우에만 실행하는 연결 확인.
-
-생성 모델은 primary·secondary 두 자리, 임베딩은 embed 한 자리다. 저장값은 app.connection_store가 실행 폴더에 둔다.
-API 키는 받기만 하고 응답에는 설정 여부(api_key_set)만 넣는다.
-"""
+"""모델 연결: 상태 보기, 화면에서 저장·되돌리기, 사용자가 누른 경우에만 실행하는 연결 확인."""
 from fastapi import APIRouter, Body, HTTPException, Request
 
 from app.connection_store import CHAT_KEYS, ConnectionStore, StoreError, clean_models, clean_ocr_patch, clean_patch, clean_url
@@ -75,7 +71,6 @@ def _draft(request: Request, body: dict) -> tuple[str, ModelConnection]:
         raise HTTPException(400, str(exc)) from None
     if not url:
         raise HTTPException(400, "Base URL을 입력하세요.")
-    # 키를 새로 넣지 않았으면 저장된 키로 확인한다(다시 입력하지 않아도 되게).
     if body.get("clear_api_key") is True:
         key = ""
     elif isinstance(body.get("api_key"), str) and body["api_key"].strip():
@@ -86,7 +81,6 @@ def _draft(request: Request, body: dict) -> tuple[str, ModelConnection]:
 
 
 def _ocr_draft(request: Request, body: dict) -> OcrConnection:
-    """저장 전 값으로 만든 OCR 연결. 키를 새로 넣지 않았으면 저장된 키를 쓴다."""
     try:
         patch = clean_ocr_patch(body)
     except StoreError as exc:
@@ -113,7 +107,6 @@ def draft_test(request: Request, body: dict = Body(...)):
 @router.post("/draft/models")
 def draft_models(request: Request, body: dict = Body(...)):
     if isinstance(body, dict) and body.get("kind") == "ocr":
-        # OCR 모델 ID를 고르기 위한 목록: 모델 ID는 아직 비어 있어도 된다.
         try:
             url = clean_url(body.get("base_url"))
         except StoreError as exc:

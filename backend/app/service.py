@@ -43,7 +43,6 @@ PREPARE_FALLBACK_WARNING = "기호·첨자 보정 사본을 파싱하지 못해 
 _WORK_PREFIX = "docops-prep-"
 
 def _review_ref(review: dict) -> dict:
-    """청크·목록에 싣는 검수 요청 요약(V번호·판정·메모·위치)."""
     return {"id": review["id"], "status": review["status"], "comment": review.get("comment"), "origin": review.get("origin"),
             "page": review.get("page"), "sheet": review.get("sheet"), "cell": review.get("cell"), "line": review.get("line"),
             "decided_at": review.get("decided_at")}
@@ -59,9 +58,7 @@ class InvalidName(Exception): pass
 def clean_name(filename: str | None) -> tuple[str, str]:
     if not filename:
         raise InvalidName("파일명이 필요합니다.")
-    # The supplied name is display metadata only, never a storage path.
     name = filename.replace("\\", "/").split("/")[-1]
-    # macOS 분해형 한글(NFD)은 조합형으로, 방향 제어 글자는 제거한다. ℃·±·− 같은 기호는 그대로 둔다.
     name = display_name("".join(c for c in name if ord(c) >= 32 and ord(c) != 127)).strip()
     if not name or name in {".", ".."}:
         raise InvalidName("유효한 파일명이 필요합니다.")
@@ -82,14 +79,13 @@ class DocumentService:
         self._stopping = threading.Event()
         self._jobs: Queue[tuple[str, str] | None] = Queue(maxsize=max(1, settings.max_pending_jobs))
         self._worker: threading.Thread | None = None
-        # 원본 글자(원본은 문서마다 바뀌지 않는다)를 잠시 둔다. 자동 대조 결과는 원장(qc_runs·qc_findings)에 둔다.
+        # 원본은 문서마다 바뀌지 않으므로 읽은 원본 글자를 잠시 캐시한다.
         self._cache_lock = threading.Lock()
         self._sources: OrderedDict[tuple, SourceText] = OrderedDict()
-        # 자동 대조 계산은 한 번에 하나(같은 실행을 두 요청이 동시에 계산하지 않게, PDF 네이티브 호출도 겹치지 않게).
+        # 자동 대조는 한 번에 하나: 같은 실행의 중복 계산과 PDF 네이티브 라이브러리 동시 호출을 막는다.
         self._qc_lock = threading.Lock()
-        # 사용자가 지정한 원천 계약(CSV 구분자·인코딩). 접수한 실행 ID → 옵션. 처리할 때 꺼내 실행에 기록한다.
+        # run_id → 사용자가 지정한 원천 계약
         self._run_options: dict[str, dict] = {}
-        # 대조 규칙(코드 지문)이 바뀐 뒤 기존 실행을 다시 대조하는 작업자와 진행 상황
         self._reverifier: threading.Thread | None = None
         self.reverify_state = {"state": "idle", "total": 0, "stale": 0, "done": 0, "failed": 0, "rule_version": qc.rule_key()}
 
@@ -121,7 +117,7 @@ class DocumentService:
             raise
 
     def _clear_work(self) -> None:
-        # 이전 프로세스가 비정상 종료하며 남긴 파싱용 사본만 지운다(이 서비스가 만든 이름만, 잠금을 얻은 뒤).
+        # 이 서비스가 만든 이름(_WORK_PREFIX)만, 잠금을 얻은 뒤 지운다.
         for leftover in self.settings.work.glob(_WORK_PREFIX + "*"):
             shutil.rmtree(leftover, ignore_errors=True)
 
@@ -152,14 +148,12 @@ class DocumentService:
             self._worker.join(timeout=5)
         if self._reverifier:
             self._reverifier.join(timeout=5)
-        # If parsing outlives shutdown, the worker retains the process lock until it exits.
-        # If the whole process exits first, the OS releases the lock and startup recovery runs.
+        # 파싱이 종료보다 오래 가면 작업자가 끝날 때 잠금을 푼다. 프로세스가 먼저 끝나면 OS가 잠금을 푼다.
         if (not self._worker or not self._worker.is_alive()) and (not self._reverifier or not self._reverifier.is_alive()):
             self._release_lock()
 
     def _reverify(self) -> None:
-        """현재 대조 규칙의 원장이 없는 최신 성공 실행을 다시 대조한다(규칙·코드가 바뀐 뒤 처음 시작할 때, 작업자가 대조 전에 멈췄을 때).
-        원본을 다시 읽어 대조만 한다(파싱·외부 호출 없음). 이전 규칙의 원장과 검수 요청(V번호·판정·메모)은 지우지 않는다."""
+        """현재 대조 규칙의 원장이 없는 최신 성공 실행을 다시 대조한다. 원본만 다시 읽는다(파싱·외부 호출 없음)."""
         state = self.reverify_state
         try:
             needed = self.repo.qc_needed(qc.rule_key())
@@ -197,7 +191,6 @@ class DocumentService:
                     else:
                         self.process(*job)
                 except Exception as exc:
-                    # Keep the worker alive if an unexpected task-level error occurs.
                     logger.error("Worker task failed (%s)", type(exc).__name__)
                     if job:
                         try:
@@ -244,7 +237,6 @@ class DocumentService:
             await file.close()
 
     def store_local(self, source: Path, origin: str) -> dict:
-        """이 컴퓨터의 파일을 서버가 직접 읽어 저장한다(허용 폴더에서 가져오기). 업로드와 같은 저장 규칙을 따른다."""
         name, extension = clean_name(source.name)
         doc_id = uuid4().hex
         suffix = f".{extension.lower()}" if extension else ""
@@ -271,7 +263,7 @@ class DocumentService:
             temp_path.unlink(missing_ok=True)
 
     def same_original(self, source: Path, candidates: list[dict], digest: str) -> dict | None:
-        """이름·크기가 같은 기존 문서 중 저장된 원본의 SHA-256까지 같은 것. 같은 파일을 두 번 저장하지 않는다."""
+        """candidates(이름·크기가 같은 기존 문서) 중 저장된 원본의 SHA-256까지 같은 것."""
         for doc in candidates:
             try:
                 path = self._source_path(doc)
@@ -290,7 +282,7 @@ class DocumentService:
         return self.get(doc_id), run_id
 
     def enqueue(self, doc_id: str, options: dict | None = None) -> dict:
-        """options: 사용자가 지정한 원천 계약(텍스트·CSV의 encoding, csv_delimiter). 다른 형식에는 쓰지 않는다."""
+        """options: 사용자가 지정한 원천 계약(텍스트·CSV의 encoding, csv_delimiter)."""
         with self._admission_lock:
             doc = self.get(doc_id)
             options = {key: value for key, value in (options or {}).items() if value not in (None, "")}
@@ -323,7 +315,6 @@ class DocumentService:
         committed = False
         try:
             doc = self.get(doc_id)
-            # Storage names originate from the server, never from the request's filename.
             source_name = doc["source_file"]
             if source_name != Path(source_name).name or not source_name.startswith(doc_id):
                 raise ParserError("저장된 파일 경로를 확인할 수 없습니다.")
@@ -332,11 +323,9 @@ class DocumentService:
             if self.parsers.parser_name(extension) is None:
                 from app.structure import FAMILY
                 if extension in FAMILY:
-                    # 구조 분석만 되는 형식: 본문 파서가 없다는 것과, 보호(암호·DRM) 여부는 확인하지 않았다는 것을 함께 알린다.
                     raise UnsupportedFormat("이 형식은 본문 파서가 없습니다. 하위 문서·링크는 문서 상세의 '구조·참조'에서 구조 분석으로 볼 수 있습니다"
                                             "(암호·보호 여부는 확인하지 않았습니다).")
                 raise UnsupportedFormat("이 파일 형식은 아직 처리 경로가 없습니다.")
-            # 확장자가 아니라 내용으로 먼저 확인한다: DRM 래핑·암호·형식 불일치는 파서 오류로 뭉뚱그리지 않는다.
             gate = check_format(path, extension, self.settings.drm_signatures, self.settings.max_upload_bytes)
             if not gate.passed:
                 raise ParserError(gate.message or "파일 형식을 확인할 수 없습니다.", code=gate.code)
@@ -368,8 +357,7 @@ class DocumentService:
                             logger.warning("Fidelity check skipped (%s)", type(exc).__name__)
                             warnings.append(FIDELITY_FAILED_WARNING)
                         if extension in WORKBOOKS:
-                            # 매크로는 실행하지 않는다. 있으면 셀 값이 저장 시점의 값이라는 것을 결과에 남긴다.
-                            # (이름만 .xlsx로 바꾼 매크로 통합문서도 같은 경고를 받는다)
+                            # 이름만 .xlsx로 바꾼 매크로 통합문서도 같은 경고를 받는다.
                             warnings.extend(macro_notes(path))
                         if not markdown.strip():
                             raise ParserError("Office 본문·그림에서 글자를 추출하지 못했습니다. " + " ".join(warnings[:2]), code="no_text")
@@ -401,19 +389,17 @@ class DocumentService:
             if temp_path:
                 temp_path.unlink(missing_ok=True)
         if committed:
-            # 같은 작업자가 이어서 자동 대조 원장을 만든다(사용자가 시작한 처리의 일부, 외부 호출 없음). 실패해도 파싱 결과는 그대로다.
             try:
                 self.ensure_qc(doc_id, run_id)
             except Exception as exc:  # noqa: BLE001 — 원장은 '미평가'로 남고 조회할 때 다시 계산한다
                 logger.info("QC after parse skipped (%s)", type(exc).__name__)
 
     def _parse(self, path: Path, extension: str, options: dict | None = None):
-        """(파싱 결과, 사본 보정 통계 | None, 경고). OOXML은 원본 대신 보정 사본을 파서에 넣는다."""
+        """(파싱 결과, 사본 보정 통계 | None, 경고)."""
         if options:
             return self.parsers.parse(path, extension, options), None, []
         if extension not in OOXML_FORMATS:
             return self.parsers.parse(path, extension), None, []
-        # 사본을 만들기 전에 압축 폭탄·위험 경로를 거른다.
         self.parsers.docling.check_office_archive(path)
         if not self.settings.ooxml_prepare:
             return self.parsers.parse(path, extension), None, []
@@ -464,8 +450,7 @@ class DocumentService:
 
     # ------------------------------------------------------------ 원본 글자·자동 대조
     def source_text(self, doc_id: str, dialect: dict | None = None) -> tuple[dict, SourceText]:
-        """파서와 별개로 읽은 원본 글자(app/source_text.py). 읽을 수 없는 형식·손상 파일은 Conflict.
-        dialect: 텍스트·CSV에서 그 실행이 쓴 인코딩·구분자(실행에 기록된 계약으로 다시 읽는다)."""
+        """파서와 별개로 읽은 원본 글자(app/source_text.py). dialect: 그 실행에 기록된 인코딩·구분자."""
         doc, path = self.original(doc_id)
         key = (doc_id, (dialect or {}).get("encoding"), (dialect or {}).get("delimiter"))
         with self._cache_lock:
@@ -501,7 +486,7 @@ class DocumentService:
         return run
 
     def ensure_qc(self, doc_id: str, run_id: str) -> dict:
-        """그 실행의 자동 대조 원장(현재 규칙 버전). 없거나 '미평가'면 지금 계산해 저장한다. 원본을 읽을 수 없으면 Conflict."""
+        """그 실행의 자동 대조 원장(현재 규칙 버전)."""
         ledger = self.repo.qc_run(doc_id, run_id, qc.rule_key())
         if ledger and ledger["state"] == "done":
             return json.loads(ledger["result"])
@@ -533,8 +518,7 @@ class DocumentService:
     def verify(self, doc_id: str, run_id: str | None = None, *, severity: list[str] | None = None, unit: str | None = None,
                kind: list[str] | None = None, order: str = "priority", offset: int = 0, limit: int = MAX_SPOTS,
                unreviewed: bool = False) -> dict:
-        """파싱 결과를 원본 글자와 자동 대조한 원장. 의심점(S번호)은 우선순위 순으로 한 쪽씩 준다(전체 수와 다음 쪽 위치 포함).
-        판정이 아니라 사람이 볼 곳의 후보다. gate는 사람 판정까지 합친 문서 상태(검수 필요·판정 불가·통과 후보)."""
+        """파싱 결과를 원본 글자와 자동 대조한 원장(판정이 아니라 사람이 볼 곳의 후보)."""
         doc = self.get(doc_id)
         run = self._run_for(doc_id, run_id)
         header = self.ensure_qc(doc_id, run["run_id"])
@@ -563,9 +547,7 @@ class DocumentService:
                 "is_latest": bool(run["is_latest"]), "document_status": doc["status"]}
 
     def chunk_findings(self, doc_id: str, run_id: str, limit: int) -> tuple[list[dict], dict]:
-        """청크에 붙일 검수 항목: 원장 의심점 중 사람이 '맞음'으로 해결하지 않은 것(판정이 있으면 V번호·판정·메모를 붙임)과,
-        의심점 없이 올린 검수 요청 중 결과 줄이 있고 '맞음'이 아닌 것. '틀림'은 확인된 오류, '보류'·확인 전은 미해결로 남긴다.
-        순서: 틀림 → 보류 → 확인 전 → 판정 없음(각각 우선순위 순). (항목, 판정 상태)를 돌려준다."""
+        """청크에 붙일 검수 항목('맞음'이 아닌 것)과 문서 판정 상태(gate)."""
         data = self.verify(doc_id, run_id, limit=1)
         reviews = self.repo.run_reviews(doc_id, run_id)
         by_finding: dict[str, dict] = {}
@@ -593,7 +575,7 @@ class DocumentService:
         return entries, data.get("gate") or {}
 
     def finding(self, doc_id: str, run_id: str | None, ref: str) -> dict:
-        """원장의 의심점 하나(S번호 또는 finding ID). 상세 목록에서 잘린 고위험 항목도 바로 열 수 있다."""
+        """원장의 의심점 하나(S번호 또는 finding ID)."""
         self.get(doc_id)
         run = self._run_for(doc_id, run_id)
         self.ensure_qc(doc_id, run["run_id"])
@@ -606,7 +588,7 @@ class DocumentService:
 
     @staticmethod
     def _qc_state(row: dict) -> str | None:
-        """목록·깔때기용 문서 판정 상태(최신 성공 실행, 사람 판정 합침). gate와 같은 순서: 검수 필요 → 판정 불가 → 통과 후보."""
+        """목록·깔때기용 문서 판정 상태(최신 성공 실행, 사람 판정 합침)."""
         if not row["result_file"]:
             return None
         if row["qc_state"] in (None, "pending"):
@@ -620,20 +602,17 @@ class DocumentService:
         return "undetermined" if row["blocking"] else "pass_candidate"
 
     def qc_summary(self) -> dict:
-        """처리 깔때기: 반입 전체 → 파싱 완료 → 자동 대조 → 판정 상태. 마지막 단계만 보고 처리율을 말하지 않도록 분모를 함께 준다.
-        판정 상태는 문서마다 최신 성공 실행 기준이고, 사람 판정(맞음·틀림·보류·열림)을 합친다(gate와 같은 규칙)."""
+        """처리 깔때기: 반입 전체 → 파싱 완료 → 자동 대조 → 판정 상태. 마지막 단계만 보고 처리율을 말하지 않도록 분모를 함께 준다."""
         rows = self.repo.qc_overview(qc.rule_key())
         out = {"rule_version": qc.rule_key(), "documents": len(rows), "parsed": 0, "qc_done": 0, "qc_pending": 0,
                "qc_unavailable": 0, "states": {state: 0 for state in ("needs_review", "undetermined", "pass_candidate")},
                "not_parsed": {}, "human_decided": 0, "processing": 0, "qc_stale": 0, "reverify": dict(self.reverify_state)}
-        out["previous_results"] = {}  # 지금 처리 중이거나 실패했지만 이전 성공본은 있는 문서(상태별). 현재 판정 수에 넣지 않는다.
+        out["previous_results"] = {}
         for row in rows:
             if row["status"] == "processing":
                 out["processing"] += 1
             state = self._qc_state(row)
             if state is not None and row["status"] != "completed":
-                # 이전 성공본의 판정은 그 실행에 남아 있지만(상세·원문 대조에서 '이전 성공본'), 지금 유효한 결과가 아니다.
-                # 현재 처리 결과로 세면 재처리에 실패한 문서가 통과 후보로 남는다(2026-11-27 리뷰).
                 out["previous_results"][row["status"]] = out["previous_results"].get(row["status"], 0) + 1
                 state = None
             if state is None:
@@ -645,7 +624,7 @@ class DocumentService:
             if state == "pending":
                 out["qc_pending"] += 1
                 if row["stale"]:
-                    out["qc_stale"] += 1  # 이전 규칙의 원장만 있다: 다시 대조할 실행
+                    out["qc_stale"] += 1
                 continue
             if state == "unavailable":
                 out["qc_unavailable"] += 1
@@ -677,7 +656,6 @@ class DocumentService:
             label = "규칙 변경 · 다시 대조 대기" if state == "pending" and row and row["stale"] else qc.STATE_LABELS.get(state, "")
             previous = bool(state) and doc["status"] != "completed"
             if previous:
-                # 지금 처리 중·실패: 판정은 이전 성공본의 것이다. 상태 이름에 붙여 현재 결과와 구별한다.
                 label = f"이전 성공본 · {label}"
             doc["qc"] = {"state": state, "label": label, "previous": previous, "wrong": (row["reviews"].get("wrong", 0) if row else 0),
                          "unresolved": max(0, (row["spots_total"] or 0) - row["resolved"]) if row and state not in (None, "pending", "unavailable") else None} if state else None
@@ -697,7 +675,6 @@ class DocumentService:
         if ref:
             if not fields["run_id"]:
                 raise Conflict("성공한 파싱 결과가 없어 자동 대조 지점을 찾을 수 없습니다.")
-            # 화면 상세 목록(한 쪽)이 아니라 원장 전체에서 찾는다: 우선순위 밖으로 잘린 지점도 검수 요청이 된다.
             spot = self.finding(doc["id"], fields["run_id"], ref)
             fields["spot"], fields["finding_id"], fields["rule_version"] = spot["key"], spot["id"], spot["rule_version"]
             for key, value in (("kind", spot["kind"]), ("severity", spot["severity"]), ("page", spot["page"]),
@@ -731,7 +708,7 @@ class DocumentService:
             raise Conflict("저장된 실행 결과를 읽을 수 없습니다.") from exc
 
     def inspect(self, doc_id: str) -> dict:
-        """원본을 바꾸지 않고 구조(하위 문서·링크)를 분석해 결과를 보관한다. 사용자가 요청할 때만 실행한다."""
+        """구조(하위 문서·링크)를 분석해 결과를 보관한다."""
         doc = self.get(doc_id)
         result = inspect_file(self._source_path(doc), doc["name"], Budget(signatures=self.settings.drm_signatures))
         payload = {"id": doc_id, "name": doc["name"], "format": doc["format"], "inspected_at": now(), **result}

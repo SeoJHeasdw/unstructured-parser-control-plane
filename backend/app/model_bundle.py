@@ -1,10 +1,5 @@
 """PDF 모델 ZIP: huggingface.co에 접속되는 PC에서 묶고, 막힌 PC에서 검증한 뒤 설치한다.
 
-- 묶기(`scripts/prepare-offline.py --models-only`): 레이아웃·표 모델 폴더와 파일별 크기·SHA-256을 적은 manifest.json.
-- 설치(`setup --models <ZIP 또는 폴더>`): manifest와 대조하며 임시 파일에 쓴 뒤 바꿔 넣는다. 모델 캐시 폴더를
-  손으로 압축한 ZIP(manifest 없음)도 받되, 이때는 크기만 확인한다.
-- 이미 있는 모델 파일은 지우거나 덮어쓰지 않는다. 내용이 같으면 건너뛰고, 다르면 설치 전체를 멈추고 알린다.
-  빈 파일(받다 만 흔적)만 바꿔 쓴다.
 표준 라이브러리만 쓴다(설치 스크립트가 가상환경 밖에서도 부른다).
 """
 from dataclasses import dataclass, field
@@ -45,7 +40,6 @@ def _sha256(handle) -> str:
 
 
 def _model_files(root: Path) -> list[str]:
-    """모델 폴더 아래 파일의 상대 경로(숨김 제외)."""
     found = []
     for directory in MODEL_DIRS:
         top = root / directory
@@ -59,7 +53,7 @@ def _model_files(root: Path) -> list[str]:
 
 
 def pack(source: Path, output: Path, docling_version: str | None = None) -> dict:
-    """source(모델 캐시 폴더) → output ZIP. 빠진 필수 파일이 있으면 묶지 않는다."""
+    """source(모델 캐시 폴더) → output ZIP."""
     names = _model_files(source)
     missing = [name.as_posix() for name in PDF_FILES if name.as_posix() not in names
                or (source / name).stat().st_size == 0]
@@ -149,10 +143,7 @@ def _manifest(source: _Source) -> dict | None:
 
 
 def install(path: Path, target: Path) -> Installed:
-    """ZIP·폴더의 모델을 target(콘솔이 모델을 찾는 폴더)에 설치한다.
-
-    빠진 파일·크기 불일치·기존 파일과의 충돌은 쓰기 전에 멈춘다. 쓰는 중 SHA-256이 다르면 그 파일에서 멈추며,
-    이미 쓴 파일은 확인을 통과한 것이라 그대로 둔다."""
+    """ZIP·폴더의 모델을 target(콘솔이 모델을 찾는 폴더)에 설치한다. SHA-256이 다르면 그 파일에서 멈추고 이미 쓴 파일은 그대로 둔다."""
     path = Path(path).expanduser()
     if not path.exists():
         raise BundleError(f"모델 ZIP이나 폴더가 없습니다: {path}")

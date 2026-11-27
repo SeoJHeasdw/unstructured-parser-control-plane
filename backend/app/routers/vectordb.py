@@ -1,7 +1,4 @@
-"""벡터 DB 읽기 전용 탐색 API. 예시 데이터(example)와 Milvus REST v2(milvus)를 같은 형태로 돌려준다.
-
-목록·설명·통계·조회·저장된 벡터로 검색만 한다. Milvus 토큰은 응답에 나오지 않는다.
-"""
+"""벡터 DB 읽기 전용 탐색 API. 예시 데이터(example)와 Milvus REST v2(milvus)를 같은 형태로 돌려준다."""
 from typing import Callable
 from urllib.parse import urlsplit
 
@@ -12,7 +9,6 @@ from app import vectordb as vdb
 
 
 def _local_only(request: Request) -> None:
-    """외부 DB로 요청이 나가는 경로라 로컬 화면에서 온 요청만 받는다."""
     origin = request.headers.get("origin")
     if not origin:
         return

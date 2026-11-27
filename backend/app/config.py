@@ -11,7 +11,6 @@ _PROJECT = Path(__file__).resolve().parents[2]
 
 
 def load_dotenv(path: Path = _PROJECT / ".env") -> None:
-    """프로젝트 루트 .env를 읽는다. 이미 설정된 환경변수는 덮어쓰지 않는다."""
     try:
         lines = path.read_text(encoding="utf-8-sig").splitlines()
     except OSError:
@@ -37,11 +36,8 @@ class Settings:
     docling_artifacts: Path | None = None
     models: tuple[ModelConnection, ...] = ()
     static_dir: Path | None = None
-    # 실제 파일에서 확인한 DRM 머리말. 형식: '제품=hex:0A0B; 제품=ascii:TAG' (format_gate 참고)
     drm_signatures: tuple[DrmSignature, ...] = ()
-    # OOXML 파싱 전 사본에서 기호 글꼴·첨자를 유니코드로 바꾼다. 원본은 바꾸지 않는다.
     ooxml_prepare: bool = True
-    # 서버 시작 때 현재 대조 규칙의 원장이 없는 최신 성공 실행을 백그라운드에서 다시 대조한다(원본을 다시 읽기만 하고 파싱·외부 호출 없음).
     qc_reverify: bool = True
 
     max_csv_output_bytes: int = 100 * 1024 * 1024
@@ -69,7 +65,7 @@ class Settings:
 
     @property
     def runtime_id(self) -> str:
-        """같은 저장소를 쓰는 서버인지 알아보는 표식. 실행기와 작업 도구(MCP)가 포트를 찾을 때 비교한다."""
+        """실행기와 작업 도구(MCP)가 같은 저장소의 서버를 찾을 때 비교하는 표식."""
         return runtime_id(self.runtime_dir)
 
     @property
@@ -86,7 +82,6 @@ class Settings:
 
     @property
     def work(self) -> Path:
-        """파싱용 임시 사본. 처리 중에만 존재한다."""
         return self.runtime_dir / "work"
 
     @property

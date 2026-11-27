@@ -1,7 +1,6 @@
 """검수 요청(V번호): 사람이 원문 대조 화면에서 눈으로 확인할 곳과 그 판정(맞음·틀림·보류).
 
-작업 에이전트(flag 도구)와 화면(자동 대조 지점에 판정을 남길 때)이 만든다. 판정은 화면에서 사람이 남긴다.
-로컬 화면 Origin만 받는 규칙(LocalRequestGuard, /api/live/)을 그대로 따른다.
+판정은 화면에서 사람이 남긴다.
 """
 from fastapi import APIRouter, HTTPException, Query, Request
 

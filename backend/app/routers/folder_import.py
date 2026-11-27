@@ -1,4 +1,4 @@
-"""허용 폴더에서 가져오기: 브라우저는 상대 경로만 보내고, 서버가 허용 폴더의 파일을 직접 읽어 저장한다(파싱은 따로)."""
+"""허용 폴더에서 가져오기 API."""
 from pathlib import Path, PurePosixPath
 
 from fastapi import APIRouter, HTTPException, Query, Request
@@ -72,7 +72,7 @@ def import_entries(request: Request, root: int = Query(0, ge=0), path: str = Que
 
 @router.post("", response_model=ImportResult)
 def import_files(body: ImportRequest, request: Request):
-    """고른 파일을 로컬 저장소에 복사한다. 같은 원본(이름·크기·SHA-256)이 이미 있으면 그 문서를 돌려준다. 파싱은 시작하지 않는다."""
+    """고른 파일을 로컬 저장소에 복사한다. 같은 원본(이름·크기·SHA-256)이 이미 있으면 그 문서를 돌려준다."""
     base = _root(body.root)
     service = request.app.state.documents
     max_bytes = request.app.state.settings.max_upload_bytes

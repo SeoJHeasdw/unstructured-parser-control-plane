@@ -1,9 +1,6 @@
 """화면에서 저장한 모델 연결(생성 모델·임베딩)을 실행 폴더에 보관하고 .env 값 위에 덮어쓴다.
 
-- 파일: <runtime>/settings/connections.json (POSIX에서는 0600). 소스 저장소에 들어가지 않는다.
 - 저장한 항목만 덮어쓴다. 비워 둔 항목은 .env·환경변수 값을 그대로 쓴다.
-- API 키는 저장만 하고 응답에는 '설정됨' 여부만 내보낸다.
-- 서버를 다시 시작하지 않아도 다음 요청부터 반영된다.
 """
 from __future__ import annotations
 
@@ -70,7 +67,6 @@ def clean_models(value) -> list[str]:
 
 
 def clean_patch(body: dict, embed: bool) -> dict:
-    """화면에서 보낸 값 → 저장할 값. api_key: 문자열이면 바꾸고, clear_api_key면 비우고, 없으면 그대로 둔다."""
     if not isinstance(body, dict):
         raise StoreError("설정 형식이 올바르지 않습니다.")
     patch: dict = {"label": _text(body.get("label"), "이름", 40), "base_url": clean_url(body.get("base_url"))}
@@ -86,7 +82,6 @@ def clean_patch(body: dict, embed: bool) -> dict:
 
 
 def clean_ocr_patch(body: dict) -> dict:
-    """OCR 모델 연결 저장값. 지시문은 비우면 기본값을 쓴다."""
     if not isinstance(body, dict):
         raise StoreError("설정 형식이 올바르지 않습니다.")
     patch = {"label": _text(body.get("label"), "이름", 40), "base_url": clean_url(body.get("base_url")),
@@ -149,7 +144,6 @@ class ConnectionStore:
 
     # ---------------------------------------------------------- 적용
     def environ(self, base=None) -> dict:
-        """환경변수 + 저장값. 임베딩·생성 모델 연결 코드가 이 값을 읽는다."""
         env = dict(os.environ if base is None else base)
         data = self.read()
         for slot, prefix in CHAT_KEYS.items():
@@ -174,7 +168,6 @@ class ConnectionStore:
         return env
 
     def chat_connections(self, startup: tuple[ModelConnection, ...]) -> list[ModelConnection]:
-        """서버 시작 때 읽은 연결 위에 저장값을 덮는다. 저장만 한 보조 연결도 목록에 넣는다."""
         data = self.read()
         by_key = {conn.key: conn for conn in startup}
         out = []
@@ -204,5 +197,4 @@ def active() -> ConnectionStore | None:
 
 
 def effective_environ() -> dict:
-    """저장소가 켜져 있으면 저장값을 덮은 환경, 아니면 환경변수 그대로."""
     return _ACTIVE.environ() if _ACTIVE else dict(os.environ)

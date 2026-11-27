@@ -1,11 +1,6 @@
 """통합문서(XLSX·XLSM) 네이티브 차트: 계열마다 차트에 저장된 표시값(numCache)과 참조한 원본 셀을 대조할 재료.
 
-numCache는 그 계열이 마지막으로 표시된 값이다(Microsoft OpenXML 'NumberingCache'). 셀 값과 캐시는 한 파일 안의 다른
-저장 표현이라, 서로 다르면 모델 없이도 '차트에 보이는 값'과 '셀 값'의 충돌을 찾을 수 있다. 실제 Excel이 다시 계산했을 때
-화면에 어느 값이 보일지는 확인하지 않는다(파일에 저장된 두 표현만 본다).
-
-해석 범위: 같은 통합문서 안의 연속 범위(한 행 또는 한 열). 여러 영역·외부 통합문서·이름 정의 참조는 '해석 못 함'으로 남긴다.
-문서 관계(통합문서 → 시트 → 그리기 → 차트)를 따라 차트가 놓인 시트를 찾는다.
+numCache는 그 계열이 마지막으로 표시된 값이다(OpenXML NumberingCache). 파일에 저장된 두 표현만 비교하고, Excel이 다시 계산한 화면 값은 확인하지 않는다.
 """
 from __future__ import annotations
 
@@ -42,8 +37,7 @@ def column_name(index: int) -> str:
 
 
 def resolve(formula: str | None) -> tuple[str, list[str]] | None:
-    """'Meter'!$B$2:$B$3 → ('Meter', ['B2', 'B3']). 한 행·한 열 연속 범위만(앞 MAX_POINTS개). 해석할 수 없으면 None.
-    범위 전체의 점 수는 ref_size()."""
+    """'Meter'!$B$2:$B$3 → ('Meter', ['B2', 'B3']). 해석할 수 없으면 None."""
     match = _REF.fullmatch((formula or "").strip())
     if not match:
         return None
@@ -144,7 +138,7 @@ def read_charts(path) -> list[dict]:
                     cached_name = (tx.findtext(f".//{_c('v')}") or "").strip()
                     name_formula = (tx.findtext(f".//{_c('f')}") or "").strip()
                     label = cached_name or name_formula
-                    name_ref = resolve(name_formula) if name_formula and not cached_name else None  # 이름 캐시가 없으면 셀에서 읽는다
+                    name_ref = resolve(name_formula) if name_formula and not cached_name else None
                 values = ser.find(_c("val"))
                 if values is None:
                     values = ser.find(_c("yVal"))

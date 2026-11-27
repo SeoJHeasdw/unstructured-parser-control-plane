@@ -50,7 +50,7 @@ def _calls(path: Path, limit: int) -> list[dict]:
 
 @router.get("/activity")
 def activity(request: Request, limit: int = Query(200, ge=1, le=2000)):
-    """작업 에이전트가 남긴 묶음·호출 기록과, 에이전트가 다룬 문서(검수 요청 수 포함). 읽기만 한다."""
+    """작업 에이전트가 남긴 묶음·호출 기록과, 에이전트가 다룬 문서(검수 요청 수 포함)."""
     root = request.app.state.settings.runtime_dir / "agent"
     repo = request.app.state.documents.repo
     documents = {doc["id"]: doc for doc in repo.list_all()}

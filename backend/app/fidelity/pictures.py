@@ -11,7 +11,6 @@ class PictureOcr:
         self.ocr = ocr
         self.budget = ImageBudget()
         self.cache = {}
-        # low_confidence: 모델 OCR에는 믿을 만한 신뢰도 값이 없어 0으로 둔다(이전 형식 호환).
         self.stats = {"attempted": 0, "recognized": 0, "empty": 0, "failed": 0, "low_confidence": 0}
         self.errors: list[str] = []
 
