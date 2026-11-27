@@ -39,13 +39,14 @@ class ParserRegistry:
     def routes(self) -> dict[str, str]:
         return {extension: self.parser_name(extension) or parser for extension, parser in PARSER_BY_EXTENSION.items()}
 
-    def parse(self, path: Path, extension: str) -> ParsedDocument:
+    def parse(self, path: Path, extension: str, options: dict | None = None) -> ParsedDocument:
+        """options: 텍스트·CSV의 원천 계약(encoding, csv_delimiter). 다른 형식은 받지 않는다(서비스가 미리 거른다)."""
         if extension == "SVG":
             return parse_svg(path, self.settings)
         if extension in IMAGE_FORMATS:
             return parse_image(path, extension, self.settings)
         if extension in TEXT_FORMATS:
-            return self.text.parse(path, extension)
+            return self.text.parse(path, extension, options)
         if extension == "PDF" and not self.pdf_models_ready():
             from app.adapters.pdf_text import parse_pdf_text
             return parse_pdf_text(path, self.settings)

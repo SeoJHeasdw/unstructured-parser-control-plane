@@ -67,6 +67,11 @@ class SourceText:
     units: list[SourceUnit]
     notes: list[str] = field(default_factory=list)
     truncated: bool = False
+    # CSV: 원본 레코드의 모든 칸(빈 칸 포함, 줄바꿈 그대로)과 읽은 계약(인코딩·구분자). 주소별 양방향 대조에 쓴다.
+    records: list[list[str]] | None = None
+    dialect: dict | None = None
+    # 대조 기준의 계통(source_layer): pdf_text_layer · ooxml_xml · xlsx_values · text · csv_records
+    layer: str = ""
 
     def unit(self, key: str) -> SourceUnit | None:
         return next((unit for unit in self.units if unit.key == key), None)
@@ -165,7 +170,7 @@ def _pdf(path, budget: _Budget) -> SourceText:
                     break
     except pdfium.PdfiumError as exc:
         raise SourceUnavailable("PDF의 글자 층을 열 수 없습니다(암호·손상).") from exc
-    return SourceText("PDF", "PDF 글자 층(pypdfium2, 파서와 별개로 읽음)", units, notes, budget.truncated)
+    return SourceText("PDF", "PDF 글자 층(pypdfium2, 파서와 별개로 읽음)", units, notes, budget.truncated, layer="pdf_text_layer")
 
 
 # ---------------------------------------------------------------- DOCX
@@ -268,7 +273,7 @@ def _docx(path, budget: _Budget) -> SourceText:
                 _DocxLines(archive, target, notes.lines, budget, prefix=f"{label} {number} ").walk(note, {})
         if notes.lines:
             units.append(notes)
-    return SourceText("DOCX", "Office XML 직접 읽기(파서와 별개)", units, [], budget.truncated)
+    return SourceText("DOCX", "Office XML 직접 읽기(파서와 별개)", units, [], budget.truncated, layer="ooxml_xml")
 
 
 # ---------------------------------------------------------------- PPTX
@@ -372,7 +377,7 @@ def _pptx(path, budget: _Budget) -> SourceText:
                 unit.kind, unit.note = "empty", "글자 없는 슬라이드(그림·도형만 있을 수 있음)"
             if budget.truncated:
                 break
-    return SourceText("PPTX", "Office XML 직접 읽기(파서와 별개)", units, notes_out, budget.truncated)
+    return SourceText("PPTX", "Office XML 직접 읽기(파서와 별개)", units, notes_out, budget.truncated, layer="ooxml_xml")
 
 
 # ---------------------------------------------------------------- XLSX·XLSM
@@ -475,39 +480,61 @@ def _xlsx(path, fmt: str, budget: _Budget) -> SourceText:
                 break
     finally:
         book.close()
-    return SourceText(fmt, "저장된 셀 값(openpyxl, 수식은 마지막 계산 값)", units, notes, budget.truncated)
+    return SourceText(fmt, "저장된 셀 값(openpyxl, 수식은 마지막 계산 값)", units, notes, budget.truncated, layer="xlsx_values")
 
 
 # ---------------------------------------------------------------- 텍스트·CSV
 
-def _text(path, fmt: str, settings, budget: _Budget) -> SourceText:
-    from app.adapters.text import TextAdapter, _delimiter
+def _text(path, fmt: str, settings, budget: _Budget, dialect: dict | None = None) -> SourceText:
+    """dialect: 그 실행의 파서가 쓴 계약(인코딩·구분자, parse_runs.evidence). 없으면 파서와 같은 규칙으로 고른다."""
+    from app.adapters.text import TextAdapter, sniff_csv
     adapter = TextAdapter(settings)
-    text = adapter.read_source(path, limit=MAX_CHARS + 1)
+    dialect = dialect or {}
+    encoding = dialect.get("encoding") or adapter.encoding_info(path)["encoding"]
+    try:
+        text = adapter.read_source(path, limit=MAX_CHARS + 1, encoding=encoding)
+    except (UnicodeDecodeError, LookupError) as exc:
+        raise SourceUnavailable(f"원본을 기록된 인코딩({encoding})으로 다시 읽을 수 없습니다.") from exc
     if len(text) > MAX_CHARS:
         text, budget.truncated = text[:MAX_CHARS], True
     unit = SourceUnit(key="body", label="본문")
+    records = None
+    used = None
     if fmt == "CSV":
-        delimiter = _delimiter(text[:32_768]) if ";" in text[:32_768] or "\t" in text[:32_768] else ","
+        delimiter = dialect.get("delimiter") or sniff_csv(text[:32_768])["delimiter"]
+        used = {"encoding": encoding, "delimiter": delimiter, "from_run": bool(dialect.get("delimiter"))}
+        records = []
         try:
-            for number, row in enumerate(csv.reader(io.StringIO(text, newline=""), delimiter=delimiter), start=1):
+            for number, row in enumerate(csv.reader(io.StringIO(text, newline=""), delimiter=delimiter, strict=True), start=1):
+                records.append(row)
                 values = [_clean(value) for value in row]
                 if not any(v.strip() for v in values):
                     continue
                 cells = [{"cell": f"{number}행 {index}열", "value": value, "alts": []} for index, value in enumerate(values, 1) if value.strip()]
                 unit.lines.append(SourceLine(text=" | ".join(values), ref=f"{number}행", row=number, cells=cells))
         except csv.Error as exc:
-            raise SourceUnavailable("CSV 원본의 따옴표·구분자를 읽을 수 없습니다.") from exc
+            if budget.truncated:
+                pass  # 잘린 끝의 따옴표: 앞부분만 대조한다(truncated)
+            else:
+                raise SourceUnavailable("CSV 원본의 따옴표·구분자를 읽을 수 없습니다.") from exc
     else:
         for number, line in enumerate(_clean(text).split("\n"), start=1):
             if line.strip():
                 unit.lines.append(SourceLine(text=line.rstrip(), ref=f"{number}줄"))
     method = "원본 텍스트(파서와 같은 인코딩 판별)" + (", CSV 칸" if fmt == "CSV" else "")
-    return SourceText(fmt, method, [unit], [], budget.truncated)
+    if fmt == "CSV":
+        method = f"원본 CSV 레코드({encoding}, 구분자 {_delimiter_name(used['delimiter'])}" + (", 실행에 기록된 계약" if used["from_run"] else "") + ")"
+    return SourceText(fmt, method, [unit], [], budget.truncated, records=records, dialect=used,
+                      layer="csv_records" if fmt == "CSV" else "text")
 
 
-def read_source(path, fmt: str, settings) -> SourceText:
-    """원본 글자. 읽을 수 없는 형식·손상 파일은 SourceUnavailable."""
+def _delimiter_name(delimiter: str) -> str:
+    from app.adapters.text import DELIMITERS
+    return DELIMITERS.get(delimiter, repr(delimiter))
+
+
+def read_source(path, fmt: str, settings, dialect: dict | None = None) -> SourceText:
+    """원본 글자. 읽을 수 없는 형식·손상 파일은 SourceUnavailable. dialect는 텍스트·CSV에서 그 실행의 인코딩·구분자."""
     fmt = (fmt or "").upper()
     budget = _Budget()
     if fmt == "PDF":
@@ -522,7 +549,7 @@ def read_source(path, fmt: str, settings) -> SourceText:
             raise SourceUnavailable("Office 원본을 열 수 없습니다(암호·손상·형식 불일치).") from exc
         return _xlsx(path, fmt, budget)
     if fmt in TEXT_FORMATS:
-        return _text(path, fmt, settings, budget)
+        return _text(path, fmt, settings, budget, dialect)
     if fmt in IMAGE_FORMATS or fmt == "SVG":
         raise SourceUnavailable("이미지 원본에는 읽을 글자 층이 없습니다. 원문 대조 화면에서 사람이 원본 그림과 결과를 대조해야 합니다.")
     raise SourceUnavailable("이 형식은 원본 글자를 직접 읽는 방법이 없습니다. 원본 파일을 열어 확인해 주세요.")

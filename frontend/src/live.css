@@ -212,3 +212,24 @@
 /* 글자 없음: 실패가 아닌 중립 상태 */
 .lw-status.is-no_text { color: var(--ink-3); }
 .lw-message.is-neutral { color: var(--ink-2); background: var(--surface-3); border-left-color: var(--rule-strong); }
+
+/* 처리 상태 칸: 파싱 상태 아래에 자동 대조 판정 상태(완료 문서) */
+.lw-status-cell { display: grid; justify-items: start; gap: 4px; min-width: 0; }
+/* 더 보기(서버 쪽 목록) */
+.lw-more { display: flex; justify-content: center; padding: 14px 16px 18px; border-top: 1px solid #e6eae8; }
+.lw-more .lw-btn small { color: var(--lw-muted); font-size: 12px; font-weight: 500; }
+
+/* 처리 깔때기: 반입 전체 → 파싱 완료 → 자동 대조 → 판정 상태 */
+.qc-funnel { margin: 0 0 16px; padding: 12px 16px 10px; border: 1px solid var(--lw-border); border-radius: 12px; background: #fbfcfb; }
+.qc-funnel ol { display: flex; flex-wrap: wrap; align-items: stretch; gap: 6px 4px; margin: 0; padding: 0; list-style: none; }
+.qc-funnel li { display: flex; align-items: center; gap: 4px; }
+.qc-funnel-arrow { color: var(--ink-4); flex: none; }
+.qc-funnel-step, .qc-funnel-state { display: grid; gap: 1px; min-width: 76px; padding: 4px 10px; border-radius: 8px; }
+.qc-funnel-step small, .qc-funnel-state small { color: var(--lw-muted); font-size: 11.5px; font-weight: 650; }
+.qc-funnel-step b, .qc-funnel-state b { color: var(--ink-1); font-size: 18px; line-height: 1.25; }
+.qc-funnel-step em { color: var(--lw-muted); font-size: 11.5px; font-style: normal; }
+.qc-funnel-states { flex-wrap: wrap; }
+.qc-funnel-state.is-needs_review { background: var(--bad-soft); } .qc-funnel-state.is-needs_review b { color: var(--bad); }
+.qc-funnel-state.is-undetermined { background: var(--warn-soft); } .qc-funnel-state.is-undetermined b { color: var(--warn); }
+.qc-funnel-state.is-pass_candidate { background: var(--ok-soft); } .qc-funnel-state.is-pass_candidate b { color: var(--ok); }
+.qc-funnel p { margin: 6px 0 0; color: var(--lw-muted); font-size: 12px; }

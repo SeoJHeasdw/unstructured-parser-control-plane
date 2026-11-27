@@ -78,6 +78,13 @@ def live(tmp_path, monkeypatch):
             ops.close()
 
 
+def _forget_qc(runtime) -> None:
+    import sqlite3
+    with sqlite3.connect(runtime / "documents.sqlite3") as conn:
+        conn.execute("DELETE FROM qc_findings")
+        conn.execute("DELETE FROM qc_runs")
+
+
 def call(ops: Ops, name: str, **args) -> str:
     text, _ = ops.call(name, args)
     return text
@@ -496,6 +503,7 @@ def test_verify_source_flag_and_verdicts_close_the_review_loop(live):
     call(ops, "parse", target="D1")  # 다시 파싱하면 원래대로 돌아오므로, 새 실행 결과를 다시 흉내 낸다
     latest = max((live["runtime"] / "results").glob("*.md"), key=lambda path: path.stat().st_mtime)
     latest.write_text(latest.read_text(encoding="utf-8").replace("±0.5", "0.5"), encoding="utf-8")
+    _forget_qc(live["runtime"])  # 파싱 직후 만든 원장은 바꾸기 전 결과로 계산됐다: 원장을 비워 바꾼 결과로 다시 대조하게 한다
     flagged = call(ops, "verify", id="D1")
     assert "의심 1곳(높음 1" in flagged and "S1 [높음] 2줄 → 결과 줄 2" in flagged, flagged
     assert "원본: 허용 오차 ±0.5 °C" in flagged and "결과: 허용 오차 0.5 °C" in flagged

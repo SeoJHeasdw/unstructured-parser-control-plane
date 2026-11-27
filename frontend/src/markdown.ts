@@ -18,7 +18,20 @@ export type Block =
   | { kind: 'rule'; line: number }
   | { kind: 'quote'; text: string; line: number };
 
-const HEADING = /^(#{1,6})\s+(.*?)\s*#*\s*$/;
+/** CommonMark ATX 제목: 0~3칸 들여쓰기, # 1~6개, 그 뒤 공백·탭(또는 줄 끝). '#LOT-7'·'    # 코드'는 제목이 아니다. */
+const HEADING = /^ {0,3}(#{1,6})(?:[ \t]+(.*?))?[ \t]*$/;
+/** 닫는 # 묶음: 앞에 공백·탭이 있을 때만(또는 내용 전체가 #일 때). '# C#'의 #은 글자다. '\###'은 이스케이프라 글자다. */
+const CLOSING = /(?:^|[ \t]+)#+[ \t]*$/;
+
+/** 한 줄이 ATX 제목이면 단계와 글(닫는 #을 뺀 것). 표·코드 안의 줄인지는 parseMarkdown이 가른다. */
+export function headingOf(line: string): { level: number; text: string } | null {
+  const match = HEADING.exec(line);
+  if (!match) return null;
+  let text = match[2] ?? '';
+  const closing = CLOSING.exec(text);
+  if (closing) text = text.slice(0, closing.index);
+  return { level: match[1].length, text: text.trim() };
+}
 const LIST = /^(\s*)([-*+]|\d{1,9}[.)])\s+(.*)$/;
 const SEPARATOR = /^\s*\|?\s*:?-{1,}:?\s*(\|\s*:?-{1,}:?\s*)*\|?\s*$/;
 const COMMENT = /^\s*<!--\s*([\s\S]*?)\s*-->\s*$/;
@@ -79,8 +92,8 @@ export function parseMarkdown(markdown: string): Block[] {
     }
     const image = IMAGE.exec(line);
     if (image) { blocks.push({ kind: 'figure', text: image[1], line: number }); i++; continue; }
-    const heading = HEADING.exec(line);
-    if (heading) { blocks.push({ kind: 'heading', level: heading[1].length, text: heading[2], line: number }); i++; continue; }
+    const heading = headingOf(line);
+    if (heading) { blocks.push({ kind: 'heading', level: heading.level, text: heading.text, line: number }); i++; continue; }
     if (isTableStart(lines, i)) {
       const header = splitRow(line);
       const align = splitRow(lines[i + 1]).map(alignOf);
@@ -166,17 +179,31 @@ export function displayWidth(text: string) {
 }
 
 export type TableLine = { role: 'head' | 'rule' | 'row'; cells: string[]; columns: string };
+/** 줄 단위 화면(원문 대조)이 쓰는 줄 해석. 읽기 보기와 같은 블록 해석기(parseMarkdown)에서 나온다. */
+export type LineKind = TableLine | { role: 'heading'; level: number; text: string } | { role: 'code' };
 
-/** 줄 번호 → 표 줄 정보. 원문 대조처럼 줄 단위로 보여 주는 곳에서 표 줄만 칸으로 그릴 때 쓴다. 같은 표의 줄은 같은 칸 너비를 쓴다. */
+/** 줄 번호 → 표 줄·제목 줄·코드 줄. 같은 표의 줄은 같은 칸 너비를 쓴다. 코드 블록 안의 '# …'은 제목이 아니다. */
+export function lineKinds(markdown: string): Map<number, LineKind> {
+  const result = new Map<number, LineKind>();
+  for (const block of parseMarkdown(markdown)) {
+    if (block.kind === 'heading') result.set(block.line, { role: 'heading', level: block.level, text: block.text });
+    else if (block.kind === 'code') {
+      const lines = block.text ? block.text.split('\n').length : 0;
+      for (let n = block.line; n <= block.line + lines + 1; n++) result.set(n, { role: 'code' });
+    } else if (block.kind === 'table') {
+      const widths = block.header.map((cell, c) => Math.min(40, Math.max(3, displayWidth(cell), ...block.rows.map(row => displayWidth(row[c] ?? '')))));
+      const columns = widths.map(w => `minmax(0, ${w}fr)`).join(' ');
+      result.set(block.line, { role: 'head', cells: block.header, columns });
+      result.set(block.line + 1, { role: 'rule', cells: [], columns });
+      block.rows.forEach((row, index) => result.set(block.line + 2 + index, { role: 'row', cells: row, columns }));
+    }
+  }
+  return result;
+}
+
+/** 줄 번호 → 표 줄 정보(lineKinds의 표 줄만). */
 export function tableLines(markdown: string): Map<number, TableLine> {
   const result = new Map<number, TableLine>();
-  for (const block of parseMarkdown(markdown)) {
-    if (block.kind !== 'table') continue;
-    const widths = block.header.map((cell, c) => Math.min(40, Math.max(3, displayWidth(cell), ...block.rows.map(row => displayWidth(row[c] ?? '')))));
-    const columns = widths.map(w => `minmax(0, ${w}fr)`).join(' ');
-    result.set(block.line, { role: 'head', cells: block.header, columns });
-    result.set(block.line + 1, { role: 'rule', cells: [], columns });
-    block.rows.forEach((row, index) => result.set(block.line + 2 + index, { role: 'row', cells: row, columns }));
-  }
+  for (const [line, kind] of lineKinds(markdown)) if (kind.role === 'head' || kind.role === 'rule' || kind.role === 'row') result.set(line, kind);
   return result;
 }

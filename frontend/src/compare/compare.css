@@ -383,6 +383,8 @@ button.compare-line-no:hover { background: var(--pane-mark); }
 .source-heading.is-h1 { font-size: 20px; }
 .source-heading.is-h2 { font-size: 16px; }
 .source-mark { color: var(--ink-4); font-weight: 500; }
+.source-level { display: inline-block; margin-right: 6px; padding: 0 4px; border-radius: 4px; background: var(--surface-3); color: var(--ink-4);
+  font-size: 10.5px; font-weight: 700; line-height: 1.5; vertical-align: middle; letter-spacing: .02em; }
 .source-line.is-rule { padding-block: 0; line-height: 1; }
 .source-line.is-rule > small { padding-top: 0; }
 .source-line.is-rule .source-cells-rule { height: 100%; border-inline: 1px solid var(--rule); }

@@ -62,9 +62,14 @@ TOOLS = [
      "description": "문서 하나의 상태, 실패 원인, 경고 원문, 처리 시간, 실행 이력과 원문 대조 링크를 보여 줍니다.",
      "inputSchema": {"type": "object", "required": ["id"], "properties": {"id": _ID}}, "annotations": _READ},
     {"name": "verify", "title": "원본과 자동 대조",
-     "description": ("파싱 결과를 원본 글자(파서와 별개로 읽음)와 자동 대조해 사람이 봐야 할 의심 지점(S번호)을 고릅니다: 바뀐 숫자, 빠진 줄·칸, "
-                     "빠진 기호(±, ℃ 등), 깨진 글자, 글자 층 없는 스캔 쪽(OCR 결과). 판정이 아니라 후보입니다. page·sheet로 단위를 좁힐 수 있습니다."),
-     "inputSchema": {"type": "object", "required": ["id"], "properties": {"id": _ID, "page": _PAGE, "sheet": _SHEET}}, "annotations": _READ},
+     "description": ("파싱 결과를 원본 글자(파서와 별개로 읽음)와 자동 대조한 원장에서 사람이 봐야 할 의심 지점(S번호)을 우선순위(높음 먼저) 순으로 20곳씩 보여 줍니다: "
+                     "바뀐 숫자, 빠진 줄·칸, 결과에만 있는 행·값, 빠진 기호(±, ℃ 등), 깨진 글자, 글자 층 없는 스캔 쪽(OCR 결과), 보이지 않는 글자 층. "
+                     "문서 판정 상태(검수 필요·판정 불가·통과 후보)도 알려 줍니다. 판정이 아니라 후보입니다. page·sheet로 단위를, severity로 심각도를 좁히고 "
+                     "offset으로 다음 20곳을 봅니다."),
+     "inputSchema": {"type": "object", "required": ["id"], "properties": {
+         "id": _ID, "page": _PAGE, "sheet": _SHEET,
+         "severity": {"type": "string", "enum": ["high", "medium", "low"], "description": "이 심각도만(선택)"},
+         "offset": {"type": "integer", "minimum": 0, "description": "앞 결과의 '나머지 …곳' 줄에 나온 offset(선택)"}}}, "annotations": _READ},
     {"name": "source", "title": "원본 읽기",
      "description": ("원본 파일의 글자를 파서와 별개로 직접 읽습니다(PDF 글자 층, Office XML, 시트 셀 값과 주소). page·sheet로 위치를, line으로 이어 읽기를, "
                      "find로 원본에서 글자 찾기를 합니다. 같은 위치의 파싱 결과(read)와 나란히 비교하세요. 스캔·이미지는 글자 층이 없다고 알려 줍니다."),
@@ -80,7 +85,7 @@ TOOLS = [
                      "결과에 콘솔 링크가 있습니다."),
      "inputSchema": {"type": "object", "required": ["id"], "properties": {
          "id": _ID,
-         "spot": {"type": "string", "description": "verify가 준 의심 지점 번호. 예: S3"},
+         "spot": {"type": "string", "description": "verify가 준 의심 지점 번호(S3) 또는 finding ID(F로 시작)"},
          "page": _PAGE, "sheet": _SHEET,
          "cell": {"type": "string", "description": "셀 주소(XLSX). 예: B5"},
          "line": {"type": "integer", "description": "파싱 결과의 줄 번호(read가 보여 준 줄 앞 숫자)"},

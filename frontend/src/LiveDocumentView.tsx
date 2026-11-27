@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { AlertCircle, ArrowLeft, BookOpen, CircleAlert, CircleDashed, Scissors, CircleCheck, CircleSlash, Clock3, Download, File, FileText, FileSpreadsheet, FileImage, FileArchive, Presentation, GitCompareArrows, LoaderCircle, Play, RefreshCw, TriangleAlert, Workflow } from 'lucide-react';
 import { getDocumentHistory, listParseRuns, liveSourceUrl } from './api/live';
-import type { HistoryEntry, LiveDoc, LiveResult, LiveStatus, ParseRun } from './api/live';
+import type { HistoryEntry, LiveDoc, LiveResult, LiveStatus, ParseRun, ProcessOptions } from './api/live';
+import { QcPanel } from './compare/QcGate';
 import { WorkspaceLink } from './WorkspaceLink';
 import type { DetailTab, WorkspaceRoute } from './navigation';
 import { Tabs } from './ui';
@@ -128,7 +129,8 @@ export function ResultBody({ markdown }: { markdown: string }) {
 type Props = {
   doc: LiveDoc; result: LiveResult | null; resultError: string; resultLoading: boolean; submittingId: string | null;
   onNavigate?: (route: WorkspaceRoute) => void;
-  onBack: () => void; onProcess: () => void; tab: DetailTab; onTab: (tab: DetailTab) => void; onCompare: () => void; onFamily?: () => void; onPickFile: () => void;
+  /** options: 텍스트·CSV의 원천 계약(구분자·인코딩). 없으면 파서가 고른다. */
+  onBack: () => void; onProcess: (options?: ProcessOptions) => void; tab: DetailTab; onTab: (tab: DetailTab) => void; onCompare: () => void; onFamily?: () => void; onPickFile: () => void;
 };
 
 export default function LiveDocumentView({ doc, result, resultError, resultLoading, submittingId, onBack, onProcess, onCompare, tab, onTab, onFamily, onPickFile, onNavigate }: Props) {
@@ -164,7 +166,7 @@ export default function LiveDocumentView({ doc, result, resultError, resultLoadi
       <div className="lw-head-actions">
         {result && onNavigate && <WorkspaceLink className="lw-btn" to={{page:'chunking', doc:doc.id}} onNavigate={onNavigate}><Scissors size={16}/>{result.is_stale ? '이전 성공본 청킹' : '청킹 비교'}</WorkspaceLink>}
         {hasComparison && <button className="lw-btn is-compare" onClick={onCompare}><GitCompareArrows size={17} />원문과 대조</button>}
-        {doc.status === 'unsupported' ? <a className="lw-btn" href="#detail-formats" onClick={() => { const node = document.querySelector<HTMLDetailsElement>('#detail-formats'); if (node) node.open = true; }}>지원 형식 보기</a> : replaceFile && failed ? <button className="lw-btn" onClick={onPickFile}>다른 파일 추가</button> : <button className={`lw-btn ${hasComparison ? '' : 'is-primary'}`} disabled={running || !!submittingId} onClick={onProcess}>
+        {doc.status === 'unsupported' ? <a className="lw-btn" href="#detail-formats" onClick={() => { const node = document.querySelector<HTMLDetailsElement>('#detail-formats'); if (node) node.open = true; }}>지원 형식 보기</a> : replaceFile && failed ? <button className="lw-btn" onClick={onPickFile}>다른 파일 추가</button> : <button className={`lw-btn ${hasComparison ? '' : 'is-primary'}`} disabled={running || !!submittingId} onClick={() => onProcess()}>
           {submitting || running ? <LoaderCircle size={16} className="live-spin" /> : doc.status === 'uploaded' ? <Play size={16} /> : <RefreshCw size={16} />}
           {submitting ? '접수 중' : running ? '처리 중 / 대기' : doc.status === 'uploaded' ? '파싱 실행' : '다시 파싱 실행'}
         </button>}
@@ -193,6 +195,7 @@ export default function LiveDocumentView({ doc, result, resultError, resultLoadi
               resultError ? <p className="lw-message is-error live-result-error" role="alert"><AlertCircle size={16} />{resultError}</p> :
               result ? <>
                 {result.is_stale && <div className="lw-message is-warning" role="status"><Clock3 size={17} /><div><strong>이전 성공 결과 · 현재 작업 결과 아님</strong>{latestTime && <time dateTime={latestTime}> · {displayDate(latestTime)}</time>}</div></div>}
+                <QcPanel doc={doc} onCompare={onCompare} onProcess={onProcess} busy={running || !!submittingId} />
                 {!!result.warnings.length && <div className="lw-message is-warning" role="alert"><TriangleAlert size={17} /><div><strong>파싱 경고</strong><ul>{result.warnings.map((warning, i) => <li key={i}>{warning}</li>)}</ul></div></div>}
                 {result.fidelity && <details className="lw-disclosure"><summary>원문 충실도 · 확인 항목 {result.fidelity.findings?.length ?? 0}개</summary>
                   {result.fidelity.findings?.length ? <ul>{result.fidelity.findings.map((f,i) => <li key={i}>{f.message}</li>)}</ul> : <p>기록된 확인 항목이 없습니다.</p>}</details>}

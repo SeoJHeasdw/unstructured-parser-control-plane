@@ -27,7 +27,7 @@ describe('허용 폴더에서 가져오기', () => {
   it('브라우저로 파일을 보내지 않고 경로만 보내며, 파싱은 사용자가 누를 때만 접수한다', async () => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const path = String(input);
-      if (path === '/api/live/documents') return json({ documents: [] });
+      if (path.split('?')[0] === '/api/live/documents') return json({ documents: [] });
       if (path === '/api/live/import/roots') return json(roots);
       if (path.startsWith('/api/live/import/entries')) {
         const params = new URL(path, 'http://x').searchParams;
@@ -79,7 +79,7 @@ describe('허용 폴더에서 가져오기', () => {
   it('허용 폴더가 없으면 설정 방법을 보여 준다', async () => {
     vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
       const path = String(input);
-      if (path === '/api/live/documents') return json({ documents: [] });
+      if (path.split('?')[0] === '/api/live/documents') return json({ documents: [] });
       if (path === '/api/live/import/roots') return json({ ...roots, roots: [], default: false, notes: ['허용 폴더가 없음: D:\\없음'] });
       throw new Error(path);
     }));

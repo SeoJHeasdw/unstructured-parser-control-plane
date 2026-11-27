@@ -40,14 +40,14 @@ function serve() {
       return json(review);
     }
     if (method !== 'GET') throw new Error(`예상하지 못한 요청 ${method} ${path}`);
-    if (path === '/api/live/documents') return json({ documents: [doc] });
+    if (path.split('?')[0] === '/api/live/documents') return json({ documents: [doc] });
     if (path === `/api/live/documents/${doc.id}`) return json(doc);
     if (path === `/api/live/documents/${doc.id}/runs`) return json({ runs: [{ run_id: RUN, completed_at: '2026-11-24T01:00:00Z', parser: 'pdf-text', parser_version: 'pypdfium2 5', ocr_enabled: false, is_latest: true }] });
     if (path === `/api/live/documents/${doc.id}/runs/${RUN}`) return json({ run_id: RUN, completed_at: '2026-11-24T01:00:00Z', parser: 'pdf-text', parser_version: 'pypdfium2 5',
       ocr_enabled: false, is_latest: true, markdown: ['줄 1', '줄 2', '줄 3', '줄 4', '검체 05 mL', '줄 6'].join('\n'), warnings: [],
       locations: [{ start_line: 1, end_line: 3, page: 1 }, { start_line: 4, end_line: 6, page: 2 }] });
     if (path.startsWith(`/api/live/reviews?doc=${doc.id}`)) return json({ reviews: saved, counts: {} });
-    if (path === `/api/live/documents/${doc.id}/verify?run=${RUN}`) return json(verify);
+    if (path.startsWith(`/api/live/documents/${doc.id}/verify?run=${RUN}`)) return json(verify);
     if (path.endsWith('/result')) return json({ id: doc.id, markdown: '줄 1', parser: 'pdf-text', parser_version: '5', is_stale: false, warnings: [] });
     return json({ detail: '없음' }, 404);
   });

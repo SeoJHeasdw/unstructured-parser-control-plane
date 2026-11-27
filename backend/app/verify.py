@@ -22,13 +22,18 @@ import math
 import re
 import unicodedata
 
+from app.adapters.text import DELIMITERS, decode_table
 from app.fidelity.report import SUPPLEMENT_MARK
+from app.qc import RULE_VERSION, assign_ids, priority, reason
 from app.source_text import SourceText, SourceUnit
 from app.textnorm import is_special
 
 SEVERITY = ("high", "medium", "low")
-MAX_SPOTS = 400
+MAX_SPOTS = 400            # 화면·에이전트가 한 번에 받는 상세 수(우선순위 순). 원장에는 전부 남는다.
+MAX_FINDINGS = 20_000      # 한 실행의 원장에 남기는 의심점 상한(넘으면 우선순위 높은 것부터 남기고 판정 불가)
 _LINE_SPOTS_PER_UNIT = 40
+_GRID_ROW_SPOTS = 200      # CSV 격자 대조에서 한 문서에 올리는 행 수
+_GRID_DIFF_ROWS = 20_000   # 행 정렬(diff)을 하는 최대 행 수(넘으면 차이 구간 첫 행부터 순서대로 비교)
 
 _HTML_COMMENT = re.compile(r"<!--.*?-->")
 _BR = re.compile(r"<br\s*/?>", re.IGNORECASE)
@@ -183,8 +188,14 @@ class _Index:
 
 
 class Verifier:
-    def __init__(self, source: SourceText, markdown: str, locations: list[dict], parser: str | None, fmt: str):
+    def __init__(self, source: SourceText, markdown: str, locations: list[dict], parser: str | None, fmt: str,
+                 evidence: dict | None = None):
         self.source, self.fmt, self.parser = source, fmt.upper(), parser or ""
+        self.evidence = evidence or {}
+        self.markdown = markdown
+        self.reasons: list[dict] = []   # 판정 근거(qc.reason): 통과 후보를 막는 것과 참고
+        self.checks: list[dict] = []    # 무엇을 어떤 근거로 검사했는지
+        self.contract = False           # 형식 계약(통과 후보 기준)을 모두 채웠는지
         # TXT·MD·LOG는 결과가 원본 글 그대로다: 원본 줄도 결과와 같은 기준(Markdown 꾸밈 제외)으로 본다.
         self.source_plain = result_plain if self.fmt in ("TXT", "MD", "LOG") else source_plain
         self.raw = markdown.split("\n")
@@ -277,7 +288,11 @@ class Verifier:
     def run(self) -> dict:
         furniture = self._furniture()
         for unit in self.source.units:
-            if self.fmt in ("XLSX", "XLSM") or (self.fmt == "CSV" and unit.lines and unit.lines[0].cells is not None):
+            if self.fmt == "CSV" and self.source.records is not None:
+                stats = self._check_csv_grid(unit)
+                if stats is None:
+                    stats = self._check_cells(unit)
+            elif self.fmt in ("XLSX", "XLSM") or (self.fmt == "CSV" and unit.lines and unit.lines[0].cells is not None):
                 stats = self._check_cells(unit)
             else:
                 stats = self._check_text(unit, furniture)
@@ -302,9 +317,20 @@ class Verifier:
         if self.source.truncated:
             self.notes.append("원본이 커서 앞부분만 대조했습니다.")
         self.notes.extend(self.source.notes)
-        rank = {name: i for i, name in enumerate(SEVERITY)}
-        ordered = sorted(enumerate(self.spots), key=lambda pair: (self._unit_order(pair[1]["unit"]), pair[1]["line"] or 0, pair[0]))
+        self._judge()
+        unit_rank = {unit.key: index for index, unit in enumerate(self.source.units)}
+        for spot in self.spots:
+            spot.setdefault("source_layer", self._layer_of(spot))
+        ordered = sorted(enumerate(self.spots), key=lambda pair: (unit_rank.get(pair[1]["unit"], len(unit_rank)), pair[1]["line"] or 0, pair[0]))
         spots = [entry for _, entry in ordered]
+        assign_ids(spots)
+        ranked = priority(spots, unit_rank)
+        dropped = 0
+        if len(spots) > MAX_FINDINGS:
+            keep = {id(entry) for entry in ranked[:MAX_FINDINGS]}
+            dropped = len(spots) - MAX_FINDINGS
+            spots = [entry for entry in spots if id(entry) in keep]
+            self.reasons.append(reason("findings_capped", f"의심점이 {len(spots) + dropped:,}곳이라 우선순위가 높은 {MAX_FINDINGS:,}곳만 원장에 남겼습니다."))
         for number, entry in enumerate(spots, start=1):
             entry["key"] = f"S{number}"
         counts = Counter(entry["severity"] for entry in spots)
@@ -315,10 +341,64 @@ class Verifier:
                    "coverage": round(matched / source_chars, 4) if source_chars else None,
                    "spots": len(spots), **{name: counts.get(name, 0) for name in SEVERITY},
                    "scan_units": sum(1 for u in self.units if u["kind"] == "scan")}
-        top = sorted(spots, key=lambda e: (rank[e["severity"]], self._unit_order(e["unit"]), e["line"] or 0))
-        return {"method": self.source.method, "format": self.fmt, "parser": self.parser, "summary": summary,
-                "units": self.units, "spots": spots[:MAX_SPOTS], "spots_total": len(spots),
-                "top": [entry["key"] for entry in top[:20]], "notes": self.notes}
+        top = sorted(spots, key=lambda e: e["rank"])
+        return {"method": self.source.method, "format": self.fmt, "parser": self.parser, "rule_version": RULE_VERSION,
+                "source_layer": self.source.layer, "summary": summary, "units": self.units, "spots": spots,
+                "spots_total": len(spots) + dropped, "top": [entry["key"] for entry in top[:20]], "notes": self.notes,
+                "reasons": self.reasons, "checks": self.checks, "contract": self.contract}
+
+    def _layer_of(self, spot: dict) -> str:
+        if spot["kind"] == "image_ocr" or spot["kind"] == "scan_ocr":
+            return "ocr_model"
+        unit = self.source.unit(spot.get("unit") or "")
+        if unit is not None and unit.kind == "hidden_text":
+            return "pdf_hidden_layer"
+        return self.source.layer
+
+    def _judge(self) -> None:
+        """판정 근거(통과 후보를 막는 것·참고)와 검사 항목. 일치율 평균이 아니라 무엇이 확인되지 않았는지를 남긴다."""
+        units = self.units
+        scans = [u["label"] for u in units if u["state"] == "scan"]
+        garbled = [u["label"] for u in units if u["state"] == "garbled"]
+        hidden_layer = [u["label"] for u in units if u["kind"] == "hidden_text"]
+        if scans:
+            self.reasons.append(reason("scan", f"글자 층이 없는 {_names(scans)}: 결과 글자는 OCR 모델이 읽은 것이라 원본 그림과 사람이 대조해야 합니다."))
+        if garbled:
+            self.reasons.append(reason("source_garbled", f"원본 글자 층이 깨진 {_names(garbled)}: 자동 대조를 할 수 없습니다."))
+        if hidden_layer:
+            self.reasons.append(reason("hidden_layer", f"그림 위의 보이지 않는 글자 층에서 읽은 {_names(hidden_layer)}: 결과와 대조 기준이 같은 숨은 층이라 "
+                                       "화면에 보이는 값과 같은지 확인되지 않았습니다."))
+        if self.source.truncated:
+            self.reasons.append(reason("truncated", "원본이 커서 앞부분만 대조했습니다."))
+        if self.unlocated or (self.located is False and self.fmt in ("PDF", "PPTX", "PPTM", "XLSX", "XLSM") and any(u.lines for u in self.source.units)):
+            self.reasons.append(reason("unlocated", "결과 줄의 원문 위치가 없는 단위는 문서 전체와 대조해 빠짐·순서를 단위별로 확인하지 못했습니다."))
+        if self.hidden_missing:
+            self.reasons.append(reason("hidden_excluded", f"원본에서 숨긴 {_names(self.hidden_missing)}는 결과에 없고 대조에서 뺐습니다. 필수 범위인지 업무 기준으로 정하세요.",
+                                       blocking=False))
+        if self.supplement_hits:
+            self.reasons.append(reason("supplement", f"결과 끝 '보충 추출'에서만 찾은 글 {self.supplement_hits}곳: 원래 위치가 아닙니다.", blocking=False))
+        if self.fmt == "PDF" and self.parser == "pdf-text":
+            self.reasons.append(reason("shared_layer", "결과와 대조 기준이 같은 PDF 글자 층입니다. 글자 전달만 확인했고 표 구조·읽는 순서·화면에 보이는 값은 "
+                                       "확인하지 않았습니다."))
+        if self.fmt in ("XLSX", "XLSM"):
+            self.reasons.append(reason("shared_layer", "파서와 대조 기준이 같은 저장 값입니다. 빠진 시트·행·칸은 찾지만 저장 값 자체가 맞는지는 확인하지 않습니다.",
+                                       blocking=False))
+        if not self.contract and self.fmt != "CSV":
+            self.reasons.append(reason("no_contract", f"{self.fmt or '이 형식'}은 아직 통과 후보 기준(형식 계약)을 검증하지 않았습니다. 기록 모드로 사람이 계속 검수합니다."))
+        checked = sum(1 for u in units if u["state"] == "checked")
+        excluded = sum(1 for u in units if u["state"] in ("hidden", "empty"))
+        unverified = sum(1 for u in units if u["state"] in ("scan", "garbled"))
+        label = "제자리 셀 값" if self.fmt in ("CSV", "XLSX", "XLSM") else "본문 글자 보존"
+        independent = not (self.fmt == "PDF" and self.parser == "pdf-text") and self.fmt not in ("XLSX", "XLSM")
+        self.checks.insert(0, {"id": "preserved", "label": label, "method": self.source.method, "source_layer": self.source.layer,
+                               "derived_from": "independent" if independent else "same_layer",
+                               "units": len(units), "checked": checked, "excluded": excluded, "unverified": unverified,
+                               "state": "done" if checked and not unverified else "partial" if checked else "unverified"})
+        if self.fmt == "PDF":
+            visible = "unverified" if scans or hidden_layer or self.parser == "pdf-text" else "partial"
+            self.checks.append({"id": "visible", "label": "화면에 보이는 값", "state": visible,
+                                "detail": "보이는 글자를 따로 읽은 근거(픽셀 판독)가 없습니다." if visible == "unverified" else
+                                          "레이아웃 모델의 결과를 글자 층과 대조했습니다(글꼴의 글자 대응이 맞다고 가정)."})
 
     def _unit_order(self, key: str) -> int:
         for index, unit in enumerate(self.source.units):
@@ -728,6 +808,188 @@ class Verifier:
         stats["spots"] = len(self.spots) - before
         return stats
 
+    # ------------------------------------------------------------ CSV: 원본 레코드 ↔ 결과 칸, 주소별 양방향
+    def _check_csv_grid(self, unit: SourceUnit) -> dict | None:
+        """원본 레코드(실행에 기록된 인코딩·구분자로 읽음)와 결과 표의 모든 칸을 주소(레코드, 열)로 양방향 비교한다.
+
+        원본에서 출발하는 비교만으로는 같은 행의 두 칸 맞바꿈, 빈 칸에 생긴 값, 결과에만 있는 행·복제 행을 놓친다
+        (같은 행 다른 칸에 값이 있으면 일치로 세기 때문). 빈 칸도 비교하고, 결과에만 있는 행·칸도 의심점으로 올린다.
+        결과가 콘솔 CSV writer의 표 문법이 아니면 None(예전 칸 대조로 돌아간다)."""
+        grid = decode_table(self.markdown)
+        if grid is None:
+            self.reasons.append(reason("grid_unavailable", "결과가 콘솔 CSV 표 문법이 아니어서 주소별 칸 대조를 하지 못했습니다(값 기준 대조로 바꿈)."))
+            return None
+        stats = {"key": unit.key, "label": unit.label, "page": unit.page, "sheet": unit.sheet, "kind": unit.kind,
+                 "note": unit.note, "source_chars": 0, "matched_chars": 0, "coverage": None, "numbers_missing": 0,
+                 "numbers_extra": 0, "spots": 0, "state": "checked", "result_lines": [1, len(grid) + 1] if grid else []}
+        records = [[_newlines(value) for value in row] for row in self.source.records or []]
+        width = max((len(row) for row in records), default=0)
+        result_width = max((len(row) for row in grid), default=0)
+        source_rows = [tuple(row + [""] * (width - len(row))) for row in records]
+        result_rows = [tuple(row) for row in grid]
+        before = len(self.spots)
+        total = sum(len(compact(value)) for row in records for value in row)
+        stats["source_chars"] = total
+        if width != result_width and records and grid:
+            self.spot(unit, "high", "grid_width", f"원본 표는 {width}열인데 결과 표는 {result_width}열입니다(구분자·칸 나눔이 다름).",
+                      ref="머리 행", line=1, source=_clip(" | ".join(records[0])), result=self.result_text(1))
+        # 같은 앞·뒤를 빼고 차이 구간만 정렬한다(단순 표의 빠른 일치 검사 → 불일치 행만 상세 진단).
+        n, m = len(source_rows), len(result_rows)
+        head = 0
+        while head < min(n, m) and source_rows[head] == result_rows[head]:
+            head += 1
+        tail = 0
+        while tail < min(n, m) - head and source_rows[n - 1 - tail] == result_rows[m - 1 - tail]:
+            tail += 1
+        matched_rows = head + tail
+        diffs: list[tuple[str, int | None, int | None]] = []  # (종류, 원본 레코드 0부터, 결과 행 0부터)
+        s_mid, r_mid = source_rows[head:n - tail], result_rows[head:m - tail]
+        if s_mid or r_mid:
+            if len(s_mid) + len(r_mid) <= _GRID_DIFF_ROWS:
+                opcodes = SequenceMatcher(None, s_mid, r_mid, autojunk=False).get_opcodes()
+            else:
+                opcodes = [("replace", 0, len(s_mid), 0, len(r_mid))]
+                self.notes.append(f"차이 나는 행이 {len(s_mid):,}행이 넘어 행 정렬 없이 순서대로 비교했습니다.")
+            for tag, i1, i2, j1, j2 in opcodes:
+                if tag == "equal":
+                    matched_rows += i2 - i1
+                    continue
+                pairs = max(i2 - i1, j2 - j1) if tag == "replace" else 0
+                for k in range(pairs):
+                    i = head + i1 + k if i1 + k < i2 else None
+                    j = head + j1 + k if j1 + k < j2 else None
+                    diffs.append(("pair" if i is not None and j is not None else "missing" if i is not None else "extra", i, j))
+                if tag == "delete":
+                    diffs.extend(("missing", head + i, None) for i in range(i1, i2))
+                elif tag == "insert":
+                    diffs.extend(("extra", None, head + j) for j in range(j1, j2))
+        source_count = Counter(source_rows)
+        result_count = Counter(result_rows)
+        # 빠진 행과 같은 내용이 결과의 다른 자리에 있으면(행 순서 바뀜) 하나의 '순서' 의심점으로 묶는다.
+        waiting: dict[tuple, list[int]] = defaultdict(list)
+        for kind, i, _ in diffs:
+            if kind == "missing":
+                waiting[source_rows[i]].append(i)
+        moved: dict[int, int] = {}
+        for kind, _, j in diffs:
+            if kind == "extra" and waiting.get(result_rows[j]):
+                moved[j] = waiting[result_rows[j]].pop(0)
+        moved_sources = set(moved.values())
+        matched = sum(len(compact(v)) for i in range(head) for v in records[i]) + sum(len(compact(v)) for i in range(n - tail, n) for v in records[i])
+        # 정렬로 같다고 본 가운데 행(equal 구간)의 글자도 일치로 센다
+        paired = {i for kind, i, _ in diffs if i is not None}
+        mid_equal = set(range(head, n - tail)) - paired
+        matched += sum(len(compact(v)) for i in mid_equal for v in records[i])
+        row_spots = 0
+        for kind, i, j in diffs:
+            if kind == "pair":
+                a, b = source_rows[i], result_rows[j]
+                cells = [(c, a[c] if c < len(a) else None, b[c] if c < len(b) else None) for c in range(max(len(a), len(b)))]
+                diff = [(c, x, y) for c, x, y in cells if (x or "") != (y or "")]
+                matched += sum(len(compact(x or "")) for c, x, y in cells if (x or "") == (y or ""))
+                if not diff:
+                    continue
+                row_spots += 1
+                if row_spots > _GRID_ROW_SPOTS:
+                    continue
+                self._grid_pair_spot(unit, i, j, records[i], diff, source_count, result_count, a, b)
+            elif kind == "missing" and i in moved_sources:
+                matched += sum(len(compact(v)) for v in records[i])
+            elif kind == "missing":
+                row_spots += 1
+                if row_spots > _GRID_ROW_SPOTS:
+                    continue
+                text = " | ".join(records[i])
+                severity = "high" if _sensitive(text) else "medium"
+                line = _record_line(j if j is not None else min(i, m), m)
+                self.spot(unit, severity, "row_missing", f"원본 {i + 1}행이 결과에 없습니다.", ref=f"{i + 1}행", line=line,
+                          source=_clip(text), source_hit=text.strip(), result=self.result_text(line), result_role="before",
+                          cell=f"{i + 1}행")
+            elif j in moved:
+                row_spots += 1
+                if row_spots > _GRID_ROW_SPOTS:
+                    continue
+                i = moved[j]
+                line = _record_line(j, m)
+                self.spot(unit, "medium", "row_moved", f"원본 {i + 1}행이 결과 {j + 1}번째 행 자리에 있습니다(행 순서 바뀜).",
+                          ref=f"{i + 1}행", line=line, source=_clip(" | ".join(records[i])), result=self.result_text(line), cell=f"{i + 1}행")
+            else:
+                row_spots += 1
+                if row_spots > _GRID_ROW_SPOTS:
+                    continue
+                row = result_rows[j]
+                text = " | ".join(row)
+                same = next((k + 1 for k, other in enumerate(source_rows) if other == row), None) if source_count[row] else None
+                severity = "high" if _sensitive(text) else "medium"
+                message = (f"결과 {j + 1}번째 행은 원본에 없는 행입니다" + (f"(원본 {same}행과 같은 내용 — 중복)." if same else "."))
+                line = _record_line(j, m)
+                self.spot(unit, severity, "row_extra", message, ref=f"결과 {j + 1}번째 행", line=line,
+                          result=self.result_text(line), result_hit=text.strip(), cell=f"{j + 1}행")
+        if row_spots > _GRID_ROW_SPOTS:
+            self.notes.append(f"{unit.label}: 다른 행이 많아 앞 {_GRID_ROW_SPOTS}행만 의심 지점으로 올렸습니다(전체 {row_spots:,}행).")
+        stats["matched_chars"] = min(matched, total)
+        stats["coverage"] = round(min(matched, total) / total, 4) if total else None
+        stats["spots"] = len(self.spots) - before
+        self._csv_contract(records, width, row_spots, matched_rows, n)
+        return stats
+
+    def _grid_pair_spot(self, unit, i, j, record, diff, source_count, result_count, a, b) -> None:
+        """짝지은 원본 레코드 i와 결과 행 j의 다른 칸들 → 의심점 하나(행 단위)."""
+        line = _record_line(j, None)
+        swapped = [(c1, c2) for c1, x1, y1 in diff for c2, x2, y2 in diff if c1 < c2 and x1 == y2 and x2 == y1 and x1 != x2]
+        if a in result_count and b in source_count and a != b and source_count[a] == result_count[a] and source_count[b] == result_count[b]:
+            kind, severity = "row_moved", "medium"
+            message = f"원본 {i + 1}행의 내용이 결과에서 다른 순서에 있습니다(행 순서 바뀜)."
+        elif swapped:
+            c1, c2 = swapped[0]
+            kind = "cell_swapped"
+            severity = "high" if _sensitive(a[c1] + a[c2]) else "medium"
+            message = (f"원본 {i + 1}행 {c1 + 1}열 '{_clip(a[c1], 0, 30)}'과 {c2 + 1}열 '{_clip(a[c2], 0, 30)}'이 결과에서 서로 바뀌었습니다.")
+        else:
+            parts = []
+            for c, x, y in diff[:4]:
+                if not x:
+                    parts.append(f"{c + 1}열 빈 칸 → '{_clip(y or '', 0, 30)}'")
+                elif not y:
+                    parts.append(f"{c + 1}열 '{_clip(x, 0, 30)}' → 빈 칸")
+                else:
+                    parts.append(f"{c + 1}열 '{_clip(x, 0, 30)}' → '{_clip(y, 0, 30)}'")
+            more = f" 외 {len(diff) - 4}칸" if len(diff) > 4 else ""
+            added = all(not x for _, x, _ in diff)
+            kind = "cell_added" if added else "cell_missing" if all(not y for _, _, y in diff) else "cell_changed"
+            severity = "high" if any(_sensitive((x or "") + (y or "")) for _, x, y in diff) else "medium"
+            message = f"원본 {i + 1}행: " + ", ".join(parts) + more + (" (원본에 없는 값이 결과에 생김)" if added else "")
+        first = diff[0]
+        self.spot(unit, severity, kind, message, ref=f"{i + 1}행 {first[0] + 1}열", line=line,
+                  source=_clip(" | ".join(record)), source_hit=first[1] or "", result=self.result_text(line),
+                  result_hit=first[2] or "", cell=f"{i + 1}행 {first[0] + 1}열")
+
+    def _csv_contract(self, records, width, row_spots, matched_rows, n) -> None:
+        """CSV 통과 후보 조건: 실행에 기록된 계약(인코딩·구분자 확정), 모든 레코드의 열 수 보존, 전체 범위 대조, 차이 없음."""
+        evidence = self.evidence if self.evidence.get("kind") == "csv" else {}
+        names = DELIMITERS
+        if not evidence:
+            self.reasons.append(reason("no_evidence", "이 실행에는 구분자·인코딩 근거가 기록되지 않았습니다(이전 버전에서 파싱). 다시 파싱하면 기록됩니다."))
+        else:
+            if not evidence.get("delimiter_certain"):
+                alternatives = ", ".join(names.get(d, d) for d in evidence.get("delimiter_alternatives") or []) or "다른 구분자"
+                self.reasons.append(reason("delimiter_ambiguous", f"구분자 {names.get(evidence.get('delimiter'), evidence.get('delimiter'))}로 읽었지만 {alternatives}로도 "
+                                           "열 수가 일관되게 나옵니다. 원천 형식으로 구분자를 지정해 다시 파싱해야 통과 후보가 됩니다.",
+                                           delimiter=evidence.get("delimiter"), alternatives=evidence.get("delimiter_alternatives") or []))
+            if not evidence.get("encoding_certain"):
+                self.reasons.append(reason("encoding_uncertain", f"인코딩을 {evidence.get('encoding')}(으)로 추정했습니다(UTF-8이 아님). 다른 인코딩으로도 "
+                                           "읽힐 수 있어 원천 형식으로 인코딩을 지정해 다시 파싱해야 통과 후보가 됩니다.", encoding=evidence.get("encoding")))
+        ragged = sum(1 for row in records if len(row) < width)
+        if ragged:
+            self.reasons.append(reason("ragged", f"열 수가 모자란 원본 레코드 {ragged:,}개(빈 줄 포함)는 결과 표에서 빈 칸으로 채워져 "
+                                       "'칸 없음'과 '빈 칸'을 구별할 수 없습니다."))
+        checked = n and not self.source.truncated
+        self.checks.append({"id": "csv_grid", "label": "CSV 주소별 칸 대조(양방향)", "state": "done" if checked else "partial",
+                            "detail": f"원본 레코드 {n:,}개 · 열 {width} · 같은 행 {matched_rows:,}개 · 다른 행 {row_spots:,}개",
+                            "derived_from": "same_contract", "source_layer": "csv_records"})
+        if evidence and evidence.get("delimiter_certain") and evidence.get("encoding_certain") and not ragged and checked:
+            self.contract = True
+
     def _best_row(self, table_lines: list[int], options: list[list[str]]) -> int | None:
         """위치가 없는 행: 원본 칸 값과 같은 칸이 가장 많은 결과 표 줄."""
         wanted = [choices for choices in options if choices]
@@ -763,8 +1025,70 @@ class Verifier:
             self.notes.append(f"그림 OCR 줄이 {count}개라 앞 10개만 의심 지점으로 올렸습니다.")
 
 
-def verify(source: SourceText, markdown: str, locations: list[dict], parser: str | None, fmt: str) -> dict:
-    return Verifier(source, markdown, locations, parser, fmt).run()
+def verify(source: SourceText, markdown: str, locations: list[dict], parser: str | None, fmt: str,
+           evidence: dict | None = None) -> dict:
+    """의심점 전부(문서 순서, S번호)와 우선순위·finding ID·판정 근거. 잘라 보이는 것은 원장(service)의 몫이다."""
+    return Verifier(source, markdown, locations, parser, fmt, evidence).run()
+
+
+def _newlines(value: str) -> str:
+    return value.replace("\r\n", "\n").replace("\r", "\n")
+
+
+def _record_line(index: int | None, rows: int | None) -> int:
+    """결과 표의 행 번호(0부터) → 결과 줄. 0행(머리 행)은 1줄, 그 뒤는 구분선(2줄) 때문에 한 줄 밀린다."""
+    if index is None:
+        return 1
+    if rows is not None:
+        index = min(index, max(rows - 1, 0))
+    return 1 if index == 0 else index + 2
+
+
+def _names(labels: list[str]) -> str:
+    return ", ".join(labels[:6]) + (f" 외 {len(labels) - 6}개" if len(labels) > 6 else "")
+
+
+def image_only(markdown: str, fmt: str, parser: str | None) -> dict:
+    """글자 층이 없는 이미지 원본: 결과 전체가 OCR 결과라 사람이 그림과 대조해야 한다."""
+    lines = [n for n, line in enumerate(markdown.split("\n"), start=1) if compact(result_plain(line))]
+    spots = []
+    if lines:
+        sample = markdown.split("\n")[lines[0] - 1]
+        spots.append({"key": "S1", "severity": "high", "kind": "image_ocr", "unit": "image", "label": "이미지", "page": None,
+                      "sheet": None, "cell": None, "ref": "이미지", "line": lines[0], "line_end": lines[-1], "source": "",
+                      "source_hit": "", "result": _clip(sample), "result_hit": "", "result_role": "same", "source_layer": "ocr_model",
+                      "message": f"이미지 원본은 글자 층이 없습니다. 결과 글자 {len(lines)}줄은 OCR 모델이 읽은 것이라 원본 그림과 사람이 대조해야 합니다."})
+    assign_ids(spots)
+    priority(spots, {"image": 0})
+    return {"method": "이미지(글자 층 없음)", "format": fmt.upper(), "parser": parser or "", "rule_version": RULE_VERSION,
+            "source_layer": "image", "summary": {
+                "units": 1, "checked": 0, "source_chars": 0, "matched_chars": 0, "coverage": None, "spots": len(spots),
+                "high": len(spots), "medium": 0, "low": 0, "scan_units": 1},
+            "units": [{"key": "image", "label": "이미지", "page": None, "sheet": None, "kind": "scan", "note": "글자 층 없음",
+                       "source_chars": 0, "matched_chars": 0, "coverage": None, "numbers_missing": 0, "numbers_extra": 0,
+                       "spots": len(spots), "state": "scan", "result_lines": [lines[0], lines[-1]] if lines else []}],
+            "spots": spots, "spots_total": len(spots), "top": [s["key"] for s in spots], "notes": [],
+            "reasons": [reason("image_only", "이미지 원본은 글자 층이 없어 기계 대조 근거가 없습니다. 원본 그림과 사람이 대조해야 합니다.")],
+            "checks": [{"id": "preserved", "label": "본문 글자 보존", "state": "unverified", "method": "이미지(글자 층 없음)",
+                        "source_layer": "image", "derived_from": "none", "units": 1, "checked": 0, "excluded": 0, "unverified": 1}],
+            "contract": False}
+
+
+def _newlines(value: str) -> str:
+    return value.replace("\r\n", "\n").replace("\r", "\n")
+
+
+def _record_line(index: int | None, rows: int | None) -> int:
+    """결과 표의 행 번호(0부터) → 결과 줄. 0행(머리 행)은 1줄, 그 뒤는 구분선(2줄) 때문에 한 줄 밀린다."""
+    if index is None:
+        return 1
+    if rows is not None:
+        index = min(index, max(rows - 1, 0))
+    return 1 if index == 0 else index + 2
+
+
+def _names(labels: list[str]) -> str:
+    return ", ".join(labels[:6]) + (f" 외 {len(labels) - 6}개" if len(labels) > 6 else "")
 
 
 def image_only(markdown: str, fmt: str, parser: str | None) -> dict:

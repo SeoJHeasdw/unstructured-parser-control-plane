@@ -1,11 +1,17 @@
 /** API boundary for explicit local file operations. No request runs until called. */
 export type LiveStatus = 'uploaded' | 'processing' | 'completed' | 'failed' | 'unsupported';
 /** seq: 문서 번호. 화면과 작업 에이전트가 'D12'처럼 부른다. 예전 서버는 보내지 않는다. */
-export type LiveDoc = { id: string; name: string; format: string; size_bytes: number; status: LiveStatus; created_at: string; updated_at: string; parser: string | null; error: string | null; error_code?: string | null; seq?: number | null };
+/** 자동 대조 판정 상태(최신 성공 실행, 사람 판정 합침). pending: 미평가 · unavailable: 원본을 읽을 수 없어 대조 못 함 */
+export type QcState = 'pending' | 'needs_review' | 'undetermined' | 'pass_candidate' | 'unavailable';
+export type DocQc = { state: QcState; label: string; unresolved: number | null };
+/** qc: 목록 질의(쪽 단위)에만 붙는다. 전체 목록(예전 호환)에는 없다. */
+export type LiveDoc = { id: string; name: string; format: string; size_bytes: number; status: LiveStatus; created_at: string; updated_at: string; parser: string | null; error: string | null; error_code?: string | null; seq?: number | null; qc?: DocQc | null };
 export type LiveResult = { id: string; markdown: string; parser: string; parser_version: string; is_stale: boolean; fidelity?: {findings?: {message: string}[]} | null; warnings: string[] };
 export type ResultLocation = { start_line: number; end_line: number; page: number | null; start_offset?: number | null; end_offset?: number | null; sheet: string | null; row: number | null; column: number | null; columns: number | null };
 export type ParseRun = { run_id: string; completed_at: string | null; parser: string | null; parser_version: string | null; ocr_enabled: boolean | null; is_latest: boolean; duration_ms?: number | null };
-export type StoredParseRun = ParseRun & { markdown: string; warnings: string[]; locations: ResultLocation[] };
+export type StoredParseRun = ParseRun & { markdown: string; warnings: string[]; locations: ResultLocation[]; evidence?: Record<string, unknown> | null; options?: ProcessOptions | null };
+/** 텍스트·CSV의 원천 계약. 지정하면 파서가 고르지 않고 이 값으로 읽는다(실행에 기록). */
+export type ProcessOptions = { csv_delimiter?: ',' | ';' | '\t' | '|'; encoding?: 'utf-8' | 'utf-8-sig' | 'cp949' | 'utf-16' | 'utf-16-le' | 'utf-16-be' | 'utf-32' };
 export type SourcePreview =
  | { kind: 'text'; text: string; truncated: boolean }
  | { kind: 'sheet'; sheets: string[]; sheet: string; first_row: number; cell: string; columns: string[]; rows: string[][] };
@@ -65,24 +71,55 @@ export async function getSourcePreview(id: string, signal: AbortSignal, sheet?: 
  return readResponse<SourcePreview>(await fetch(`${documentUrl(id)}/source-preview?${params}`, {signal}));
 }
 
-/** 자동 대조(GET …/verify): 원본 글자와 결과를 비교한 의심 지점(S번호). 판정이 아니라 사람이 볼 곳의 후보다. */
+/** 자동 대조(GET …/verify): 원본 글자와 결과를 비교한 원장. 의심 지점(S번호)은 우선순위 순으로 한 쪽씩 온다. 판정이 아니라 사람이 볼 곳의 후보다.
+ * id: finding ID(규칙이 바뀌어도 같은 사실을 가리킴). rank: 검수 우선순위(0부터). 예전 서버는 id·rank를 보내지 않는다. */
 export type VerifySpot = {
- key: string; severity: 'high' | 'medium' | 'low'; kind: string; message: string; unit: string; label: string;
+ key: string; id?: string; rank?: number; severity: 'high' | 'medium' | 'low'; kind: string; message: string; unit: string; label: string;
  page: number | null; sheet: string | null; cell: string | null; ref: string; line: number | null; line_end: number | null;
- source: string; source_hit: string; result: string; result_hit: string; result_role?: 'same' | 'before';
+ source: string; source_hit: string; result: string; result_hit: string; result_role?: 'same' | 'before'; source_layer?: string;
 };
 export type VerifyUnit = { key: string; label: string; page: number | null; sheet: string | null; kind: string; note: string; source_chars: number;
  matched_chars: number; coverage: number | null; numbers_missing: number; numbers_extra: number; spots: number; state: string; result_lines: number[] };
+/** 판정 근거 한 줄. blocking이면 그것만으로 통과 후보가 될 수 없다. */
+export type QcReason = { code: string; message: string; blocking: boolean; [key: string]: unknown };
+export type QcCheck = { id: string; label: string; state: 'done' | 'partial' | 'unverified' | string; detail?: string; method?: string;
+ source_layer?: string; derived_from?: string; units?: number; checked?: number; excluded?: number; unverified?: number };
+export type QcGate = { state: Exclude<QcState, 'pending' | 'unavailable'>; label: string; reasons: QcReason[]; unresolved: number; unresolved_high: number;
+ open_reviews: number; wrong_reviews: number; note?: string };
 export type VerifyResult = {
  id: string; run_id: string; is_latest: boolean; method: string; format: string; parser: string;
  summary: { units: number; checked: number; source_chars: number; matched_chars: number; coverage: number | null; spots: number; high: number; medium: number; low: number; scan_units: number };
  units: VerifyUnit[]; spots: VerifySpot[]; spots_total: number; top: string[]; notes: string[];
+ /* 원장(2026-11-27). 예전 서버에는 없다. */
+ rule_version?: string; document_status?: string; spots_matched?: number; page?: { offset: number; limit: number; order: string; next: number | null };
+ top_spots?: VerifySpot[]; gate?: QcGate; reasons?: QcReason[]; checks?: QcCheck[]; verdicts?: Record<string, string>;
 };
-export async function getVerify(id: string, run: string | undefined, signal?: AbortSignal): Promise<VerifyResult> {
- const query = run ? `?run=${encodeURIComponent(run)}` : '';
- const body = await readResponse<VerifyResult>(await fetch(`${documentUrl(id)}/verify${query}`, signal ? {signal} : undefined));
+export type VerifyQuery = { severity?: ('high' | 'medium' | 'low')[]; unit?: string; order?: 'priority' | 'document'; offset?: number; limit?: number; unreviewed?: boolean };
+export async function getVerify(id: string, run: string | undefined, signal?: AbortSignal, query: VerifyQuery = {}): Promise<VerifyResult> {
+ const params = new URLSearchParams();
+ if (run) params.set('run', run);
+ if (query.severity?.length) params.set('severity', query.severity.join(','));
+ if (query.unit) params.set('unit', query.unit);
+ if (query.order) params.set('order', query.order);
+ if (query.offset) params.set('offset', String(query.offset));
+ if (query.limit) params.set('limit', String(query.limit));
+ if (query.unreviewed) params.set('unreviewed', 'true');
+ const text = params.toString();
+ const body = await readResponse<VerifyResult>(await fetch(`${documentUrl(id)}/verify${text ? `?${text}` : ''}`, signal ? {signal} : undefined));
  if (!Array.isArray(body.spots)) throw new Error('자동 대조의 응답 형식을 확인할 수 없습니다.');
  return body;
+}
+/** 의심점 하나(S번호 또는 finding ID). 받은 쪽에 없는 지점(주소의 check=S441)을 열 때 쓴다. */
+export async function getVerifySpot(id: string, ref: string, run: string | undefined, signal?: AbortSignal): Promise<VerifySpot & { run_id: string }> {
+ const query = run ? `?run=${encodeURIComponent(run)}` : '';
+ return readResponse(await fetch(`${documentUrl(id)}/verify/spots/${encodeURIComponent(ref)}${query}`, signal ? {signal} : undefined));
+}
+
+/** 처리 깔때기: 반입 전체 → 파싱 완료 → 자동 대조 → 판정 상태. not_parsed: 파싱하지 못한 사유(오류 코드·상태)별 수. */
+export type QcSummary = { rule_version: string; documents: number; parsed: number; qc_done: number; qc_pending: number; qc_unavailable: number;
+ states: Record<'needs_review' | 'undetermined' | 'pass_candidate', number>; not_parsed: Record<string, number>; human_decided: number; processing: number };
+export async function getQcSummary(signal?: AbortSignal): Promise<QcSummary> {
+ return readResponse<QcSummary>(await fetch('/api/live/qc-summary', signal ? {signal} : undefined));
 }
 
 export async function getLiveDocument(id:string, signal:AbortSignal):Promise<LiveDoc> {
@@ -101,8 +138,35 @@ export async function uploadLiveDocument(file:File):Promise<LiveDoc> {
  return readResponse<LiveDoc>(await fetch(DOCUMENTS_URL,{method:'POST',body:form}));
 }
 
-export async function processLiveDocument(id:string):Promise<LiveDoc> {
- return readResponse<LiveDoc>(await fetch(`${documentUrl(id)}/process`,{method:'POST'}));
+export async function processLiveDocument(id:string, options?: ProcessOptions):Promise<LiveDoc> {
+ const body = options && Object.keys(options).length ? { headers: {'Content-Type': 'application/json'}, body: JSON.stringify(options) } : {};
+ return readResponse<LiveDoc>(await fetch(`${documentUrl(id)}/process`,{method:'POST', ...body}));
+}
+
+/** 문서함 한 쪽(서버가 검색·상태·확장자·정렬을 처리). facets.formats: 확장자('' = 확장자 없음) → 수, facets.statuses: 화면 상태 → 수. */
+export type DocSort = 'recent' | 'updated' | 'name';
+export type DocPage = { documents: LiveDoc[]; total: number; next_cursor: string | null; facets: { formats: Record<string, number>; statuses: Record<string, number> };
+ /** 예전 서버: 조건을 모르고 전체 목록만 준다(화면이 거르고 센다). */
+ legacy?: boolean };
+export type DocQuery = { q?: string; status?: string; format?: string | null; sort?: DocSort; cursor?: string | null; limit?: number };
+export async function listDocumentPage(query: DocQuery, signal?: AbortSignal): Promise<DocPage> {
+ const params = new URLSearchParams();
+ if (query.q?.trim()) params.set('q', query.q.trim());
+ params.set('status', query.status || 'all');
+ if (query.format !== null && query.format !== undefined) params.set('format', query.format === '' ? '-' : query.format);
+ params.set('sort', query.sort ?? 'recent');
+ if (query.cursor) params.set('cursor', query.cursor);
+ params.set('limit', String(query.limit ?? 50));
+ const body = await readResponse<DocPage>(await fetch(`${DOCUMENTS_URL}?${params}`, signal ? {signal} : undefined));
+ if (!Array.isArray(body.documents)) throw new Error('문서 목록의 응답 형식을 확인할 수 없습니다.');
+ if (typeof body.total !== 'number') return { documents: body.documents, total: body.documents.length, next_cursor: null, facets: { formats: {}, statuses: {} }, legacy: true };
+ return body;
+}
+/** 지정한 문서들만(지금 쪽 밖에서 처리 중인 문서의 완료 알림). */
+export async function getDocumentsByIds(ids: string[], signal?: AbortSignal): Promise<LiveDoc[]> {
+ if (!ids.length) return [];
+ const body = await readResponse<{documents: LiveDoc[]}>(await fetch(`${DOCUMENTS_URL}?ids=${encodeURIComponent(ids.join(','))}`, signal ? {signal} : undefined));
+ return Array.isArray(body.documents) ? body.documents : [];
 }
 
 export async function getLiveResult(id:string, signal:AbortSignal):Promise<LiveResult|null> {

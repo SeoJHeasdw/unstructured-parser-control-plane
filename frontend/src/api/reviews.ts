@@ -8,10 +8,12 @@ export type Review = {
   page: number | null; sheet: string | null; cell: string | null; line: number | null; line_end: number | null; ref: string | null;
   note: string; source_text: string | null; source_hit: string | null; result_text: string | null; result_hit: string | null;
   status: ReviewStatus; comment: string | null; batch: number | null;
+  /** 자동 대조 원장의 finding ID와 규칙 버전(V를 만들 때의 스냅샷). 예전 서버·직접 올린 요청은 없다. */
+  finding_id?: string | null; rule_version?: string | null;
 };
 export type ReviewList = { reviews: Review[]; counts: Partial<Record<ReviewStatus, number>> };
 export type ReviewDraft = Partial<Pick<Review, 'run_id' | 'spot' | 'kind' | 'severity' | 'page' | 'sheet' | 'cell' | 'line' | 'line_end' | 'ref' |
-  'note' | 'source_text' | 'source_hit' | 'result_text' | 'result_hit' | 'status' | 'comment'>> & { document_id: string; origin?: 'agent' | 'console' };
+  'note' | 'source_text' | 'source_hit' | 'result_text' | 'result_hit' | 'status' | 'comment' | 'finding_id'>> & { document_id: string; origin?: 'agent' | 'console' };
 
 const URL_BASE = '/api/live/reviews';
 

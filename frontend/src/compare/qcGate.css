@@ -1,0 +1,57 @@
+/* 자동 대조 판정 상태(검수 필요·판정 불가·통과 후보·미평가). 색은 공통 토큰의 역할만 쓴다. */
+.qc-badge { display: inline-flex; align-items: center; gap: 4px; min-height: 22px; padding: 1px 8px; border: 1px solid transparent; border-radius: 11px;
+  font: inherit; font-size: var(--fs-xs); font-weight: 700; line-height: 1.3; white-space: nowrap; }
+.qc-badge b { min-width: 16px; padding: 0 5px; border-radius: 8px; background: rgba(255, 255, 255, .7); text-align: center; }
+.qc-badge.is-needs_review { background: var(--bad-soft); color: var(--bad); }
+.qc-badge.is-undetermined { background: var(--warn-soft); color: var(--warn); }
+.qc-badge.is-pass_candidate { background: var(--ok-soft); color: var(--ok); }
+.qc-badge.is-pending, .qc-badge.is-unavailable { border-color: var(--rule); background: var(--surface); color: var(--ink-3); }
+.qc-badge.is-button { cursor: pointer; }
+.qc-badge.is-button:hover { box-shadow: inset 0 0 0 1px currentColor; }
+.qc-badge.is-button[aria-expanded=true] { box-shadow: inset 0 0 0 1.5px currentColor; }
+
+.qc-chip-wrap { position: relative; display: inline-flex; }
+.qc-popover { position: absolute; z-index: 9; top: calc(100% + 6px); left: 0; width: min(460px, 86vw); max-height: min(60vh, 520px); overflow: auto;
+  padding: 10px 12px 12px; border: 1px solid var(--rule); border-radius: var(--r-2); background: var(--surface); box-shadow: var(--shadow-float);
+  color: var(--ink-1); font-size: var(--fs-sm); animation: ui-fade .14s var(--ease-out); }
+.qc-popover h3, .qc-details h3 { margin: 10px 0 4px; color: var(--ink-3); font-size: var(--fs-xs); font-weight: 700; }
+.qc-popover h3:first-child, .qc-details h3:first-of-type { margin-top: 2px; }
+.qc-reasons { display: grid; gap: 4px; margin: 0; padding: 0; list-style: none; }
+.qc-reasons li { position: relative; padding-left: 14px; color: var(--ink-2); line-height: 1.5; }
+.qc-reasons li::before { content: ""; position: absolute; left: 3px; top: .62em; width: 5px; height: 5px; border-radius: 50%; background: var(--rule-strong); }
+.qc-reasons li.is-blocking { color: var(--ink-1); }
+.qc-reasons li.is-blocking::before { background: var(--warn); }
+.qc-checks { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.qc-checks li { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 8px; align-items: start; }
+.qc-checks li > span:last-child { display: grid; gap: 1px; color: var(--ink-1); }
+.qc-checks small { color: var(--ink-3); font-size: var(--fs-xs); line-height: 1.45; overflow-wrap: anywhere; }
+.qc-check { padding: 1px 7px; border-radius: 9px; background: var(--surface-3); color: var(--ink-2); font-size: 11.5px; font-weight: 700; white-space: nowrap; }
+.qc-check.is-done { background: var(--evidence-surface); color: var(--evidence-ink); }
+.qc-check.is-partial { background: var(--warn-soft); color: var(--warn); }
+.qc-check.is-unverified { background: var(--bad-soft); color: var(--bad); }
+.qc-note { margin: 0 0 4px; padding: 6px 8px; border-radius: var(--r-1); background: var(--ok-soft); color: var(--ok); font-size: var(--fs-xs); line-height: 1.5; }
+.qc-rule { margin: 10px 0 0; color: var(--ink-4); font-size: 11px; }
+
+/* 문서 상세의 자동 대조 칸 */
+.qc-panel { display: grid; gap: 8px; margin: 0 0 12px; padding: 10px 12px; border: 1px solid var(--rule); border-left: 3px solid var(--rule-strong);
+  border-radius: var(--r-2); background: var(--surface-2); font-size: var(--fs-sm); }
+.qc-panel.is-needs_review { border-left-color: var(--bad); }
+.qc-panel.is-undetermined { border-left-color: var(--warn); }
+.qc-panel.is-pass_candidate { border-left-color: var(--ok); }
+.qc-panel > header { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
+.qc-panel > header .lw-btn { margin-left: auto; }
+.qc-panel.is-muted p, .qc-loading { display: inline-flex; align-items: center; gap: 6px; margin: 0; color: var(--ink-3); }
+.qc-counts { color: var(--ink-2); font-weight: 600; }
+.qc-details > summary { width: max-content; color: var(--ink-3); font-size: var(--fs-xs); font-weight: 650; cursor: pointer; }
+.qc-details[open] > summary { margin-bottom: 4px; }
+.qc-contract { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; padding-top: 8px; border-top: 1px dashed var(--rule); }
+.qc-contract > strong { color: var(--ink-1); font-size: var(--fs-xs); }
+.qc-contract > small { flex-basis: 100%; order: 9; color: var(--ink-3); font-size: var(--fs-xs); }
+.qc-contract label { display: inline-flex; align-items: center; gap: 6px; color: var(--ink-2); font-size: var(--fs-xs); font-weight: 650; }
+.qc-contract select { min-height: 28px; padding: 0 6px; border: 1px solid var(--rule-strong); border-radius: var(--r-1); background: var(--surface); color: var(--ink-1); font: inherit; font-size: var(--fs-xs); }
+
+/* 원문 대조 목록 끝의 '더 보기' */
+.rc-more button { display: flex !important; flex-wrap: wrap; justify-content: center; gap: 2px 8px; color: var(--accent); font-weight: 650; }
+.rc-more small { color: var(--ink-3); font-weight: 500; }
+.lw-btn.is-compact { min-height: 30px; padding: 0 10px; font-size: var(--fs-xs); }
+.qc-panel .lw-icon-btn { width: 30px; min-height: 30px; }

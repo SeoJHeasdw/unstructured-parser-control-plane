@@ -24,7 +24,7 @@ function serve(docs: Doc[], extra: (path: string) => Response | undefined = () =
     if (init?.method && init.method !== 'GET') throw new Error('예상하지 못한 변경 요청 ' + path);
     const handled = extra(path);
     if (handled) return handled;
-    if (path === '/api/live/documents') return json({ documents: docs });
+    if (path.split('?')[0] === '/api/live/documents') return json({ documents: docs });
     const doc = docs.find(item => path === `/api/live/documents/${item.id}`);
     if (doc) return json(doc);
     if (path.endsWith('/result')) return json({ detail: '완료된 파싱 결과가 없습니다.' }, 409);

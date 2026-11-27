@@ -26,8 +26,9 @@ from app.format_gate import check as check_format
 from app.formats import IMAGE_FORMATS
 from app.repository import DocumentRepository, now
 from app.source_preview import worksheet_preview
+from app import qc
 from app.source_text import SourceText, SourceUnavailable, read_source
-from app.verify import image_only, verify as verify_result
+from app.verify import MAX_SPOTS, image_only, verify as verify_result
 from app.structure import Budget, inspect_file
 from app.textnorm import display_name
 from app.vba import parse_notes as macro_notes
@@ -74,10 +75,13 @@ class DocumentService:
         self._stopping = threading.Event()
         self._jobs: Queue[tuple[str, str] | None] = Queue(maxsize=max(1, settings.max_pending_jobs))
         self._worker: threading.Thread | None = None
-        # 원본 글자(원본은 문서마다 바뀌지 않는다)와 자동 대조(실행마다 바뀌지 않는다) 결과를 잠시 둔다.
+        # 원본 글자(원본은 문서마다 바뀌지 않는다)를 잠시 둔다. 자동 대조 결과는 원장(qc_runs·qc_findings)에 둔다.
         self._cache_lock = threading.Lock()
-        self._sources: OrderedDict[str, SourceText] = OrderedDict()
-        self._verified: OrderedDict[tuple[str, str], dict] = OrderedDict()
+        self._sources: OrderedDict[tuple, SourceText] = OrderedDict()
+        # 자동 대조 계산은 한 번에 하나(같은 실행을 두 요청이 동시에 계산하지 않게, PDF 네이티브 호출도 겹치지 않게).
+        self._qc_lock = threading.Lock()
+        # 사용자가 지정한 원천 계약(CSV 구분자·인코딩). 접수한 실행 ID → 옵션. 처리할 때 꺼내 실행에 기록한다.
+        self._run_options: dict[str, dict] = {}
 
     def start(self) -> None:
         self.settings.runtime_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
@@ -247,9 +251,15 @@ class DocumentService:
             raise Conflict("이미 처리 중인 문서입니다.")
         return self.get(doc_id), run_id
 
-    def enqueue(self, doc_id: str) -> dict:
+    def enqueue(self, doc_id: str, options: dict | None = None) -> dict:
+        """options: 사용자가 지정한 원천 계약(텍스트·CSV의 encoding, csv_delimiter). 다른 형식에는 쓰지 않는다."""
         with self._admission_lock:
             doc = self.get(doc_id)
+            options = {key: value for key, value in (options or {}).items() if value not in (None, "")}
+            if options and doc["format"] not in TEXT_FORMATS:
+                raise Conflict("구분자·인코딩 지정은 텍스트·CSV 문서에만 쓸 수 있습니다.")
+            if options.get("csv_delimiter") and doc["format"] != "CSV":
+                raise Conflict("구분자 지정은 CSV 문서에만 쓸 수 있습니다.")
             if doc["status"] == "processing":
                 raise Conflict("이미 처리 중인 문서입니다.")
             if self._stopping.is_set() or not self._worker or not self._worker.is_alive():
@@ -259,6 +269,8 @@ class DocumentService:
                 self.repo.record_event(doc_id, doc["status"], "처리 대기열이 가득 차 요청을 접수하지 못했습니다.")
                 raise QueueUnavailable("처리 대기열이 가득 찼습니다. 잠시 후 다시 시도해 주세요.")
             processing_doc, run_id = self.begin(doc_id)
+            if options:
+                self._run_options[run_id] = options
             try:
                 self._jobs.put_nowait((doc_id, run_id))
             except Full:
@@ -269,6 +281,8 @@ class DocumentService:
     def process(self, doc_id: str, run_id: str) -> None:
         result_path = None
         temp_path = None
+        options = self._run_options.pop(run_id, None)
+        committed = False
         try:
             doc = self.get(doc_id)
             # Storage names originate from the server, never from the request's filename.
@@ -290,10 +304,10 @@ class DocumentService:
             fd = os.open(temp_path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
             with os.fdopen(fd, "w", encoding="utf-8", newline="") as output:
                 if extension in TEXT_FORMATS and path.stat().st_size >= 1024 * 1024:
-                    parsed = self.parsers.text.write_to(path, extension, output)
+                    parsed = self.parsers.text.write_to(path, extension, output, options)
                     warnings, locations, fidelity, ocr_enabled = [], [], None, None
                 else:
-                    parsed, prepared, warnings = self._parse(path, extension)
+                    parsed, prepared, warnings = self._parse(path, extension, options)
                     markdown, locations, fidelity = parsed.markdown, list(parsed.locations), None
                     warnings.extend(parsed.warnings)
                     ocr_enabled = parsed.ocr_enabled
@@ -321,12 +335,12 @@ class DocumentService:
             os.replace(temp_path, result_path)
             if extension == "PDF" and not ocr_enabled:
                 warnings.insert(0, PDF_OCR_WARNING)
-            committed = False
             try:
                 committed = self.repo.finish(doc_id, run_id, status="completed", parser=parsed.parser,
                                              parser_version=parsed.parser_version, result_file=result_name, error=None,
                                              warnings=warnings, ocr_enabled=ocr_enabled, duration_ms=duration_ms,
-                                             locations=[location.model_dump() for location in locations], fidelity=fidelity)
+                                             locations=[location.model_dump() for location in locations], fidelity=fidelity,
+                                             evidence=parsed.evidence, options=options, qc_version=qc.RULE_VERSION)
             finally:
                 if not committed:
                     result_path.unlink(missing_ok=True)
@@ -343,9 +357,17 @@ class DocumentService:
         finally:
             if temp_path:
                 temp_path.unlink(missing_ok=True)
+        if committed:
+            # 같은 작업자가 이어서 자동 대조 원장을 만든다(사용자가 시작한 처리의 일부, 외부 호출 없음). 실패해도 파싱 결과는 그대로다.
+            try:
+                self.ensure_qc(doc_id, run_id)
+            except Exception as exc:  # noqa: BLE001 — 원장은 '미평가'로 남고 조회할 때 다시 계산한다
+                logger.info("QC after parse skipped (%s)", type(exc).__name__)
 
-    def _parse(self, path: Path, extension: str):
+    def _parse(self, path: Path, extension: str, options: dict | None = None):
         """(파싱 결과, 사본 보정 통계 | None, 경고). OOXML은 원본 대신 보정 사본을 파서에 넣는다."""
+        if options:
+            return self.parsers.parse(path, extension, options), None, []
         if extension not in OOXML_FORMATS:
             return self.parsers.parse(path, extension), None, []
         # 사본을 만들기 전에 압축 폭탄·위험 경로를 거른다.
@@ -398,18 +420,20 @@ class DocumentService:
         raise Conflict("이 형식은 원본 파일로 열어 확인할 수 있습니다.")
 
     # ------------------------------------------------------------ 원본 글자·자동 대조
-    def source_text(self, doc_id: str) -> tuple[dict, SourceText]:
-        """파서와 별개로 읽은 원본 글자(app/source_text.py). 읽을 수 없는 형식·손상 파일은 Conflict."""
+    def source_text(self, doc_id: str, dialect: dict | None = None) -> tuple[dict, SourceText]:
+        """파서와 별개로 읽은 원본 글자(app/source_text.py). 읽을 수 없는 형식·손상 파일은 Conflict.
+        dialect: 텍스트·CSV에서 그 실행이 쓴 인코딩·구분자(실행에 기록된 계약으로 다시 읽는다)."""
         doc, path = self.original(doc_id)
+        key = (doc_id, (dialect or {}).get("encoding"), (dialect or {}).get("delimiter"))
         with self._cache_lock:
-            cached = self._sources.get(doc_id)
+            cached = self._sources.get(key)
             if cached is not None:
-                self._sources.move_to_end(doc_id)
+                self._sources.move_to_end(key)
                 return doc, cached
         try:
             if doc["format"] in OOXML_FORMATS:
                 self.parsers.docling.check_office_archive(path)  # 압축 폭탄·위험 경로
-            source = read_source(path, doc["format"], self.settings)
+            source = read_source(path, doc["format"], self.settings, dialect)
         except SourceUnavailable as exc:
             raise Conflict(str(exc)) from exc
         except ParserError as exc:
@@ -417,7 +441,7 @@ class DocumentService:
         except OSError as exc:
             raise Conflict("저장된 원본을 읽을 수 없습니다.") from exc
         with self._cache_lock:
-            self._sources[doc_id] = source
+            self._sources[key] = source
             while len(self._sources) > 3:
                 self._sources.popitem(last=False)
         return doc, source
@@ -433,29 +457,135 @@ class DocumentService:
             raise MissingRun()
         return run
 
-    def verify(self, doc_id: str, run_id: str | None = None) -> dict:
-        """파싱 결과를 원본 글자와 자동 대조한 의심 지점(S번호). 판정이 아니라 사람이 볼 곳의 후보다."""
+    def ensure_qc(self, doc_id: str, run_id: str) -> dict:
+        """그 실행의 자동 대조 원장(현재 규칙 버전). 없거나 '미평가'면 지금 계산해 저장한다. 원본을 읽을 수 없으면 Conflict."""
+        ledger = self.repo.qc_run(doc_id, run_id, qc.RULE_VERSION)
+        if ledger and ledger["state"] == "done":
+            return json.loads(ledger["result"])
+        with self._qc_lock:
+            ledger = self.repo.qc_run(doc_id, run_id, qc.RULE_VERSION)
+            if ledger and ledger["state"] == "done":
+                return json.loads(ledger["result"])
+            doc = self.get(doc_id)
+            stored = self.parse_run(doc_id, run_id)
+            started = time.perf_counter()
+            if doc["format"] in IMAGE_FORMATS or doc["format"] == "SVG":
+                result = image_only(stored["markdown"], doc["format"], stored["parser"])
+            else:
+                evidence = stored.get("evidence") or {}
+                dialect = {"encoding": evidence.get("encoding"), "delimiter": evidence.get("delimiter")} if evidence.get("encoding") else None
+                try:
+                    _, source = self.source_text(doc_id, dialect)
+                except Conflict as exc:
+                    self.repo.mark_qc(doc_id, run_id, qc.RULE_VERSION, "unavailable", str(exc))
+                    raise
+                result = verify_result(source, stored["markdown"], stored["locations"], stored["parser"], doc["format"], evidence)
+            spots = result.pop("spots")
+            header = {**result, "computed_at": now()}
+            self.repo.save_qc(doc_id, run_id, qc.RULE_VERSION, header, spots,
+                              qc.machine_state(result["spots_total"], result["reasons"]),
+                              round((time.perf_counter() - started) * 1000))
+            return header
+
+    def verify(self, doc_id: str, run_id: str | None = None, *, severity: list[str] | None = None, unit: str | None = None,
+               kind: list[str] | None = None, order: str = "priority", offset: int = 0, limit: int = MAX_SPOTS,
+               unreviewed: bool = False) -> dict:
+        """파싱 결과를 원본 글자와 자동 대조한 원장. 의심점(S번호)은 우선순위 순으로 한 쪽씩 준다(전체 수와 다음 쪽 위치 포함).
+        판정이 아니라 사람이 볼 곳의 후보다. gate는 사람 판정까지 합친 문서 상태(검수 필요·판정 불가·통과 후보)."""
         doc = self.get(doc_id)
         run = self._run_for(doc_id, run_id)
-        key = (doc_id, run["run_id"])
-        with self._cache_lock:
-            cached = self._verified.get(key)
-            if cached is not None:
-                self._verified.move_to_end(key)
-                return {**cached, "is_latest": bool(run["is_latest"]), "document_status": doc["status"]}
-        stored = self.parse_run(doc_id, run["run_id"])
-        if doc["format"] in IMAGE_FORMATS or doc["format"] == "SVG":
-            result = image_only(stored["markdown"], doc["format"], stored["parser"])
-        else:
-            _, source = self.source_text(doc_id)
-            result = verify_result(source, stored["markdown"], stored["locations"], stored["parser"], doc["format"])
-        result = {"id": doc_id, "run_id": run["run_id"], "completed_at": run["completed_at"],
-                  "parser_version": run["parser_version"], **result}
-        with self._cache_lock:
-            self._verified[key] = result
-            while len(self._verified) > 16:
-                self._verified.popitem(last=False)
-        return {**result, "is_latest": bool(run["is_latest"]), "document_status": doc["status"]}
+        header = self.ensure_qc(doc_id, run["run_id"])
+        verdicts, counts = self.repo.review_verdicts(doc_id, run["run_id"])
+        exclude = {fid for fid, status in verdicts.items() if status != "open"} if unreviewed else None
+        spots, matched = self.repo.qc_findings(doc_id, run["run_id"], qc.RULE_VERSION, severity=severity, unit=unit, kind=kind,
+                                               order=order, offset=offset, limit=limit, exclude=exclude)
+        top_spots, _ = self.repo.qc_findings(doc_id, run["run_id"], qc.RULE_VERSION, order="priority", limit=20)
+        stale = not run["is_latest"] or doc["status"] != "completed"
+        gate = qc.gate(self.repo.qc_all(doc_id, run["run_id"], qc.RULE_VERSION), header.get("reasons", []), verdicts,
+                       counts.get("open", 0) + counts.get("unclear", 0), counts.get("wrong", 0), stale=stale)
+        following = offset + len(spots)
+        return {"id": doc_id, "run_id": run["run_id"], "completed_at": run["completed_at"], "parser_version": run["parser_version"],
+                **header, "qc_state": "done", "spots": spots, "spots_matched": matched,
+                "page": {"offset": offset, "limit": limit, "order": order, "next": following if following < matched else None},
+                "top_spots": top_spots, "gate": gate, "verdicts": verdicts,
+                "is_latest": bool(run["is_latest"]), "document_status": doc["status"]}
+
+    def finding(self, doc_id: str, run_id: str | None, ref: str) -> dict:
+        """원장의 의심점 하나(S번호 또는 finding ID). 상세 목록에서 잘린 고위험 항목도 바로 열 수 있다."""
+        self.get(doc_id)
+        run = self._run_for(doc_id, run_id)
+        self.ensure_qc(doc_id, run["run_id"])
+        if not (qc.SPOT_KEY.fullmatch(ref) or qc.FINDING_ID.fullmatch(ref)):
+            raise Conflict("S번호(예: S3) 또는 finding ID(F로 시작하는 13자리)를 넣으세요.")
+        spot = self.repo.qc_finding(doc_id, run["run_id"], qc.RULE_VERSION, ref)
+        if spot is None:
+            raise Conflict(f"{ref} 자동 대조 지점이 없습니다. 자동 대조를 다시 확인하세요.")
+        return {**spot, "run_id": run["run_id"], "rule_version": qc.RULE_VERSION}
+
+    @staticmethod
+    def _qc_state(row: dict) -> str | None:
+        """목록·깔때기용 문서 판정 상태(최신 성공 실행, 사람 판정 합침). gate와 같은 순서: 검수 필요 → 판정 불가 → 통과 후보."""
+        if not row["result_file"]:
+            return None
+        if row["qc_state"] in (None, "pending"):
+            return "pending"
+        if row["qc_state"] != "done":
+            return "unavailable"
+        reviews = row["reviews"]
+        unresolved = max(0, (row["spots_total"] or 0) - row["resolved"])
+        if unresolved or reviews.get("open") or reviews.get("unclear") or reviews.get("wrong"):
+            return "needs_review"
+        return "undetermined" if row["blocking"] else "pass_candidate"
+
+    def qc_summary(self) -> dict:
+        """처리 깔때기: 반입 전체 → 파싱 완료 → 자동 대조 → 판정 상태. 마지막 단계만 보고 처리율을 말하지 않도록 분모를 함께 준다.
+        판정 상태는 문서마다 최신 성공 실행 기준이고, 사람 판정(맞음·틀림·보류·열림)을 합친다(gate와 같은 규칙)."""
+        rows = self.repo.qc_overview(qc.RULE_VERSION)
+        out = {"rule_version": qc.RULE_VERSION, "documents": len(rows), "parsed": 0, "qc_done": 0, "qc_pending": 0,
+               "qc_unavailable": 0, "states": {state: 0 for state in ("needs_review", "undetermined", "pass_candidate")},
+               "not_parsed": {}, "human_decided": 0, "processing": 0}
+        for row in rows:
+            if row["status"] == "processing":
+                out["processing"] += 1
+            state = self._qc_state(row)
+            if state is None:
+                if row["status"] != "processing":
+                    key = row["error_code"] or row["status"]
+                    out["not_parsed"][key] = out["not_parsed"].get(key, 0) + 1
+                continue
+            out["parsed"] += 1
+            if state == "pending":
+                out["qc_pending"] += 1
+                continue
+            if state == "unavailable":
+                out["qc_unavailable"] += 1
+                continue
+            out["qc_done"] += 1
+            out["states"][state] += 1
+            if any(row["reviews"].get(status) for status in ("correct", "wrong", "unclear")):
+                out["human_decided"] += 1
+        return out
+
+    def documents_page(self, *, query: str = "", status: str = "all", formats: list[str] | None = None, sort: str = "recent",
+                       cursor: str | None = None, limit: int = 50) -> dict:
+        page = self.repo.list_page(query=query, status=status, formats=formats, sort=sort, cursor=cursor, limit=limit)
+        self._attach_qc(page["documents"])
+        return page
+
+    def documents_by_id(self, ids: list[str]) -> list[dict]:
+        docs = self.repo.get_many([doc_id for doc_id in ids if _ID.fullmatch(doc_id)])
+        self._attach_qc(docs)
+        return docs
+
+    def _attach_qc(self, docs: list[dict]) -> None:
+        if not docs:
+            return
+        rows = {row["id"]: row for row in self.repo.qc_overview(qc.RULE_VERSION, [doc["id"] for doc in docs])}
+        for doc in docs:
+            row = rows.get(doc["id"])
+            state = self._qc_state(row) if row else None
+            doc["qc"] = {"state": state, "label": qc.STATE_LABELS.get(state, ""),
+                         "unresolved": max(0, (row["spots_total"] or 0) - row["resolved"]) if row and state not in (None, "pending", "unavailable") else None} if state else None
 
     # ------------------------------------------------------------ 검수 요청(V번호)
     def create_review(self, payload: dict) -> tuple[dict, bool]:
@@ -468,13 +598,13 @@ class DocumentService:
             fields["run_id"] = latest["run_id"] if latest else None
         elif not self.repo.parse_run(doc["id"], run_id):
             raise MissingRun()
-        if fields.get("spot"):
+        ref = fields.get("finding_id") or fields.get("spot")
+        if ref:
             if not fields["run_id"]:
                 raise Conflict("성공한 파싱 결과가 없어 자동 대조 지점을 찾을 수 없습니다.")
-            spots = self.verify(doc["id"], fields["run_id"])["spots"]
-            spot = next((entry for entry in spots if entry["key"] == fields["spot"]), None)
-            if spot is None:
-                raise Conflict(f"{fields['spot']} 자동 대조 지점이 없습니다. 자동 대조를 다시 확인하세요.")
+            # 화면 상세 목록(한 쪽)이 아니라 원장 전체에서 찾는다: 우선순위 밖으로 잘린 지점도 검수 요청이 된다.
+            spot = self.finding(doc["id"], fields["run_id"], ref)
+            fields["spot"], fields["finding_id"], fields["rule_version"] = spot["key"], spot["id"], spot["rule_version"]
             for key, value in (("kind", spot["kind"]), ("severity", spot["severity"]), ("page", spot["page"]),
                                ("sheet", spot["sheet"]), ("cell", spot["cell"]), ("line", spot["line"]), ("line_end", spot["line_end"]),
                                ("ref", spot["ref"]), ("source_text", spot["source"]), ("source_hit", spot["source_hit"]),
@@ -499,7 +629,9 @@ class DocumentService:
         try:
             markdown = (self.settings.results / f"{doc_id}-{run_id}.md").read_text(encoding="utf-8")
             return {**run, "markdown": markdown, "warnings": json.loads(run["warnings"]), "locations": json.loads(run["locations"]),
-                    "fidelity": json.loads(run["fidelity"]) if run.get("fidelity") else None}
+                    "fidelity": json.loads(run["fidelity"]) if run.get("fidelity") else None,
+                    "evidence": json.loads(run["evidence"]) if run.get("evidence") else None,
+                    "options": json.loads(run["options"]) if run.get("options") else None}
         except (OSError, ValueError) as exc:
             raise Conflict("저장된 실행 결과를 읽을 수 없습니다.") from exc
 

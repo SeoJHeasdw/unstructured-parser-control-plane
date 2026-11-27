@@ -29,7 +29,7 @@ describe('실제 문서 로컬 작업 공간',()=>{
     const staleDoc = {...uploaded, status:'failed' as const, error:'최근 실행 실패'};
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const path = String(input);
-      if (path === url) return jsonResponse({documents:[staleDoc]});
+      if (path.split('?')[0] === url) return jsonResponse({documents:[staleDoc]});
       if (path === detailUrl) return jsonResponse(staleDoc);
       if (path === detailUrl + '/result') return jsonResponse({id:uploaded.id,markdown:'이전 본문',parser:'python-text',parser_version:'1',is_stale:true,warnings:[]});
       if (path === detailUrl + '/runs') return jsonResponse({runs:[]});
@@ -58,7 +58,7 @@ describe('실제 문서 로컬 작업 공간',()=>{
     const pendingList = new Promise<Response>(resolve => { resolveList = resolve; });
     vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const path = String(input);
-      if (path === url) return init?.method === 'POST' ? jsonResponse(uploaded, 201) : pendingList;
+      if (path.split('?')[0] === url) return init?.method === 'POST' ? jsonResponse(uploaded, 201) : pendingList;
       if (path === detailUrl) return jsonResponse(uploaded);
       return jsonResponse({}, 404);
     }));
@@ -79,7 +79,7 @@ describe('실제 문서 로컬 작업 공간',()=>{
     vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const path = String(input);
       if (path === '/api/data') return jsonResponse({ asOf: '', documents: [], relations: [], activity: [] });
-      if (path === url) return init?.method === 'POST' ? (++uploadCount === 1 ? firstUpload : jsonResponse(second, 201)) : jsonResponse({ documents: [] });
+      if (path.split('?')[0] === url) return init?.method === 'POST' ? (++uploadCount === 1 ? firstUpload : jsonResponse(second, 201)) : jsonResponse({ documents: [] });
       if (path === `${url}/${second.id}`) return jsonResponse(second);
       return jsonResponse({}, 404);
     }));
@@ -99,14 +99,14 @@ describe('실제 문서 로컬 작업 공간',()=>{
   it('목록을 조회하고 선택한 문서의 상세를 불러오며 자동으로 업로드하거나 파싱하지 않는다',async()=>{
     const fetchMock=vi.fn(async(input:RequestInfo|URL,init?:RequestInit)=>{
       const path=String(input);const method=init?.method||'GET';
-      if(path===url&&method==='GET')return jsonResponse({documents:[uploaded]});
+      if(path.split('?')[0]===url&&method==='GET')return jsonResponse({documents:[uploaded]});
       if(path===detailUrl&&method==='GET')return jsonResponse(uploaded);
       throw new Error(`예상하지 못한 호출 ${method} ${path}`);
     });
     vi.stubGlobal('fetch',fetchMock);const user=userEvent.setup();render(<LiveWorkspace/>);
     const list=document.querySelector('.live-list') as HTMLElement;
     expect(await within(list).findByText(uploaded.name)).toBeTruthy();
-    expect(fetchMock).toHaveBeenCalledWith(url);
+    expect(fetchMock.mock.calls.some(([path]) => String(path).split('?')[0] === url)).toBe(true);
     expect(fetchMock.mock.calls.some(([,init])=>init?.method==='POST')).toBe(false);
     await user.click(within(list).getByRole('link',{name:/예시\.txt/}));
     await waitFor(()=>expect(fetchMock.mock.calls.some(([path,init])=>String(path)===detailUrl&&(!init?.method||init.method==='GET'))).toBe(true));
@@ -118,7 +118,7 @@ describe('실제 문서 로컬 작업 공간',()=>{
     const waiting = { ...uploaded, id: 'pending', name: '다른예시.txt' };
     const historyUrl = detailUrl + '/history';
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
-      switch (String(input)) {
+      switch (String(input).split('?')[0]) {
         case url: return jsonResponse({ documents: [waiting, completed] });
         case detailUrl: return jsonResponse(completed);
         case detailUrl + '/result': return jsonResponse({ id: completed.id, markdown: resultText, parser: 'text', parser_version: '1', warnings: [], is_stale: false });
@@ -149,13 +149,13 @@ describe('실제 문서 로컬 작업 공간',()=>{
   it('여러 파일 중 실패한 파일만 원래 이름으로 다시 저장한다', async () => {
     const names: string[] = [];
     vi.stubGlobal('fetch', vi.fn(async (path:string, init?:RequestInit) => {
-      if (path === url && init?.method === 'POST') {
+      if (path.split('?')[0] === url && init?.method === 'POST') {
         const file = (init.body as FormData).get('file') as File;
         names.push(file.name);
         if (file.name === '재시도.txt' && names.length === 2) return jsonResponse({detail:'일시 오류'}, 503);
         return jsonResponse({...uploaded, id:file.name, name:file.name}, 201);
       }
-      if (path === url) return jsonResponse({documents:[]});
+      if (path.split('?')[0] === url) return jsonResponse({documents:[]});
       return jsonResponse({...uploaded,id:'재시도.txt',name:'재시도.txt'});
     }));
     const user = userEvent.setup(); render(<App/>);
@@ -169,7 +169,7 @@ describe('실제 문서 로컬 작업 공간',()=>{
   });
 
   it('브라우저 뒤로가면 검색어·상태·선택한 행의 초점을 복원한다', async () => {
-    vi.stubGlobal('fetch', vi.fn(async (path:string) => jsonResponse(path === url ? {documents:[uploaded]} : uploaded)));
+    vi.stubGlobal('fetch', vi.fn(async (path:string) => jsonResponse(path.split('?')[0] === url ? {documents:[uploaded]} : uploaded)));
     const user = userEvent.setup(); render(<App/>);
     await screen.findByRole('link', {name:/예시\.txt/});
     await user.type(screen.getByRole('textbox',{name:'실제 문서 검색'}), '예시');
@@ -185,7 +185,7 @@ describe('실제 문서 로컬 작업 공간',()=>{
 
   it('잘못된 문서 주소에는 찾을 수 없음과 문서함 복귀를 제공한다', async () => {
     history.replaceState(null, '', '?view=live&doc=missing&tab=history');
-    vi.stubGlobal('fetch', vi.fn(async (path:string) => path === url ? jsonResponse({documents:[]}) : jsonResponse({detail:'문서 없음'},404)));
+    vi.stubGlobal('fetch', vi.fn(async (path:string) => path.split('?')[0] === url ? jsonResponse({documents:[]}) : jsonResponse({detail:'문서 없음'},404)));
     const user = userEvent.setup(); render(<App/>);
     expect(await screen.findByRole('heading',{name:'문서를 찾을 수 없습니다'})).toBeTruthy();
     await user.click(screen.getByRole('button', {name:'문서함으로'}));
@@ -195,8 +195,8 @@ describe('실제 문서 로컬 작업 공간',()=>{
   it('사용자가 고른 파일을 multipart POST로 저장하고, 업로드만으로 파싱을 실행하지 않는다',async()=>{
     const fetchMock=vi.fn(async(input:RequestInfo|URL,init?:RequestInit)=>{
       const path=String(input);const method=init?.method||'GET';
-      if(path===url&&method==='GET')return jsonResponse({documents:[]});
-      if(path===url&&method==='POST')return jsonResponse(uploaded,201);
+      if(path.split('?')[0]===url&&method==='GET')return jsonResponse({documents:[]});
+      if(path.split('?')[0]===url&&method==='POST')return jsonResponse(uploaded,201);
       if(path===detailUrl&&method==='GET')return jsonResponse(uploaded);
       throw new Error(`예상하지 못한 호출 ${method} ${path}`);
     });
@@ -206,8 +206,8 @@ describe('실제 문서 로컬 작업 공간',()=>{
     const input=screen.getByLabelText('로컬에 업로드할 파일 선택') as HTMLInputElement;
     const file=new File(['테스트 내용'],uploaded.name,{type:'text/plain'});
     await user.upload(input,file);
-    await waitFor(()=>expect(fetchMock.mock.calls.some(([path,init])=>String(path)===url&&init?.method==='POST')).toBe(true));
-    const uploadCall=fetchMock.mock.calls.find(([path,init])=>String(path)===url&&init?.method==='POST');
+    await waitFor(()=>expect(fetchMock.mock.calls.some(([path,init])=>String(path).split('?')[0]===url&&init?.method==='POST')).toBe(true));
+    const uploadCall=fetchMock.mock.calls.find(([path,init])=>String(path).split('?')[0]===url&&init?.method==='POST');
     expect(uploadCall?.[1]?.body).toBeInstanceOf(FormData);
     const part=(uploadCall?.[1]?.body as FormData).get('file') as File;
     expect(part).toBeInstanceOf(File);expect(part.name).toBe(uploaded.name);expect(part.size).toBe(file.size);
@@ -217,7 +217,7 @@ describe('실제 문서 로컬 작업 공간',()=>{
   it('파싱 버튼을 눌렀을 때만 POST하고 결과를 HTML 실행 없이 텍스트로 보여준다',async()=>{
     const fetchMock=vi.fn(async(input:RequestInfo|URL,init?:RequestInit)=>{
       const path=String(input);const method=init?.method||'GET';
-      if(path===url&&method==='GET')return jsonResponse({documents:[uploaded]});
+      if(path.split('?')[0]===url&&method==='GET')return jsonResponse({documents:[uploaded]});
       if(path===detailUrl&&method==='GET')return jsonResponse(uploaded);
       if(path===`${detailUrl}/process`&&method==='POST')return jsonResponse(completed);
       if(path===`${detailUrl}/result`&&method==='GET')return jsonResponse({id:uploaded.id,markdown:resultText,parser:'text',parser_version:'1.0',is_stale:false,warnings:[]});
@@ -242,7 +242,7 @@ describe('실제 문서 로컬 작업 공간',()=>{
   it('파싱 요청이 실패하면 서버가 반환한 오류를 표시하고 결과 조회를 하지 않는다',async()=>{
     const fetchMock=vi.fn(async(input:RequestInfo|URL,init?:RequestInit)=>{
       const path=String(input);const method=init?.method||'GET';
-      if(path===url&&method==='GET')return jsonResponse({documents:[uploaded]});
+      if(path.split('?')[0]===url&&method==='GET')return jsonResponse({documents:[uploaded]});
       if(path===detailUrl&&method==='GET')return jsonResponse(uploaded);
       if(path===`${detailUrl}/process`&&method==='POST')return jsonResponse({detail:'파서 모델을 찾을 수 없습니다.'},500);
       throw new Error(`예상하지 못한 호출 ${method} ${path}`);
@@ -257,7 +257,7 @@ describe('실제 문서 로컬 작업 공간',()=>{
   });
   it('목록 조회 오류와 다시 시도 경로를 보여준다',async()=>{
     const fetchMock=vi.fn(async(input:RequestInfo|URL,init?:RequestInit)=>{
-      if(String(input)===url&&(!init?.method||init.method==='GET'))return jsonResponse({detail:'로컬 저장소를 읽을 수 없습니다.'},503);
+      if(String(input).split('?')[0]===url&&(!init?.method||init.method==='GET'))return jsonResponse({detail:'로컬 저장소를 읽을 수 없습니다.'},503);
       throw new Error('예상하지 못한 호출');
     });
     vi.stubGlobal('fetch',fetchMock);render(<LiveWorkspace/>);
@@ -277,7 +277,7 @@ describe('Mock 데이터와 실제 파일 작업의 독립성',()=>{
         mockAttempts++;
         return mockAttempts===1?jsonResponse({detail:'Mock 조회 실패'},503):jsonResponse({asOf:'예시 시각',documents:[mockDoc],relations:[],activity:[]});
       }
-      if(path===url&&method==='GET')return jsonResponse({documents:[uploaded]});
+      if(path.split('?')[0]===url&&method==='GET')return jsonResponse({documents:[uploaded]});
       throw new Error(`예상하지 못한 호출 ${method} ${path}`);
     });
     vi.stubGlobal('fetch',fetchMock);const user=userEvent.setup();render(<App/>);
@@ -297,7 +297,7 @@ describe('Mock 데이터와 실제 파일 작업의 독립성',()=>{
     const neverResolved=new Promise<Response>(()=>{});
     const fetchMock=vi.fn((input:RequestInfo|URL):Promise<Response>=>{
       if(String(input)==='/api/data')return neverResolved;
-      if(String(input)===url)return Promise.resolve(jsonResponse({documents:[uploaded]}));
+      if(String(input).split('?')[0]===url)return Promise.resolve(jsonResponse({documents:[uploaded]}));
       return Promise.reject(new Error('예상하지 못한 호출'));
     });
     vi.stubGlobal('fetch',fetchMock);const user=userEvent.setup();render(<App/>);
@@ -306,7 +306,7 @@ describe('Mock 데이터와 실제 파일 작업의 독립성',()=>{
     await screen.findByText('예시 데이터를 불러오는 중입니다.');
     await user.click(nav.getByRole('link',{name:'문서함'}));
     expect(await within(document.querySelector('.live-list') as HTMLElement).findByText(uploaded.name)).toBeTruthy();
-    expect(fetchMock.mock.calls.some(([path])=>String(path)===url)).toBe(true);
+    expect(fetchMock.mock.calls.some(([path])=>String(path).split('?')[0]===url)).toBe(true);
   });
 });
 
@@ -321,7 +321,7 @@ describe('비동기 처리 알림',()=>{
     const final:MockDoc={...uploaded,status,updated_at:'2026-11-12T00:00:02Z',parser:status==='completed'?'text':null,error:status==='failed'?'파싱 오류':null};
     const fetchMock=vi.fn(async(input:RequestInfo|URL,init?:RequestInit)=>{
       const path=String(input);const method=init?.method||'GET';
-      if(path===url&&method==='GET')return jsonResponse({documents:[started?final:uploaded]});
+      if(path.split('?')[0]===url&&method==='GET')return jsonResponse({documents:[started?final:uploaded]});
       if(path===detailUrl&&method==='GET')return jsonResponse(uploaded);
       if(path===`${detailUrl}/process`&&method==='POST'){started=true;return jsonResponse(running)}
       if(path===`${detailUrl}/result`&&method==='GET')return status==='completed'?jsonResponse({id:uploaded.id,markdown:'완료 결과',parser:'text',parser_version:'1.0',is_stale:false,warnings:[]}):jsonResponse({detail:'완료된 파싱 결과가 없습니다.'},409);
@@ -343,7 +343,7 @@ describe('마지막 성공 결과 및 파싱 경고',()=>{
     const doc:MockDoc={...uploaded,status,updated_at:'2026-11-12T00:00:02Z',error:status==='failed'?'새 작업 실패':null};
     const fetchMock=vi.fn(async(input:RequestInfo|URL,init?:RequestInit)=>{
       const path=String(input);const method=init?.method||'GET';
-      if(path===url&&method==='GET')return jsonResponse({documents:[doc]});
+      if(path.split('?')[0]===url&&method==='GET')return jsonResponse({documents:[doc]});
       if(path===detailUrl&&method==='GET')return jsonResponse(doc);
       if(path===`${detailUrl}/result`&&method==='GET')return jsonResponse({id:doc.id,markdown:'이전 파싱 본문',parser:'text',parser_version:'1.0',is_stale:true,warnings:['이전 결과의 경고']});
       throw new Error(`예상하지 못한 호출 ${method} ${path}`);
@@ -360,7 +360,7 @@ describe('마지막 성공 결과 및 파싱 경고',()=>{
     const pdf:MockDoc={...completed,name:'스캔.pdf',format:'PDF'};
     const fetchMock=vi.fn(async(input:RequestInfo|URL,init?:RequestInit)=>{
       const path=String(input);const method=init?.method||'GET';
-      if(path===url&&method==='GET')return jsonResponse({documents:[pdf]});
+      if(path.split('?')[0]===url&&method==='GET')return jsonResponse({documents:[pdf]});
       if(path===detailUrl&&method==='GET')return jsonResponse(pdf);
       if(path===`${detailUrl}/result`&&method==='GET')return jsonResponse({id:pdf.id,markdown:'추출된 텍스트',parser:'Docling',parser_version:'1',is_stale:false,warnings:['스캔 페이지가 OCR 없이 누락되었을 수 있습니다.']});
       throw new Error(`예상하지 못한 호출 ${method} ${path}`);
@@ -378,7 +378,7 @@ describe('마지막 성공 결과 및 파싱 경고',()=>{
     let unavailable=false;
     const fetchMock=vi.fn(async(input:RequestInfo|URL,init?:RequestInit)=>{
       const path=String(input);const method=init?.method||'GET';
-      if(path===url&&method==='GET')return jsonResponse({documents:[doc]});
+      if(path.split('?')[0]===url&&method==='GET')return jsonResponse({documents:[doc]});
       if(path===detailUrl&&method==='GET')return jsonResponse(doc);
       if(path===`${detailUrl}/result`&&method==='GET')return unavailable?jsonResponse({detail:'결과 저장소가 응답하지 않습니다.'},503):jsonResponse({detail:'완료된 파싱 결과가 없습니다.'},409);
       throw new Error(`예상하지 못한 호출 ${method} ${path}`);
@@ -401,7 +401,7 @@ describe('마지막 성공 결과 및 파싱 경고',()=>{
   it('결과 파일 손실에 대한 409는 빈 결과로 숨기지 않고 오류를 표시한다',async()=>{
     const fetchMock=vi.fn(async(input:RequestInfo|URL)=>{
       const path=String(input);
-      if(path===url)return jsonResponse({documents:[completed]});
+      if(path.split('?')[0]===url)return jsonResponse({documents:[completed]});
       if(path===detailUrl)return jsonResponse(completed);
       if(path===`${detailUrl}/result`)return jsonResponse({detail:'저장된 결과 파일을 찾을 수 없습니다.'},409);
       throw new Error(`예상하지 못한 호출 ${path}`);
@@ -420,7 +420,7 @@ describe('마지막 성공 결과 및 파싱 경고',()=>{
     const oldResult=new Promise<Response>(resolve=>{resolveOld=resolve});
     const fetchMock=vi.fn(async(input:RequestInfo|URL,init?:RequestInit)=>{
       const path=String(input);const method=init?.method||'GET';
-      if(path===url&&method==='GET')return jsonResponse({documents:[completed,other]});
+      if(path.split('?')[0]===url&&method==='GET')return jsonResponse({documents:[completed,other]});
       if(path===detailUrl&&method==='GET')return jsonResponse(completed);
       if(path===`${url}/${other.id}`&&method==='GET')return jsonResponse(other);
       if(path===`${detailUrl}/result`&&method==='GET')return oldResult;

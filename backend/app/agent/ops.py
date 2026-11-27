@@ -1259,41 +1259,56 @@ class Ops:
         return "\n".join(heading + body + tail)
 
     # ------------------------------------------------------------------ 도구: verify(자동 대조)
-    def verify(self, id: str, page=None, sheet: str = "") -> str:  # noqa: A002
+    def verify(self, id: str, page=None, sheet: str = "", severity: str = "", offset=None) -> str:  # noqa: A002
         doc = self.find_doc(id)
-        page, sheet = as_int(page), as_text(sheet)
+        page, sheet, offset = as_int(page), as_text(sheet), as_int(offset) or 0
+        severity = as_text(severity).lower()
+        severity = {"높음": "high", "보통": "medium", "낮음": "low"}.get(severity, severity)
+        if severity and severity not in ("high", "medium", "low"):
+            raise ToolError("bad-arg", "severity는 high(높음), medium(보통), low(낮음) 중 하나입니다.")
         try:
-            data = self.api.get(f"/api/live/documents/{doc['id']}/verify")
+            index = self.api.get(f"/api/live/documents/{doc['id']}/verify", limit=1)
         except ApiError as exc:
             if exc.status == 409:
                 raise ToolError("no-source", exc.detail, f"doc(id=\"D{doc['n']}\")로 상태를 보거나, 원본을 직접 볼 수 없으면 flag 로 사람에게 확인을 요청하세요.") from None
             raise
+        units = index["units"]
+        unit_key = None
+        if page is not None or sheet:
+            chosen = [u for u in units if (page is not None and u.get("page") == page) or (sheet and (u.get("sheet") or "").casefold() == sheet.casefold())]
+            if not chosen:
+                raise ToolError("not-found", f"D{doc['n']}에 그 위치가 없습니다.", "verify(id=…)를 위치 없이 불러 단위 목록을 보세요.")
+            units, unit_key = chosen, chosen[0]["key"]
+        # 원장에서 우선순위 순으로 20곳(높음 먼저). 전체 수와 다음 쪽 위치를 함께 받는다(상세 400곳 밖으로 잘리는 일이 없다).
+        data = self.api.get(f"/api/live/documents/{doc['id']}/verify", run=index["run_id"], limit=20, offset=offset,
+                            unit=unit_key, severity=severity or None)
         spots = data["spots"]
         self._spots[doc["id"]] = (data["run_id"], spots)
+        verdicts = data.get("verdicts") or {}
         flagged = {}
         try:
             for review in self.api.get("/api/live/reviews", doc=doc["id"], limit=1000)["reviews"]:
-                if review.get("spot") and review.get("run_id") == data["run_id"]:
-                    flagged[review["spot"]] = review
+                if review.get("run_id") == data["run_id"] and (review.get("finding_id") or review.get("spot")):
+                    flagged[review.get("finding_id") or review["spot"]] = review
         except (ApiError, KeyError, TypeError):
             pass
-        units = data["units"]
-        if page is not None or sheet:
-            units = [u for u in units if (page is not None and u.get("page") == page) or (sheet and (u.get("sheet") or "").casefold() == sheet.casefold())]
-            if not units:
-                raise ToolError("not-found", f"D{doc['n']}에 그 위치가 없습니다.", "verify(id=…)를 위치 없이 불러 단위 목록을 보세요.")
-            keys = {u["key"] for u in units}
-            spots = [spot for spot in spots if spot["unit"] in keys]
         summary = data["summary"]
-        counts = Counter(spot["severity"] for spot in spots)
         coverage = summary.get("coverage")
+        matched = data.get("spots_matched", len(spots))
         stale = "" if data.get("is_latest", True) and data.get("document_status") == "completed" else " — 이전 성공본(is_stale) 기준"
-        head = (f"결과: D{doc['n']} 원본 대조 — 의심 {len(spots)}곳" + (f"(높음 {counts['high']}, 보통 {counts['medium']}, 낮음 {counts['low']})" if spots else "")
+        scope = (f"{units[0]['label']} " if unit_key else "") + ({"high": "높음 ", "medium": "보통 ", "low": "낮음 "}[severity] if severity else "")
+        counts = f"(높음 {summary['high']}, 보통 {summary['medium']}, 낮음 {summary['low']})" if data.get("spots_total") else ""
+        head = (f"결과: D{doc['n']} 원본 대조 — 의심 {data.get('spots_total', len(spots))}곳{counts}"
+                + (f", 그중 {scope.strip()} {matched}곳" if scope else "")
                 + (f", 원본 글자의 {coverage:.0%}를 결과에서 찾음" if coverage is not None else "") + stale)
-        lines = [head,
-                 (f"다음: 의심 지점마다 source 와 read 로 같은 위치를 읽어 직접 비교하세요. 사람이 눈으로 봐야 할 곳은 flag(id=\"D{doc['n']}\", spot=\"S번호\", note=\"무엇이 다른지\")로 올립니다."
-                  if spots else f"다음: 자동 대조로는 차이가 없습니다. 표 구조·읽는 순서·그림 속 글자는 자동 대조가 보지 않으니, 중요한 문서는 flag 로 사람에게 원문 대조를 요청하세요."),
-                 f"기준: {data['method']} · 파서 {data.get('parser') or '-'}"]
+        gate = data.get("gate") or {}
+        lines = [head]
+        if gate:
+            blocking = [r["message"] for r in gate.get("reasons", []) if r.get("blocking") and r.get("code") not in ("findings", "open_reviews", "confirmed_wrong")]
+            lines.append(f"판정 상태: {gate.get('label')}" + (f" — {_clip(blocking[0], 160)}" if blocking and gate.get("state") != "needs_review" else ""))
+        lines += [(f"다음: 의심 지점마다 source 와 read 로 같은 위치를 읽어 직접 비교하세요. 사람이 눈으로 봐야 할 곳은 flag(id=\"D{doc['n']}\", spot=\"S번호\", note=\"무엇이 다른지\")로 올립니다."
+                   if spots else f"다음: 자동 대조로는 차이가 없습니다. 표 구조·읽는 순서·그림 속 글자는 자동 대조가 보지 않으니, 중요한 문서는 flag 로 사람에게 원문 대조를 요청하세요."),
+                  f"기준: {data['method']} · 파서 {data.get('parser') or '-'} · 규칙 {data.get('rule_version') or '-'}"]
         for note in data.get("notes", [])[:6]:
             lines.append(f"참고: {note}")
         if len(units) > 1:
@@ -1307,14 +1322,12 @@ class Ops:
                     shown.append(f"{unit['label']} {unit['coverage']:.0%}" + (f" 의심{unit['spots']}" if unit["spots"] else ""))
             if shown:
                 lines.append("단위: " + " · ".join(shown[:40]) + (f" 외 {len(shown) - 40}개" if len(shown) > 40 else ""))
-        rank = {"high": 0, "medium": 1, "low": 2}
-        ordered = sorted(spots, key=lambda spot: (rank[spot["severity"]], int(spot["key"][1:])))
-        if ordered:
-            lines.append(f"의심 지점({'높음 먼저' if len(ordered) > 1 else '1곳'}" + (f", 앞 20곳" if len(ordered) > 20 else "") + "):")
-        for spot in ordered[:20]:
+        if spots:
+            lines.append(f"의심 지점(우선순위 순, {offset + 1}~{offset + len(spots)}번째 / {matched}곳):")
+        for spot in spots:
             where = spot["ref"] or spot["label"]
             result_at = f" → 결과 줄 {spot['line']}" + (f"-{spot['line_end']}" if spot.get("line_end") and spot["line_end"] != spot["line"] else "") if spot.get("line") else ""
-            mark = flagged.get(spot["key"])
+            mark = flagged.get(spot.get("id")) or flagged.get(spot["key"])
             tag = f" [이미 V{mark['id']} {VERDICT_LABELS.get(mark['status'], mark['status'])}]" if mark else ""
             lines.append(f"{spot['key']} [{SEVERITY_WORDS[spot['severity']]}] {where}{result_at}: {_clip(spot['message'], 220)}{tag}")
             if spot.get("source") and spot.get("source_hit"):
@@ -1322,8 +1335,10 @@ class Ops:
             if spot.get("result"):
                 label = "결과(있어야 할 자리 앞 줄)" if spot.get("result_role") == "before" else "결과"
                 lines.append(f"    {label}: {_clip(spot['result'], 200)}")
-        if len(ordered) > 20:
-            lines.append(f"… 나머지 {len(ordered) - 20}곳은 page·sheet로 단위를 지정해 보세요.")
+        following = (data.get("page") or {}).get("next")
+        if following is not None:
+            where = (f", page={page}" if page is not None else "") + (f", sheet=\"{sheet}\"" if sheet else "") + (f", severity=\"{severity}\"" if severity else "")
+            lines.append(f"… 나머지 {matched - following}곳: verify(id=\"D{doc['n']}\"{where}, offset={following})")
         lines.append(f"원문 대조: {self.link(doc)}")
         return "\n".join(lines)
 
@@ -1335,17 +1350,24 @@ class Ops:
         page, line = as_int(page), as_int(line)
         payload: dict = {"document_id": doc["id"], "origin": "agent"}
         if spot:
-            if not re.fullmatch(r"S\d{1,5}", spot):
-                raise ToolError("bad-arg", "spot에는 verify가 준 S번호를 넣으세요. 예: spot=\"S3\"")
+            spot = spot if not spot.startswith("F") else "F" + spot[1:].lower()
+            if not re.fullmatch(r"S\d{1,6}|F[0-9a-f]{12}", spot):
+                raise ToolError("bad-arg", "spot에는 verify가 준 S번호(또는 F로 시작하는 finding ID)를 넣으세요. 예: spot=\"S3\"")
             payload["spot"] = spot
             cached = self._spots.get(doc["id"])
             if cached:
                 payload["run_id"] = cached[0]
-                known = next((entry for entry in cached[1] if entry["key"] == spot), None)
-                if known is None:
-                    raise ToolError("not-found", f"{spot}는 D{doc['n']}의 자동 대조 지점이 아닙니다.", f"verify(id=\"D{doc['n']}\")로 S번호를 다시 확인하세요.")
-                if note:
-                    note = f"{note} — 자동 대조 {spot}: {known['message']}"
+            # 화면에 받은 한 쪽이 아니라 원장에서 찾는다(우선순위 밖으로 잘린 지점도 올릴 수 있다).
+            try:
+                known = self.api.get(f"/api/live/documents/{doc['id']}/verify/spots/{spot}", run=payload.get("run_id"))
+            except ApiError as exc:
+                if exc.status in (404, 409):
+                    raise ToolError("not-found", f"{spot}는 D{doc['n']}의 자동 대조 지점이 아닙니다.", f"verify(id=\"D{doc['n']}\")로 S번호를 다시 확인하세요.") from None
+                raise
+            payload["run_id"] = known.get("run_id") or payload.get("run_id")
+            payload["finding_id"] = known.get("id")
+            if note:
+                note = f"{note} — 자동 대조 {spot}: {known['message']}"
         elif not note:
             raise ToolError("bad-arg", "spot(S번호) 또는 note(사람이 무엇을 확인할지)를 넣으세요.",
                             "예: flag(id=\"D12\", spot=\"S3\") 또는 flag(id=\"D12\", page=3, line=120, note=\"표 3행의 단위가 원본과 같은지\")")
@@ -1568,7 +1590,7 @@ TOOL_ARGS = {
     "wait": ["batch"],
     "docs": ["state", "before"],
     "doc": ["id"],
-    "verify": ["id", "page", "sheet"],
+    "verify": ["id", "page", "sheet", "severity", "offset"],
     "source": ["id", "page", "sheet", "line", "find"],
     "read": ["id", "page", "sheet", "line", "find"],
     "flag": ["id", "spot", "page", "sheet", "cell", "line", "note", "source_text", "result_text"],

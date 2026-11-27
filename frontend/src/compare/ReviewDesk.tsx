@@ -4,8 +4,8 @@ import { BookOpen, GitCompareArrows, LocateFixed } from 'lucide-react';
 import { ResultReview, pageLabel, type ResultPane, type ReviewEvidence, type ReviewLocation } from './ResultReview';
 import { columnName } from './worksheet';
 import { lines } from './diff';
-import { tableLines } from '../markdown';
-import type { TableLine } from '../markdown';
+import { lineKinds } from '../markdown';
+import type { LineKind } from '../markdown';
 import { ResultModeSwitch, useResultMode } from '../MarkdownView';
 import type { ReviewMode } from '../navigation';
 import type { ShowAt } from './ReviewChecks';
@@ -54,8 +54,9 @@ export function ReviewDesk({ mode, onMode, canCompare, baseline, candidate, orig
   const view = canCompare ? mode : 'source';
   const output = useMemo(() => sourcePane?.text ? lines(sourcePane.text) : [], [sourcePane?.text]);
   const [textMode, setTextMode] = useResultMode();
-  // 읽기 보기: 줄 번호와 원문 위치는 그대로 두고 표 줄만 칸으로 그린다(한글 폭을 2칸으로 세어 같은 표는 같은 칸 너비).
-  const tables = useMemo(() => textMode === 'read' && sourcePane?.text ? tableLines(sourcePane.text) : new Map<number, TableLine>(), [sourcePane?.text, textMode]);
+  // 읽기 보기: 줄 번호와 원문 위치는 그대로 두고 표 줄은 칸으로, 제목 줄은 제목으로 그린다. 읽기 보기(상세)와 같은 블록 해석기를 쓴다
+  // (한글 폭을 2칸으로 세어 같은 표는 같은 칸 너비. 코드 블록 안의 '# …'·'#LOT-7'은 제목이 아니다).
+  const kinds = useMemo(() => textMode === 'read' && sourcePane?.text ? lineKinds(sourcePane.text) : new Map<number, LineKind>(), [sourcePane?.text, textMode]);
   useEffect(() => { if (mode === 'runs') setOpenedRuns(true); }, [mode]);
   const lastSource = useRef(sourceKey);
   useEffect(() => {
@@ -161,13 +162,14 @@ export function ReviewDesk({ mode, onMode, canCompare, baseline, candidate, orig
             const labels = new Set(origins.keys());
             const shown = Array.from(origins).filter(([label]) => !previous.has(label));
             previous = labels;
-            const table = tables.get(number);
-            const heading = textMode === 'read' && !table ? /^(#{1,6})\s+(.*)$/.exec(value) : null;
+            const kind = kinds.get(number);
+            const table = kind && (kind.role === 'head' || kind.role === 'rule' || kind.role === 'row') ? kind : undefined;
+            const heading = kind?.role === 'heading' ? kind : null;
             const body = table ? table.role === 'rule' ? <span className="source-cells-rule" aria-hidden="true" />
               : <span className="source-table-line"><span className={`source-cells${table.role === 'head' ? ' is-head' : ''}`} style={{ gridTemplateColumns: table.columns }}>{table.cells.map((cell, c) => <span key={c}>{cell}</span>)}</span>
                 {/* 표 줄은 칸 정렬이 흐트러지지 않게 근거를 오른쪽 고정 칸에 아이콘으로 단다 */}
                 <span className="source-evidence">{shown.map(([label, loc]) => <button className="evidence-link is-icon" key={label} aria-label={label} data-tip={label} onClick={() => reveal(loc, number)}><LocateFixed size={14}/></button>)}</span></span>
-              : heading ? <span className={`source-heading is-h${heading[1].length}`}><span className="source-mark">{heading[1]}</span> {heading[2]}</span>
+              : heading ? <span className={`source-heading is-h${heading.level}`}><span className="source-level" aria-label={`제목 ${heading.level}단계`}>H{heading.level}</span>{heading.text}</span>
               : textMode === 'read' && /^\s*<!--\s*image\s*-->\s*$/.test(value) ? <span className="source-figure">그림 자리 · 그림 안 글자 없음</span> : value || ' ';
             return <div className={'source-line' + (table ? table.role === 'rule' ? ' is-table is-rule' : ' is-table' : '') + (!value.trim() && !table ? ' is-blank' : '') + (lit(number) ? ' is-evidence' : '')} key={number}><small aria-hidden="true">{number}</small><div>{body}
               {!table && shown.map(([label, loc]) => <button className="evidence-link" key={label} onClick={() => reveal(loc, number)}><LocateFixed size={14}/>{label}</button>)}</div></div>;

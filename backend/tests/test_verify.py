@@ -216,12 +216,16 @@ def test_review_from_spot_is_filled_by_server_and_deduplicated(tmp_path, monkeyp
         spot = {"key": "S1", "severity": "high", "kind": "changed", "message": "원본 '0.5'이(가) 결과에서 '05'(으)로 다릅니다.",
                 "page": None, "sheet": None, "cell": None, "line": 1, "line_end": 1, "ref": "1줄", "source": "기준 0.5 mL",
                 "source_hit": "0.5", "result": "기준 05 mL", "result_hit": "05"}
-        monkeypatch.setattr(type(service), "verify", lambda self, doc, run=None: {"spots": [spot]})
+        monkeypatch.setattr(type(service), "finding",
+                            lambda self, doc, run, ref: {**spot, "id": "F0123456789ab", "run_id": run, "rule_version": "test"})
         first = client.post("/api/live/reviews", json={"document_id": doc_id, "spot": "S1", "origin": "console", "status": "wrong"}).json()
         assert first["created"] is True and first["kind"] == "changed" and first["source_hit"] == "0.5" and first["line"] == 1
         assert first["note"] == spot["message"] and first["status"] == "wrong" and first["origin"] == "console"
+        assert first["finding_id"] == "F0123456789ab" and first["rule_version"] == "test"
         again = client.post("/api/live/reviews", json={"document_id": doc_id, "spot": "S1"}).json()
         assert again["created"] is False and again["id"] == first["id"]
+        by_id = client.post("/api/live/reviews", json={"document_id": doc_id, "finding_id": "F0123456789ab"}).json()
+        assert by_id["created"] is False and by_id["id"] == first["id"]  # S번호든 finding ID든 같은 V
 
 
 @pytest.mark.parametrize("name", ["SOP-QC-0040_Rev5.pdf"])

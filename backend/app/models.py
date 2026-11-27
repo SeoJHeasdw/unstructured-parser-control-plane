@@ -16,9 +16,18 @@ class LiveDocument(BaseModel):
     error_code: str | None = None
     # 문서 번호. 화면과 작업 에이전트가 'D12'처럼 부른다. 올린 순서로 매기며 바뀌지 않는다.
     seq: int | None = None
+    # 최신 성공 실행의 자동 대조 판정 상태(목록 질의에만 붙는다). state: pending·needs_review·undetermined·pass_candidate·unavailable
+    qc: dict | None = None
 
 class DocumentList(BaseModel):
     documents: list[LiveDocument]
+
+class DocumentPage(BaseModel):
+    documents: list[LiveDocument]
+    total: int
+    next_cursor: str | None = None
+    # formats: 확장자(대문자, 없으면 '') → 수(검색·상태 조건 적용), statuses: 화면 상태(no_text 포함) → 수(검색·확장자 조건 적용)
+    facets: dict[str, dict[str, int]]
 
 
 # ----- 허용 폴더에서 가져오기(app/folder_import.py). 경로는 허용 폴더 기준 상대 경로(/ 구분)다.
@@ -116,6 +125,16 @@ class StoredParseRun(ParseRun):
     warnings: list[str]
     locations: list[ResultLocation]
     fidelity: dict | None = None
+    # 판정 근거(텍스트·CSV: 인코딩·구분자 후보·원래 열 수). 예전 실행에는 없다.
+    evidence: dict | None = None
+    # 사용자가 지정한 원천 계약(구분자·인코딩). 지정하지 않았으면 None.
+    options: dict | None = None
+
+
+class ProcessOptions(BaseModel):
+    """파싱할 때 쓸 원천 계약. 텍스트·CSV에만 쓴다. 비우면 파서가 고른다(근거는 실행의 evidence에 남는다)."""
+    csv_delimiter: Literal[",", ";", "\t", "|"] | None = None
+    encoding: Literal["utf-8", "utf-8-sig", "cp949", "utf-16", "utf-16-le", "utf-16-be", "utf-32"] | None = None
 
 class HistoryEntry(BaseModel):
     created_at: str
@@ -136,8 +155,10 @@ class ReviewCreate(BaseModel):
     # 대조한 파싱 실행. 생략하면 지금 결과(최신 성공 실행)
     run_id: str | None = Field(None, pattern=_HEX32)
     origin: Literal["agent", "console"] = "agent"
-    # 자동 대조 지점(S번호). 주면 위치·원본/결과 글자를 서버가 그 지점으로 채운다(같은 실행의 같은 지점은 하나만).
-    spot: str | None = Field(None, pattern=r"^S\d{1,5}$")
+    # 자동 대조 지점(S번호 또는 finding ID). 주면 위치·원본/결과 글자를 서버가 원장의 그 지점으로 채운다
+    # (같은 실행의 같은 지점은 하나만). S번호는 표시 순번이라 규칙 버전이 바뀌면 달라질 수 있다: finding ID가 안정적이다.
+    spot: str | None = Field(None, pattern=r"^(?:S\d{1,6}|F[0-9a-f]{12})$")
+    finding_id: str | None = Field(None, pattern=r"^F[0-9a-f]{12}$")
     kind: str | None = Field(None, max_length=40)
     severity: Literal["high", "medium", "low"] | None = None
     page: int | None = Field(None, ge=1, le=100_000)
@@ -190,6 +211,9 @@ class Review(BaseModel):
     status: ReviewStatus
     comment: str | None = None
     batch: int | None = None
+    # 자동 대조 원장의 의심점 ID와 그때의 규칙 버전(V는 만들 때의 내용을 스냅샷으로 가진다).
+    finding_id: str | None = None
+    rule_version: str | None = None
 
 class ReviewSaved(Review):
     created: bool
