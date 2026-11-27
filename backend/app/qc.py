@@ -108,7 +108,7 @@ def machine_state(spots_total: int, reasons: list[dict]) -> str:
 
 
 def gate(spots: list[dict], reasons: list[dict], verdicts: dict[str, str], open_reviews: int, wrong_reviews: int,
-         *, stale: bool = False) -> dict:
+         *, stale: bool = False, omitted: int = 0) -> dict:
     """문서 판정 상태. verdicts: finding ID → 사람 판정(open·correct·wrong·unclear). open_reviews: 이 실행의 열린·보류 검수 요청 수.
 
     중요 오류나 확인 안 된 필수 범위 하나가 문서 평균(일치율)에 묻히지 않도록 일치율은 쓰지 않는다."""
@@ -117,11 +117,14 @@ def gate(spots: list[dict], reasons: list[dict], verdicts: dict[str, str], open_
     shown: list[dict] = []
     if unresolved:
         shown.append(reason("findings", f"확인하지 않은 의심점 {len(unresolved):,}곳" + (f"(높음 {high:,})" if high else "") + "이 있습니다."))
+    if omitted:
+        # 찾았지만 상세를 남기지 못한 차이: 사람이 볼 수 없으니 해결될 수 없다. 남은 수만큼 통과 후보를 막는다.
+        shown.append(reason("findings_omitted", f"찾았지만 상세를 남기지 못한 차이 {omitted:,}곳이 있습니다. 볼 수 없는 차이는 해결로 셀 수 없습니다."))
     if wrong_reviews:
         shown.append(reason("confirmed_wrong", f"사람이 '틀림'으로 확인한 곳 {wrong_reviews:,}건이 있습니다. 파서를 고치거나 다시 파싱해야 합니다."))
     if open_reviews:
         shown.append(reason("open_reviews", f"판정을 기다리는 검수 요청 {open_reviews:,}건이 있습니다."))
-    if shown:
+    if shown:  # 확인 안 된 의심점·상세 없는 차이·틀림·열린 검수 요청
         state = "needs_review"
     elif any(r.get("blocking") for r in reasons):
         state = "undetermined"
@@ -129,7 +132,7 @@ def gate(spots: list[dict], reasons: list[dict], verdicts: dict[str, str], open_
         state = "pass_candidate"
     if stale:
         shown.append(reason("stale", "이 결과는 이전 성공본입니다. 그 뒤 처리가 실패했거나 다시 처리하는 중입니다.", blocking=False))
-    out = {"state": state, "label": STATE_LABELS[state], "reasons": shown + list(reasons), "unresolved": len(unresolved),
+    out = {"state": state, "label": STATE_LABELS[state], "reasons": shown + list(reasons), "unresolved": len(unresolved) + omitted,
            "unresolved_high": high, "open_reviews": open_reviews, "wrong_reviews": wrong_reviews}
     if state == "pass_candidate":
         out["note"] = "기록 모드: 운영 자동 통과는 꺼져 있습니다. 통과 후보로 기록하고 사람 검수를 이어 갑니다."

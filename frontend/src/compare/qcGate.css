@@ -7,6 +7,8 @@
 .qc-badge.is-pass_candidate { background: var(--ok-soft); color: var(--ok); }
 .qc-badge.is-pending, .qc-badge.is-unavailable { border-color: var(--rule); background: var(--surface); color: var(--ink-3); }
 .qc-badge.is-button { cursor: pointer; }
+/* 이전 성공본의 판정: 현재 결과가 아니라 흐리게, 점선 테두리로 */
+.qc-badge.is-previous { border: 1px dashed currentColor; background: var(--surface); opacity: .85; font-weight: 600; }
 .qc-badge.is-button:hover { box-shadow: inset 0 0 0 1px currentColor; }
 .qc-badge.is-button[aria-expanded=true] { box-shadow: inset 0 0 0 1.5px currentColor; }
 

@@ -99,6 +99,7 @@ class _Mail:
         self.lines: list[str] = []
         self.attachments = 0
         self.inline_images = 0
+        self.image_places: list[str] = []
         self.nested = 0
         self.bodies = 0
         self.warnings: list[str] = []
@@ -113,19 +114,28 @@ class _Mail:
         rows = [(label, " ".join(str(message.get(key)).split())) for key, label in _HEADERS if message.get(key)]
         if rows:
             self.lines += ["| 항목 | 값 |", "|---|---|"] + ["| " + label + " | " + _cell(value) + " |" for label, value in rows] + [""]
-        bodies, attachments, nested = [], [], []
-        self._walk(message, address, bodies, attachments, nested)
+        bodies, attachments, nested, images = [], [], [], []
+        self._walk(message, address, bodies, attachments, nested, images, shown=True)
         if bodies:
             self.bodies += 1
             for text in bodies:
                 self.lines += [text, ""]
         else:
             self.lines += ["_(본문 없음)_", ""]
+        if images:
+            # 표시한 본문이 하나여도 그림은 메일의 모든 MIME 부분에서 센다(글 본문이 있어 내보내지 않은 HTML 본문 안 그림 포함).
+            self.inline_images += len(images)
+            self.lines += [f"{level}# 본문 그림 {len(images)}개 (읽지 않음)", "", "| 위치 | 형식 | 크기 | 연결 | 속한 본문 |", "|---|---|---|---|---|"]
+            for where, ctype, size, cid, shown in images:
+                self.lines.append(f"| {where} | {ctype} | {_human(size)} | {_cell('cid:' + cid) if cid else '—'} | "
+                                  f"{'표시한 본문' if shown else '표시하지 않은 대체 본문(HTML 등)'} |")
+                self.image_places.append(where + ("" if shown else "(표시하지 않은 대체 본문)"))
+            self.lines.append("")
         if attachments:
             self.attachments += len(attachments)
-            self.lines += [f"{level}# 첨부 {len(attachments)}개", "", "| # | 이름 | 형식 | 크기 | 위치 |", "|---|---|---|---|---|"]
-            for number, (name, ctype, size, where) in enumerate(attachments, start=1):
-                self.lines.append(f"| {number} | {_cell(name)} | {ctype} | {_human(size)} | {where} |")
+            self.lines += [f"{level}# 첨부 {len(attachments)}개", "", "| 이름 | 형식 | 크기 | 위치 |", "|---|---|---|---|"]
+            for name, ctype, size, where in attachments:
+                self.lines.append(f"| {_cell(name)} | {ctype} | {_human(size)} | {where} |")
             self.lines.append("")
         for inner, where in nested:
             self.nested += 1
@@ -134,7 +144,8 @@ class _Mail:
                 continue
             self.message(inner, where, depth + 1)
 
-    def _walk(self, part: Message, address: str, bodies: list[str], attachments: list, nested: list) -> None:
+    def _walk(self, part: Message, address: str, bodies: list[str], attachments: list, nested: list, images: list, *, shown: bool) -> None:
+        """shown: 이 부분이 내보내는 대표 본문 쪽인지. 아니어도(같은 본문의 다른 표현) 그림·첨부·첨부 메일은 모두 센다."""
         ctype = part.get_content_type()
         if ctype == "message/rfc822":
             payload = part.get_payload()
@@ -145,34 +156,31 @@ class _Mail:
         if part.is_multipart():
             children = list(part.iter_parts()) if isinstance(part, EmailMessage) else part.get_payload()
             if ctype == "multipart/alternative":
-                # 같은 본문의 다른 표현: 글(plain)이 있으면 그것만, 없으면 HTML. 둘을 다 넣지 않는다.
+                # 같은 본문의 다른 표현: 글(plain)이 있으면 그것만, 없으면 HTML을 내보낸다. 둘을 다 넣지 않는다.
                 plain = next((c for c in children if c.get_content_type() == "text/plain" and _content(c).strip()), None)
                 chosen = plain or next((c for c in children if c.get_content_type() == "text/html"), None)
                 if chosen is None:
                     chosen = next((c for c in children if c.is_multipart()), None)
                 for index, child in enumerate(children, start=1):
-                    if child is chosen:
-                        self._walk(child, f"{address}.{index}", bodies, attachments, nested)
+                    self._walk(child, f"{address}.{index}", bodies, attachments, nested, images, shown=shown and child is chosen)
                 return
             for index, child in enumerate(children, start=1):
-                self._walk(child, f"{address}.{index}", bodies, attachments, nested)
+                self._walk(child, f"{address}.{index}", bodies, attachments, nested, images, shown=shown)
             return
         filename = part.get_filename()
         disposition = part.get_content_disposition()
         if filename or disposition == "attachment":
             attachments.append((filename or f"이름 없는 첨부 {address}", ctype, _size(part), address))
         elif ctype == "text/plain":
-            text = clean(_content(part))
+            text = clean(_content(part)) if shown else ""
             if text.strip():
                 bodies.append(text)
         elif ctype == "text/html":
-            text = html_text(_content(part))
+            text = html_text(_content(part)) if shown else ""
             if text.strip():
                 bodies.append(text)
         elif ctype.startswith("image/"):
-            self.inline_images += 1
-            content_id = (part.get("content-id") or "").strip("<> ")
-            bodies.append(f"<!-- image -->  _(본문 그림 위치 {address}" + (f", cid:{content_id}" if content_id else "") + ")_")
+            images.append((address, ctype, _size(part), (part.get("content-id") or "").strip("<> "), shown))
         elif _size(part):
             attachments.append((f"이름 없는 부분 {address}", ctype, _size(part), address))
 
@@ -193,7 +201,8 @@ def parse_eml(path: Path, settings: Settings) -> ParsedDocument:
     if mail.attachments:
         warnings.insert(0, f"첨부 {mail.attachments}개: {ATTACHMENT_WARNING}")
     if mail.inline_images:
-        warnings.append(f"본문 안 그림 {mail.inline_images}개는 읽지 않았습니다(그림 속 글자 없음).")
+        places = ", ".join(mail.image_places[:6]) + (f" 외 {len(mail.image_places) - 6}개" if len(mail.image_places) > 6 else "")
+        warnings.append(f"본문 안 그림 {mail.inline_images}개는 읽지 않았습니다(그림 속 글자 없음). 위치: {places}.")
     if not mail.bodies:
         warnings.append("본문이 없는 메일입니다(첨부만 있음). 실패가 아닙니다.")
     markdown = "\n".join(mail.lines).strip()

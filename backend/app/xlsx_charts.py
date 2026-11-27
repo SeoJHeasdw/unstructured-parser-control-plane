@@ -42,7 +42,8 @@ def column_name(index: int) -> str:
 
 
 def resolve(formula: str | None) -> tuple[str, list[str]] | None:
-    """'Meter'!$B$2:$B$3 → ('Meter', ['B2', 'B3']). 한 행·한 열 연속 범위만. 해석할 수 없으면 None."""
+    """'Meter'!$B$2:$B$3 → ('Meter', ['B2', 'B3']). 한 행·한 열 연속 범위만(앞 MAX_POINTS개). 해석할 수 없으면 None.
+    범위 전체의 점 수는 ref_size()."""
     match = _REF.fullmatch((formula or "").strip())
     if not match:
         return None
@@ -57,6 +58,18 @@ def resolve(formula: str | None) -> tuple[str, list[str]] | None:
         return None  # 2차원 범위는 계열 값이 아니다
     cells = [f"{column_name(c)}{r}" for c in range(c1, c2 + 1) for r in range(r1, r2 + 1)]
     return sheet, cells[:MAX_POINTS]
+
+
+def ref_size(formula: str | None) -> int | None:
+    """연속 범위의 점 수(잘라 내기 전). 해석할 수 없으면 None."""
+    match = _REF.fullmatch((formula or "").strip())
+    if not match:
+        return None
+    c1, r1 = column_index(match.group(3)), int(match.group(4))
+    c2, r2 = (column_index(match.group(5)), int(match.group(6))) if match.group(5) else (c1, r1)
+    if c1 != c2 and r1 != r2:
+        return None
+    return abs(c2 - c1) + abs(r2 - r1) + 1
 
 
 def _cache(element) -> tuple[dict[int, str] | None, int | None]:
@@ -141,9 +154,10 @@ def read_charts(path) -> list[dict]:
                 formula = values.findtext(f".//{_c('f')}") if values is not None else None
                 cache, count = _cache(values)
                 cat_formula = categories.findtext(f".//{_c('f')}") if categories is not None else None
-                cat_cache, _ = _cache(categories)
+                cat_cache, cat_count = _cache(categories)
                 series.append({
-                    "name": label, "name_ref": name_ref, "formula": formula, "ref": resolve(formula),
+                    "name": label, "name_ref": name_ref, "formula": formula, "ref": resolve(formula), "ref_size": ref_size(formula),
+                    "category_formula": cat_formula, "category_count": cat_count,
                     "literal": values is not None and values.find(_c("numLit")) is not None,
                     "cache": cache, "cache_count": count,
                     "categories": resolve(cat_formula), "category_cache": cat_cache,

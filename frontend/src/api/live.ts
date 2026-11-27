@@ -3,7 +3,8 @@ export type LiveStatus = 'uploaded' | 'processing' | 'completed' | 'failed' | 'u
 /** seq: 문서 번호. 화면과 작업 에이전트가 'D12'처럼 부른다. 예전 서버는 보내지 않는다. */
 /** 자동 대조 판정 상태(최신 성공 실행, 사람 판정 합침). pending: 미평가 · unavailable: 원본을 읽을 수 없어 대조 못 함 */
 export type QcState = 'pending' | 'needs_review' | 'undetermined' | 'pass_candidate' | 'unavailable';
-export type DocQc = { state: QcState; label: string; unresolved: number | null };
+/** previous: 지금 처리 중이거나 실패해서, 이 판정은 이전 성공본의 것(label에 '이전 성공본 · …'). 현재 판정 수에 넣지 않는다. */
+export type DocQc = { state: QcState; label: string; unresolved: number | null; previous?: boolean };
 /** qc: 목록 질의(쪽 단위)에만 붙는다. 전체 목록(예전 호환)에는 없다. */
 export type LiveDoc = { id: string; name: string; format: string; size_bytes: number; status: LiveStatus; created_at: string; updated_at: string; parser: string | null; error: string | null; error_code?: string | null; seq?: number | null; qc?: DocQc | null };
 export type LiveResult = { id: string; markdown: string; parser: string; parser_version: string; is_stale: boolean; fidelity?: {findings?: {message: string}[]} | null; warnings: string[] };
@@ -119,6 +120,8 @@ export async function getVerifySpot(id: string, ref: string, run: string | undef
 export type QcSummary = { rule_version: string; documents: number; parsed: number; qc_done: number; qc_pending: number; qc_unavailable: number;
  states: Record<'needs_review' | 'undetermined' | 'pass_candidate', number>; not_parsed: Record<string, number>; human_decided: number; processing: number;
  /** 대조 규칙이 바뀌어 이전 규칙의 원장만 있는 실행 수와, 서버 시작 때의 다시 대조 진행(예전 서버는 없다) */
+ /** 지금 처리 중·실패지만 이전 성공본이 있는 문서(상태별). 파싱 완료·판정 수에 들어가지 않는다. */
+ previous_results?: Record<string, number>;
  qc_stale?: number; reverify?: { state: 'idle' | 'running' | 'done' | 'failed' | 'stopped'; total: number; stale: number; done: number; failed: number; rule_version: string } };
 export async function getQcSummary(signal?: AbortSignal): Promise<QcSummary> {
  return readResponse<QcSummary>(await fetch('/api/live/qc-summary', signal ? {signal} : undefined));

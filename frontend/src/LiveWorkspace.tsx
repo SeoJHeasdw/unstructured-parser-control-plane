@@ -432,7 +432,7 @@ export default function LiveWorkspace({ active = true, route, onRoute, onFamily,
              e.preventDefault(); selectDocument(doc.id);
            }}>
              <span className="lw-file"><FileGlyph format={doc.format}/><span className="lw-file-copy"><FileName name={doc.name}/><small><DocNumber seq={doc.seq}/>{statusNote(doc) ?? `${doc.format || '확장자 없음'} · ${displaySize(doc.size_bytes)}`}</small></span></span>
-             <span className="lw-status-cell"><StatusBadge status={displayStatus(doc)}/>{doc.qc?.state && doc.status !== 'processing' && <QcStateBadge state={doc.qc.state} unresolved={doc.qc.unresolved} />}</span>
+             <span className="lw-status-cell"><StatusBadge status={displayStatus(doc)}/>{doc.qc?.state && <QcStateBadge state={doc.qc.state} unresolved={doc.qc.unresolved} label={doc.qc.label} previous={doc.qc.previous} />}</span>
              <time dateTime={doc.updated_at}>{displayDate(doc.updated_at)}</time>
            </a></li>)}</ul>
            {remaining > 0 && !legacy && <div className="lw-more"><button className="lw-btn" onClick={() => void loadMore()} disabled={loadingMore || !listMeta.next}>

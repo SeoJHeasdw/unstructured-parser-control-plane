@@ -106,6 +106,8 @@ describe('문서함 서버 목록', () => {
   function servePages() {
     const all = [...Array.from({ length: 60 }, (_, i) => make(i + 1, i % 2 ? 'XLSX' : 'XLSM'))].reverse();
     all[0] = { ...all[0], qc: { state: 'needs_review', label: '검수 필요', unresolved: 3 } };
+    // 재처리에 실패한 문서: 이전 성공본의 판정은 보존하되 현재 결과와 구별한다
+    all[1] = { ...all[1], status: 'failed', qc: { state: 'pass_candidate', label: '이전 성공본 · 통과 후보', unresolved: 0, previous: true } };
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
       const path = String(input);
       if (path === '/api/live/qc-summary') return json({ rule_version: 'v', documents: 60, parsed: 58, qc_done: 57, qc_pending: 1, qc_unavailable: 0,
@@ -136,6 +138,10 @@ describe('문서함 서버 목록', () => {
     expect(within(funnel).getByText('통과 후보')).toBeTruthy();
     const firstRow = screen.getByRole('link', { name: /문서60\.xlsx/ });
     expect(firstRow.querySelector('.lw-status-cell .qc-badge')?.textContent).toBe('검수 필요3');
+    const failedRow = screen.getByRole('link', { name: /문서59\.xlsm/ });
+    const previous = failedRow.querySelector('.lw-status-cell .qc-badge');
+    expect(previous?.textContent).toBe('이전 성공본 · 통과 후보');
+    expect(previous?.className).toContain('is-previous');
     await user.click(screen.getByRole('button', { name: /10개 더 보기/ }));
     await screen.findByText('문서1.xlsm');
     expect(fetchMock.mock.calls.some(([path]) => String(path).includes('cursor=50'))).toBe(true);

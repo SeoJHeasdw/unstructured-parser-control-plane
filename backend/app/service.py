@@ -551,8 +551,10 @@ class DocumentService:
             reasons.append(qc.reason("rules_changed", f"대조 규칙이 바뀌어 이 실행을 다시 대조했습니다(이전 규칙 {before['rule_version']}: 의심점 "
                                      f"{before['spots_total'] or 0}곳 → 지금 {header.get('spots_total', 0)}곳). 이전 검수 판정과 근거(V번호·메모)는 그대로입니다.",
                                      blocking=False, previous=before["rule_version"]))
-        gate = qc.gate(self.repo.qc_all(doc_id, run["run_id"], qc.rule_key()), reasons, verdicts,
-                       counts.get("open", 0) + counts.get("unclear", 0), counts.get("wrong", 0), stale=stale)
+        stored = self.repo.qc_all(doc_id, run["run_id"], qc.rule_key())
+        omitted = max(0, int(header.get("spots_total") or 0) - len(stored))  # 상세 없이 센 차이(전체 상한을 넘음)
+        gate = qc.gate(stored, reasons, verdicts, counts.get("open", 0) + counts.get("unclear", 0), counts.get("wrong", 0),
+                       stale=stale, omitted=omitted)
         following = offset + len(spots)
         return {"id": doc_id, "run_id": run["run_id"], "completed_at": run["completed_at"], "parser_version": run["parser_version"],
                 **header, "qc_state": "done", "spots": spots, "spots_matched": matched,
@@ -624,10 +626,16 @@ class DocumentService:
         out = {"rule_version": qc.rule_key(), "documents": len(rows), "parsed": 0, "qc_done": 0, "qc_pending": 0,
                "qc_unavailable": 0, "states": {state: 0 for state in ("needs_review", "undetermined", "pass_candidate")},
                "not_parsed": {}, "human_decided": 0, "processing": 0, "qc_stale": 0, "reverify": dict(self.reverify_state)}
+        out["previous_results"] = {}  # 지금 처리 중이거나 실패했지만 이전 성공본은 있는 문서(상태별). 현재 판정 수에 넣지 않는다.
         for row in rows:
             if row["status"] == "processing":
                 out["processing"] += 1
             state = self._qc_state(row)
+            if state is not None and row["status"] != "completed":
+                # 이전 성공본의 판정은 그 실행에 남아 있지만(상세·원문 대조에서 '이전 성공본'), 지금 유효한 결과가 아니다.
+                # 현재 처리 결과로 세면 재처리에 실패한 문서가 통과 후보로 남는다(2026-11-27 리뷰).
+                out["previous_results"][row["status"]] = out["previous_results"].get(row["status"], 0) + 1
+                state = None
             if state is None:
                 if row["status"] != "processing":
                     key = row["error_code"] or row["status"]
@@ -667,7 +675,11 @@ class DocumentService:
             row = rows.get(doc["id"])
             state = self._qc_state(row) if row else None
             label = "규칙 변경 · 다시 대조 대기" if state == "pending" and row and row["stale"] else qc.STATE_LABELS.get(state, "")
-            doc["qc"] = {"state": state, "label": label,
+            previous = bool(state) and doc["status"] != "completed"
+            if previous:
+                # 지금 처리 중·실패: 판정은 이전 성공본의 것이다. 상태 이름에 붙여 현재 결과와 구별한다.
+                label = f"이전 성공본 · {label}"
+            doc["qc"] = {"state": state, "label": label, "previous": previous,
                          "unresolved": max(0, (row["spots_total"] or 0) - row["resolved"]) if row and state not in (None, "pending", "unavailable") else None} if state else None
 
     # ------------------------------------------------------------ 검수 요청(V번호)

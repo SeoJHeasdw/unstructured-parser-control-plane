@@ -404,3 +404,21 @@ Docling 실행 시 `HF_HUB_OFFLINE=1`, `TRANSFORMERS_OFFLINE=1`을 설정하며 
 ### PDF 네이티브 호출 직렬화
 
 pypdfium2는 한 프로세스의 여러 스레드에서 동시에 부르면 안 된다. PDF 파싱(Docling PDF 경로·`pdf-text`)과 원본 읽기(`source-text`·자동 대조)는 `app/pdf_layers.PDFIUM` 잠금 안에서 한다. 큰 PDF를 파싱하는 동안 다른 PDF의 원본 읽기는 기다린다(자동 대조는 파싱 직후 같은 작업자가 계산해 두므로 화면 조회는 대개 원장만 읽는다). 프로세스 격리는 아직 하지 않았다.
+
+
+### 리뷰 반영 (2026-11-27, 8건)
+
+다른 에이전트의 반입 리뷰에서 재현된 문제를 고쳤다. 계약이 바뀐 부분만 적는다.
+
+| 항목 | 바뀐 계약 |
+|---|---|
+| 규칙 키 | 원장의 `rule_version`은 `verify-2026.11.28+<지문 10자>`다. 지문은 대조·원본 읽기 모듈(`qc.py`·`verify.py`·`source_text.py`·`pdf_layers.py`·`xlsx_charts.py`·`textnorm.py`·`adapters/text.py`·`adapters/eml.py`·`fidelity/probe.py`·`fidelity/report.py`·`format_gate.py`) 내용과 `pypdfium2`·`openpyxl`·`docling` 버전, Python 버전이다. 이름만 쓰던 첫 커밋은 규칙이 바뀌어도 같은 이름이라 옛 원장(의심점 0)을 계속 썼다. |
+| 다시 대조 | 서버가 시작할 때 현재 키의 원장이 없는 **최신 성공 실행**을 백그라운드에서 다시 대조한다(`DOCOPS_QC_REVERIFY`, 기본 켬, 원본만 다시 읽음). 그 사이 조회하면 그 자리에서 계산한다. 이전 키의 원장 행과 검수 요청(V번호·판정·메모·근거)은 지우지 않는다. `verify` 응답에 `rule_history`(같은 실행의 이전 원장: 규칙·의심점 수·시각)와 막지 않는 이유 `rules_changed`. `qc-summary`에 `qc_stale`(이전 규칙 원장만 있는 실행)·`reverify:{state, total, stale, done, failed, rule_version}`. 목록의 `qc.label`은 '규칙 변경 · 다시 대조 대기'. |
+| 상세 없는 차이 | 단위별 상세 상한(CSV 200행·글·셀 40곳·결과에만 있는 숫자 8·깨진 글자 5·그림 OCR 줄 10)을 없앴다. 찾은 차이는 모두 의심점이다. 전체 상한 2만 곳을 넘으면 우선순위 순으로 남기고 나머지를 `omitted`로 세며(`findings_capped`, 막음), `gate.unresolved`에 더하고 이유 `findings_omitted`를 단다. 앞의 지점을 모두 '맞음'으로 해도 통과 후보가 되지 않는다. |
+| 칸 단위 의심점 | CSV·XLSX의 바뀐·빠진·생긴 칸은 **칸마다** 의심점 하나다(두 칸 맞바꿈은 그 쌍 하나, 행 순서·행 빠짐·결과에만 있는 행은 행 하나, XLSX 열 밀림은 행 하나). 한 행을 묶으면 공백 차이만 보고 '맞음'을 눌러 같은 행의 수치 오류까지 해결될 수 있었다. |
+| 청크의 판정 | 청크 `qc`는 원장 의심점 중 '맞음'이 아닌 것과 의심점 없이 올린 검수 요청(결과 줄이 있고 '맞음'이 아닌 것)이다. 항목마다 `review:{id, status, comment, origin, page, sheet, cell, line, decided_at}`(없으면 `null`). 청크 `qc_counts:{wrong, unclear, open}`, 표시 `confirmed-wrong`(틀림 확인)·`unverified`(보류·확인 전·판정 없음). `source.qc`에 `wrong`·`unclear`. 순서는 틀림 → 보류 → 확인 전 → 판정 없음. |
+| CSV 구분자 | 고른 구분자로는 대부분의 행이 한 칸인데 다른 후보(`\|` 등)가 표본 행의 80% 이상을 여러 칸으로 나누면 열 수가 들쭉날쭉해도 '확정 아님'이다(`delimiter_candidates[].multi`). 사유 문장은 후보마다 일관된 열 수 또는 나뉘는 비율을 말한다. 정상 1열 CSV는 확정이다. |
+| PDF 숨은 층 ↔ 그림 OCR | `pdf-text` 실행 근거에 그림마다 `picture_ocr:{쪽:[{bbox(PDF 좌표), text}]}`. 숨은 층 묶음은 상자가 겹치는(IoU ≥ 0.5) 같은 그림의 OCR과만 짝짓고(근거가 없으면 그 쪽에 묶음·OCR이 하나씩일 때만), **항목·값·단위**를 한 벌로 비교한다(`verify.measure_match`). 다르면 `hidden_conflict`(항목별 `conflicts:[{label, hidden, ocr}]`), 항목 대응을 정할 수 없거나 짝이 없으면 `hidden_layer`(화면 값 미확인), 모두 같으면 의심점 없음. |
+| 차트 | 계열마다 **(범주, 값)** 한 쌍으로 대조한다(셀의 범주 ↔ 차트에 저장된 범주 이름, 날짜는 일련번호 변환). 참조 셀 수와 캐시 `ptCount`·캐시에만 있는 점도 충돌로 본다. 점이 2,000개를 넘으면 앞 2,000개만 대조하고 계열 상태 `partial`, 이유 `chart_partial`(막음), 검사 항목 `2,000/2,001`. 차트 단위 `series[]`에 `points`(전체)·`checked`. |
+| 재처리 실패 | 지금 처리 중·실패지만 이전 성공본이 있는 문서는 목록 `qc.previous: true`, `qc.label` '이전 성공본 · …'(당시 판정은 그대로). `qc-summary`의 `parsed`·`qc_done`·`states`에 넣지 않고 `previous_results:{상태: 수}`로 따로 세며, 실패는 `not_parsed`에 오류 코드로 센다. |
+| EML 그림 | 대표 본문은 하나만 내보내되 그림·첨부·첨부 메일은 모든 MIME 부분에서 센다. 결과에 `## 본문 그림 N개 (읽지 않음)` 표(위치·형식·크기·연결 cid·속한 본문: 표시한 본문 / 표시하지 않은 대체 본문), 경고에 위치. 첨부·그림 표에서 `#` 번호 열은 뺐다(원본에 없는 숫자). |

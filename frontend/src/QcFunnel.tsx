@@ -27,10 +27,12 @@ export function QcFunnel({ revision, active }: { revision: number; active: boole
   if (!summary || !summary.documents || typeof summary.states !== 'object') return null;
   const notParsed = Object.entries(summary.not_parsed ?? {}).sort((a, b) => b[1] - a[1]);
   const notParsedTotal = notParsed.reduce((sum, [, count]) => sum + count, 0);
+  const previousTotal = Object.values(summary.previous_results ?? {}).reduce((sum, count) => sum + count, 0);
   const steps = [
     { label: '반입 전체', value: summary.documents },
-    { label: '파싱 완료', value: summary.parsed, note: notParsedTotal ? `못 함 ${notParsedTotal}` : undefined,
-      tip: notParsed.map(([key, count]) => `${notParsedLabels[key] ?? key} ${count}`).join(' · ') },
+    { label: '파싱 완료', value: summary.parsed, note: [notParsedTotal ? `못 함 ${notParsedTotal}` : '', previousTotal ? `이전 성공본만 ${previousTotal}` : ''].filter(Boolean).join(' · ') || undefined,
+      tip: [notParsed.map(([key, count]) => `${notParsedLabels[key] ?? key} ${count}`).join(' · '),
+        previousTotal ? `이전 성공본만 있는 문서 ${previousTotal}개(지금 처리 중·실패)는 이전 판정을 보존하되 현재 수에 넣지 않습니다.` : ''].filter(Boolean).join(' / ') },
     { label: '자동 대조', value: summary.qc_done,
       note: summary.reverify?.state === 'running' ? `규칙 변경 · 다시 대조 ${summary.reverify.done}/${summary.reverify.total}`
         : summary.qc_stale ? `규칙 변경 ${summary.qc_stale}` : summary.qc_pending ? `미평가 ${summary.qc_pending}` : summary.qc_unavailable ? `대조 불가 ${summary.qc_unavailable}` : undefined,

@@ -132,3 +132,55 @@ def test_visible_text_on_a_hidden_layer_page_keeps_its_own_layer(tmp_path):
     result = verify(source, "PRESSURE 71 bar", [{"start_line": 1, "end_line": 1, "page": 1}], "docling", "PDF")
     layers = {spot["kind"]: spot["source_layer"] for spot in result["spots"]}
     assert layers["hidden_layer"] == "pdf_hidden_layer" and layers["missing"] == "pdf_text_layer"
+
+
+@pytest.mark.parametrize("hidden, ocr, expected", [
+    ("A 71 bar B 17 bar", "A 17 bar B 71 bar", "conflict"),   # 값의 주인이 바뀜
+    ("PRESSURE 17 bar", "PRESSURE 17 kPa", "conflict"),       # 단위가 바뀜
+    ("PRESSURE 17 bar", "PRESSURE 17 bar", "agree"),
+    ("PRESSURE 17 bar", "17 bar", "unaligned"),                # 항목 대응을 정할 수 없음: 일치가 아니다
+])
+def test_hidden_layer_and_picture_ocr_are_compared_as_item_value_unit(tmp_path, monkeypatch, hidden, ocr, expected):
+    """리뷰 재현: 숫자 모음만 비교해 A·B 값 맞바꿈과 bar → kPa가 '다름 0·같음 1'이었다."""
+    fake = FakeOcr(lambda prompt, png: ocr)
+    fake.env(monkeypatch, mode="region")
+    try:
+        parsed, _, result = _check(tmp_path, raster_pdf(hidden=hidden), "m.pdf")
+        assert parsed.evidence["picture_ocr"]["1"][0]["text"] == ocr and len(parsed.evidence["picture_ocr"]["1"][0]["bbox"]) == 4
+        kinds = [spot["kind"] for spot in result["spots"] if spot["kind"].startswith("hidden")]
+        check = next(c for c in result["checks"] if c["id"] == "hidden_layer")
+        if expected == "conflict":
+            spot = next(s for s in result["spots"] if s["kind"] == "hidden_conflict")
+            assert kinds == ["hidden_conflict"] and spot["conflicts"] and "같음 0" in check["detail"] and "다름 1" in check["detail"]
+            if hidden.startswith("A"):
+                assert [(d["label"], d["hidden"], d["ocr"]) for d in spot["conflicts"]] == [("a", "71 bar", "17 bar"), ("b", "17 bar", "71 bar")]
+            else:
+                assert spot["conflicts"][0]["ocr"] == "17 kPa" and "kPa" in spot["message"]
+        elif expected == "agree":
+            assert kinds == [] and "같음 1" in check["detail"]
+        else:
+            spot = next(s for s in result["spots"] if s["kind"] == "hidden_layer")
+            assert kinds == ["hidden_layer"] and "대응을 정할 수 없어" in spot["message"] and "같음 0" in check["detail"]
+    finally:
+        fake.close()
+
+
+def test_two_pictures_on_one_page_pair_by_box_not_by_order():
+    from app.source_text import SourceLine, SourceText, SourceUnit
+    a_box, b_box = [10.0, 10.0, 200.0, 100.0], [10.0, 300.0, 200.0, 400.0]
+    unit = SourceUnit(key="p1", label="1쪽", page=1, kind="hidden_text",
+                      lines=[SourceLine(text="A 71 bar", ref="1쪽 1줄"), SourceLine(text="B 17 bar", ref="1쪽 2줄")],
+                      regions=[{"bbox": a_box, "text": "A 71 bar", "numbers": ["71"], "chars": 6},
+                               {"bbox": b_box, "text": "B 17 bar", "numbers": ["17"], "chars": 6}])
+    source = SourceText("PDF", "test", [unit], layer="pdf_text_layer")
+    markdown = "A 71 bar\nB 17 bar\n\n[그림 속 글자]\nB 17 bar\n\n[그림 속 글자]\nA 71 bar"
+    locations = [{"start_line": 1, "end_line": 8, "page": 1}]
+    evidence = {"kind": "pdf", "picture_ocr": {"1": [{"bbox": b_box, "text": "B 17 bar"}, {"bbox": a_box, "text": "A 71 bar"}]}}
+    paired = verify(source, markdown, locations, "pdf-text", "PDF", evidence)
+    assert not [s for s in paired["spots"] if s["kind"].startswith("hidden")]      # 상자로 짝지으면 둘 다 일치
+    swapped = {"kind": "pdf", "picture_ocr": {"1": [{"bbox": a_box, "text": "B 17 bar"}, {"bbox": b_box, "text": "A 71 bar"}]}}
+    conflicts = verify(source, markdown, locations, "pdf-text", "PDF", swapped)
+    assert [s["kind"] for s in conflicts["spots"] if s["kind"].startswith("hidden")] == ["hidden_layer", "hidden_layer"]  # 항목이 달라 대응 불가
+    unknown = verify(source, markdown, locations, "pdf-text", "PDF", {"kind": "pdf"})   # 그림 상자 근거 없음 + 그림 둘: 짝을 정하지 않는다
+    spots = [s for s in unknown["spots"] if s["kind"].startswith("hidden")]
+    assert [s["kind"] for s in spots] == ["hidden_layer", "hidden_layer"] and all("어느 그림 OCR과 짝인지" in s["message"] for s in spots)

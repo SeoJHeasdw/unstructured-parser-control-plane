@@ -59,6 +59,8 @@ def parse_pdf_text(path: Path, settings: Settings) -> ParsedDocument:
     pages: dict[int, str] = {}
     pictures: dict[int, list[tuple[float, float, float, float]]] = {}  # 쪽 → 큰 그림 상자(왼쪽 위 기준, PDF 포인트)
     hidden: dict[int, list[dict]] = {}  # 쪽 → 그림 위의 보이지 않는 글자 묶음(화면 값으로 확인되지 않은 글자)
+    bounds: dict[int, list[tuple[float, float, float, float]]] = {}  # 쪽 → 큰 그림의 PDF 좌표(왼쪽, 아래, 오른쪽, 위)
+    picture_ocr: dict[int, list[dict]] = {}  # 쪽 → 그림마다 OCR 결과와 그 그림 상자(같은 그림의 숨은 층과 대조)
     try:
         with pdfium.PdfDocument(path) as pdf:
             for index in range(count):
@@ -76,6 +78,7 @@ def parse_pdf_text(path: Path, settings: Settings) -> ParsedDocument:
                             # 회전한 쪽은 렌더링 좌표와 맞지 않아 잘라 읽지 않는다(경고에는 센다).
                             box = (max(0, left), max(0, height - top), min(width, right), min(height, height - bottom))
                             pictures.setdefault(index + 1, []).append(box if not page.get_rotation() else (0, 0, 0, 0))
+                            bounds.setdefault(index + 1, []).append((left, bottom, right, top))  # 같은 순서: PDF 좌표(숨은 층 묶음과 짝짓기)
                 finally:
                     textpage.close()
                     page.close()
@@ -99,7 +102,7 @@ def parse_pdf_text(path: Path, settings: Settings) -> ParsedDocument:
         budget = MAX_PICTURES
         for number, image in _render(path, sorted(pictures)):
             texts = []
-            for left, top, right, bottom in pictures[number]:
+            for position, (left, top, right, bottom) in enumerate(pictures[number]):
                 if budget <= 0 or right <= left:
                     skipped += 1
                     continue
@@ -109,6 +112,7 @@ def parse_pdf_text(path: Path, settings: Settings) -> ParsedDocument:
                     repeated.append(number)
                 if result.text.strip():
                     texts.append(f"{PICTURE_LABEL}\n{result.text.strip()}")
+                    picture_ocr.setdefault(number, []).append({"bbox": [round(v, 1) for v in bounds[number][position]], "text": result.text.strip()[:2000]})
             if texts:
                 figures[number] = "\n\n".join(texts)
     if not any(text.strip() for text in pages.values()) and not read:
@@ -152,6 +156,7 @@ def parse_pdf_text(path: Path, settings: Settings) -> ParsedDocument:
     if empty:
         warnings.append("본문 글자가 추출되지 않은 PDF 페이지: " + ", ".join(map(str, empty)))
     evidence = {"kind": "pdf", "pages": count, "hidden_layer_pages": sorted(hidden),
-                "hidden_regions": {str(page): regions for page, regions in hidden.items()}} if hidden else {"kind": "pdf", "pages": count, "hidden_layer_pages": []}
+                "hidden_regions": {str(page): regions for page, regions in hidden.items()},
+                "picture_ocr": {str(page): items for page, items in picture_ocr.items()}}
     return ParsedDocument(markdown="\n".join(lines), parser=PARSER, parser_version=f"pypdfium2 {version}",
                           ocr_enabled=ocr.configured, locations=locations, warnings=warnings, evidence=evidence)

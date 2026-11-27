@@ -522,10 +522,15 @@ def _xlsx(path, fmt: str, budget: _Budget) -> SourceText:
             name = series["name"]
             if name_ref and found.get((name_ref[0], name_ref[1][0])) not in (None, ""):
                 name = str(found[(name_ref[0], name_ref[1][0])])  # 계열 이름이 셀 참조뿐이면 그 셀 값
+            # 범주는 두 표현을 따로 둔다: 참조한 셀 값(category_cells)과 차트에 저장된 범주 이름(category_cache).
+            # 값만 맞고 범주가 뒤바뀐 차트(LOT-1·LOT-2 맞바꿈)를 찾으려면 (범주, 값)을 한 쌍으로 대조해야 한다.
             item = {"name": name, "formula": series["formula"], "literal": series["literal"], "cache": series["cache"],
                     "cache_count": series["cache_count"], "sheet": ref[0] if ref else None, "cells": ref[1] if ref else [],
+                    "points_total": series.get("ref_size") or (len(ref[1]) if ref else 0),
                     "resolved": bool(ref) and ref[0] in sheet_names and not budget.truncated,
                     "values": [_json_value(found.get((ref[0], cell))) for cell in ref[1]] if ref else [],
+                    "category_cells": [_json_value(found.get((cats[0], cell))) for cell in cats[1]] if cats else [],
+                    "category_cache": series["category_cache"], "category_count": series.get("category_count"),
                     "categories": ([_json_value(found.get((cats[0], cell))) for cell in cats[1]] if cats
                                    else [series["category_cache"].get(i) for i in range(len(ref[1]))] if series["category_cache"] and ref else [])}
             series_out.append(item)
@@ -615,7 +620,7 @@ def _eml(path, budget: _Budget) -> SourceText:
 
     from app.adapters.eml import _human  # 첨부 크기 표기(결과의 첨부 목록과 같은 글자로 대조한다)
 
-    def walk(part, address: str):
+    def walk(part, address: str, shown: bool = True):
         ctype = part.get_content_type()
         if ctype == "message/rfc822":
             payload = part.get_payload()
@@ -628,11 +633,13 @@ def _eml(path, budget: _Budget) -> SourceText:
             return
         if part.is_multipart():
             children = list(part.iter_parts())
+            chosen = None
             if ctype == "multipart/alternative":
                 plain = [c for c in children if c.get_content_type() == "text/plain" and text_of(c).strip()]
-                children = plain[:1] or [c for c in children if c.get_content_type() == "text/html"][:1] or children
+                chosen = (plain[:1] or [c for c in children if c.get_content_type() == "text/html"][:1] or [None])[0]
             for index, child in enumerate(children, start=1):
-                walk(child, f"{address}.{index}")
+                # 대표 본문이 아닌 표현도 그림·첨부는 센다(글은 읽지 않는다)
+                walk(child, f"{address}.{index}", shown if chosen is None else shown and child is chosen)
             return
         if part.get_filename() or part.get_content_disposition() == "attachment":
             payload = part.get_payload(decode=True)
@@ -640,6 +647,16 @@ def _eml(path, budget: _Budget) -> SourceText:
             line = f"{part.get_filename() or f'이름 없는 첨부 {address}'} {ctype} {_human(size)} {address}"
             if budget.take(line):
                 files.lines.append(SourceLine(text=line, ref=f"첨부 {address}"))
+            return
+        if ctype.startswith("image/"):
+            payload = part.get_payload(decode=True)
+            size = len(payload) if isinstance(payload, (bytes, bytearray)) else 0
+            cid = (part.get("content-id") or "").strip("<> ")
+            line = f"{address} {ctype} {_human(size)}" + (f" cid:{cid}" if cid else "")
+            if budget.take(line):
+                files.lines.append(SourceLine(text=line, ref=f"본문 그림 {address}"))
+            return
+        if ctype in ("text/plain", "text/html") and not shown:
             return
         if ctype in ("text/plain", "text/html"):
             text = text_of(part)

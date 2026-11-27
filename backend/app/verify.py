@@ -31,8 +31,9 @@ from app.textnorm import is_special
 SEVERITY = ("high", "medium", "low")
 MAX_SPOTS = 400            # 화면·에이전트가 한 번에 받는 상세 수(우선순위 순). 원장에는 전부 남는다.
 MAX_FINDINGS = 20_000      # 한 실행의 원장에 남기는 의심점 상한(넘으면 우선순위 높은 것부터 남기고 판정 불가)
-_LINE_SPOTS_PER_UNIT = 40
-_GRID_ROW_SPOTS = 200      # CSV 격자 대조에서 한 문서에 올리는 행 수
+# 단위별 상세 상한은 두지 않는다(2026-11-27 리뷰: CSV 201번째 차이가 원장에서 빠져, 앞 200곳을 '맞음'으로 처리하자
+# 압력 오류가 남은 채 통과 후보가 됐다). 찾은 차이는 모두 의심점이 되고, 화면은 쪽 단위로 보인다. 전체 상한(MAX_FINDINGS)을
+# 넘은 것은 '상세 없음'으로 세어 판정 상태에서 미해결로 남긴다.
 _GRID_DIFF_ROWS = 20_000   # 행 정렬(diff)을 하는 최대 행 수(넘으면 차이 구간 첫 행부터 순서대로 비교)
 
 _HTML_COMMENT = re.compile(r"<!--.*?-->")
@@ -199,7 +200,8 @@ class Verifier:
         self.hidden_pages: list[str] = []    # 그림 위 숨은 글자 층이 있는 단위
         self.hidden_conflicts = 0            # 숨은 층 값과 그림 OCR 값이 다른 그림 수
         self.hidden_agreed = 0               # 숨은 층 값과 그림 OCR 값이 같은 그림 수(다른 표현과 일치)
-        self.chart_tally = Counter()         # 차트 계열 상태별 수(match·conflict·no_cache·unresolved·literal)
+        self.chart_tally = Counter()         # 차트 계열 상태별 수(match·conflict·partial·no_cache·unresolved·literal)
+        self.chart_partial: list[str] = []   # 점이 많아 앞부분만 대조한 계열('제목'·'계열' 2,000/2,001)
         # TXT·MD·LOG는 결과가 원본 글 그대로다: 원본 줄도 결과와 같은 기준(Markdown 꾸밈 제외)으로 본다.
         self.source_plain = result_plain if self.fmt in ("TXT", "MD", "LOG") else source_plain
         self.raw = markdown.split("\n")
@@ -337,7 +339,8 @@ class Verifier:
             keep = {id(entry) for entry in ranked[:MAX_FINDINGS]}
             dropped = len(spots) - MAX_FINDINGS
             spots = [entry for entry in spots if id(entry) in keep]
-            self.reasons.append(reason("findings_capped", f"의심점이 {len(spots) + dropped:,}곳이라 우선순위가 높은 {MAX_FINDINGS:,}곳만 원장에 남겼습니다."))
+            self.reasons.append(reason("findings_capped", f"의심점이 {len(spots) + dropped:,}곳이라 우선순위가 높은 {MAX_FINDINGS:,}곳만 상세를 남겼습니다. "
+                                       f"상세가 없는 {dropped:,}곳은 미해결로 셉니다(앞의 지점을 모두 확인해도 통과 후보가 되지 않습니다).", omitted=dropped))
         for number, entry in enumerate(spots, start=1):
             entry["key"] = f"S{number}"
         counts = Counter(entry["severity"] for entry in spots)
@@ -351,7 +354,7 @@ class Verifier:
         top = sorted(spots, key=lambda e: e["rank"])
         return {"method": self.source.method, "format": self.fmt, "parser": self.parser, "rule_version": rule_key(),
                 "source_layer": self.source.layer, "summary": summary, "units": self.units, "spots": spots,
-                "spots_total": len(spots) + dropped, "top": [entry["key"] for entry in top[:20]], "notes": self.notes,
+                "spots_total": len(spots) + dropped, "omitted": dropped, "top": [entry["key"] for entry in top[:20]], "notes": self.notes,
                 "reasons": self.reasons, "checks": self.checks, "contract": self.contract}
 
     def _layer_of(self, spot: dict) -> str:
@@ -399,10 +402,16 @@ class Verifier:
                 self.reasons.append(reason("chart_unresolved", f"차트 계열 {tally['unresolved']}개는 참조(여러 영역·외부 통합문서·이름 정의)를 해석하지 못했습니다."))
             if tally["literal"]:
                 self.reasons.append(reason("chart_literal", f"차트 계열 {tally['literal']}개는 셀 참조 없이 차트 안에 값을 직접 넣었습니다(원본 셀과 대조할 수 없음)."))
+            if self.chart_partial:
+                self.reasons.append(reason("chart_partial", "점이 많아 앞부분만 대조한 차트 계열이 있습니다(부분 검증: " + ", ".join(self.chart_partial[:4])
+                                           + (f" 외 {len(self.chart_partial) - 4}개" if len(self.chart_partial) > 4 else "") + ")."))
             charts = [u for u in units if u["kind"] == "chart"]
-            self.checks.append({"id": "chart_values", "label": "차트 표시값 ↔ 원본 셀", "source_layer": "xlsx_chart_cache", "derived_from": "independent",
-                                "state": "done" if not (tally["no_cache"] or tally["unresolved"] or tally["literal"]) else "partial" if tally["match"] or tally["conflict"] else "unverified",
-                                "detail": f"차트 {len(charts)}개 · 계열 일치 {tally['match']} · 충돌 {tally['conflict']} · 캐시 없음 {tally['no_cache']} · 해석 못 함 {tally['unresolved']}"})
+            incomplete = tally["no_cache"] or tally["unresolved"] or tally["literal"] or self.chart_partial
+            self.checks.append({"id": "chart_values", "label": "차트 (범주, 값) ↔ 원본 셀", "source_layer": "xlsx_chart_cache", "derived_from": "independent",
+                                "state": "done" if not incomplete else "partial" if tally["match"] or tally["conflict"] or tally["partial"] else "unverified",
+                                "detail": f"차트 {len(charts)}개 · 계열 일치 {tally['match']} · 충돌 {tally['conflict']} · 부분 검증 {tally['partial']}"
+                                          + (f"({', '.join(self.chart_partial[:3])})" if self.chart_partial else "")
+                                          + f" · 캐시 없음 {tally['no_cache']} · 해석 못 함 {tally['unresolved']}"})
         units = [u for u in units if u["kind"] != "chart"]
         checked = sum(1 for u in units if u["state"] == "checked")
         excluded = sum(1 for u in units if u["state"] in ("hidden", "empty"))
@@ -417,7 +426,7 @@ class Verifier:
             visible = "unverified" if scans or hidden_layer or self.parser == "pdf-text" else "partial"
             if hidden_layer:
                 self.checks.append({"id": "hidden_layer", "label": "보이지 않는 글자 층", "state": "unverified", "source_layer": "pdf_hidden_layer",
-                                    "derived_from": "same_layer", "detail": f"그림 위 숨은 층 {_names(hidden_layer)} · 그림 OCR과 다름 {self.hidden_conflicts} · 같음 {self.hidden_agreed}"})
+                                    "derived_from": "same_layer", "detail": f"그림 위 숨은 층 {_names(hidden_layer)} · 같은 그림 OCR과 항목·값·단위 다름 {self.hidden_conflicts} · 같음 {self.hidden_agreed}"})
             self.checks.append({"id": "visible", "label": "화면에 보이는 값", "state": visible,
                                 "detail": "보이는 글자를 따로 읽은 근거(픽셀 판독)가 없습니다." if visible == "unverified" else
                                           "레이아웃 모델의 결과를 글자 층과 대조했습니다(글꼴의 글자 대응이 맞다고 가정)."})
@@ -529,9 +538,8 @@ class Verifier:
                                         f"원본 {line.ref}의 글이 원본에는 {source_compact.count(c)}번, 결과에는 {index.text.count(c)}번 나옵니다(같은 글 하나가 빠짐).",
                                         line.ref, anchor, plain, plain.strip(), self.result_text(anchor), "", "before")
                 best_for[position] = anchor
-                if line_spots < _LINE_SPOTS_PER_UNIT:
-                    self.spots.append(entry)
-                    flagged[position] = entry
+                self.spots.append(entry)
+                flagged[position] = entry
                 line_spots += 1
                 continue
             if len(c) >= 4 and c in self.supplement_text:
@@ -544,12 +552,11 @@ class Verifier:
                 anchor = result["best"]
             matched += max(0, len(c) - result["missing"])
             if result["spot"] is not None:
-                if line_spots < _LINE_SPOTS_PER_UNIT:
-                    self.spots.append(result["spot"])
-                    flagged[position] = result["spot"]
-                    if result["spot"]["line"]:
-                        self._result_spots.add(("number", result["spot"]["line"]))
-                        self._line_spot.setdefault(result["spot"]["line"], result["spot"])
+                self.spots.append(result["spot"])
+                flagged[position] = result["spot"]
+                if result["spot"]["line"]:
+                    self._result_spots.add(("number", result["spot"]["line"]))
+                    self._line_spot.setdefault(result["spot"]["line"], result["spot"])
                 line_spots += 1
         stats["source_chars"], stats["matched_chars"] = total, matched
         stats["coverage"] = round(matched / total, 4) if total else None
@@ -560,8 +567,6 @@ class Verifier:
             stats["state"] = "hidden"
             stats["spots"] = len(self.spots) - before
             return stats
-        if line_spots > _LINE_SPOTS_PER_UNIT:
-            self.notes.append(f"{unit.label}: 줄 차이가 많아 앞 {_LINE_SPOTS_PER_UNIT}곳만 의심 지점으로 올렸습니다(전체 {line_spots}곳).")
         collapsed = total >= 40 and matched / total < 0.4
         if collapsed:
             # 단위 대부분이 결과에 없다: 줄마다 올리지 않고 하나로 묶는다(기호·숫자 지점도 따로 올리지 않는다).
@@ -580,7 +585,7 @@ class Verifier:
         missing_numbers = source_numbers - result_numbers
         stats["numbers_missing"] = sum(missing_numbers.values())
         spotted_lines = {entry["line"] for entry in self.spots if entry["unit"] == unit.key}
-        extra = extra_spots = 0
+        extra = 0
         for line_no in index.numbers if not collapsed else ():
             if line_no in self._supplement or ("number", line_no) in self._result_spots:
                 continue
@@ -594,10 +599,9 @@ class Verifier:
                 if value in source_numbers or value in self.source_numbers or (len(value) < 2 and "." not in value):
                     continue
                 extra += 1
-                if line_no not in spotted_lines and extra_spots < 8:
+                if line_no not in spotted_lines:
                     spotted_lines.add(line_no)
                     self._result_spots.add(("number", line_no))
-                    extra_spots += 1
                     self.spot(unit, "medium", "extra_number", f"결과의 숫자 '{value}'가 원본 {unit.label}에 없습니다(OCR 오인·글자 붙음·다른 쪽 내용일 수 있음).",
                               line=line_no, result=self.result_text(line_no, value), result_hit=value)
         stats["numbers_extra"] = extra
@@ -631,9 +635,8 @@ class Verifier:
                     existing["message"] += f" 결과에 깨진 글자(U+{ord(found):04X})가 있습니다."
                     continue
                 broken += 1
-                if broken <= 5:
-                    self.spot(unit, "high", "garbled", f"결과에 깨진 글자(U+{ord(found):04X})가 있습니다. 원본의 해당 글자를 확인하세요.",
-                              line=line_no, result=self.result_text(line_no, found), result_hit=found)
+                self.spot(unit, "high", "garbled", f"결과에 깨진 글자(U+{ord(found):04X})가 있습니다. 원본의 해당 글자를 확인하세요.",
+                          line=line_no, result=self.result_text(line_no, found), result_hit=found)
         self._hidden_layer(unit, unit_lines or index.numbers)
         stats["hidden_regions"] = len(unit.regions)
         stats["spots"] = len(self.spots) - before
@@ -641,48 +644,62 @@ class Verifier:
 
     def _hidden_layer(self, unit: SourceUnit, lines: list[int]) -> None:
         """그림 위의 보이지 않는 글자 층(PDF 렌더 모드 3). 파서와 대조가 같은 층을 읽으므로 '같다'가 화면 값을 보증하지 않는다.
-        그 값을 '화면에 보이는 값으로 확인되지 않음'으로 올리고, 같은 쪽에 그림 OCR 결과('[그림 속 글자]')가 있으면 두 값을 대조한다."""
+        숨은 층 묶음마다 **같은 그림**의 OCR 결과를 찾아(실행 근거의 그림 상자, 없으면 쪽에 그림·OCR 묶음이 하나씩일 때만)
+        항목·값·단위를 한 벌로 대조한다(measure_match). 숫자 모음만 비교하면 A·B 값 맞바꿈이나 bar → kPa를 놓친다(2026-11-27 리뷰).
+        - 모두 같은 항목에서 같은 값·단위: '다른 표현과 일치'(의심점 없음, 그래도 판정 불가 근거는 남는다)
+        - 다른 값·단위: hidden_conflict(항목별 두 값)
+        - 같은 그림의 OCR이 없거나 항목 대응을 정할 수 없음: hidden_layer(화면 값 미확인)"""
         if not unit.regions:
             return
         self.hidden_pages.append(unit.label)
-        ocr: list[str] = []
-        block = False
+        blocks: list[str] = []          # 결과 줄의 '[그림 속 글자]' 묶음(쪽 안 순서)
+        current: list[str] | None = None
         for n in lines:
             raw = self.raw[n - 1]
             if PICTURE_LABEL in raw:
-                block = True
+                current = []
+                blocks.append("")
                 continue
-            if block and not raw.strip():
-                block = False
-            elif block:
-                ocr += numbers(self.plain[n])
+            if current is not None and not raw.strip():
+                current = None
+            elif current is not None:
+                blocks[-1] = (blocks[-1] + "\n" + self.plain[n]).strip()
+        by_box = ((self.evidence.get("picture_ocr") or {}).get(str(unit.page)) or []) if self.evidence.get("kind") == "pdf" else []
         for region in unit.regions:
-            hidden = numbers(region.get("text") or "")
+            text = region.get("text") or ""
+            hidden = numbers(text)
             if not hidden and (region.get("chars") or 0) < 4:
                 continue
             target = next((n for n in lines if hidden and PICTURE_LABEL not in self.raw[n - 1]
                            and any(value in numbers(self.plain[n]) for value in hidden)), lines[0] if lines else None)
-            text = region.get("text") or ""
+            ocr_text, pairing = _same_picture(region, by_box, blocks, len(unit.regions))
+            verdict, details = measure_match(text, ocr_text) if ocr_text is not None else ("unpaired", [])
             hit = hidden[0] if hidden else _clip(text, 0, 40)
-            if ocr and hidden:
-                if set(hidden) == set(ocr):
-                    self.hidden_agreed += 1
-                    continue
+            if verdict == "agree":
+                self.hidden_agreed += 1
+                continue
+            if verdict == "conflict":
                 self.hidden_conflicts += 1
-                first = next((value for value in hidden if value not in ocr), hidden[0])
-                other = next((value for value in ocr if value not in hidden), ocr[0])
+                first = details[0]
+                described = "; ".join(f"항목 {d['label'] or '(이름 없음)'} — 숨은 층 {d['hidden']}, 그림 OCR {d['ocr']}" for d in details[:6])
                 entry = self.spot(unit, "high", "hidden_conflict",
-                                  f"{unit.label} 그림: 보이지 않는 글자 층의 값({', '.join(hidden[:6])})과 그림 OCR이 읽은 값({', '.join(ocr[:6])})이 다릅니다. "
+                                  f"{unit.label} 그림: 보이지 않는 글자 층과 같은 그림의 OCR이 항목·값·단위에서 다릅니다({described}). "
                                   "원본 그림에서 실제로 보이는 값을 확인하세요.",
-                                  ref=f"{unit.label} 그림", line=target, source=_clip(text), source_hit=first,
-                                  result=self.result_text(target, first), result_hit=other)
+                                  ref=f"{unit.label} 그림", line=target, source=_clip(text), source_hit=first["hidden_value"],
+                                  result=self.result_text(target, first["hidden_value"]), result_hit=first["ocr_value"])
+                entry["conflicts"] = details[:20]
             else:
+                why = {"unpaired": "같은 그림의 OCR 결과가 없어" if pairing == "none" else "이 묶음이 어느 그림 OCR과 짝인지 정할 수 없어",
+                       "unaligned": "같은 그림의 OCR과 항목·값·단위의 대응을 정할 수 없어",
+                       "no_values": "값을 찾지 못해"}.get(verdict, "")
                 entry = self.spot(unit, "high" if hidden else "medium", "hidden_layer",
                                   f"{unit.label} 그림 위의 보이지 않는 글자 층에서 읽은 '{_clip(text, 0, 60)}'"
                                   + (f"의 값 {', '.join(hidden[:6])}" if hidden else "")
-                                  + "은(는) 화면에 보이는 값으로 확인되지 않았습니다(파서와 대조가 같은 숨은 층을 읽음). 원본 그림과 대조하세요.",
+                                  + f"은(는) 화면에 보이는 값으로 확인되지 않았습니다({why} 파서와 대조가 같은 숨은 층만 읽음). 원본 그림과 대조하세요.",
                                   ref=f"{unit.label} 그림", line=target, source=_clip(text), source_hit=hit,
                                   result=self.result_text(target, hit if hidden else ""), result_hit=hit if hidden else "")
+                if ocr_text:
+                    entry["ocr_text"] = _clip(ocr_text, 0, 200)
             entry["source_layer"] = "pdf_hidden_layer"
             entry["bbox"] = region.get("bbox")
 
@@ -848,32 +865,29 @@ class Verifier:
             if not missing and not shifted:
                 continue
             row_spots += 1
-            if row_spots > _LINE_SPOTS_PER_UNIT:
-                continue
-            problem = missing or shifted
-            shown = problem[:4]
-            names = ", ".join(f"{cell['cell']} '{_clip(cell['value'], 0, 40)}'" + (f"→'{_clip(produced, 0, 40)}'" if produced else "")
-                              for cell, produced in shown)
-            more = f" 외 {len(problem) - len(shown)}칸" if len(problem) > len(shown) else ""
-            ref = f"{unit.sheet}!{shown[0][0]['cell']}" if unit.sheet else f"{line.ref} {shown[0][0]['cell'].split()[-1]}"
-            if missing:
-                changed = any(produced for _, produced in missing)
-                severity = "high" if any(_sensitive(cell["value"]) for cell, _ in missing) else "medium"
-                kind = "cell_changed" if changed else "cell_missing"
-                message = f"{unit.label} {line.ref}: 원본 칸 {names}{more}" + (" 결과의 같은 칸과 다릅니다." if changed else "이(가) 결과의 같은 행에 없습니다.")
-            else:
-                severity, kind = "low", "cell_moved"
-                message = f"{unit.label} {line.ref}: 원본 칸 {names}{more}이(가) 결과의 같은 행 다른 칸에 있습니다(열 밀림 확인)."
-            self.spot(unit, severity, kind, message, ref=ref, line=target or last_line, source=_clip(line.text),
-                      source_hit=shown[0][0]["value"], result=self.result_text(target or last_line), result_hit=shown[0][1] or "",
-                      cell=shown[0][0]["cell"] if unit.sheet else None)
+            line_no = target or last_line
+            # 바뀐·빠진 칸은 칸마다 의심점 하나(한 행을 묶으면 앞 칸만 보고 '맞음'을 눌러 같은 행의 다른 오류까지 해결될 수 있다).
+            for cell, produced in missing:
+                ref = f"{unit.sheet}!{cell['cell']}" if unit.sheet else f"{line.ref} {cell['cell'].split()[-1]}"
+                message = (f"{unit.label} {line.ref}: 원본 칸 {cell['cell']} '{_clip(cell['value'], 0, 40)}'"
+                           + (f"이(가) 결과의 같은 칸에서 '{_clip(produced, 0, 40)}'(으)로 다릅니다." if produced else "이(가) 결과의 같은 행에 없습니다."))
+                self.spot(unit, "high" if _sensitive(cell["value"]) else "medium", "cell_changed" if produced else "cell_missing", message,
+                          ref=ref, line=line_no, source=_clip(line.text), source_hit=cell["value"], result=self.result_text(line_no),
+                          result_hit=produced or "", cell=cell["cell"] if unit.sheet else None)
+            if shifted:
+                # 값은 같은 행에 있고 칸만 다르다(열 밀림): 행마다 하나로 묶는다.
+                shown = shifted[:4]
+                names = ", ".join(f"{cell['cell']} '{_clip(cell['value'], 0, 40)}'" for cell, _ in shown)
+                more = f" 외 {len(shifted) - len(shown)}칸" if len(shifted) > len(shown) else ""
+                ref = f"{unit.sheet}!{shown[0][0]['cell']}" if unit.sheet else f"{line.ref} {shown[0][0]['cell'].split()[-1]}"
+                self.spot(unit, "low", "cell_moved", f"{unit.label} {line.ref}: 원본 칸 {names}{more}이(가) 결과의 같은 행 다른 칸에 있습니다(열 밀림 확인).",
+                          ref=ref, line=line_no, source=_clip(line.text), source_hit=shown[0][0]["value"], result=self.result_text(line_no),
+                          cell=shown[0][0]["cell"] if unit.sheet else None)
         if unit.kind == "hidden" and total and matched / total < 0.5:
             del self.spots[before:]
             self.hidden_missing.append(unit.label)
             stats.update(source_chars=total, matched_chars=matched, coverage=round(matched / total, 4), state="hidden")
             return stats
-        if row_spots > _LINE_SPOTS_PER_UNIT:
-            self.notes.append(f"{unit.label}: 다른 행이 많아 앞 {_LINE_SPOTS_PER_UNIT}곳만 의심 지점으로 올렸습니다(전체 {row_spots}행).")
         stats["source_chars"], stats["matched_chars"] = total, matched
         stats["coverage"] = round(matched / total, 4) if total else None
         stats["spots"] = len(self.spots) - before
@@ -881,19 +895,34 @@ class Verifier:
 
     # ------------------------------------------------------------ 차트: 저장된 표시값(numCache) ↔ 참조 셀
     def _check_chart(self, unit: SourceUnit) -> dict:
-        """계열마다 차트에 저장된 표시값과 원본 셀 값을 점 하나씩 대조한다. 두 저장 표현이 다르면 '충돌'로 두 값을 모두 보인다.
-        캐시가 없으면 셀 값만 있는 '차트 표시값 미확인', 참조를 해석할 수 없으면 '해석 못 함'. 축 눈금으로 값을 추정하지 않는다."""
+        """계열마다 차트에 저장된 표시(캐시)와 원본 셀을 **(범주, 값) 한 쌍**으로 점마다 대조하고, 양쪽 점 개수를 맞춰 본다.
+        - 값이나 범주가 다르면 충돌(LOT-1·LOT-2 범주 맞바꿈도 값이 그대로여도 충돌), 캐시에만 있는 점·개수 차이도 충돌.
+        - 점이 많아 앞 xlsx_charts.MAX_POINTS개만 대조했으면 '부분 검증'(2,000/2,001). 완료로 표시하지 않는다.
+        - 캐시가 없으면 '차트 표시값 미확인', 참조를 해석할 수 없으면 '해석 못 함'. 축 눈금으로 값을 추정하지 않는다."""
         stats = {"key": unit.key, "label": unit.label, "page": None, "sheet": unit.sheet, "kind": "chart", "note": unit.note,
                  "source_chars": 0, "matched_chars": 0, "coverage": None, "numbers_missing": 0, "numbers_extra": 0, "spots": 0,
                  "state": "checked", "result_lines": [], "series": []}
         before = len(self.spots)
         chart = unit.chart or {}
         title = chart.get("title") or unit.label
-        conflicts = 0
+
+        def conflict(series, name, message, cell=None, source="", source_hit="", result="", result_hit=""):
+            sheet = series.get("sheet")
+            self.spot(unit, "high", "chart_conflict", f"차트 '{title}' 계열 '{name}' " + message + " 어느 값이 보고서·화면에 쓰였는지 원본에서 확인하세요.",
+                      ref=f"{sheet}!{cell}" if cell else f"차트 '{title}'", source=source, source_hit=source_hit, result=result,
+                      result_hit=result_hit, cell=cell)
+            self.spots[-1]["sheet"] = sheet
+            self.spots[-1]["source_layer"] = "xlsx_chart_cache"
+
         for series in chart.get("series", []):
             name = series.get("name") or series.get("formula") or "계열"
             cache = {int(k): v for k, v in (series.get("cache") or {}).items()} if series.get("cache") is not None else None
-            if series.get("literal") and not series.get("cells"):
+            cat_cache = {int(k): v for k, v in (series.get("category_cache") or {}).items()}
+            cells, values = series.get("cells") or [], series.get("values") or []
+            cat_cells = series.get("category_cells") or []
+            total = int(series.get("points_total") or len(cells))
+            checked = len(cells)
+            if series.get("literal") and not cells:
                 state = "literal"
             elif not series.get("resolved"):
                 state = "unresolved"
@@ -901,29 +930,43 @@ class Verifier:
                 state = "no_cache"
             else:
                 state = "match"
-                for index, (cell, value) in enumerate(zip(series["cells"], series["values"])):
+                # 점 개수: 참조 셀 수 ↔ 캐시 ptCount·캐시에만 있는 점
+                cached_count = series.get("cache_count")
+                extra = sorted(index for index in cache if index >= total)
+                if (cached_count is not None and cached_count != total) or extra:
+                    state = "conflict"
+                    shown = ", ".join(f"{index + 1}번째 {cache[index]}" for index in extra[:5])
+                    conflict(series, name, f"점 개수가 다릅니다: 참조 셀 {total:,}개, 차트에 저장된 점 {cached_count if cached_count is not None else len(cache):,}개"
+                             + (f"(캐시에만 있는 점: {shown})." if extra else "."),
+                             source=f"참조 {series.get('formula') or ''} = 셀 {total:,}개", source_hit=f"{total:,}",
+                             result=f"차트 캐시 점 {cached_count if cached_count is not None else len(cache):,}개" + (f" · {shown}" if extra else ""),
+                             result_hit=str(cache[extra[0]]) if extra else str(cached_count))
+                for index, (cell, value) in enumerate(zip(cells, values)):
                     cached = cache.get(index)
-                    if _same_value(value, cached):
+                    cat_cell = cat_cells[index] if index < len(cat_cells) else None
+                    cat_shown = cat_cache.get(index)
+                    value_ok = _same_value(value, cached)
+                    category_ok = not cat_cells or not cat_cache or _same_category(cat_cell, cat_shown)
+                    if value_ok and category_ok:
                         continue
                     state = "conflict"
-                    conflicts += 1
-                    if conflicts > _LINE_SPOTS_PER_UNIT:
-                        continue
-                    category = series["categories"][index] if index < len(series.get("categories") or []) else None
-                    shown_cell = "빈 칸" if value in (None, "") else _value_text(value)
-                    shown_cache = "없음" if cached in (None, "") else cached
-                    self.spot(unit, "high", "chart_conflict",
-                              f"차트 '{title}' 계열 '{name}' {index + 1}번째 점" + (f"(범주 '{_value_text(category)}')" if category not in (None, "") else "")
-                              + f": 차트에 저장된 표시값 {shown_cache}와 원본 셀 {series['sheet']}!{cell} 값 {shown_cell}이 다릅니다. "
-                              "어느 값이 보고서·화면에 쓰였는지 원본에서 확인하세요.",
-                              ref=f"{series['sheet']}!{cell}", source=f"셀 {series['sheet']}!{cell} = {shown_cell}", source_hit=shown_cell,
-                              result=f"차트 '{title}' 표시값(저장된 캐시) = {shown_cache}", result_hit=str(shown_cache), cell=cell)
-                    self.spots[-1]["sheet"] = series["sheet"]
-                    self.spots[-1]["source_layer"] = "xlsx_chart_cache"
+                    cell_pair = f"({_value_text(cat_cell) if cat_cell not in (None, '') else '범주 없음'}, {'빈 칸' if value in (None, '') else _value_text(value)})"
+                    cache_pair = f"({cat_shown if cat_shown not in (None, '') else '범주 없음'}, {'없음' if cached in (None, '') else cached})"
+                    what = "범주와 값" if not value_ok and not category_ok else "값" if not value_ok else "범주"
+                    conflict(series, name, f"{index + 1}번째 점의 {what}이(가) 다릅니다: 원본 셀 {series['sheet']}!{cell} {cell_pair} ↔ 차트에 저장된 표시 {cache_pair}.",
+                             cell=cell, source=f"셀 {series['sheet']}!{cell} (범주, 값) = {cell_pair}",
+                             source_hit=_value_text(value) if not value_ok else _value_text(cat_cell),
+                             result=f"차트 '{title}' 저장된 표시 (범주, 값) = {cache_pair}",
+                             result_hit=str(cached) if not value_ok else str(cat_shown))
+                if state == "match" and checked < total:
+                    state = "partial"
+            if state in ("partial", "conflict") and checked < total:
+                self.chart_partial.append(f"'{title}'·'{name}' {checked:,}/{total:,}")
             self.chart_tally[state] += 1
-            stats["series"].append({"name": name, "state": state, "sheet": series.get("sheet"), "points": len(series.get("cells") or [])})
+            stats["series"].append({"name": name, "state": state, "sheet": series.get("sheet"), "points": total, "checked": checked})
         states = {item["state"] for item in stats["series"]}
-        stats["state"] = ("conflict" if "conflict" in states else "unverified" if states & {"no_cache", "unresolved"} else "checked") if states else "empty"
+        stats["state"] = ("conflict" if "conflict" in states else "unverified" if states & {"no_cache", "unresolved"}
+                          else "partial" if "partial" in states else "checked") if states else "empty"
         stats["spots"] = len(self.spots) - before
         return stats
 
@@ -1009,15 +1052,11 @@ class Verifier:
                 if not diff:
                     continue
                 row_spots += 1
-                if row_spots > _GRID_ROW_SPOTS:
-                    continue
                 self._grid_pair_spot(unit, i, j, records[i], diff, source_count, result_count, a, b)
             elif kind == "missing" and i in moved_sources:
                 matched += sum(len(compact(v)) for v in records[i])
             elif kind == "missing":
                 row_spots += 1
-                if row_spots > _GRID_ROW_SPOTS:
-                    continue
                 text = " | ".join(records[i])
                 severity = "high" if _sensitive(text) else "medium"
                 line = _record_line(j if j is not None else min(i, m), m)
@@ -1026,16 +1065,12 @@ class Verifier:
                           cell=f"{i + 1}행")
             elif j in moved:
                 row_spots += 1
-                if row_spots > _GRID_ROW_SPOTS:
-                    continue
                 i = moved[j]
                 line = _record_line(j, m)
                 self.spot(unit, "medium", "row_moved", f"원본 {i + 1}행이 결과 {j + 1}번째 행 자리에 있습니다(행 순서 바뀜).",
                           ref=f"{i + 1}행", line=line, source=_clip(" | ".join(records[i])), result=self.result_text(line), cell=f"{i + 1}행")
             else:
                 row_spots += 1
-                if row_spots > _GRID_ROW_SPOTS:
-                    continue
                 row = result_rows[j]
                 text = " | ".join(row)
                 same = next((k + 1 for k, other in enumerate(source_rows) if other == row), None) if source_count[row] else None
@@ -1044,8 +1079,6 @@ class Verifier:
                 line = _record_line(j, m)
                 self.spot(unit, severity, "row_extra", message, ref=f"결과 {j + 1}번째 행", line=line,
                           result=self.result_text(line), result_hit=text.strip(), cell=f"{j + 1}행")
-        if row_spots > _GRID_ROW_SPOTS:
-            self.notes.append(f"{unit.label}: 다른 행이 많아 앞 {_GRID_ROW_SPOTS}행만 의심 지점으로 올렸습니다(전체 {row_spots:,}행).")
         stats["matched_chars"] = min(matched, total)
         stats["coverage"] = round(min(matched, total) / total, 4) if total else None
         stats["spots"] = len(self.spots) - before
@@ -1053,35 +1086,35 @@ class Verifier:
         return stats
 
     def _grid_pair_spot(self, unit, i, j, record, diff, source_count, result_count, a, b) -> None:
-        """짝지은 원본 레코드 i와 결과 행 j의 다른 칸들 → 의심점 하나(행 단위)."""
+        """짝지은 원본 레코드 i와 결과 행 j의 다른 칸들 → 의심점. 행 순서 바뀜은 행 하나, 두 칸 맞바뀜은 그 쌍 하나,
+        그 밖의 다른 칸은 **칸마다 하나**다. 한 행의 차이를 하나로 묶으면 공백 차이만 보고 '맞음'을 눌러 같은 행의
+        수치 오류(17 bar → 71 bar)까지 해결로 처리될 수 있다(2026-11-27 리뷰)."""
         line = _record_line(j, None)
-        swapped = [(c1, c2) for c1, x1, y1 in diff for c2, x2, y2 in diff if c1 < c2 and x1 == y2 and x2 == y1 and x1 != x2]
+        row_text = _clip(" | ".join(record))
         if a in result_count and b in source_count and a != b and source_count[a] == result_count[a] and source_count[b] == result_count[b]:
-            kind, severity = "row_moved", "medium"
-            message = f"원본 {i + 1}행의 내용이 결과에서 다른 순서에 있습니다(행 순서 바뀜)."
-        elif swapped:
-            c1, c2 = swapped[0]
-            kind = "cell_swapped"
-            severity = "high" if _sensitive(a[c1] + a[c2]) else "medium"
-            message = (f"원본 {i + 1}행 {c1 + 1}열 '{_clip(a[c1], 0, 30)}'과 {c2 + 1}열 '{_clip(a[c2], 0, 30)}'이 결과에서 서로 바뀌었습니다.")
-        else:
-            parts = []
-            for c, x, y in diff[:4]:
-                if not x:
-                    parts.append(f"{c + 1}열 빈 칸 → '{_clip(y or '', 0, 30)}'")
-                elif not y:
-                    parts.append(f"{c + 1}열 '{_clip(x, 0, 30)}' → 빈 칸")
-                else:
-                    parts.append(f"{c + 1}열 '{_clip(x, 0, 30)}' → '{_clip(y, 0, 30)}'")
-            more = f" 외 {len(diff) - 4}칸" if len(diff) > 4 else ""
-            added = all(not x for _, x, _ in diff)
-            kind = "cell_added" if added else "cell_missing" if all(not y for _, _, y in diff) else "cell_changed"
-            severity = "high" if any(_sensitive((x or "") + (y or "")) for _, x, y in diff) else "medium"
-            message = f"원본 {i + 1}행: " + ", ".join(parts) + more + (" (원본에 없는 값이 결과에 생김)" if added else "")
-        first = diff[0]
-        self.spot(unit, severity, kind, message, ref=f"{i + 1}행 {first[0] + 1}열", line=line,
-                  source=_clip(" | ".join(record)), source_hit=first[1] or "", result=self.result_text(line),
-                  result_hit=first[2] or "", cell=f"{i + 1}행 {first[0] + 1}열")
+            self.spot(unit, "medium", "row_moved", f"원본 {i + 1}행의 내용이 결과에서 다른 순서에 있습니다(행 순서 바뀜).",
+                      ref=f"{i + 1}행", line=line, source=row_text, result=self.result_text(line), cell=f"{i + 1}행")
+            return
+        used: set[int] = set()
+        for c1, x1, y1 in diff:
+            for c2, x2, y2 in diff:
+                if c1 < c2 and c1 not in used and c2 not in used and x1 == y2 and x2 == y1 and x1 != x2:
+                    used.update((c1, c2))
+                    self.spot(unit, "high" if _sensitive(a[c1] + a[c2]) else "medium", "cell_swapped",
+                              f"원본 {i + 1}행 {c1 + 1}열 '{_clip(a[c1], 0, 30)}'과 {c2 + 1}열 '{_clip(a[c2], 0, 30)}'이 결과에서 서로 바뀌었습니다.",
+                              ref=f"{i + 1}행 {c1 + 1}열", line=line, source=row_text, source_hit=x1 or "", result=self.result_text(line),
+                              result_hit=y1 or "", cell=f"{i + 1}행 {c1 + 1}열")
+        for c, x, y in diff:
+            if c in used:
+                continue
+            if not x:
+                kind, message = "cell_added", f"원본 {i + 1}행 {c + 1}열은 빈 칸인데 결과에 '{_clip(y or '', 0, 40)}'이(가) 있습니다(원본에 없는 값)."
+            elif not y:
+                kind, message = "cell_missing", f"원본 {i + 1}행 {c + 1}열 '{_clip(x, 0, 40)}'이(가) 결과에서 빈 칸입니다."
+            else:
+                kind, message = "cell_changed", f"원본 {i + 1}행 {c + 1}열 '{_clip(x, 0, 40)}'이(가) 결과에서 '{_clip(y, 0, 40)}'(으)로 다릅니다."
+            self.spot(unit, "high" if _sensitive((x or "") + (y or "")) else "medium", kind, message, ref=f"{i + 1}행 {c + 1}열", line=line,
+                      source=row_text, source_hit=x or "", result=self.result_text(line), result_hit=y or "", cell=f"{i + 1}행 {c + 1}열")
 
     def _csv_contract(self, records, width, row_spots, matched_rows, n) -> None:
         """CSV 통과 후보 조건: 실행에 기록된 계약(인코딩·구분자 확정), 모든 레코드의 열 수 보존, 전체 범위 대조, 차이 없음."""
@@ -1147,14 +1180,10 @@ class Verifier:
         for n, raw in enumerate(self.raw, start=1):
             if SUPPLEMENT_OCR in raw or PICTURE_LABEL in raw:
                 count += 1
-                if count > 10:
-                    continue
                 owner = next((key for key, lines in self._regions.items() if n in lines), None)
                 unit = next((u for u in self.source.units if u.key == owner), pseudo)
                 self.spot(unit, "medium", "image_ocr", "그림 속 글자를 OCR 모델로 읽어 넣은 줄입니다. 원본 그림의 글자와 같은지 사람이 확인하세요.",
                           line=n, result=_clip(raw))
-        if count > 10:
-            self.notes.append(f"그림 OCR 줄이 {count}개라 앞 10개만 의심 지점으로 올렸습니다.")
 
 
 def verify(source: SourceText, markdown: str, locations: list[dict], parser: str | None, fmt: str,
@@ -1163,10 +1192,92 @@ def verify(source: SourceText, markdown: str, locations: list[dict], parser: str
     return Verifier(source, markdown, locations, parser, fmt, evidence).run()
 
 
+_MEASURE = re.compile(r"[-+−]?\d+(?:[.,]\d+)*")
+_UNIT = re.compile(r"\s*([A-Za-zµμ°℃%‰Ω][A-Za-z0-9µμ°℃%‰Ω/·²³⁻]{0,7})")
+_LABEL_WORD = re.compile(r"[^\W\d_][\w\-]*")
+
+
+def measurements(text: str) -> list[dict]:
+    """글에서 (항목, 값, 단위) 벌을 순서대로 뽑는다. 항목은 앞 값(과 그 단위) 뒤부터 이 값 앞까지의 낱말(마지막 3개)."""
+    folded = fold(text)
+    out, cursor = [], 0
+    for match in _MEASURE.finditer(folded):
+        if match.start() < cursor:
+            continue
+        label = " ".join(_LABEL_WORD.findall(folded[cursor:match.start()])[-3:]).casefold()
+        unit_match = _UNIT.match(folded, match.end())
+        unit = unit_match.group(1) if unit_match else ""
+        cursor = unit_match.end() if unit_match else match.end()
+        raw = match.group(0).replace("−", "-")
+        value = raw.replace(",", "") if _THOUSANDS.fullmatch(raw.lstrip("+-")) else raw.replace(",", ".")
+        out.append({"label": label, "value": value, "unit": unit.casefold().replace("°c", "℃").replace("μ", "µ"), "text": (raw + (" " + unit if unit else "")).strip()})
+    return out
+
+
+def _same_number(a: str, b: str) -> bool:
+    try:
+        return math.isclose(float(a), float(b), rel_tol=1e-9, abs_tol=1e-12)
+    except ValueError:
+        return a == b
+
+
+def measure_match(hidden_text: str, ocr_text: str) -> tuple[str, list[dict]]:
+    """같은 그림의 숨은 층 글과 OCR 글을 항목·값·단위 한 벌로 대조한다.
+    agree(모든 항목이 같은 값·단위) · conflict(항목이 대응하는데 값·단위가 다름, 차이 목록) · unaligned(항목 대응을 정할 수 없음) · no_values."""
+    left, right = measurements(hidden_text), measurements(ocr_text)
+    if not left:
+        return "no_values", []
+    labels_l, labels_r = [m["label"] for m in left], [m["label"] for m in right]
+    unique = all(labels_l) and len(set(labels_l)) == len(labels_l) and all(labels_r) and len(set(labels_r)) == len(labels_r)
+    if unique and set(labels_l) == set(labels_r):
+        pairs = [(m, next(o for o in right if o["label"] == m["label"])) for m in left]
+    elif labels_l == labels_r and len(left) == len(right):
+        pairs = list(zip(left, right))  # 이름이 없거나 겹쳐도 순서와 이름 열이 똑같으면 자리로 짝짓는다
+    else:
+        return "unaligned", []
+    details = [{"label": a["label"], "hidden": a["text"], "ocr": b["text"], "hidden_value": a["value"], "ocr_value": b["value"]}
+               for a, b in pairs if not (_same_number(a["value"], b["value"]) and a["unit"] == b["unit"])]
+    return ("conflict", details) if details else ("agree", [])
+
+
+def _overlap_share(a, b) -> float:
+    inter = max(0.0, min(a[2], b[2]) - max(a[0], b[0])) * max(0.0, min(a[3], b[3]) - max(a[1], b[1]))
+    union = (a[2] - a[0]) * (a[3] - a[1]) + (b[2] - b[0]) * (b[3] - b[1]) - inter
+    return inter / union if union > 0 else 0.0
+
+
+def _same_picture(region: dict, by_box: list[dict], blocks: list[str], regions: int) -> tuple[str | None, str]:
+    """숨은 층 묶음과 같은 그림의 OCR 글. 실행 근거에 그림 상자가 있으면 상자가 겹치는 것(IoU ≥ 0.5),
+    없으면 그 쪽에 숨은 층 묶음과 OCR 묶음이 하나씩일 때만 짝짓는다. (글 또는 None, 짝지은 방법)"""
+    box = region.get("bbox")
+    if by_box and box:
+        best = max(by_box, key=lambda item: _overlap_share(box, item.get("bbox") or (0, 0, 0, 0)))
+        if _overlap_share(box, best.get("bbox") or (0, 0, 0, 0)) >= 0.5:
+            return best.get("text") or "", "box"
+        return None, "none"
+    if regions == 1 and len(blocks) == 1:
+        return blocks[0], "only"
+    return None, "ambiguous" if blocks else "none"
+
+
 def _value_text(value) -> str:
     if isinstance(value, float) and value.is_integer():
         return str(int(value))
     return str(value)
+
+
+def _same_category(cell, cached) -> bool:
+    """범주 셀 값과 차트에 저장된 범주 이름. 날짜 셀은 캐시가 날짜 일련번호(1900 체계)로 저장될 수 있다."""
+    if cached in (None, "") or cell in (None, ""):
+        return (cached in (None, "")) == (cell in (None, ""))
+    if isinstance(cell, str) and re.fullmatch(r"\d{4}-\d{2}-\d{2}(?:[T ][\d:.]+)?", cell):
+        try:
+            from datetime import date, timedelta
+            serial = float(cached)
+            return (date(1899, 12, 30) + timedelta(days=int(serial))).isoformat() == cell[:10]
+        except (TypeError, ValueError, OverflowError):
+            return str(cached).strip()[:10] == cell[:10]
+    return _same_value(cell, cached)
 
 
 def _same_value(cell, cached) -> bool:
@@ -1224,10 +1335,92 @@ def image_only(markdown: str, fmt: str, parser: str | None) -> dict:
             "contract": False}
 
 
+_MEASURE = re.compile(r"[-+−]?\d+(?:[.,]\d+)*")
+_UNIT = re.compile(r"\s*([A-Za-zµμ°℃%‰Ω][A-Za-z0-9µμ°℃%‰Ω/·²³⁻]{0,7})")
+_LABEL_WORD = re.compile(r"[^\W\d_][\w\-]*")
+
+
+def measurements(text: str) -> list[dict]:
+    """글에서 (항목, 값, 단위) 벌을 순서대로 뽑는다. 항목은 앞 값(과 그 단위) 뒤부터 이 값 앞까지의 낱말(마지막 3개)."""
+    folded = fold(text)
+    out, cursor = [], 0
+    for match in _MEASURE.finditer(folded):
+        if match.start() < cursor:
+            continue
+        label = " ".join(_LABEL_WORD.findall(folded[cursor:match.start()])[-3:]).casefold()
+        unit_match = _UNIT.match(folded, match.end())
+        unit = unit_match.group(1) if unit_match else ""
+        cursor = unit_match.end() if unit_match else match.end()
+        raw = match.group(0).replace("−", "-")
+        value = raw.replace(",", "") if _THOUSANDS.fullmatch(raw.lstrip("+-")) else raw.replace(",", ".")
+        out.append({"label": label, "value": value, "unit": unit.casefold().replace("°c", "℃").replace("μ", "µ"), "text": (raw + (" " + unit if unit else "")).strip()})
+    return out
+
+
+def _same_number(a: str, b: str) -> bool:
+    try:
+        return math.isclose(float(a), float(b), rel_tol=1e-9, abs_tol=1e-12)
+    except ValueError:
+        return a == b
+
+
+def measure_match(hidden_text: str, ocr_text: str) -> tuple[str, list[dict]]:
+    """같은 그림의 숨은 층 글과 OCR 글을 항목·값·단위 한 벌로 대조한다.
+    agree(모든 항목이 같은 값·단위) · conflict(항목이 대응하는데 값·단위가 다름, 차이 목록) · unaligned(항목 대응을 정할 수 없음) · no_values."""
+    left, right = measurements(hidden_text), measurements(ocr_text)
+    if not left:
+        return "no_values", []
+    labels_l, labels_r = [m["label"] for m in left], [m["label"] for m in right]
+    unique = all(labels_l) and len(set(labels_l)) == len(labels_l) and all(labels_r) and len(set(labels_r)) == len(labels_r)
+    if unique and set(labels_l) == set(labels_r):
+        pairs = [(m, next(o for o in right if o["label"] == m["label"])) for m in left]
+    elif labels_l == labels_r and len(left) == len(right):
+        pairs = list(zip(left, right))  # 이름이 없거나 겹쳐도 순서와 이름 열이 똑같으면 자리로 짝짓는다
+    else:
+        return "unaligned", []
+    details = [{"label": a["label"], "hidden": a["text"], "ocr": b["text"], "hidden_value": a["value"], "ocr_value": b["value"]}
+               for a, b in pairs if not (_same_number(a["value"], b["value"]) and a["unit"] == b["unit"])]
+    return ("conflict", details) if details else ("agree", [])
+
+
+def _overlap_share(a, b) -> float:
+    inter = max(0.0, min(a[2], b[2]) - max(a[0], b[0])) * max(0.0, min(a[3], b[3]) - max(a[1], b[1]))
+    union = (a[2] - a[0]) * (a[3] - a[1]) + (b[2] - b[0]) * (b[3] - b[1]) - inter
+    return inter / union if union > 0 else 0.0
+
+
+def _same_picture(region: dict, by_box: list[dict], blocks: list[str], regions: int) -> tuple[str | None, str]:
+    """숨은 층 묶음과 같은 그림의 OCR 글. 실행 근거에 그림 상자가 있으면 상자가 겹치는 것(IoU ≥ 0.5),
+    없으면 그 쪽에 숨은 층 묶음과 OCR 묶음이 하나씩일 때만 짝짓는다. (글 또는 None, 짝지은 방법)"""
+    box = region.get("bbox")
+    if by_box and box:
+        best = max(by_box, key=lambda item: _overlap_share(box, item.get("bbox") or (0, 0, 0, 0)))
+        if _overlap_share(box, best.get("bbox") or (0, 0, 0, 0)) >= 0.5:
+            return best.get("text") or "", "box"
+        return None, "none"
+    if regions == 1 and len(blocks) == 1:
+        return blocks[0], "only"
+    return None, "ambiguous" if blocks else "none"
+
+
 def _value_text(value) -> str:
     if isinstance(value, float) and value.is_integer():
         return str(int(value))
     return str(value)
+
+
+def _same_category(cell, cached) -> bool:
+    """범주 셀 값과 차트에 저장된 범주 이름. 날짜 셀은 캐시가 날짜 일련번호(1900 체계)로 저장될 수 있다."""
+    if cached in (None, "") or cell in (None, ""):
+        return (cached in (None, "")) == (cell in (None, ""))
+    if isinstance(cell, str) and re.fullmatch(r"\d{4}-\d{2}-\d{2}(?:[T ][\d:.]+)?", cell):
+        try:
+            from datetime import date, timedelta
+            serial = float(cached)
+            return (date(1899, 12, 30) + timedelta(days=int(serial))).isoformat() == cell[:10]
+        except (TypeError, ValueError, OverflowError):
+            return str(cached).strip()[:10] == cell[:10]
+    return _same_value(cell, cached)
 
 
 def _same_value(cell, cached) -> bool:

@@ -36,7 +36,7 @@ def test_plain_body_is_chosen_once_attachments_are_listed_and_nested_mail_is_add
     text = parsed.markdown
     assert text.startswith("# QC 결과 보고 | 배치 B-17") and "| 보낸 사람 | qc@example.com |" in text
     assert text.count("17 bar") == 1 and "pH" not in text            # plain이 있으면 HTML 대체 본문을 다시 넣지 않는다
-    assert "| 1 | COA.pdf | application/pdf | 13 B | 1.2 |" in text and "%PDF" not in text  # 첨부는 목록만
+    assert "| COA.pdf | application/pdf | 13 B | 1.2 |" in text and "%PDF" not in text  # 첨부는 목록만
     assert "## 첨부 메일 (위치 1.3): 원 메일" in text and "원 메일 본문 21 mL" in text
     assert parsed.evidence == {"kind": "eml", "bodies": 2, "attachments": 1, "nested": 1, "inline_images": 0}
     assert parsed.warnings[0].startswith("첨부 1개:")
@@ -78,3 +78,39 @@ def test_attachment_only_mail_is_not_a_failure_and_unsupported_formats_say_why(t
             time.sleep(0.05)
         doc = client.get(f"/api/live/documents/{zipped}").json()
         assert doc["status"] == "unsupported" and "구조 분석" in doc["error"] and "암호·보호 여부는 확인하지 않았습니다" in doc["error"]
+
+
+def _dashboard_mail(with_plain: bool) -> bytes:
+    """같은 계기판 그림(CID)을 HTML 본문에 넣은 메일. with_plain이면 글 본문 대체 표현을 더한다."""
+    from email.message import EmailMessage
+    message = EmailMessage()
+    message["Subject"] = "계기판 확인"
+    if with_plain:
+        message.set_content("계기판 그림을 확인해 주세요.")
+        message.add_alternative('<p>계기판 그림: <img src="cid:gauge@x"></p>', subtype="html")
+        html_part = message.get_payload()[1]
+    else:
+        message.set_content('<p>계기판 그림: <img src="cid:gauge@x"></p>', subtype="html")
+        html_part = message
+    html_part.add_related(b"\x89PNG\r\n\x1a\nfake-gauge", maintype="image", subtype="png", cid="<gauge@x>")
+    return bytes(message)
+
+
+def test_pictures_in_the_html_alternative_are_listed_even_when_plain_text_is_shown(tmp_path):
+    """리뷰 재현: 글 본문 대체 표현을 더하자 HTML 쪽 그림이 '그림 0개·경고 없음'이 됐다."""
+    settings = Settings(runtime_dir=tmp_path / "rt")
+    results = {}
+    for with_plain in (False, True):
+        path = tmp_path / f"mail-{with_plain}.eml"
+        path.write_bytes(_dashboard_mail(with_plain))
+        parsed = parse_eml(path, settings)
+        results[with_plain] = parsed
+        assert parsed.evidence["inline_images"] == 1, with_plain
+        assert any(w.startswith("본문 안 그림 1개는 읽지 않았습니다") for w in parsed.warnings), with_plain
+        assert "본문 그림 1개 (읽지 않음)" in parsed.markdown and "cid:gauge@x" in parsed.markdown
+        check = verify(read_source(path, "EML", settings), parsed.markdown, [], parsed.parser, "EML", parsed.evidence)
+        assert check["spots"] == [], check["spots"]
+    plain = results[True]
+    assert "계기판 그림을 확인해 주세요." in plain.markdown and "계기판 그림:" not in plain.markdown  # 대표 본문은 하나
+    assert "표시하지 않은 대체 본문(HTML 등)" in plain.markdown and "(표시하지 않은 대체 본문)" in plain.warnings[-1]
+    assert "| 표시한 본문 |" in results[False].markdown
