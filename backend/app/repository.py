@@ -379,6 +379,14 @@ class DocumentRepository:
             conn.execute(f"UPDATE review_requests SET {', '.join(sets)} WHERE id=?", (*params, review_id))
             return self._review(conn, review_id)
 
+    def run_reviews(self, document_id: str, run_id: str) -> list[dict[str, Any]]:
+        """그 실행의 검수 요청 전부(청크에 판정을 잇는 데 쓴다). 최신 V번호 먼저."""
+        with self.connect() as conn:
+            return [dict(row) for row in conn.execute(
+                "SELECT id, finding_id, spot, status, comment, origin, kind, severity, page, sheet, cell, line, line_end, ref, note, "
+                "source_hit, result_hit, decided_at FROM review_requests WHERE document_id=? AND run_id=? ORDER BY id DESC",
+                (document_id, run_id))]
+
     def review_verdicts(self, document_id: str, run_id: str) -> tuple[dict[str, str], dict[str, int]]:
         """(finding ID → 사람 판정, 이 실행의 검수 요청 상태별 수)."""
         with self.connect() as conn:
@@ -464,6 +472,30 @@ class DocumentRepository:
                                    (document_id, run_id, rule_version, ref)).fetchone()
             return json.loads(row[0]) if row else None
 
+    def qc_needed(self, rule_version: str) -> list[tuple[str, str, bool]]:
+        """현재 규칙의 원장이 없는 '최신 성공 실행'(문서 번호 큰 것부터): [(문서 ID, 실행 ID, 다른 규칙의 원장이 있는지)].
+        다른 규칙의 원장이 있으면 규칙이 바뀐 것(다시 대조), 없으면 아직 대조하지 않은 것(미평가)."""
+        with self.connect() as conn:
+            rows = conn.execute("""
+                SELECT d.id, substr(d.result_file, 34, 32) AS run,
+                    EXISTS (SELECT 1 FROM qc_runs o WHERE o.document_id=d.id AND o.run_id=substr(d.result_file, 34, 32)
+                            AND o.rule_version != ? AND o.state='done') AS stale
+                FROM documents d
+                WHERE d.result_file IS NOT NULL AND length(d.result_file)=68
+                    AND NOT EXISTS (SELECT 1 FROM qc_runs q WHERE q.document_id=d.id AND q.run_id=substr(d.result_file, 34, 32)
+                                    AND q.rule_version=? AND q.state IN ('done', 'unavailable'))
+                ORDER BY d.seq DESC
+            """, (rule_version, rule_version)).fetchall()
+        return [(row[0], row[1], bool(row[2])) for row in rows]
+
+    def qc_history(self, document_id: str, run_id: str, rule_version: str) -> list[dict[str, Any]]:
+        """같은 실행의 다른 규칙 원장(지우지 않고 남겨 둔 것). 최근 것부터."""
+        with self.connect() as conn:
+            return [dict(row) for row in conn.execute(
+                "SELECT rule_version, state, spots_total, high, completed_at FROM qc_runs "
+                "WHERE document_id=? AND run_id=? AND rule_version != ? AND state='done' ORDER BY completed_at DESC",
+                (document_id, run_id, rule_version))]
+
     def qc_all(self, document_id: str, run_id: str, rule_version: str) -> list[dict]:
         """판정 상태 계산용 요약(finding ID·심각도). 원문 조각은 읽지 않는다."""
         with self.connect() as conn:
@@ -477,11 +509,13 @@ class DocumentRepository:
         with self.connect() as conn:
             docs = conn.execute(f"""
                 SELECT d.id, d.format, d.status, d.error_code, d.result_file,
-                    q.state AS qc_state, q.machine_state, q.spots_total, q.blocking
+                    q.state AS qc_state, q.machine_state, q.spots_total, q.blocking,
+                    EXISTS (SELECT 1 FROM qc_runs o WHERE o.document_id=d.id AND d.result_file = d.id || '-' || o.run_id || '.md'
+                            AND o.rule_version != ? AND o.state='done') AS stale
                 FROM documents d
                 LEFT JOIN qc_runs q ON q.document_id=d.id AND q.rule_version=? AND d.result_file IS NOT NULL
                     AND d.result_file = d.id || '-' || q.run_id || '.md'{only}
-            """, (rule_version, *(ids or []))).fetchall()
+            """, (rule_version, rule_version, *(ids or []))).fetchall()
             reviews: dict[str, dict[str, int]] = {}
             resolved: dict[str, int] = {}
             for document_id, status, linked, count in conn.execute("""

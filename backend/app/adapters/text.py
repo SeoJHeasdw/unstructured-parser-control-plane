@@ -62,13 +62,17 @@ def _delimiter(sample: str) -> str:
 def sniff_csv(sample: str, declared: str | None = None) -> dict:
     """파서와 원본 대조가 함께 쓰는 CSV 구분자 결정.
 
-    고르는 규칙은 예전과 같다(쉼표 우선, 세미콜론·탭이 있으면 열 수가 더 일관된 쪽). 다만 다른 구분자로도 열 수가
-    일관되게 나오면(예: 세미콜론 구분 + 쉼표 소수점) 그 후보를 남기고 '확정 아님'으로 표시한다. 모양이 예쁜 직사각 표도
-    구분자를 원천 계약으로 확정하지 못하면 통과 후보가 될 수 없다."""
+    고르는 규칙은 예전과 같다(쉼표 우선, 세미콜론·탭이 있으면 열 수가 더 일관된 쪽). 다만 다음 후보가 있으면 남기고
+    '확정 아님'으로 표시한다. 모양이 예쁜 직사각 표도 구분자를 원천 계약으로 확정하지 못하면 통과 후보가 될 수 없다.
+    - 다른 구분자로도 열 수가 일관되게 나온다(예: 세미콜론 구분 + 쉼표 소수점).
+    - 고른 구분자로는 대부분의 행이 한 칸인데, 다른 구분자는 대부분의 행을 여러 칸으로 나눈다(열 수가 들쭉날쭉해도).
+      예: '|' 구분 3열에서 한 행의 마지막 칸이 빠지면 열 수가 일관되지 않아 '|'가 탈락하고 전체가 1열로 읽혔다.
+    정상적인 1열 CSV(구분자 후보가 거의 나오지 않음)는 확정이다."""
     chosen = declared or (_delimiter(sample) if ";" in sample or "\t" in sample else ",")
     candidates = []
+    stats: dict[str, dict] = {}
     for candidate in DELIMITERS:
-        if candidate not in sample:
+        if candidate not in sample and candidate != chosen:
             continue
         widths = []
         try:
@@ -80,12 +84,19 @@ def sniff_csv(sample: str, declared: str | None = None) -> dict:
         if not widths:
             continue
         width, matches = Counter(widths).most_common(1)[0]
-        candidates.append({"delimiter": candidate, "width": width, "share": round(matches / len(widths), 3), "rows": len(widths)})
+        stats[candidate] = {"delimiter": candidate, "width": width, "share": round(matches / len(widths), 3), "rows": len(widths),
+                            "multi": round(sum(1 for w in widths if w > 1) / len(widths), 3)}
+        if candidate in sample:
+            candidates.append(stats[candidate])
+    chosen_multi = stats.get(chosen, {}).get("multi", 0.0)
     plausible = [c["delimiter"] for c in candidates if c["width"] > 1 and c["share"] >= 0.9]
+    splitting = [c["delimiter"] for c in candidates
+                 if c["delimiter"] != chosen and c["multi"] >= 0.8 and chosen_multi < 0.8 and c["delimiter"] not in plausible]
     if declared:
         basis, certain = "declared", True
     else:
-        basis, certain = "sniffed", not plausible or plausible == [chosen]
+        basis, certain = "sniffed", not (set(plausible) | set(splitting)) - {chosen}
+    plausible = plausible + splitting
     return {"delimiter": chosen, "basis": basis, "certain": certain, "candidates": candidates,
             "plausible": [d for d in plausible if d != chosen]}
 

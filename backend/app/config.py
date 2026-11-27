@@ -41,6 +41,8 @@ class Settings:
     drm_signatures: tuple[DrmSignature, ...] = ()
     # OOXML 파싱 전 사본에서 기호 글꼴·첨자를 유니코드로 바꾼다. 원본은 바꾸지 않는다.
     ooxml_prepare: bool = True
+    # 서버 시작 때 현재 대조 규칙의 원장이 없는 최신 성공 실행을 백그라운드에서 다시 대조한다(원본을 다시 읽기만 하고 파싱·외부 호출 없음).
+    qc_reverify: bool = True
 
     max_csv_output_bytes: int = 100 * 1024 * 1024
     ocr_enabled: bool = True
@@ -62,7 +64,8 @@ class Settings:
         return cls(runtime_dir=runtime, docling_artifacts=artifact_path, models=load_connections(), static_dir=static if (static / "index.html").is_file() else None,
                    ocr_enabled=os.getenv("DOCOPS_OCR", "1").strip().lower() not in {"0", "false", "no", "off"},
                    ocr_model_dir=Path(os.environ["DOCOPS_OCR_MODELS"]).expanduser() if os.getenv("DOCOPS_OCR_MODELS") else None,
-                   drm_signatures=parse_signatures(os.environ.get("DOCOPS_DRM_SIGNATURES")), ooxml_prepare=prepare)
+                   drm_signatures=parse_signatures(os.environ.get("DOCOPS_DRM_SIGNATURES")), ooxml_prepare=prepare,
+                   qc_reverify=os.environ.get("DOCOPS_QC_REVERIFY", "1").strip().lower() not in ("0", "false", "no", "off"))
 
     @property
     def runtime_id(self) -> str:

@@ -31,8 +31,10 @@ export function QcFunnel({ revision, active }: { revision: number; active: boole
     { label: '반입 전체', value: summary.documents },
     { label: '파싱 완료', value: summary.parsed, note: notParsedTotal ? `못 함 ${notParsedTotal}` : undefined,
       tip: notParsed.map(([key, count]) => `${notParsedLabels[key] ?? key} ${count}`).join(' · ') },
-    { label: '자동 대조', value: summary.qc_done, note: summary.qc_pending ? `미평가 ${summary.qc_pending}` : summary.qc_unavailable ? `대조 불가 ${summary.qc_unavailable}` : undefined,
-      tip: '최신 성공 실행을 원본 글자와 대조한 문서. 미평가는 원문 대조를 열면 계산합니다.' },
+    { label: '자동 대조', value: summary.qc_done,
+      note: summary.reverify?.state === 'running' ? `규칙 변경 · 다시 대조 ${summary.reverify.done}/${summary.reverify.total}`
+        : summary.qc_stale ? `규칙 변경 ${summary.qc_stale}` : summary.qc_pending ? `미평가 ${summary.qc_pending}` : summary.qc_unavailable ? `대조 불가 ${summary.qc_unavailable}` : undefined,
+      tip: '최신 성공 실행을 원본 글자와 대조한 문서. 대조 규칙이 바뀌면 서버가 시작할 때 기존 실행을 다시 대조합니다(이전 판정은 그대로). 미평가는 원문 대조를 열면 계산합니다.' },
   ];
   return <section className="qc-funnel" aria-label="처리 깔때기">
     <ol>

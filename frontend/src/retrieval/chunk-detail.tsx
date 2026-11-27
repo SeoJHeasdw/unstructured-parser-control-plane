@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 import { ArrowUpRight, Pencil, Ruler } from 'lucide-react';
-import type { Chunk, ChunkSource, EmbedConnection, ModelSpec, StrategyParams, TokenMeasure } from '../api/retrieval';
+import type { Chunk, ChunkFinding, ChunkSource, EmbedConnection, ModelSpec, StrategyParams, TokenMeasure } from '../api/retrieval';
 import { measureTokens } from '../api/retrieval';
 import { ListBox, Modal, Tabs } from '../ui';
 import { workspaceHref } from '../navigation';
@@ -45,8 +45,12 @@ export function ChunkText({ text }: { text: string }) {
 }
 
 /** 목록에서 바로 보여 줄 문제 표시. 나머지 표시는 오른쪽 상세에서 설명한다. */
-const LIST_FLAGS = ['unverified', 'over-limit', 'table-cut', 'table-no-header', 'caption-detached'];
+const LIST_FLAGS = ['confirmed-wrong', 'unverified', 'over-limit', 'table-cut', 'table-no-header', 'caption-detached'];
 const SEVERITY_WORD = { high: '높음', medium: '보통', low: '낮음' } as const;
+const VERDICT = { wrong: { label: '틀림 확인', tone: 'is-wrong' }, unclear: { label: '보류', tone: 'is-unclear' }, open: { label: '확인 전', tone: 'is-open' } } as const;
+/** '3쪽 · 결과 줄 12', '시트 요약!B5' */
+const findingWhere = (spot: ChunkFinding) => [spot.page ? `${spot.page}쪽` : '', spot.sheet ? (spot.cell ? `${spot.sheet}!${spot.cell}` : `시트 ${spot.sheet}`) : '',
+  spot.line ? `결과 줄 ${spot.line}` : ''].filter(Boolean).join(' · ');
 const uniqueKinds = (chunk: Chunk) => [...new Set(chunk.element_kinds ?? [])].filter(kind => kind !== 'heading');
 
 export type StrategyTab = 'chunks' | 'doc' | 'settings';
@@ -102,14 +106,28 @@ function ChunkPane({ source, column, chunk, number, byEl }: { source: ChunkSourc
     <h3 className="cb-pane-title">{number}번 청크</h3>
     <p className="cb-pane-meta">{meta}</p>
     {source.run_id && <p className="cb-pane-meta" data-tip={`본문 SHA-256 ${source.text_sha256 ?? '-'}`}>실행 {source.run_id.slice(0, 8)}{source.is_stale ? ' · 이전 성공본' : ''}{source.qc?.label ? ` · 문서 판정 ${source.qc.label}` : ''}</p>}
-    {!!chunk.qc?.length && source.doc_id && <section className="cb-qc" aria-label="확인 안 된 지점">
-      <h4 className="cb-h4">확인 안 된 지점 {fmtInt(chunk.qc_total ?? chunk.qc.length)}</h4>
-      <ul>{chunk.qc.map(spot => <li key={spot.id ?? spot.key}>
-        <b className={`cb-qc-sev is-${spot.severity}`}>{spot.key} · {SEVERITY_WORD[spot.severity]}</b>
-        <span>{spot.message}{spot.source_layer === 'pdf_hidden_layer' ? ' (보이지 않는 글자 층)' : ''}</span>
-        <a href={workspaceHref({ page: 'live', doc: source.doc_id!, review: 'source', focus: { check: spot.id ?? spot.key, run: source.run_id ?? undefined,
-          page: spot.page ?? undefined, sheet: spot.sheet ?? undefined, cell: spot.cell ?? undefined, line: spot.line ?? undefined } })}>원문 대조<ArrowUpRight size={13} aria-hidden="true" /></a>
-      </li>)}</ul>
+    {!!chunk.qc?.length && source.doc_id && <section className={`cb-qc${chunk.qc_counts?.wrong ? ' has-wrong' : ''}`} aria-label="검수할 곳">
+      <h4 className="cb-h4">검수할 곳 {fmtInt(chunk.qc_total ?? chunk.qc.length)}
+        {chunk.qc_counts && <small>{[chunk.qc_counts.wrong ? `틀림 확인 ${chunk.qc_counts.wrong}` : '', chunk.qc_counts.unclear ? `보류 ${chunk.qc_counts.unclear}` : '',
+          chunk.qc_counts.open ? `확인 전 ${chunk.qc_counts.open}` : ''].filter(Boolean).join(' · ')}</small>}</h4>
+      <ul>{chunk.qc.map(spot => {
+        const verdict = spot.review ? VERDICT[spot.review.status] ?? VERDICT.open : null;
+        // 판정이 있으면 그 검수 요청(V번호)을, 없으면 자동 대조 지점을 원문 위치와 함께 연다.
+        const check = spot.review ? `V${spot.review.id}` : spot.id ?? spot.key;
+        return <li key={`${spot.key}-${spot.review?.id ?? ''}`}>
+          <span className="cb-qc-tags">
+            {verdict ? <b className={`cb-qc-verdict ${verdict.tone}`}>{verdict.label} · V{spot.review!.id}</b> : <b className="cb-qc-verdict is-auto">자동 대조</b>}
+            <b className={`cb-qc-sev is-${spot.severity}`}>{spot.key.startsWith('V') ? '' : `${spot.key} · `}{SEVERITY_WORD[spot.severity] ?? spot.severity}</b>
+          </span>
+          <span className="cb-qc-body">{spot.message}{spot.source_layer === 'pdf_hidden_layer' ? ' (보이지 않는 글자 층)' : ''}
+            {(spot.source_hit || spot.result_hit) && <small>원본 '{spot.source_hit || '—'}' → 결과 '{spot.result_hit || '없음'}'</small>}
+            {spot.review?.comment && <small className="cb-qc-memo">검수 메모: {spot.review.comment}</small>}
+            {findingWhere(spot) && <small>{findingWhere(spot)}</small>}</span>
+          <a href={workspaceHref({ page: 'live', doc: source.doc_id!, review: 'source', focus: { check, run: source.run_id ?? undefined,
+            page: spot.page ?? undefined, sheet: spot.sheet ?? undefined, cell: spot.cell ?? undefined, line: spot.line ?? undefined } })}>
+            {spot.review ? '판정·원문 위치' : '원문 대조'}<ArrowUpRight size={13} aria-hidden="true" /></a>
+        </li>;
+      })}</ul>
     </section>}
     {parent && <p className="cb-pane-meta">답변 맥락 {(chunk.parent ?? 0) + 1}번 · {fmtInt(parent.chars)}자</p>}
     {chunk.flags.length > 0 && <ul className="cb-flag-list">{chunk.flags.map(flag => {

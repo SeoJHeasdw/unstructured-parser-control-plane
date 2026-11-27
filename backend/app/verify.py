@@ -24,7 +24,7 @@ import unicodedata
 
 from app.adapters.text import DELIMITERS, decode_table
 from app.fidelity.report import SUPPLEMENT_MARK
-from app.qc import RULE_VERSION, assign_ids, priority, reason
+from app.qc import assign_ids, priority, reason, rule_key
 from app.source_text import SourceText, SourceUnit
 from app.textnorm import is_special
 
@@ -349,7 +349,7 @@ class Verifier:
                    "spots": len(spots), **{name: counts.get(name, 0) for name in SEVERITY},
                    "scan_units": sum(1 for u in self.units if u["kind"] == "scan")}
         top = sorted(spots, key=lambda e: e["rank"])
-        return {"method": self.source.method, "format": self.fmt, "parser": self.parser, "rule_version": RULE_VERSION,
+        return {"method": self.source.method, "format": self.fmt, "parser": self.parser, "rule_version": rule_key(),
                 "source_layer": self.source.layer, "summary": summary, "units": self.units, "spots": spots,
                 "spots_total": len(spots) + dropped, "top": [entry["key"] for entry in top[:20]], "notes": self.notes,
                 "reasons": self.reasons, "checks": self.checks, "contract": self.contract}
@@ -1091,10 +1091,23 @@ class Verifier:
             self.reasons.append(reason("no_evidence", "이 실행에는 구분자·인코딩 근거가 기록되지 않았습니다(이전 버전에서 파싱). 다시 파싱하면 기록됩니다."))
         else:
             if not evidence.get("delimiter_certain"):
-                alternatives = ", ".join(names.get(d, d) for d in evidence.get("delimiter_alternatives") or []) or "다른 구분자"
-                self.reasons.append(reason("delimiter_ambiguous", f"구분자 {names.get(evidence.get('delimiter'), evidence.get('delimiter'))}로 읽었지만 {alternatives}로도 "
-                                           "열 수가 일관되게 나옵니다. 원천 형식으로 구분자를 지정해 다시 파싱해야 통과 후보가 됩니다.",
-                                           delimiter=evidence.get("delimiter"), alternatives=evidence.get("delimiter_alternatives") or []))
+                chosen = evidence.get("delimiter")
+                stats = {c.get("delimiter"): c for c in evidence.get("delimiter_candidates") or []}
+                details = []
+                for alt in evidence.get("delimiter_alternatives") or []:
+                    c = stats.get(alt, {})
+                    if c.get("share", 0) >= 0.9 and c.get("width", 0) > 1:
+                        details.append(f"{names.get(alt, alt)}(으)로 읽어도 {c['width']}열로 일관되게 나뉩니다")
+                    elif c:
+                        details.append(f"{names.get(alt, alt)}(으)로 읽으면 표본 {c.get('rows', 0)}행 중 {round(c.get('multi', 0) * 100)}%가 여러 칸으로 "
+                                       f"나뉩니다(가장 흔한 열 수 {c.get('width')}, {round(c.get('share', 0) * 100)}%)")
+                    else:
+                        details.append(f"{names.get(alt, alt)}도 후보입니다")
+                self.reasons.append(reason("delimiter_ambiguous",
+                                           f"구분자를 {names.get(chosen, chosen)}(으)로 골라 {evidence.get('width')}열로 읽었지만, "
+                                           + ("; ".join(details) or "다른 구분자도 후보입니다")
+                                           + ". 원천 형식으로 구분자를 지정해 다시 파싱해야 통과 후보가 됩니다.",
+                                           delimiter=chosen, alternatives=evidence.get("delimiter_alternatives") or []))
             if not evidence.get("encoding_certain"):
                 self.reasons.append(reason("encoding_uncertain", f"인코딩을 {evidence.get('encoding')}(으)로 추정했습니다(UTF-8이 아님). 다른 인코딩으로도 "
                                            "읽힐 수 있어 원천 형식으로 인코딩을 지정해 다시 파싱해야 통과 후보가 됩니다.", encoding=evidence.get("encoding")))
@@ -1197,7 +1210,7 @@ def image_only(markdown: str, fmt: str, parser: str | None) -> dict:
                       "message": f"이미지 원본은 글자 층이 없습니다. 결과 글자 {len(lines)}줄은 OCR 모델이 읽은 것이라 원본 그림과 사람이 대조해야 합니다."})
     assign_ids(spots)
     priority(spots, {"image": 0})
-    return {"method": "이미지(글자 층 없음)", "format": fmt.upper(), "parser": parser or "", "rule_version": RULE_VERSION,
+    return {"method": "이미지(글자 층 없음)", "format": fmt.upper(), "parser": parser or "", "rule_version": rule_key(),
             "source_layer": "image", "summary": {
                 "units": 1, "checked": 0, "source_chars": 0, "matched_chars": 0, "coverage": None, "spots": len(spots),
                 "high": len(spots), "medium": 0, "low": 0, "scan_units": 1},

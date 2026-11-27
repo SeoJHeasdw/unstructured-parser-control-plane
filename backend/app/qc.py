@@ -18,8 +18,38 @@ import hashlib
 import re
 import unicodedata
 
-# 대조 규칙이 바뀌면 올린다. 같은 실행이라도 규칙 버전이 다르면 원장을 새로 만든다(이전 원장과 V번호는 보존).
-RULE_VERSION = "verify-2026.11.27"
+# 사람이 읽는 규칙 이름. 원장의 실제 키는 rule_key()(이 이름 + 대조 코드·원본 읽기 라이브러리 지문)다.
+# 2026-11-27 두 번째 커밋에서 대조 규칙(숨은 글자 층·차트)이 바뀌었는데 이름을 올리지 않아, 첫 커밋 때 만든 원장이 그대로
+# 쓰였다(의심점 0). 그래서 이름에 기대지 않고 코드 지문으로 바뀜을 감지한다.
+RULE_VERSION = "verify-2026.11.28"
+# 원장 결과에 영향을 주는 모듈(원본 읽기·대조·판정 규칙). 파서 모듈은 넣지 않는다(파싱 결과는 실행마다 저장돼 있다).
+_RULE_MODULES = ("qc.py", "verify.py", "source_text.py", "pdf_layers.py", "xlsx_charts.py", "textnorm.py",
+                 "adapters/text.py", "adapters/eml.py", "fidelity/probe.py", "fidelity/report.py", "format_gate.py")
+_RULE_PACKAGES = ("pypdfium2", "openpyxl", "docling")
+_rule_key: str | None = None
+
+
+def rule_key() -> str:
+    """원장 키: 'verify-2026.11.28+<지문 10자>'. 대조 코드나 원본 읽기 라이브러리 버전이 바뀌면 달라져, 기존 실행을 다시 대조한다."""
+    global _rule_key
+    if _rule_key is None:
+        import importlib.metadata
+        from pathlib import Path
+        import sys
+        root = Path(__file__).resolve().parent
+        digest = hashlib.sha256(RULE_VERSION.encode())
+        for name in _RULE_MODULES:
+            path = root / name
+            digest.update(name.encode())
+            digest.update(path.read_bytes() if path.is_file() else b"-")
+        for package in _RULE_PACKAGES:
+            try:
+                digest.update(f"{package}={importlib.metadata.version(package)}".encode())
+            except importlib.metadata.PackageNotFoundError:
+                digest.update(f"{package}=-".encode())
+        digest.update(f"python={sys.version_info[0]}.{sys.version_info[1]}".encode())
+        _rule_key = f"{RULE_VERSION}+{digest.hexdigest()[:10]}"
+    return _rule_key
 EVIDENCE_SCHEMA = 1
 SEVERITY_RANK = {"high": 0, "medium": 1, "low": 2}
 FINDING_ID = re.compile(r"^F[0-9a-f]{12}$")

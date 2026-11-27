@@ -119,7 +119,8 @@ export const FLAGS: Record<string, { label: string; tone: Tone; desc: string }> 
   'caption-detached': { label: '캡션 떨어짐', tone: 'warn', desc: '캡션이 설명하는 표·그림과 다른 청크에 있습니다.' },
   'furniture-kept': { label: '반복 머리말 포함', tone: 'warn', desc: '쪽마다 반복되는 머리말·꼬리말이 들어 있습니다.' },
   'table-row-text': { label: '행을 문장으로', tone: 'info', desc: '표 행을 \'열: 값\' 문장으로 바꿨습니다.' },
-  'unverified': { label: '확인 안 된 지점', tone: 'bad', desc: '자동 대조가 원본과 다르다고 본 곳(사람이 아직 판정하지 않음)이 이 청크에 들어 있습니다. 색인하기 전에 원문 대조로 확인하세요.' },
+  'confirmed-wrong': { label: '틀림 확인', tone: 'bad', desc: '사람이 원문 대조로 원본과 다르다고 확인한 곳(검수 판정 \'틀림\')이 이 청크에 들어 있습니다. 이 청크의 글자는 원본과 다릅니다. 다시 파싱하거나 고친 뒤에 색인하세요.' },
+  'unverified': { label: '확인 안 된 지점', tone: 'bad', desc: '자동 대조가 원본과 다르다고 본 곳이나 판정을 미룬 검수 요청(보류·확인 전)이 이 청크에 들어 있습니다. 색인하기 전에 원문 대조로 확인하세요.' },
 };
 export const flagMeta = (flag: string) => FLAGS[flag] ?? { label: flag, tone: 'muted' as Tone, desc: '' };
 export const TOKEN_NOTE = '추정 토큰: 한글 1음절 1토큰, 영문 약 4글자 1토큰, 숫자 2자리 1토큰, 기호 1토큰으로 셉니다. 한글은 보수적으로 잡은 값입니다.';

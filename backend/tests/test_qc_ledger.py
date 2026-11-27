@@ -11,7 +11,7 @@ from app.adapters.base import ParsedDocument
 from app.adapters.text import TextAdapter, decode_table, sniff_csv
 from app.config import Settings
 from app.models import ResultLocation
-from app.qc import RULE_VERSION, gate
+from app.qc import gate, rule_key
 from app.source_text import read_source
 from app.verify import verify
 from main import create_app
@@ -67,7 +67,7 @@ def test_high_finding_outside_first_400_reaches_review(tmp_path, monkeypatch):
         assert _wait(client, doc_id)["status"] == "completed"
         checked = client.get(f"/api/live/documents/{doc_id}/verify").json()
         assert checked["spots_total"] == 441 and checked["summary"]["high"] == 1
-        assert checked["rule_version"] == RULE_VERSION and checked["qc_state"] == "done"
+        assert checked["rule_version"] == rule_key() and checked["qc_state"] == "done"
         # 우선순위 순: 문서 끝(마지막 시트)의 높음 1곳이 첫 상세다. 예전에는 문서 순서 앞 400곳만 줘서 빠졌다.
         first = checked["spots"][0]
         assert first["key"] == "S441" and first["severity"] == "high" and first["sheet"] == "S12"
@@ -112,7 +112,7 @@ def test_qc_is_registered_with_the_run_and_survives_restart(tmp_path):
         client.post(f"/api/live/documents/{doc_id}/process")
         _wait(client, doc_id)
         run_id = client.get(f"/api/live/documents/{doc_id}/runs").json()["runs"][0]["run_id"]
-        ledger = client.app.state.documents.repo.qc_run(doc_id, run_id, RULE_VERSION)
+        ledger = client.app.state.documents.repo.qc_run(doc_id, run_id, rule_key())
         assert ledger["state"] == "done" and ledger["machine_state"] == "pass_candidate"
     with TestClient(create_app(settings)) as client:
         checked = client.get(f"/api/live/documents/{doc_id}/verify").json()
@@ -242,3 +242,45 @@ def test_gate_orders_reviews_before_missing_evidence():
     assert gate([spot], [], {"F000000000001": "correct"}, 0, 0)["state"] == "pass_candidate"
     assert gate([spot], [], {"F000000000001": "wrong"}, 0, 1)["state"] == "needs_review"
     assert gate([], [], {}, 1, 0)["state"] == "needs_review"  # 열린 검수 요청
+
+
+def test_pipe_file_with_a_short_row_is_not_read_as_a_certain_single_column(tmp_path):
+    """리뷰 지적: '|' 구분 3열에서 한 행의 마지막 칸이 빠지면 '|'가 후보에서 탈락해 전체가 1열로 읽히고 통과 후보가 됐다."""
+    path = _csv(tmp_path, "장비|최소|최대\nP-1|20|30\nP-2|21\nP-3|22|32\n", name="pipe.csv")
+    parsed, result = _check(tmp_path, path)
+    assert parsed.evidence["delimiter"] == "," and parsed.evidence["width"] == 1
+    assert parsed.evidence["delimiter_certain"] is False and parsed.evidence["delimiter_alternatives"] == ["|"]
+    assert result["contract"] is False
+    ambiguous = next(r for r in result["reasons"] if r["code"] == "delimiter_ambiguous")
+    assert ambiguous["blocking"] and ambiguous["alternatives"] == ["|"]
+    assert "1열로 읽었지만" in ambiguous["message"] and "세로선(으)로 읽으면 표본 4행 중 100%가 여러 칸" in ambiguous["message"]
+    declared, fixed = _check(tmp_path, path, options={"csv_delimiter": "|"})
+    assert declared.evidence["width"] == 3 and declared.evidence["delimiter_basis"] == "declared"
+    assert "ragged" in [r["code"] for r in fixed["reasons"] if r["blocking"]] and fixed["contract"] is False  # 빠진 칸은 그대로 판정 불가
+
+
+def test_single_column_csv_controls_stay_pass_candidates(tmp_path):
+    controls = {"one.csv": "이름\n홍길동\n김철수\n이영희\n", "stray.csv": "name\nA\nB|C\nD\nE\nF\n"}
+    for name, text in controls.items():
+        parsed, result = _check(tmp_path, _csv(tmp_path, text, name=name))
+        assert parsed.evidence["delimiter_certain"] is True and parsed.evidence["width"] == 1, name
+        assert result["spots"] == [] and result["contract"] is True, name
+        assert not [r for r in result["reasons"] if r["blocking"]], name
+
+
+def test_gate_for_pipe_and_single_column_files_through_the_api(tmp_path):
+    with TestClient(create_app(Settings(runtime_dir=tmp_path / "runtime"))) as client:
+        ids = {}
+        for name, text in (("pipe.csv", "장비|최소|최대\nP-1|20|30\nP-2|21\nP-3|22|32\n"), ("one.csv", "이름\n홍길동\n김철수\n")):
+            ids[name] = client.post("/api/live/documents", files={"file": (name, text.encode())}).json()["id"]
+            client.post(f"/api/live/documents/{ids[name]}/process")
+            _wait(client, ids[name])
+        pipe = client.get(f"/api/live/documents/{ids['pipe.csv']}/verify").json()["gate"]
+        assert pipe["state"] == "undetermined" and "delimiter_ambiguous" in [r["code"] for r in pipe["reasons"]]
+        assert client.get(f"/api/live/documents/{ids['one.csv']}/verify").json()["gate"]["state"] == "pass_candidate"
+        # 구분자를 지정해 다시 파싱: 빠진 칸이 드러나 여전히 판정 불가(ragged)
+        client.post(f"/api/live/documents/{ids['pipe.csv']}/process", json={"csv_delimiter": "|"})
+        _wait(client, ids["pipe.csv"])
+        declared = client.get(f"/api/live/documents/{ids['pipe.csv']}/verify").json()
+        assert declared["gate"]["state"] == "undetermined" and "ragged" in [r["code"] for r in declared["gate"]["reasons"]]
+        assert "delimiter_ambiguous" not in [r["code"] for r in declared["gate"]["reasons"]]

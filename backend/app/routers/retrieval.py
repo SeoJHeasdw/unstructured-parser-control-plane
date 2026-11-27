@@ -200,14 +200,14 @@ def _annotate_qc(request: Request, meta: dict, text: str, locations, results: li
     """청크마다 덮는 쪽·시트와 사람이 아직 판정하지 않은 의심점을 붙인다. 원장이 없으면(원본을 못 읽음 등) 위치만 붙인다."""
     service = request.app.state.documents
     try:
-        data = service.verify(meta["doc_id"], meta["run_id"], unreviewed=True, limit=MAX_QC_FINDINGS)
+        entries, gate = service.chunk_findings(meta["doc_id"], meta["run_id"], MAX_QC_FINDINGS)
     except Exception:  # noqa: BLE001 — 대조를 못 해도 청킹 결과는 준다
         annotate(results, text, [], locations)
         return None
-    annotate(results, text, data["spots"], locations)
-    gate = data.get("gate") or {}
-    return {"rule_version": data.get("rule_version"), "state": gate.get("state"), "label": gate.get("label"),
-            "unresolved": gate.get("unresolved"), "attached": min(len(data["spots"]), MAX_QC_FINDINGS)}
+    annotate(results, text, entries, locations)
+    statuses = [(entry.get("review") or {}).get("status") for entry in entries]
+    return {"state": gate.get("state"), "label": gate.get("label"), "unresolved": gate.get("unresolved"), "attached": len(entries),
+            "wrong": statuses.count("wrong"), "unclear": statuses.count("unclear"), "open_reviews": gate.get("open_reviews")}
 
 
 @router.post("/tokens")

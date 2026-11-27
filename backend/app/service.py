@@ -42,6 +42,13 @@ FIDELITY_FAILED_WARNING = "원문 충실도 점검을 하지 못했습니다. �
 PREPARE_FALLBACK_WARNING = "기호·첨자 보정 사본을 파싱하지 못해 원본으로 파싱했습니다. 기호 글꼴·첨자가 빠지거나 붙을 수 있습니다."
 _WORK_PREFIX = "docops-prep-"
 
+def _review_ref(review: dict) -> dict:
+    """청크·목록에 싣는 검수 요청 요약(V번호·판정·메모·위치)."""
+    return {"id": review["id"], "status": review["status"], "comment": review.get("comment"), "origin": review.get("origin"),
+            "page": review.get("page"), "sheet": review.get("sheet"), "cell": review.get("cell"), "line": review.get("line"),
+            "decided_at": review.get("decided_at")}
+
+
 class MissingDocument(Exception): pass
 class MissingRun(Exception): pass
 class Conflict(Exception): pass
@@ -82,6 +89,9 @@ class DocumentService:
         self._qc_lock = threading.Lock()
         # 사용자가 지정한 원천 계약(CSV 구분자·인코딩). 접수한 실행 ID → 옵션. 처리할 때 꺼내 실행에 기록한다.
         self._run_options: dict[str, dict] = {}
+        # 대조 규칙(코드 지문)이 바뀐 뒤 기존 실행을 다시 대조하는 작업자와 진행 상황
+        self._reverifier: threading.Thread | None = None
+        self.reverify_state = {"state": "idle", "total": 0, "stale": 0, "done": 0, "failed": 0, "rule_version": qc.rule_key()}
 
     def start(self) -> None:
         self.settings.runtime_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
@@ -103,6 +113,9 @@ class DocumentService:
             self._stopping.clear()
             self._worker = threading.Thread(target=self._run_worker, name="document-parser", daemon=True)
             self._worker.start()
+            if self.settings.qc_reverify:
+                self._reverifier = threading.Thread(target=self._reverify, name="qc-reverify", daemon=True)
+                self._reverifier.start()
         except BaseException:
             self._release_lock()
             raise
@@ -137,10 +150,35 @@ class DocumentService:
                 self._jobs.put_nowait(None)
         if self._worker:
             self._worker.join(timeout=5)
+        if self._reverifier:
+            self._reverifier.join(timeout=5)
         # If parsing outlives shutdown, the worker retains the process lock until it exits.
         # If the whole process exits first, the OS releases the lock and startup recovery runs.
-        if not self._worker or not self._worker.is_alive():
+        if (not self._worker or not self._worker.is_alive()) and (not self._reverifier or not self._reverifier.is_alive()):
             self._release_lock()
+
+    def _reverify(self) -> None:
+        """현재 대조 규칙의 원장이 없는 최신 성공 실행을 다시 대조한다(규칙·코드가 바뀐 뒤 처음 시작할 때, 작업자가 대조 전에 멈췄을 때).
+        원본을 다시 읽어 대조만 한다(파싱·외부 호출 없음). 이전 규칙의 원장과 검수 요청(V번호·판정·메모)은 지우지 않는다."""
+        state = self.reverify_state
+        try:
+            needed = self.repo.qc_needed(qc.rule_key())
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("QC re-verification skipped (%s)", type(exc).__name__)
+            state["state"] = "failed"
+            return
+        state.update(state="running" if needed else "done", total=len(needed), stale=sum(1 for _, _, stale in needed if stale))
+        for doc_id, run_id, _ in needed:
+            if self._stopping.is_set():
+                state["state"] = "stopped"
+                return
+            try:
+                self.ensure_qc(doc_id, run_id)
+            except Exception as exc:  # noqa: BLE001 — 원본을 읽을 수 없는 문서는 '대조 불가'로 남는다
+                state["failed"] += 1
+                logger.info("QC re-verification failed for one run (%s)", type(exc).__name__)
+            state["done"] += 1
+        state["state"] = "done"
 
     def _mark_interrupted(self, doc_id: str, run_id: str) -> None:
         doc = self.repo.get(doc_id)
@@ -345,7 +383,7 @@ class DocumentService:
                                              parser_version=parsed.parser_version, result_file=result_name, error=None,
                                              warnings=warnings, ocr_enabled=ocr_enabled, duration_ms=duration_ms,
                                              locations=[location.model_dump() for location in locations], fidelity=fidelity,
-                                             evidence=parsed.evidence, options=options, qc_version=qc.RULE_VERSION)
+                                             evidence=parsed.evidence, options=options, qc_version=qc.rule_key())
             finally:
                 if not committed:
                     result_path.unlink(missing_ok=True)
@@ -464,11 +502,11 @@ class DocumentService:
 
     def ensure_qc(self, doc_id: str, run_id: str) -> dict:
         """그 실행의 자동 대조 원장(현재 규칙 버전). 없거나 '미평가'면 지금 계산해 저장한다. 원본을 읽을 수 없으면 Conflict."""
-        ledger = self.repo.qc_run(doc_id, run_id, qc.RULE_VERSION)
+        ledger = self.repo.qc_run(doc_id, run_id, qc.rule_key())
         if ledger and ledger["state"] == "done":
             return json.loads(ledger["result"])
         with self._qc_lock:
-            ledger = self.repo.qc_run(doc_id, run_id, qc.RULE_VERSION)
+            ledger = self.repo.qc_run(doc_id, run_id, qc.rule_key())
             if ledger and ledger["state"] == "done":
                 return json.loads(ledger["result"])
             doc = self.get(doc_id)
@@ -482,12 +520,12 @@ class DocumentService:
                 try:
                     _, source = self.source_text(doc_id, dialect)
                 except Conflict as exc:
-                    self.repo.mark_qc(doc_id, run_id, qc.RULE_VERSION, "unavailable", str(exc))
+                    self.repo.mark_qc(doc_id, run_id, qc.rule_key(), "unavailable", str(exc))
                     raise
                 result = verify_result(source, stored["markdown"], stored["locations"], stored["parser"], doc["format"], evidence)
             spots = result.pop("spots")
             header = {**result, "computed_at": now()}
-            self.repo.save_qc(doc_id, run_id, qc.RULE_VERSION, header, spots,
+            self.repo.save_qc(doc_id, run_id, qc.rule_key(), header, spots,
                               qc.machine_state(result["spots_total"], result["reasons"]),
                               round((time.perf_counter() - started) * 1000))
             return header
@@ -502,18 +540,55 @@ class DocumentService:
         header = self.ensure_qc(doc_id, run["run_id"])
         verdicts, counts = self.repo.review_verdicts(doc_id, run["run_id"])
         exclude = {fid for fid, status in verdicts.items() if status != "open"} if unreviewed else None
-        spots, matched = self.repo.qc_findings(doc_id, run["run_id"], qc.RULE_VERSION, severity=severity, unit=unit, kind=kind,
+        spots, matched = self.repo.qc_findings(doc_id, run["run_id"], qc.rule_key(), severity=severity, unit=unit, kind=kind,
                                                order=order, offset=offset, limit=limit, exclude=exclude)
-        top_spots, _ = self.repo.qc_findings(doc_id, run["run_id"], qc.RULE_VERSION, order="priority", limit=20)
+        top_spots, _ = self.repo.qc_findings(doc_id, run["run_id"], qc.rule_key(), order="priority", limit=20)
         stale = not run["is_latest"] or doc["status"] != "completed"
-        gate = qc.gate(self.repo.qc_all(doc_id, run["run_id"], qc.RULE_VERSION), header.get("reasons", []), verdicts,
+        history = self.repo.qc_history(doc_id, run["run_id"], qc.rule_key())
+        reasons = list(header.get("reasons", []))
+        if history:
+            before = history[0]
+            reasons.append(qc.reason("rules_changed", f"대조 규칙이 바뀌어 이 실행을 다시 대조했습니다(이전 규칙 {before['rule_version']}: 의심점 "
+                                     f"{before['spots_total'] or 0}곳 → 지금 {header.get('spots_total', 0)}곳). 이전 검수 판정과 근거(V번호·메모)는 그대로입니다.",
+                                     blocking=False, previous=before["rule_version"]))
+        gate = qc.gate(self.repo.qc_all(doc_id, run["run_id"], qc.rule_key()), reasons, verdicts,
                        counts.get("open", 0) + counts.get("unclear", 0), counts.get("wrong", 0), stale=stale)
         following = offset + len(spots)
         return {"id": doc_id, "run_id": run["run_id"], "completed_at": run["completed_at"], "parser_version": run["parser_version"],
                 **header, "qc_state": "done", "spots": spots, "spots_matched": matched,
                 "page": {"offset": offset, "limit": limit, "order": order, "next": following if following < matched else None},
-                "top_spots": top_spots, "gate": gate, "verdicts": verdicts,
+                "top_spots": top_spots, "gate": gate, "verdicts": verdicts, "rule_history": history,
                 "is_latest": bool(run["is_latest"]), "document_status": doc["status"]}
+
+    def chunk_findings(self, doc_id: str, run_id: str, limit: int) -> tuple[list[dict], dict]:
+        """청크에 붙일 검수 항목: 원장 의심점 중 사람이 '맞음'으로 해결하지 않은 것(판정이 있으면 V번호·판정·메모를 붙임)과,
+        의심점 없이 올린 검수 요청 중 결과 줄이 있고 '맞음'이 아닌 것. '틀림'은 확인된 오류, '보류'·확인 전은 미해결로 남긴다.
+        순서: 틀림 → 보류 → 확인 전 → 판정 없음(각각 우선순위 순). (항목, 판정 상태)를 돌려준다."""
+        data = self.verify(doc_id, run_id, limit=1)
+        reviews = self.repo.run_reviews(doc_id, run_id)
+        by_finding: dict[str, dict] = {}
+        for review in reviews:
+            if review["finding_id"] and review["finding_id"] not in by_finding:
+                by_finding[review["finding_id"]] = review
+        resolved = {fid for fid, review in by_finding.items() if review["status"] == "correct"}
+        spots, _ = self.repo.qc_findings(doc_id, run_id, qc.rule_key(), order="priority", limit=limit, exclude=resolved)
+        entries: list[dict] = []
+        for spot in spots:
+            review = by_finding.get(spot.get("id") or "")
+            entries.append({**spot, "review": _review_ref(review) if review else None})
+        known = {spot.get("id") for spot in spots}
+        for review in reviews:
+            if review["status"] == "correct" or not review["line"] or (review["finding_id"] and review["finding_id"] in known):
+                continue
+            if review["finding_id"] and review["finding_id"] in resolved:
+                continue
+            entries.append({"key": f"V{review['id']}", "id": review["finding_id"], "severity": review["severity"] or "medium",
+                            "kind": review["kind"], "message": review["note"], "page": review["page"], "sheet": review["sheet"],
+                            "cell": review["cell"], "line": review["line"], "line_end": review["line_end"] or review["line"],
+                            "source_hit": review["source_hit"] or "", "result_hit": review["result_hit"] or "", "review": _review_ref(review)})
+        weight = {"wrong": 0, "unclear": 1, "open": 2}
+        entries.sort(key=lambda entry: (weight.get((entry.get("review") or {}).get("status"), 3), entry.get("rank", 10**9)))
+        return entries, data.get("gate") or {}
 
     def finding(self, doc_id: str, run_id: str | None, ref: str) -> dict:
         """원장의 의심점 하나(S번호 또는 finding ID). 상세 목록에서 잘린 고위험 항목도 바로 열 수 있다."""
@@ -522,10 +597,10 @@ class DocumentService:
         self.ensure_qc(doc_id, run["run_id"])
         if not (qc.SPOT_KEY.fullmatch(ref) or qc.FINDING_ID.fullmatch(ref)):
             raise Conflict("S번호(예: S3) 또는 finding ID(F로 시작하는 13자리)를 넣으세요.")
-        spot = self.repo.qc_finding(doc_id, run["run_id"], qc.RULE_VERSION, ref)
+        spot = self.repo.qc_finding(doc_id, run["run_id"], qc.rule_key(), ref)
         if spot is None:
             raise Conflict(f"{ref} 자동 대조 지점이 없습니다. 자동 대조를 다시 확인하세요.")
-        return {**spot, "run_id": run["run_id"], "rule_version": qc.RULE_VERSION}
+        return {**spot, "run_id": run["run_id"], "rule_version": qc.rule_key()}
 
     @staticmethod
     def _qc_state(row: dict) -> str | None:
@@ -545,10 +620,10 @@ class DocumentService:
     def qc_summary(self) -> dict:
         """처리 깔때기: 반입 전체 → 파싱 완료 → 자동 대조 → 판정 상태. 마지막 단계만 보고 처리율을 말하지 않도록 분모를 함께 준다.
         판정 상태는 문서마다 최신 성공 실행 기준이고, 사람 판정(맞음·틀림·보류·열림)을 합친다(gate와 같은 규칙)."""
-        rows = self.repo.qc_overview(qc.RULE_VERSION)
-        out = {"rule_version": qc.RULE_VERSION, "documents": len(rows), "parsed": 0, "qc_done": 0, "qc_pending": 0,
+        rows = self.repo.qc_overview(qc.rule_key())
+        out = {"rule_version": qc.rule_key(), "documents": len(rows), "parsed": 0, "qc_done": 0, "qc_pending": 0,
                "qc_unavailable": 0, "states": {state: 0 for state in ("needs_review", "undetermined", "pass_candidate")},
-               "not_parsed": {}, "human_decided": 0, "processing": 0}
+               "not_parsed": {}, "human_decided": 0, "processing": 0, "qc_stale": 0, "reverify": dict(self.reverify_state)}
         for row in rows:
             if row["status"] == "processing":
                 out["processing"] += 1
@@ -561,6 +636,8 @@ class DocumentService:
             out["parsed"] += 1
             if state == "pending":
                 out["qc_pending"] += 1
+                if row["stale"]:
+                    out["qc_stale"] += 1  # 이전 규칙의 원장만 있다: 다시 대조할 실행
                 continue
             if state == "unavailable":
                 out["qc_unavailable"] += 1
@@ -585,11 +662,12 @@ class DocumentService:
     def _attach_qc(self, docs: list[dict]) -> None:
         if not docs:
             return
-        rows = {row["id"]: row for row in self.repo.qc_overview(qc.RULE_VERSION, [doc["id"] for doc in docs])}
+        rows = {row["id"]: row for row in self.repo.qc_overview(qc.rule_key(), [doc["id"] for doc in docs])}
         for doc in docs:
             row = rows.get(doc["id"])
             state = self._qc_state(row) if row else None
-            doc["qc"] = {"state": state, "label": qc.STATE_LABELS.get(state, ""),
+            label = "규칙 변경 · 다시 대조 대기" if state == "pending" and row and row["stale"] else qc.STATE_LABELS.get(state, "")
+            doc["qc"] = {"state": state, "label": label,
                          "unresolved": max(0, (row["spots_total"] or 0) - row["resolved"]) if row and state not in (None, "pending", "unavailable") else None} if state else None
 
     # ------------------------------------------------------------ 검수 요청(V번호)

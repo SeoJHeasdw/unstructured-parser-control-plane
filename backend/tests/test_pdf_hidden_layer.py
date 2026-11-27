@@ -91,10 +91,36 @@ def test_hidden_value_reaches_the_chunk_with_its_source_location(tmp_path, monke
         assert "unverified" in chunk["flags"] and chunk["qc"][0]["kind"] == "hidden_layer" and chunk["qc"][0]["page"] == 1
         assert chunk["regions"] == [{"page": 1}]
         assert body["results"][0]["stats"]["flags"]["unverified"] == 1
-        # 사람이 '맞음'으로 판정하면 청크의 확인 안 된 지점에서 빠진다
-        client.post("/api/live/reviews", json={"document_id": doc_id, "spot": checked["spots"][0]["id"], "status": "correct", "origin": "console"})
-        again = client.post("/api/retrieval/chunk", json={"source": {"doc_id": doc_id}, "strategies": [{"kind": "fixed", "params": {"size": 64}}]}).json()
-        assert all("unverified" not in chunk["flags"] for chunk in again["results"][0]["chunks"])
+        assert chunk["qc"][0]["review"] is None and chunk["qc_counts"] == {"wrong": 0, "unclear": 0, "open": 1}
+
+        def chunk_71():
+            body = client.post("/api/retrieval/chunk", json={"source": {"doc_id": doc_id}, "strategies": [{"kind": "fixed", "params": {"size": 64}}]}).json()
+            return body["source"]["qc"], next(c for c in body["results"][0]["chunks"] if "71 bar" in c["text"])
+
+        # 리뷰 지적: '틀림'·'보류'를 누르면 청크의 경고와 근거가 사라졌다. → '틀림'은 확인된 오류, '보류'는 미해결로 남는다.
+        review = client.post("/api/live/reviews", json={"document_id": doc_id, "spot": checked["spots"][0]["id"], "status": "wrong",
+                                                        "comment": "화면은 17 bar", "origin": "console"}).json()
+        meta, wrong = chunk_71()
+        entry = wrong["qc"][0]
+        assert "confirmed-wrong" in wrong["flags"] and "unverified" not in wrong["flags"]
+        assert entry["kind"] == "hidden_layer" and entry["source_hit"] == "71" and entry["page"] == 1 and entry["line"] == 1
+        assert entry["review"]["id"] == review["id"] and entry["review"]["status"] == "wrong" and entry["review"]["comment"] == "화면은 17 bar"
+        assert wrong["qc_counts"] == {"wrong": 1, "unclear": 0, "open": 0} and meta["wrong"] == 1
+        client.patch(f"/api/live/reviews/{review['id']}", json={"status": "unclear"})
+        meta, unclear = chunk_71()
+        assert "unverified" in unclear["flags"] and "confirmed-wrong" not in unclear["flags"]
+        assert unclear["qc"][0]["review"]["status"] == "unclear" and meta["unclear"] == 1
+        # 의심점 없이 사람이 직접 올린 검수 요청도 결과 줄이 있으면 청크에 남는다
+        manual = client.post("/api/live/reviews", json={"document_id": doc_id, "page": 1, "line": 1, "note": "단위 bar 확인",
+                                                        "status": "wrong", "origin": "console"}).json()
+        _, both = chunk_71()
+        assert [item["key"] for item in both["qc"]] == [f"V{manual['id']}", checked["spots"][0]["key"]]  # 틀림 먼저
+        assert both["qc_counts"] == {"wrong": 1, "unclear": 1, "open": 0} and {"confirmed-wrong", "unverified"} <= set(both["flags"])
+        # '맞음'만 해결이다
+        client.patch(f"/api/live/reviews/{review['id']}", json={"status": "correct"})
+        client.patch(f"/api/live/reviews/{manual['id']}", json={"status": "correct"})
+        _, solved = chunk_71()
+        assert "qc" not in solved and not {"unverified", "confirmed-wrong"} & set(solved["flags"])
 
 
 def test_visible_text_on_a_hidden_layer_page_keeps_its_own_layer(tmp_path):

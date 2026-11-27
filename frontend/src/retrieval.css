@@ -383,13 +383,21 @@
 .ui-dialog-foot .cb-parallel select { min-height:32px; border:1px solid var(--rule-strong); border-radius:6px; padding:0 6px; background:var(--surface); color:var(--ink-1); font:inherit; }
 @media(max-width:760px) { .cb-kind-group { grid-template-columns:1fr 1fr; } .cb-picks { grid-template-columns:1fr; } }
 
-/* 청크와 겹치는 확인 안 된 자동 대조 지점(실제 문서) */
-.cb-qc { margin: 10px 0 12px; padding: 8px 10px; border: 1px solid #f1d2d9; border-left: 3px solid var(--bad); border-radius: 8px; background: var(--bad-soft); }
-.cb-qc .cb-h4 { margin: 0 0 6px; color: var(--bad); }
-.cb-qc ul { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
+/* 청크와 겹치는 검수할 곳(실제 문서): 자동 대조 지점과 사람 판정(틀림 확인·보류·확인 전) */
+.cb-qc { margin: 10px 0 12px; padding: 8px 10px; border: 1px solid #f0dcae; border-left: 3px solid var(--warn); border-radius: 8px; background: var(--warn-soft); }
+.cb-qc.has-wrong { border-color: #f1d2d9; border-left-color: var(--bad); background: var(--bad-soft); }
+.cb-qc .cb-h4 { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; margin: 0 0 6px; color: var(--ink-1); }
+.cb-qc .cb-h4 small { color: var(--ink-3); font-size: 12px; font-weight: 600; }
+.cb-qc ul { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
 .cb-qc li { display: grid; grid-template-columns: max-content minmax(0, 1fr) max-content; gap: 8px; align-items: baseline; font-size: 12.5px; line-height: 1.5; color: var(--ink-1); }
-.cb-qc li > span { overflow-wrap: anywhere; }
+.cb-qc-tags { display: grid; gap: 3px; justify-items: start; }
+.cb-qc-body { display: grid; gap: 1px; overflow-wrap: anywhere; }
+.cb-qc-body small { color: var(--ink-3); font-size: 11.5px; }
+.cb-qc-body .cb-qc-memo { color: var(--ink-2); }
 .cb-qc a { display: inline-flex; align-items: center; gap: 2px; color: var(--accent); font-weight: 650; white-space: nowrap; }
-.cb-qc-sev { padding: 0 6px; border-radius: 5px; background: var(--surface); color: var(--ink-2); font-size: 11.5px; white-space: nowrap; }
+.cb-qc-sev, .cb-qc-verdict { padding: 0 6px; border-radius: 5px; background: var(--surface); color: var(--ink-2); font-size: 11.5px; white-space: nowrap; }
 .cb-qc-sev.is-high { color: var(--bad); } .cb-qc-sev.is-medium { color: var(--warn); }
+.cb-qc-verdict.is-wrong { background: var(--bad); color: #fff; }
+.cb-qc-verdict.is-unclear { background: var(--warn-soft); color: var(--warn); box-shadow: inset 0 0 0 1px currentColor; }
+.cb-qc-verdict.is-open, .cb-qc-verdict.is-auto { color: var(--ink-3); }
 @media (max-width: 640px) { .cb-qc li { grid-template-columns: minmax(0, 1fr); } }

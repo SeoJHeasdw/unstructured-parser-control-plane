@@ -117,7 +117,9 @@ export async function getVerifySpot(id: string, ref: string, run: string | undef
 
 /** 처리 깔때기: 반입 전체 → 파싱 완료 → 자동 대조 → 판정 상태. not_parsed: 파싱하지 못한 사유(오류 코드·상태)별 수. */
 export type QcSummary = { rule_version: string; documents: number; parsed: number; qc_done: number; qc_pending: number; qc_unavailable: number;
- states: Record<'needs_review' | 'undetermined' | 'pass_candidate', number>; not_parsed: Record<string, number>; human_decided: number; processing: number };
+ states: Record<'needs_review' | 'undetermined' | 'pass_candidate', number>; not_parsed: Record<string, number>; human_decided: number; processing: number;
+ /** 대조 규칙이 바뀌어 이전 규칙의 원장만 있는 실행 수와, 서버 시작 때의 다시 대조 진행(예전 서버는 없다) */
+ qc_stale?: number; reverify?: { state: 'idle' | 'running' | 'done' | 'failed' | 'stopped'; total: number; stale: number; done: number; failed: number; rule_version: string } };
 export async function getQcSummary(signal?: AbortSignal): Promise<QcSummary> {
  return readResponse<QcSummary>(await fetch('/api/live/qc-summary', signal ? {signal} : undefined));
 }

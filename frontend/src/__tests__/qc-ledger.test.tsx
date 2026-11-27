@@ -164,3 +164,31 @@ describe('제목 해석(CommonMark ATX)', () => {
     expect(kinds.get(5)).toEqual({ role: 'heading', level: 2, text: '둘째' });
   });
 });
+
+describe('청크의 검수 판정', () => {
+  it("'틀림'은 확인된 오류, '보류'는 미해결로 보이고 각 판정을 원문 위치와 함께 연다", async () => {
+    const { StrategyModal } = await import('../retrieval/chunk-detail');
+    const text = 'PRESSURE 71 bar';
+    const chunk = { index: 0, text, start: 0, end: text.length, heading_path: [], kind: 'text', chars: text.length, est_tokens: 6, elements: [], element_kinds: [],
+      page: 1, parent: null, flags: ['confirmed-wrong', 'unverified'], regions: [{ page: 1 }], qc_total: 2, qc_counts: { wrong: 1, unclear: 1, open: 0 },
+      qc: [
+        { key: 'V3', severity: 'high', kind: 'manual', message: '단위 bar 확인', page: 1, sheet: null, cell: null, line: 1, line_end: 1,
+          review: { id: 3, status: 'wrong', comment: '화면은 17 bar' } },
+        { key: 'S1', id: 'F0123456789ab', severity: 'high', kind: 'hidden_layer', message: '보이지 않는 글자 층의 값 71', page: 1, sheet: null, cell: null,
+          line: 1, line_end: 1, source_hit: '71', result_hit: '71', source_layer: 'pdf_hidden_layer', review: { id: 4, status: 'unclear', comment: null } },
+      ] };
+    const source = { doc_id: 'doc-p', sample: null, name: '압력.pdf', is_stale: false, chars: text.length, est_tokens: 6, tables: 0, headings: 0, sections: 1, text,
+      elements: [], pages: 1, composition: {}, run_id: RUN, text_sha256: 'a'.repeat(64), qc: { state: 'needs_review', label: '검수 필요', wrong: 1, unclear: 1 } };
+    const column = { id: 'fixed', name: '고정 길이', kind: 'fixed', params: { size: 64 }, result: { id: 'fixed', chunks: [chunk], stats: null, outcomes: {}, by_kind: {} } };
+    render(<StrategyModal source={source as never} column={column as never} tab="chunks" index={0} onTab={() => {}} onIndex={() => {}} onClose={() => {}} onEdit={() => {}} measure={null} />);
+    const block = screen.getByRole('region', { name: '검수할 곳' });
+    expect(within(block).getByText('틀림 확인 · V3')).toBeTruthy();
+    expect(within(block).getByText('보류 · V4')).toBeTruthy();
+    expect(within(block).getByText('검수 메모: 화면은 17 bar')).toBeTruthy();
+    expect(within(block).getByText(/틀림 확인 1 · 보류 1/)).toBeTruthy();
+    const links = within(block).getAllByRole('link', { name: /판정·원문 위치/ }).map(link => link.getAttribute('href') ?? '');
+    expect(links[0]).toContain('check=V3'); expect(links[1]).toContain('check=V4');
+    expect(links[1]).toContain('page=1'); expect(links[1]).toContain(`run=${RUN}`); expect(links[1]).toContain('line=1');
+    expect(screen.getAllByText('틀림 확인').length).toBeGreaterThan(0);  // 목록·표시 설명에도 '틀림 확인'
+  });
+});
