@@ -103,3 +103,13 @@ def test_connection_check_and_settings_api(tmp_path, monkeypatch):
     finally:
         good.close()
         wrong.close()
+
+
+def test_scripts_keep_units_and_exponents_and_do_not_glue_markers():
+    """모델이 낸 <sup>·<sub>: 지우면 m²→m2, 10⁻³→10-3처럼 뜻이 바뀐다(파서 품질 검수 고도화 계획 §4.3)."""
+    from app.ocr_model import normalize
+    assert normalize("10<sup>th</sup> 검사, 면적 25 m<sup>2</sup>") == "10th 검사, 면적 25 m²"
+    assert normalize("농도 10<sup>-3</sup> M, CO<sub>2</sub> 5%") == "농도 10⁻³ M, CO₂ 5%"
+    assert normalize("Assay<sup>a</sup> 결과") == "Assay<sup>a</sup> 결과"   # 각주 표시를 앞 낱말에 붙이지 않는다
+    assert normalize("<table><tr><td>m<sup>2</sup></td><td>10<sup>th</sup></td></tr></table>") == "| m² | 10th |\n|---|---|"
+    assert normalize("$10^{-3}$ 와 $m^2$") == "10⁻³ 와 m²"

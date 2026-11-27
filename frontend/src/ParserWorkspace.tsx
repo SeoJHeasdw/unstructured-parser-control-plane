@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { ArrowRight, ChevronRight, CircleAlert, FileCheck2, FileCode2, FileInput, FileText, GitBranch, Layers3, PencilRuler, Play, RefreshCw, ScanText, Scissors, Settings2, SlidersHorizontal, Table2, Workflow } from 'lucide-react';
+import { ArrowRight, ChevronRight, CircleAlert, FileCheck2, FileCode2, FileInput, FileText, GitBranch, Layers3, Mail, PencilRuler, Play, RefreshCw, ScanText, Scissors, Settings2, SlidersHorizontal, Table2, Workflow } from 'lucide-react';
 import { getParserCatalog, listLiveDocuments, processLiveDocument, type LiveDoc, type ParserCatalog } from './api/live';
 import { DocNumber, displayDate, displayStatus, FileGlyph, statusNote, StatusBadge } from './LiveDocumentView';
 import { WorkspaceLink } from './WorkspaceLink';
@@ -15,6 +15,7 @@ const engines = new Map([
   ['ocr-model', { name: 'OCR 모델', icon: ScanText }],
   ['easyocr', { name: 'EasyOCR(사용 중단)', icon: ScanText }],
   ['python-svg', { name: 'SVG', icon: FileCode2 }],
+  ['python-eml', { name: '메일(EML)', icon: Mail }],
 ]);
 const formatName = (ext: string) => ext || '확장자 없음';
 
@@ -29,7 +30,8 @@ function extraction(format: string, engine: string) {
     case 'ocr-model': return ['이미지 문자 인식', '문서 OCR 모델로 글자를 읽습니다. 모델이 연결되지 않으면 처리하지 않습니다.'];
     case 'easyocr': return ['이미지 문자 인식(사용 중단)', '이전 실행 기록입니다. 라이브러리 OCR은 더 이상 쓰지 않습니다.'];
     case 'python-svg': return ['벡터 글자 추출', 'SVG의 텍스트를 읽고 내장 이미지에서 추출 가능한 글자를 보충합니다.'];
-    case 'python-csv': return ['행·열 복원', '인코딩과 구분자를 판별한 뒤 행과 열을 Markdown 표로 변환합니다.'];
+    case 'python-csv': return ['행·열 복원', '인코딩과 구분자를 판별한 뒤 행과 열을 Markdown 표로 변환합니다. 구분자 후보·원래 열 수를 근거로 남기고, 모호하면 원천 형식을 지정해 다시 파싱합니다.'];
+    case 'python-eml': return ['메일 본문·첨부 목록', '주요 헤더와 대표 본문(글 본문이 있으면 그것만, 없으면 HTML)을 읽고 첨부는 이름·형식·크기만 남깁니다. 첨부 본문은 읽지 않습니다.'];
     case 'python-text': return ['텍스트 읽기', '인코딩을 판별해 본문의 줄바꿈과 문자 순서를 보존합니다.'];
     default: return ['본문 추출', '이 형식에 등록된 파서가 원본을 처리합니다.'];
   }

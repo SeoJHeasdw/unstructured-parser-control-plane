@@ -52,6 +52,7 @@ _WARNING_PREFIXES = (
     ("본문 글자가 추출되지 않은 PDF 페이지", "empty-pg"),
     ("PDF 레이아웃·표 모델 없이 글자 층만", "text-only"),
     ("글자 층이 깨져 보이는 PDF 쪽", "text-broken"),
+    ("그림 위의 보이지 않는 글자 층", "hidden-layer"),
     ("발표자 메모", "notes-added"),
     ("표 맨 위의 전체 너비 병합 행", "title-row"),
     ("OCR을 포함한 변환이 실패", "ocr-fallback"),
@@ -96,9 +97,9 @@ def warning_codes(warnings: list[str], fidelity: dict | None) -> list[tuple[str,
             code = next((short for prefix, short in _WARNING_PREFIXES if text.startswith(prefix)), None)
         if code is None:
             code = "svg" if "SVG" in text else "other"
-        if code == "empty-pg" or (code == "ocr-read" and ":" in text):
-            # 쪽 번호만 옮긴다('…쪽: 1, 3 (모델 이름)'에서 괄호 앞까지).
-            pages = _PAGES.findall(text.split(":", 1)[-1].split("(", 1)[0])
+        if code in ("empty-pg", "hidden-layer") or (code == "ocr-read" and ":" in text):
+            # 쪽 번호만 옮긴다('…쪽: 1, 3 (모델 이름)'에서 괄호·마침표 앞까지).
+            pages = _PAGES.findall(text.split(":", 1)[-1].split("(", 1)[0].split(".", 1)[0])
             detail = " ".join("p" + page for page in pages[:6]) + (f" +{len(pages) - 6}" if len(pages) > 6 else "")
         result.append((code, detail))
     return result
@@ -142,6 +143,7 @@ MEANINGS = {
     "pic-skip": "PDF 쪽의 큰 그림 속 글자를 OCR 모델이 연결되지 않아 읽지 않음(그림 안 글자가 결과에 없음)",
     "text-only": "PDF 모델 없이 글자 층만 읽음(pdf-text). 표 칸 구조가 없고 여러 단의 읽는 순서가 섞일 수 있어 원본 대조가 필요함",
     "text-broken": "PDF 글자 층이 깨진 쪽이 있음(글꼴 대응표 없음). 결과 글자를 믿을 수 없어 원본 대조가 필요함",
+    "hidden-layer": "그림 위의 보이지 않는 글자 층(스캔 + OCR 층)에서 글자를 읽은 쪽이 있음. 화면에 보이는 값과 같은지 확인되지 않아 숫자·단위는 원본 그림과 대조가 필요함",
     "notes-added": "PPTX 발표자 메모를 슬라이드 내용 끝에 덧붙임(파서가 넣지 않던 글자)",
     "title-row": "XLSX 표 맨 위의 병합 제목 행을 표 위 문단으로 옮김(칸마다 반복하지 않게)",
     "ocr-fallback": "OCR을 포함한 변환이 실패해 PDF 텍스트 층만 읽음",

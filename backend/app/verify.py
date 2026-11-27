@@ -196,6 +196,10 @@ class Verifier:
         self.reasons: list[dict] = []   # 판정 근거(qc.reason): 통과 후보를 막는 것과 참고
         self.checks: list[dict] = []    # 무엇을 어떤 근거로 검사했는지
         self.contract = False           # 형식 계약(통과 후보 기준)을 모두 채웠는지
+        self.hidden_pages: list[str] = []    # 그림 위 숨은 글자 층이 있는 단위
+        self.hidden_conflicts = 0            # 숨은 층 값과 그림 OCR 값이 다른 그림 수
+        self.hidden_agreed = 0               # 숨은 층 값과 그림 OCR 값이 같은 그림 수(다른 표현과 일치)
+        self.chart_tally = Counter()         # 차트 계열 상태별 수(match·conflict·no_cache·unresolved·literal)
         # TXT·MD·LOG는 결과가 원본 글 그대로다: 원본 줄도 결과와 같은 기준(Markdown 꾸밈 제외)으로 본다.
         self.source_plain = result_plain if self.fmt in ("TXT", "MD", "LOG") else source_plain
         self.raw = markdown.split("\n")
@@ -288,6 +292,9 @@ class Verifier:
     def run(self) -> dict:
         furniture = self._furniture()
         for unit in self.source.units:
+            if unit.kind == "chart":
+                self.units.append(self._check_chart(unit))
+                continue
             if self.fmt == "CSV" and self.source.records is not None:
                 stats = self._check_csv_grid(unit)
                 if stats is None:
@@ -348,11 +355,9 @@ class Verifier:
                 "reasons": self.reasons, "checks": self.checks, "contract": self.contract}
 
     def _layer_of(self, spot: dict) -> str:
+        """지점이 기댄 원본 계통. 숨은 글자 층 지점(hidden_layer·hidden_conflict)은 만들 때 따로 표시한다. 같은 쪽의 보이는 글자 지점은 글자 층 그대로다."""
         if spot["kind"] == "image_ocr" or spot["kind"] == "scan_ocr":
             return "ocr_model"
-        unit = self.source.unit(spot.get("unit") or "")
-        if unit is not None and unit.kind == "hidden_text":
-            return "pdf_hidden_layer"
         return self.source.layer
 
     def _judge(self) -> None:
@@ -360,14 +365,15 @@ class Verifier:
         units = self.units
         scans = [u["label"] for u in units if u["state"] == "scan"]
         garbled = [u["label"] for u in units if u["state"] == "garbled"]
-        hidden_layer = [u["label"] for u in units if u["kind"] == "hidden_text"]
+        hidden_layer = self.hidden_pages
         if scans:
             self.reasons.append(reason("scan", f"글자 층이 없는 {_names(scans)}: 결과 글자는 OCR 모델이 읽은 것이라 원본 그림과 사람이 대조해야 합니다."))
         if garbled:
             self.reasons.append(reason("source_garbled", f"원본 글자 층이 깨진 {_names(garbled)}: 자동 대조를 할 수 없습니다."))
         if hidden_layer:
+            agreed = f" 그림 OCR과 값이 같은 그림 {self.hidden_agreed}개도 모델 판독이라 운영 승인 근거로 쓰지 않습니다." if self.hidden_agreed else ""
             self.reasons.append(reason("hidden_layer", f"그림 위의 보이지 않는 글자 층에서 읽은 {_names(hidden_layer)}: 결과와 대조 기준이 같은 숨은 층이라 "
-                                       "화면에 보이는 값과 같은지 확인되지 않았습니다."))
+                                       "화면에 보이는 값과 같은지 확인되지 않았습니다." + agreed))
         if self.source.truncated:
             self.reasons.append(reason("truncated", "원본이 커서 앞부분만 대조했습니다."))
         if self.unlocated or (self.located is False and self.fmt in ("PDF", "PPTX", "PPTM", "XLSX", "XLSM") and any(u.lines for u in self.source.units)):
@@ -384,7 +390,20 @@ class Verifier:
             self.reasons.append(reason("shared_layer", "파서와 대조 기준이 같은 저장 값입니다. 빠진 시트·행·칸은 찾지만 저장 값 자체가 맞는지는 확인하지 않습니다.",
                                        blocking=False))
         if not self.contract and self.fmt != "CSV":
-            self.reasons.append(reason("no_contract", f"{self.fmt or '이 형식'}은 아직 통과 후보 기준(형식 계약)을 검증하지 않았습니다. 기록 모드로 사람이 계속 검수합니다."))
+            self.reasons.append(reason("no_contract", f"{self.fmt + ' ' if self.fmt else '이 '}형식은 아직 통과 후보 기준(형식 계약)을 검증하지 않았습니다. 기록 모드로 사람이 계속 검수합니다."))
+        if self.chart_tally:
+            tally = self.chart_tally
+            if tally["no_cache"]:
+                self.reasons.append(reason("chart_no_cache", f"차트 계열 {tally['no_cache']}개는 표시값(캐시)이 저장되지 않아 셀 값만 확인했습니다(차트 표시값 미확인)."))
+            if tally["unresolved"]:
+                self.reasons.append(reason("chart_unresolved", f"차트 계열 {tally['unresolved']}개는 참조(여러 영역·외부 통합문서·이름 정의)를 해석하지 못했습니다."))
+            if tally["literal"]:
+                self.reasons.append(reason("chart_literal", f"차트 계열 {tally['literal']}개는 셀 참조 없이 차트 안에 값을 직접 넣었습니다(원본 셀과 대조할 수 없음)."))
+            charts = [u for u in units if u["kind"] == "chart"]
+            self.checks.append({"id": "chart_values", "label": "차트 표시값 ↔ 원본 셀", "source_layer": "xlsx_chart_cache", "derived_from": "independent",
+                                "state": "done" if not (tally["no_cache"] or tally["unresolved"] or tally["literal"]) else "partial" if tally["match"] or tally["conflict"] else "unverified",
+                                "detail": f"차트 {len(charts)}개 · 계열 일치 {tally['match']} · 충돌 {tally['conflict']} · 캐시 없음 {tally['no_cache']} · 해석 못 함 {tally['unresolved']}"})
+        units = [u for u in units if u["kind"] != "chart"]
         checked = sum(1 for u in units if u["state"] == "checked")
         excluded = sum(1 for u in units if u["state"] in ("hidden", "empty"))
         unverified = sum(1 for u in units if u["state"] in ("scan", "garbled"))
@@ -396,6 +415,9 @@ class Verifier:
                                "state": "done" if checked and not unverified else "partial" if checked else "unverified"})
         if self.fmt == "PDF":
             visible = "unverified" if scans or hidden_layer or self.parser == "pdf-text" else "partial"
+            if hidden_layer:
+                self.checks.append({"id": "hidden_layer", "label": "보이지 않는 글자 층", "state": "unverified", "source_layer": "pdf_hidden_layer",
+                                    "derived_from": "same_layer", "detail": f"그림 위 숨은 층 {_names(hidden_layer)} · 그림 OCR과 다름 {self.hidden_conflicts} · 같음 {self.hidden_agreed}"})
             self.checks.append({"id": "visible", "label": "화면에 보이는 값", "state": visible,
                                 "detail": "보이는 글자를 따로 읽은 근거(픽셀 판독)가 없습니다." if visible == "unverified" else
                                           "레이아웃 모델의 결과를 글자 층과 대조했습니다(글꼴의 글자 대응이 맞다고 가정)."})
@@ -612,8 +634,57 @@ class Verifier:
                 if broken <= 5:
                     self.spot(unit, "high", "garbled", f"결과에 깨진 글자(U+{ord(found):04X})가 있습니다. 원본의 해당 글자를 확인하세요.",
                               line=line_no, result=self.result_text(line_no, found), result_hit=found)
+        self._hidden_layer(unit, unit_lines or index.numbers)
+        stats["hidden_regions"] = len(unit.regions)
         stats["spots"] = len(self.spots) - before
         return stats
+
+    def _hidden_layer(self, unit: SourceUnit, lines: list[int]) -> None:
+        """그림 위의 보이지 않는 글자 층(PDF 렌더 모드 3). 파서와 대조가 같은 층을 읽으므로 '같다'가 화면 값을 보증하지 않는다.
+        그 값을 '화면에 보이는 값으로 확인되지 않음'으로 올리고, 같은 쪽에 그림 OCR 결과('[그림 속 글자]')가 있으면 두 값을 대조한다."""
+        if not unit.regions:
+            return
+        self.hidden_pages.append(unit.label)
+        ocr: list[str] = []
+        block = False
+        for n in lines:
+            raw = self.raw[n - 1]
+            if PICTURE_LABEL in raw:
+                block = True
+                continue
+            if block and not raw.strip():
+                block = False
+            elif block:
+                ocr += numbers(self.plain[n])
+        for region in unit.regions:
+            hidden = numbers(region.get("text") or "")
+            if not hidden and (region.get("chars") or 0) < 4:
+                continue
+            target = next((n for n in lines if hidden and PICTURE_LABEL not in self.raw[n - 1]
+                           and any(value in numbers(self.plain[n]) for value in hidden)), lines[0] if lines else None)
+            text = region.get("text") or ""
+            hit = hidden[0] if hidden else _clip(text, 0, 40)
+            if ocr and hidden:
+                if set(hidden) == set(ocr):
+                    self.hidden_agreed += 1
+                    continue
+                self.hidden_conflicts += 1
+                first = next((value for value in hidden if value not in ocr), hidden[0])
+                other = next((value for value in ocr if value not in hidden), ocr[0])
+                entry = self.spot(unit, "high", "hidden_conflict",
+                                  f"{unit.label} 그림: 보이지 않는 글자 층의 값({', '.join(hidden[:6])})과 그림 OCR이 읽은 값({', '.join(ocr[:6])})이 다릅니다. "
+                                  "원본 그림에서 실제로 보이는 값을 확인하세요.",
+                                  ref=f"{unit.label} 그림", line=target, source=_clip(text), source_hit=first,
+                                  result=self.result_text(target, first), result_hit=other)
+            else:
+                entry = self.spot(unit, "high" if hidden else "medium", "hidden_layer",
+                                  f"{unit.label} 그림 위의 보이지 않는 글자 층에서 읽은 '{_clip(text, 0, 60)}'"
+                                  + (f"의 값 {', '.join(hidden[:6])}" if hidden else "")
+                                  + "은(는) 화면에 보이는 값으로 확인되지 않았습니다(파서와 대조가 같은 숨은 층을 읽음). 원본 그림과 대조하세요.",
+                                  ref=f"{unit.label} 그림", line=target, source=_clip(text), source_hit=hit,
+                                  result=self.result_text(target, hit if hidden else ""), result_hit=hit if hidden else "")
+            entry["source_layer"] = "pdf_hidden_layer"
+            entry["bbox"] = region.get("bbox")
 
     def _diff_line(self, unit, index: _Index, line, plain: str, c: str, source_compact: str, anchor: int | None) -> dict:
         tokens = _tokens(plain)
@@ -805,6 +876,54 @@ class Verifier:
             self.notes.append(f"{unit.label}: 다른 행이 많아 앞 {_LINE_SPOTS_PER_UNIT}곳만 의심 지점으로 올렸습니다(전체 {row_spots}행).")
         stats["source_chars"], stats["matched_chars"] = total, matched
         stats["coverage"] = round(matched / total, 4) if total else None
+        stats["spots"] = len(self.spots) - before
+        return stats
+
+    # ------------------------------------------------------------ 차트: 저장된 표시값(numCache) ↔ 참조 셀
+    def _check_chart(self, unit: SourceUnit) -> dict:
+        """계열마다 차트에 저장된 표시값과 원본 셀 값을 점 하나씩 대조한다. 두 저장 표현이 다르면 '충돌'로 두 값을 모두 보인다.
+        캐시가 없으면 셀 값만 있는 '차트 표시값 미확인', 참조를 해석할 수 없으면 '해석 못 함'. 축 눈금으로 값을 추정하지 않는다."""
+        stats = {"key": unit.key, "label": unit.label, "page": None, "sheet": unit.sheet, "kind": "chart", "note": unit.note,
+                 "source_chars": 0, "matched_chars": 0, "coverage": None, "numbers_missing": 0, "numbers_extra": 0, "spots": 0,
+                 "state": "checked", "result_lines": [], "series": []}
+        before = len(self.spots)
+        chart = unit.chart or {}
+        title = chart.get("title") or unit.label
+        conflicts = 0
+        for series in chart.get("series", []):
+            name = series.get("name") or series.get("formula") or "계열"
+            cache = {int(k): v for k, v in (series.get("cache") or {}).items()} if series.get("cache") is not None else None
+            if series.get("literal") and not series.get("cells"):
+                state = "literal"
+            elif not series.get("resolved"):
+                state = "unresolved"
+            elif cache is None:
+                state = "no_cache"
+            else:
+                state = "match"
+                for index, (cell, value) in enumerate(zip(series["cells"], series["values"])):
+                    cached = cache.get(index)
+                    if _same_value(value, cached):
+                        continue
+                    state = "conflict"
+                    conflicts += 1
+                    if conflicts > _LINE_SPOTS_PER_UNIT:
+                        continue
+                    category = series["categories"][index] if index < len(series.get("categories") or []) else None
+                    shown_cell = "빈 칸" if value in (None, "") else _value_text(value)
+                    shown_cache = "없음" if cached in (None, "") else cached
+                    self.spot(unit, "high", "chart_conflict",
+                              f"차트 '{title}' 계열 '{name}' {index + 1}번째 점" + (f"(범주 '{_value_text(category)}')" if category not in (None, "") else "")
+                              + f": 차트에 저장된 표시값 {shown_cache}와 원본 셀 {series['sheet']}!{cell} 값 {shown_cell}이 다릅니다. "
+                              "어느 값이 보고서·화면에 쓰였는지 원본에서 확인하세요.",
+                              ref=f"{series['sheet']}!{cell}", source=f"셀 {series['sheet']}!{cell} = {shown_cell}", source_hit=shown_cell,
+                              result=f"차트 '{title}' 표시값(저장된 캐시) = {shown_cache}", result_hit=str(shown_cache), cell=cell)
+                    self.spots[-1]["sheet"] = series["sheet"]
+                    self.spots[-1]["source_layer"] = "xlsx_chart_cache"
+            self.chart_tally[state] += 1
+            stats["series"].append({"name": name, "state": state, "sheet": series.get("sheet"), "points": len(series.get("cells") or [])})
+        states = {item["state"] for item in stats["series"]}
+        stats["state"] = ("conflict" if "conflict" in states else "unverified" if states & {"no_cache", "unresolved"} else "checked") if states else "empty"
         stats["spots"] = len(self.spots) - before
         return stats
 
@@ -1031,6 +1150,24 @@ def verify(source: SourceText, markdown: str, locations: list[dict], parser: str
     return Verifier(source, markdown, locations, parser, fmt, evidence).run()
 
 
+def _value_text(value) -> str:
+    if isinstance(value, float) and value.is_integer():
+        return str(int(value))
+    return str(value)
+
+
+def _same_value(cell, cached) -> bool:
+    """차트 캐시 글자와 셀 값이 같은 값인지. 숫자는 상대 오차 1e-9 안이면 같다(캐시는 보통 전체 자릿수로 저장)."""
+    if cached in (None, ""):
+        return cell in (None, "")
+    if cell in (None, ""):
+        return False
+    try:
+        return math.isclose(float(cell), float(cached), rel_tol=1e-9, abs_tol=1e-12)
+    except (TypeError, ValueError):
+        return str(cell).strip() == str(cached).strip()
+
+
 def _newlines(value: str) -> str:
     return value.replace("\r\n", "\n").replace("\r", "\n")
 
@@ -1072,6 +1209,24 @@ def image_only(markdown: str, fmt: str, parser: str | None) -> dict:
             "checks": [{"id": "preserved", "label": "본문 글자 보존", "state": "unverified", "method": "이미지(글자 층 없음)",
                         "source_layer": "image", "derived_from": "none", "units": 1, "checked": 0, "excluded": 0, "unverified": 1}],
             "contract": False}
+
+
+def _value_text(value) -> str:
+    if isinstance(value, float) and value.is_integer():
+        return str(int(value))
+    return str(value)
+
+
+def _same_value(cell, cached) -> bool:
+    """차트 캐시 글자와 셀 값이 같은 값인지. 숫자는 상대 오차 1e-9 안이면 같다(캐시는 보통 전체 자릿수로 저장)."""
+    if cached in (None, ""):
+        return cell in (None, "")
+    if cell in (None, ""):
+        return False
+    try:
+        return math.isclose(float(cell), float(cached), rel_tol=1e-9, abs_tol=1e-12)
+    except (TypeError, ValueError):
+        return str(cell).strip() == str(cached).strip()
 
 
 def _newlines(value: str) -> str:

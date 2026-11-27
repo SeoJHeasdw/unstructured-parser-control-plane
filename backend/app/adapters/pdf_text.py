@@ -21,6 +21,7 @@ FALLBACK_WARNING = ("PDF 레이아웃·표 모델 없이 글자 층만 읽었습
 _CONTROL = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f￾￿]")
 _GARBLED = re.compile(r"[-�]")
 _MARK = re.compile(r"^(\s*)([#>|])")  # 줄 머리의 Markdown 기호는 글자로 남긴다(제목·인용·표로 오해하지 않게)
+HIDDEN_LAYER_WARNING = "그림 위의 보이지 않는 글자 층에서 읽은 PDF 쪽: "
 
 
 def clean(text: str) -> str:
@@ -54,8 +55,10 @@ def parse_pdf_text(path: Path, settings: Settings) -> ParsedDocument:
     ocr = ModelOcr(settings)
     count = _pdf_pages(path, RENDER_SCALE if ocr.configured else 1.0)
     import pypdfium2.raw as pdfium_raw
+    from app.pdf_layers import observe
     pages: dict[int, str] = {}
     pictures: dict[int, list[tuple[float, float, float, float]]] = {}  # 쪽 → 큰 그림 상자(왼쪽 위 기준, PDF 포인트)
+    hidden: dict[int, list[dict]] = {}  # 쪽 → 그림 위의 보이지 않는 글자 묶음(화면 값으로 확인되지 않은 글자)
     try:
         with pdfium.PdfDocument(path) as pdf:
             for index in range(count):
@@ -63,6 +66,9 @@ def parse_pdf_text(path: Path, settings: Settings) -> ParsedDocument:
                 textpage = page.get_textpage()
                 try:
                     pages[index + 1] = clean(textpage.get_text_range())
+                    layers = observe(page, textpage)
+                    if layers.regions:
+                        hidden[index + 1] = [region.as_dict() for region in layers.regions]
                     width, height = page.get_size()
                     for image in page.get_objects(filter=[pdfium_raw.FPDF_PAGEOBJ_IMAGE], max_depth=4):
                         left, bottom, right, top = image.get_bounds()
@@ -137,10 +143,15 @@ def parse_pdf_text(path: Path, settings: Settings) -> ParsedDocument:
                         + f" (그림 {total}개). 그림 속 글자는 읽지 않았습니다(OCR 모델 미연결).")
     if repeated:
         warnings.append(REPEAT_WARNING)
+    if hidden:
+        warnings.append(HIDDEN_LAYER_WARNING + ", ".join(map(str, sorted(hidden)))
+                        + ". 이 글자는 화면에 그려지지 않는 층(스캔 + OCR 층으로 보임)에서 읽어, 보이는 값과 같은지 확인되지 않았습니다. 숫자·단위는 원본 그림과 대조해 주세요.")
     if broken:
         warnings.append("글자 층이 깨져 보이는 PDF 쪽: " + ", ".join(map(str, broken))
                         + " (글꼴에 글자 대응표가 없음). 원본과 대조하고, 필요하면 OCR 모델로 다시 읽어야 합니다.")
     if empty:
         warnings.append("본문 글자가 추출되지 않은 PDF 페이지: " + ", ".join(map(str, empty)))
+    evidence = {"kind": "pdf", "pages": count, "hidden_layer_pages": sorted(hidden),
+                "hidden_regions": {str(page): regions for page, regions in hidden.items()}} if hidden else {"kind": "pdf", "pages": count, "hidden_layer_pages": []}
     return ParsedDocument(markdown="\n".join(lines), parser=PARSER, parser_version=f"pypdfium2 {version}",
-                          ocr_enabled=ocr.configured, locations=locations, warnings=warnings)
+                          ocr_enabled=ocr.configured, locations=locations, warnings=warnings, evidence=evidence)

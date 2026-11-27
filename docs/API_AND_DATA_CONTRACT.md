@@ -21,16 +21,16 @@
 | `GET /api/health` | API 기능 제공 상태 | `200` | 해당 응답은 고정값으로, Docling 설치·모델 또는 실제 문서의 파싱 성공을 확인하지 않음 |
 | `GET /api/data` | `mock-data/data.json` 전체 | `200` | 예시 파일을 읽지 못하면 서버 오류 가능 |
 | `GET /api/live/parsers` | `routes`는 지금 실제로 쓰는 확장자 → 파서 ID 매핑(이미지는 `ocr-model`). PDF는 필수 모델 파일이 갖춰지면 `docling`, 아니면 `pdf-text`(2026-11-25). `docling_installed`, `pdf_model_directory`는 패키지·폴더 확인값. `pdf_models_ready`는 필수 레이아웃·표 파일 5개가 존재하고 0바이트보다 큰지 확인한 값이며, `pdf_missing_files`는 누락·빈 파일의 모델 폴더 기준 상대 경로 목록. `ocr_models_found`는 OCR 모델 연결이 **설정됐는지**(2026-11-24부터, 호출해 보지 않음), `ocr_model`은 `{label, model_id, mode, configured}`. 조회는 모델 로딩·호출이나 파싱을 실행하지 않는다. | `200` | |
-| `GET /api/live/documents` | 로컬 문서 목록, `{ "documents": [...] }` | `200` | 현재 필터·페이지네이션 없음 |
+| `GET /api/live/documents` | 조건이 없으면 예전처럼 전체 목록 `{ "documents": [...] }`(파서 화면·에이전트·구조 분석이 쓴다). 조건(`q`·`status`·`format`·`sort`·`cursor`·`limit` 중 하나)이 있으면 **한 쪽**(2026-11-27): `{documents, total, next_cursor, facets:{formats, statuses}}`. `q`는 이름·확장자·ID 글자 포함 또는 D번호(`D12`·`#12`·`12`), `status`는 `all`·`attention`(실패+미지원)·`uploaded`·`processing`·`completed`·`failed`·`unsupported`·`no_text`(글자 없는 이미지), `format`은 확장자 목록(쉼표, 확장자 없음은 `-`, `XLSM`과 `XLSX`는 다른 값), `sort`는 `recent`(올린 순, 기본)·`updated`·`name`, `limit` 1~500(기본 50), `cursor`는 앞 응답의 `next_cursor`(정렬 열 + 바뀌지 않는 문서 번호의 키라 읽는 사이에 문서가 올라와도 같은 행이 두 번 나오지 않는다). `facets.formats`는 검색·상태 조건을 적용한 전체 집합의 확장자별 수(확장자 조건은 뺌), `facets.statuses`는 검색·확장자 조건 기준의 화면 상태별 수. 쪽 응답의 문서에는 최신 성공 실행의 자동 대조 판정 `qc:{state, label, unresolved}`가 붙는다. `ids=<ID,…>`(최대 200)는 그 문서들만(쪽 밖에서 처리 중인 작업의 완료 확인) | `200` | `400` 상태 값 오류, `403` 허용되지 않은 Origin |
 | `POST /api/live/documents` | `multipart/form-data`의 `file` **1개**. 저장만 수행 | `201`, `LiveDocument` | `400` 파일명 오류/길이 정보 문제, `403` 허용되지 않은 Origin, `413` 크기 초과, `422` 필수 파일 필드 누락 등 |
 | `GET /api/live/import/roots` | 허용 폴더 `{roots:[{index,path,name}], notes, default, setting, max_bytes}`. `notes`는 없거나 열 수 없는 설정 항목, `default`는 `samples/` 기본값 사용 여부 | `200` | `403` 허용되지 않은 Origin |
 | `GET /api/live/import/entries?root=&path=&recursive=` | 허용 폴더 안 한 폴더의 하위 폴더와 파일. `recursive=true`면 하위 폴더 파일까지 평평하게(최대 5,000개, 넘으면 `truncated`). 파일마다 `state`(`ready` 파서 있음, `no_parser` 저장만, `empty`, `too_large`)와 이름·크기가 같은 기존 문서 `existing:[{id,seq,status}]` | `200`, `ImportListing` | `400` 허용 폴더 밖·숨김·없는 경로, `404` 허용 폴더 번호 없음 |
 | `POST /api/live/import` | JSON `{root, paths:[상대 경로 1~1000개]}`. 파일마다 복사해 저장하고, 이름·크기·SHA-256이 같은 원본이 있으면 그 문서를 돌려준다. 파싱하지 않음 | `200`, `{items:[{path, outcome:"imported"\|"reused"\|"failed", document?, reason?}]}` | 파일별 실패는 `failed`와 `reason`(밖·숨김·빈 파일·크기 초과·읽기 실패). `404` 허용 폴더 번호 없음, `422` 경로 목록 형식 |
 | `GET /api/live/documents/{id}` | 해당 문서 상태 | `200`, `LiveDocument` | `404` ID 형식이 틀렸거나 없는 문서 |
-| `POST /api/live/documents/{id}/process` | 기존 원본에 대한 처리 요청. 요청 바디 불필요 | `202`, 접수 시 `status: "processing"` | `404` 문서 없음, `409` 이미 처리/대기 중, `503` 대기열 만석 또는 작업자 사용 불가 |
+| `POST /api/live/documents/{id}/process` | 기존 원본에 대한 처리 요청. 바디는 선택(2026-11-27): 텍스트·CSV의 **원천 계약** `{csv_delimiter?: "," \| ";" \| "\t" \| "\|", encoding?: "utf-8" \| "utf-8-sig" \| "cp949" \| "utf-16" \| "utf-16-le" \| "utf-16-be" \| "utf-32"}`. 지정하면 파서가 고르지 않고 그 값으로 읽고, 실행의 `options`와 `evidence`(근거 `declared`)에 남는다 | `202`, 접수 시 `status: "processing"` | `404` 문서 없음, `409` 이미 처리/대기 중·텍스트·CSV가 아닌 문서에 계약 지정, `422` 지원하지 않는 값, `503` 대기열 만석 또는 작업자 사용 불가 |
 | `GET /api/live/documents/{id}/result` | 마지막 성공 결과 | `200`, `ParseResult` | `404` 문서 없음, `409` 성공 결과 없음 **또는 결과 포인터·파일·메타데이터 오류** |
 | `GET /api/live/documents/{id}/runs` | 같은 원본의 성공 실행 이력. 실행마다 파서·버전·OCR 여부와 처리 시간 `duration_ms`(2026-11-17부터 기록, 이전 실행은 `null`) | `200`, `{ "runs": [...] }` | `404` 문서 없음 |
-| `GET /api/live/documents/{id}/runs/{run_id}` | 선택한 성공 실행의 Markdown·경고·위치 | `200`, `StoredParseRun` | `404` 문서 또는 실행 없음, `409` 결과 읽기 오류 |
+| `GET /api/live/documents/{id}/runs/{run_id}` | 선택한 성공 실행의 Markdown·경고·위치, 판정 근거 `evidence`와 사용자가 지정한 원천 계약 `options`(2026-11-27, 예전 실행은 `null`) | `200`, `StoredParseRun` | `404` 문서 또는 실행 없음, `409` 결과 읽기 오류 |
 | `GET /api/live/documents/{id}/source` | 저장된 원본 | `200`, PDF는 인라인, 나머지는 첨부 다운로드 | `404` 문서 없음, `409` 원본 오류 |
 | `GET /api/live/documents/{id}/source-preview` | 텍스트 첫 60,000자 또는 XLSX·XLSM의 `sheet`·`cell` 주변 값 | `200`, `kind`가 `text` 또는 `sheet` | `404` 문서 없음, `409` 미지원 또는 원본 오류 |
 | `GET /api/live/documents/{id}/history` | 상태 변경·접수 실패 이벤트 | `200`, `{ "id": ..., "history": [...] }` | `404` 문서 없음 |
@@ -42,15 +42,17 @@
 | `POST /api/models/draft/test`, `POST /api/models/draft/models`, `POST /api/models/embedding/test` | 저장하지 않고 입력 중인 값으로 확인 `{kind: chat\|embed, key, base_url, model_id \| models, api_key?}`(키를 비우면 저장된 키), 저장된 임베딩 연결로 짧은 문장 하나 임베딩(차원·지연) | `200` `{ok, status, latency_ms, …}` | `400` 입력 오류, `409` 미설정 |
 | `GET /api/models`의 `ocr`, `PUT /api/models/ocr`, `DELETE /api/models/ocr/saved`, `POST /api/models/ocr/test` (2026-11-24) | 문서 OCR 모델 연결 `{label, base_url, model_id, api_key?, clear_api_key?, mode: region\|page, text_prompt, table_prompt, page_prompt}`(지시문은 비우면 기본값 `OCR:`·`Table Recognition:`·`document parsing.`). 응답에 키 값 없음(`api_key_set`). 연결 확인은 'OCR TEST 12.5 mg/mL'이 든 시험 그림을 실제로 읽혀 `12.5`가 나오는지 본다(사용자가 누를 때만, **외부 모델 호출**). `POST /api/models/draft/test`에 `kind: ocr`로 저장 전 확인, `POST /api/models/draft/models`에 `kind: ocr`로 게이트웨이 모델 목록(모델 ID 없이도 됨, 키를 비우면 저장된 OCR 키) | `200` | `400` 입력 오류·방식 오류, `409` 연결 미설정 |
 | `GET /api/live/documents/{id}/source-text` (2026-11-26) | **파서와 별개로 원본에서 직접 읽은 글자**(`app/source_text.py`). 기본은 단위 목록 `{format, method, notes, truncated, units:[{key,label,page,sheet,kind,note,chars,lines}]}`. `?unit=<key>`면 그 단위의 줄 `{unit:{…, lines:[{text, ref, row?, cells?}]}}`, `?find=<글자>`면 찾은 줄 최대 50개 `{hits:[{unit,label,page,sheet,ref,row,text}]}`. 단위는 PDF 쪽(`p3`, 글자 층 없는 쪽은 `kind: scan`, 깨진 글자 층은 `garbled`)·PPTX 슬라이드(`p3`, 숨김은 `hidden`)·XLSX·XLSM 시트(`sheet:<이름>`, 셀 `{cell, value, alts}`)·DOCX `body`·`headers`·`notes`·텍스트 `body`. 원본은 바뀌지 않으므로 서버가 문서 3개까지 잠시 둔다 | `200` | `404` 문서·단위 없음, `409` 읽을 글자 층이 없는 형식(이미지·SVG 등)·손상·암호·구성 요소 없음(문장으로 사유) |
-| `GET /api/live/documents/{id}/verify?run=` (2026-11-26) | **자동 대조**(`app/verify.py`): 파싱 결과(기본 최신 성공 실행)를 원본 글자와 비교해 사람이 볼 의심 지점을 고른다. 판정이 아니라 후보다. `{id, run_id, is_latest, document_status, method, format, parser, summary:{units, checked, source_chars, matched_chars, coverage, spots, high, medium, low, scan_units}, units:[{key,label,page,sheet,kind,state,coverage,numbers_missing,numbers_extra,spots,result_lines}], spots:[{key:'S1', severity, kind, message, unit, label, page, sheet, cell, ref, line, line_end, source, source_hit, result, result_hit, result_role}], spots_total, top, notes}`. S번호는 같은 실행이면 같다. 종류는 [작업 에이전트 도구](AGENT_TOOLS.md) §5. 이미지·SVG는 결과 전체를 `image_ocr` 지점 하나로 돌려준다. 실행마다 서버가 16개까지 잠시 둔다 | `200` | `404` 문서·실행 없음, `409` 성공 결과 없음·원본 글자를 읽을 수 없음 |
+| `GET /api/live/documents/{id}/verify?run=&severity=&unit=&kind=&order=&offset=&limit=&unreviewed=` (2026-11-26, 2026-11-27 원장) | **자동 대조 원장**(`app/verify.py` → `qc_runs`·`qc_findings`): 파싱 결과(기본 최신 성공 실행)를 원본 글자와 비교한 의심 지점. 판정이 아니라 후보다. 성공 실행을 저장할 때 같은 트랜잭션에서 '미평가'로 등록하고 같은 작업자가 이어 계산하며, 없으면(예전 실행·규칙 버전 변경) 조회할 때 계산해 저장한다. 응답 `{id, run_id, is_latest, document_status, rule_version, qc_state, method, format, parser, source_layer, summary:{…}, units:[…], spots:[…한 쪽], spots_total, spots_matched, page:{offset, limit, order, next}, top, top_spots, notes, reasons, checks, contract, gate, verdicts}`. **`spots`는 우선순위 순(높음 → 원본 단위 순서 → 결과 줄)으로 한 쪽**(기본 400, 최대 1,000)이고 `page.next`로 이어 받는다(예전에는 문서 순서 앞 400곳으로 잘라 우선순위 1위가 빠질 수 있었다). `order=document`면 S번호 순. `severity=high,medium`·`unit=p3`·`kind=changed,missing`으로 거른다. `unreviewed=true`면 사람이 판정(맞음·틀림·보류)한 지점을 뺀다. 지점마다 `id`(finding ID)·`rank`·`source_layer`(`pdf_text_layer`·`pdf_hidden_layer`·`ooxml_xml`·`xlsx_values`·`xlsx_chart_cache`·`csv_records`·`text`·`mime_parts`·`ocr_model`). `top_spots`는 우선순위 앞 20곳의 상세. `gate`·`reasons`·`checks`는 §11. 이미지·SVG는 결과 전체를 `image_ocr` 지점 하나로 돌려준다 | `200` | `400` 심각도 값 오류, `404` 문서·실행 없음, `409` 성공 결과 없음·원본 글자를 읽을 수 없음 |
+| `GET /api/live/documents/{id}/verify/spots/{ref}?run=` (2026-11-27) | 의심 지점 하나. `ref`는 S번호(`S441`) 또는 finding ID(`F` + 16진수 12자). 받은 쪽에 없는 지점(주소의 `check=S441`)을 바로 연다 | `200`, 지점 + `{run_id, rule_version}` | `404` 문서·실행·지점 없음, `409` 형식 오류·원본을 읽을 수 없음 |
+| `GET /api/live/qc-summary` (2026-11-27) | **처리 깔때기**: 반입 전체 `documents` → 파싱 완료 `parsed` → 자동 대조 `qc_done`(나머지 `qc_pending` 미평가·`qc_unavailable` 대조 불가) → 판정 상태 `states:{needs_review, undetermined, pass_candidate}`(최신 성공 실행, 사람 판정 합침). `not_parsed`는 파싱하지 못한 사유(오류 코드·상태)별 수, `human_decided`는 사람 판정이 있는 문서 수. 마지막 단계만 보고 처리율을 말하지 않도록 분모를 차례로 준다 | `200` | `403` 허용되지 않은 Origin |
 | `GET /api/live/reviews?status=&doc=&limit=` (2026-11-26) | **검수 요청(V번호)** 목록, 최신 먼저. `status`는 `open`(확인 전)·`correct`(맞음)·`wrong`(틀림)·`unclear`(보류)·`all`, `doc`은 문서 ID. `counts`는 상태별 전체 수(거른 목록과 별개) | `200`, `{reviews:[Review], counts}` | `400` 상태 값 오류, `403` 허용되지 않은 Origin |
-| `POST /api/live/reviews` (2026-11-26) | 검수 요청 만들기 `ReviewCreate`. 작업 에이전트(`origin: agent`, 기본)는 `flag` 도구로, 화면(`origin: console`)은 원문 대조의 자동 대조 지점에 판정을 누를 때 만든다. `spot`(S번호)을 주면 서버가 그 실행의 자동 대조로 위치·원본/결과 글자·종류·심각도와 기본 `note`를 채우고, **같은 문서·실행·S번호는 하나만** 둔다(기존 것을 `created:false`로 돌려줌). `run_id`를 생략하면 최신 성공 실행. `spot`이 없으면 `note`가 필요하다 | `201`, `Review + {created}` | `404` 문서·실행 없음, `409` note 없음·없는 S번호·성공 결과 없음, `422` 형식 오류 |
+| `POST /api/live/reviews` (2026-11-26) | 검수 요청 만들기 `ReviewCreate`. 작업 에이전트(`origin: agent`, 기본)는 `flag` 도구로, 화면(`origin: console`)은 원문 대조의 자동 대조 지점에 판정을 누를 때 만든다. `spot`(S번호 또는 finding ID)이나 `finding_id`를 주면 서버가 그 실행의 **원장 전체**에서 지점을 찾아(화면이 받은 한 쪽 밖도 된다) 위치·원본/결과 글자·종류·심각도와 기본 `note`, `finding_id`·`rule_version`을 채우고, **같은 문서·실행·finding ID는 하나만** 둔다(기존 것을 `created:false`로 돌려줌. finding ID가 없던 예전 요청은 S번호로). `run_id`를 생략하면 최신 성공 실행. 지점이 없으면 `note`가 필요하다 | `201`, `Review + {created}` | `404` 문서·실행 없음, `409` note 없음·없는 지점·성공 결과 없음, `422` 형식 오류 |
 | `PATCH /api/live/reviews/{n}` (2026-11-26) | 사람의 판정과 메모 `{status?, comment?}`. 상태를 바꾸면 `decided_at`을 남기고, `open`으로 되돌리면 지운다 | `200`, `Review` | `400` 바꿀 값 없음, `404` 없는 번호 |
 | `GET /api/agent/activity?limit=` (2026-11-24, 2026-11-26 바뀜) | 작업 에이전트(MCP·CLI)의 묶음·호출 기록과 **에이전트가 다룬 문서**. `runtime/agent/`와 문서·검수 요청을 읽기만 한다. 묶음·호출의 문서는 `seq`(D번호)로 준다. `documents`: 묶음·도구 호출·에이전트 검수 요청에 나온 문서 `{id, seq, name, format, status, error_code, updated_at, last_agent_at, batches, calls, reviews:{open,correct,wrong,unclear}}`(최근 순). `calls`: `{ts, tool, args, kind, repeat, ms, result, text(에이전트가 받은 결과 앞 12,000자), docs, session(연결 표식)}`. 예전의 `reports`(타이핑용 보고서)는 2026-11-26에 뺐다. 작업 도구는 Origin 없이 부르고, 브라우저는 로컬 화면 Origin만 허용 | `200`, `{available, batches, documents, calls}` | `403` 허용되지 않은 Origin |
 | `GET /api/lineage?source=live\|example` | 문서 계보(판 묶음·최신 판단·포함·참조 연결 상태). `live`는 업로드 목록과 **이미 실행해 둔** 구조 분석 결과만 읽고 분석·파싱을 새로 시작하지 않는다. `example`은 `mock-data/lineage-example.json`으로 계산한다 | `200`, `LineageData` | `400` 출처 값 오류, `503` 예시 파일 읽기 실패 |
 | `GET /api/retrieval/config` | 임베딩 연결(`EMBED_*`와 주소가 있는 `MODEL_*`·`MODEL2_*`, 키 값 제외), 모델 사양, 청킹 전략 설명, 요청 한도, 벡터 캐시 크기 | `200` | `403` 허용되지 않은 Origin(이하 `/api/retrieval`, `/api/vectordb` 공통) |
 | `GET /api/retrieval/documents`, `GET /api/retrieval/samples` | 청킹 원문 후보: 성공 결과가 있는 실제 문서 / 합성 예시 3종(`sop` 절차서, `report` 그림 많은 점검 보고서, `coa` 표 많은 시험 성적서)과 요소 구성 | `200` | |
-| `POST /api/retrieval/chunk` | `{source: {doc_id} · {sample} · {text,name}, strategies(1~6개), limit_tokens, parallelism?}` → 원문 요소 목록(제목·본문·목록·표·그림·캡션·코드·반복 머리말, 쪽)과 전략별 청크·통계·요소별 결과(`outcomes`, `by_kind`). 전략은 기준선 4종(고정·재귀·문장·제목 구조)과 요소 인지·부모-자식·페이지 단위, 의미 기반(`semantic`). 의미 기반은 캐시에 있는 문장 임베딩만 쓰고, 없으면 그 전략만 `pending {missing,total,model}`으로 돌려준다. 사용자가 '나누기'를 누른 요청(`embed: true`)에서만 임베딩 연결을 호출하고 결과를 캐시에 넣는다. 그 밖의 전략은 외부 호출 없음 | `200` | `400` 원문·전략 오류, `404` 문서 없음, `409` 성공 결과 없음, `413` 원문·청크 수 한도 초과 |
+| `POST /api/retrieval/chunk` | `{source: {doc_id} · {sample} · {text,name}, strategies(1~6개), limit_tokens, parallelism?}` → 원문 요소 목록(제목·본문·목록·표·그림·캡션·코드·반복 머리말, 쪽)과 전략별 청크·통계·요소별 결과(`outcomes`, `by_kind`). 실제 문서(2026-11-27)는 `source`에 나눈 본문의 성공 실행 `run_id`·`text_sha256`과 그 실행의 판정 `qc:{state, label, unresolved, rule_version}`를 주고, 청크마다 덮는 원본 영역 `regions:[{page}\|{sheet}]`와 **겹치는, 사람이 아직 판정하지 않은 의심점** `qc:[{key, id, severity, kind, message, page, sheet, cell, line, line_end, source_hit, result_hit, source_layer}]`(최대 12)·`qc_total`, 표시 `unverified`를 붙인다(청킹을 막지는 않는다). 전략은 기준선 4종(고정·재귀·문장·제목 구조)과 요소 인지·부모-자식·페이지 단위, 의미 기반(`semantic`). 의미 기반은 캐시에 있는 문장 임베딩만 쓰고, 없으면 그 전략만 `pending {missing,total,model}`으로 돌려준다. 사용자가 '나누기'를 누른 요청(`embed: true`)에서만 임베딩 연결을 호출하고 결과를 캐시에 넣는다. 그 밖의 전략은 외부 호출 없음 | `200` | `400` 원문·전략 오류, `404` 문서 없음, `409` 성공 결과 없음, `413` 원문·청크 수 한도 초과 |
 | `POST /api/retrieval/tokens` | 고른 연결·모델로 표본 텍스트(최대 16개)를 임베딩해 실제 토큰 수·차원을 잰다. **외부 모델 호출** | `200` | `400` 표본 오류, `409` 연결 미설정 |
 | `GET`·`PUT /api/retrieval/questions`, `POST .../questions/parse`, `GET .../questions/export?format=csv\|jsonl` | 평가 질문 세트(질문·정답 문서·정답 구절). `runtime/retrieval/questions.json`에 저장 | `200` | `400` 형식 오류, `409` 저장 파일 읽기 실패 |
 | `POST /api/retrieval/runs` | 문서(실제·`sample:<id>`)·청킹 프리셋·후보 모델·`top_k`로 검색 정확도 평가 시작. 결과는 질문 유형(본문·표·그림)별 지표 포함. 한 번에 하나만 실행. **외부 모델 호출**, 청크 벡터는 `runtime/retrieval/embeddings.sqlite3`에 캐시 | `202`, `Run` | `400` 요청 오류, `409` 다른 평가 실행 중 |
@@ -123,7 +125,7 @@ Content-Type: text/plain
 | `error` | 마지막 처리 실패 등에 대한 표시용 문자열 또는 `null`. 자동 분기용 안정 코드가 아님 |
 | `error_code` | 마지막 실패·미지원의 안정 사유 코드 또는 `null`(2026-11-19 추가). 값은 §4-1. 처리 접수·성공 시 `null`로 비운다. 추가 전에 실패한 문서는 `null` |
 
-목록은 `documents` 배열로 전체를 반환하고 생성 시각 내림차순, 같은 시각에는 내부 등록 순서의 역순으로 정렬한다. 사용자·원천·파일명별 접근권한, 변경분 조회, 페이징은 없다.
+조건 없는 목록은 `documents` 배열로 전체를 반환하고 생성 시각 내림차순, 같은 시각에는 내부 등록 순서의 역순으로 정렬한다. 조건을 주면 서버가 검색·상태·확장자·정렬·커서를 처리한 한 쪽을 준다(2026-11-27, §2). 사용자·원천·파일명별 접근권한, 변경분 조회는 없다.
 
 ### `ParseResult`
 
@@ -150,7 +152,7 @@ Content-Type: text/plain
 - `warnings`는 결과 관련 문자열 배열이다. OCR 없이 처리한 PDF는 미적용 경고를 유지한다. 본문·표가 추출되지 않은 PDF 페이지 번호를 별도로 기록한다. `ocr_enabled`는 PDF 변환 설정, 이미지·Office 그림은 OCR 적용 여부다.
 - DOCX·XLSX·XLSM·PPTX 결과의 `warnings`에는 원문 대조 경고가 붙는다: 특수기호 손실(`특수기호 N건이 결과에서 빠짐(원문 M건): ≥×2…`), 바꿀 수 없는 첨자·기호 글꼴, 흰색에 가까운 글자 포함, 숨김 글자 포함, 병합 셀 값 반복 가능, 보충 추출, OCR 없이 읽지 않은 래스터 그림 수. 사본 보정이나 점검이 실패하면 그 사실도 경고로 남는다.
 - 매크로(VBA 프로젝트 `vbaProject.bin`)가 든 통합문서 결과(2026-11-25, XLSM과 이름만 `.xlsx`로 바꾼 매크로 통합문서)의 `warnings`: 코드가 든 모듈이 있으면 `매크로 포함: VBA 모듈 N개(코드 M줄)는 실행하지 않았고 결과 본문에 넣지 않았습니다. 셀 값은 파일에 마지막으로 저장된 값입니다.`로 시작하는 한 줄. 열거나 닫을 때 자동 실행되는 프로시저(`Auto_Open`, `Workbook_Open`, `Document_Open` 등 이름 기준)가 있으면 같은 줄에 이름을 덧붙인다. 소스가 없는 모듈(실행 코드만 남았거나 손상)은 따로 한 줄, 프로젝트를 읽지 못하면 `매크로(VBA) 프로젝트가 있지만 읽지 못했습니다…` 한 줄. 빈 시트·통합문서 모듈만 있으면 경고가 없다. 매크로 코드는 `markdown`에 넣지 않는다.
-- 현재 응답에는 결과 생성 시각, 결과별 실행 ID, 결과 원본 버전, 구조화 위치, 페이지별 품질이나 이전 결과 목록이 없다. 여러 번 성공했을 때 공개 API는 마지막 성공 결과만 가리킨다.
+- `run_id`(2026-11-27)는 이 결과를 만든 성공 실행이다(청크·검수 요청이 같은 실행을 가리키게 한다). `locations`도 함께 준다. 결과 생성 시각, 결과 원본 버전, 페이지별 품질이나 이전 결과 목록은 없다(실행 목록·실행별 조회는 `runs`). 여러 번 성공했을 때 이 경로는 마지막 성공 결과만 가리킨다.
 
 ### 원문 충실도 보고서 (`fidelity`)
 
@@ -321,6 +323,7 @@ Docling 실행 시 `HF_HUB_OFFLINE=1`, `TRANSFORMERS_OFFLINE=1`을 설정하며 
 - 파싱 전 형식·DRM 판별: `backend/app/format_gate.py`. 사본 보정·원문 대조: `backend/app/fidelity/`(`prepare.py`, `probe.py`, `report.py`). 문자 도우미(기호 글꼴 표·첨자·대비·파일명 키): `backend/app/textnorm.py`.
 - 엣지 케이스 회귀: `backend/tests/test_edge_cases.py`(Docling 실측 테스트는 Docling이 설치된 환경에서만 실행), 합성 파일 `backend/tests/edge_case_files.py`.
 - 프론트 실제 API 경계: `frontend/src/api/live.ts`. 실제 API와 실패 동작의 회귀: `backend/tests/test_live_api.py`, `frontend/src/__tests__/live.test.tsx`.
+- 자동 대조 원장·판정(2026-11-27): 규칙·finding ID·판정 `backend/app/qc.py`, 대조 `backend/app/verify.py`, 원장 저장 `backend/app/repository.py`(`qc_*`), 계산 시점 `backend/app/service.py`(`ensure_qc`·`verify`·`finding`·`qc_summary`·`documents_page`), PDF 숨은 층 `backend/app/pdf_layers.py`, 차트 `backend/app/xlsx_charts.py`, 청크 연결 `backend/app/chunk_qc.py`, 메일 `backend/app/adapters/eml.py`. 테스트 `backend/tests/test_qc_ledger.py`(S441·CSV 216종 축약·판정 순서), `test_pdf_hidden_layer.py`, `test_xlsx_charts.py`, `test_document_page.py`(1만 건 커서), `test_eml.py`, 프론트 `frontend/src/__tests__/qc-ledger.test.tsx`.
 
 
 ### 작업 도구의 청킹 비교
@@ -343,5 +346,61 @@ Docling 실행 시 `HF_HUB_OFFLINE=1`, `TRANSFORMERS_OFFLINE=1`을 설정하며 
 | `source_text`, `source_hit`, `result_text`, `result_hit` | 원본·결과 문맥과 그중 다른 부분 |
 | `status`, `decided_at`, `comment` | 사람의 판정(`open`·`correct`·`wrong`·`unclear`)과 시각, 메모 |
 | `batch` | 에이전트 묶음 B번호(있으면) |
+| `finding_id`, `rule_version` | (2026-11-27) 자동 대조 원장의 의심점 ID와 그때의 규칙 버전. V는 만들 때의 위치·글자를 스냅샷으로 가지므로 규칙이 바뀌어 S번호가 달라져도 내용이 그대로다. 다른 실행에 자동으로 이어 붙이지 않는다 |
 
 원문 대조 주소는 `?view=live&doc=<ID>&review=source`에 `page`·`sheet`·`cell`·`line`·`check`(V·S번호)·`run`을 붙여 그 위치를 연다([프론트·화면 계약](FRONTEND_AND_INTERACTION_CONTRACT.md) §5-2).
+
+
+## 11. 자동 대조 원장과 판정 상태 (2026-11-27)
+
+'파서 품질 검수 고도화 계획'(개정 2, 2026-11-27, 저장소 밖 문서)의 1·2단계와 3·4단계 일부를 구현한 것이다. 검수 요청을 끝까지 전달하고, 어떤 근거로 무엇을 검사했는지 실행에 고정한다. **운영 자동 통과는 하지 않는다(기록 모드).**
+
+### 저장(`runtime/documents.sqlite3`, 서버 시작 때 없으면 만든다)
+
+| 테이블·열 | 뜻 |
+|---|---|
+| `qc_runs (document_id, run_id, rule_version)` | 실행·규칙 버전마다 한 줄. `state`(`pending` 미평가 · `done` · `unavailable` 원본을 읽을 수 없음), `machine_state`(사람 판정 전 상태), `spots_total`·`high`·`blocking`(막는 이유 수), `result`(요약·단위·참고·이유·검사 항목 JSON), `duration_ms`. 성공 실행을 저장하는 트랜잭션에서 `pending`으로 등록한다 |
+| `qc_findings (…, seq)` | 의심점 전부. `seq`(S번호, 문서 순서), `finding_id`(유일), `rank`(우선순위), `severity`·`kind`·`unit`·`page`·`sheet`·`line`, `data`(지점 JSON). 우선순위·S번호·조건으로 조회한다 |
+| `parse_runs.evidence`, `parse_runs.options` | 판정 근거와 사용자가 지정한 원천 계약(아래) |
+| `review_requests.finding_id`, `.rule_version` | 검수 요청이 가리키는 의심점 |
+
+규칙 버전(`app/qc.RULE_VERSION`, 지금 `verify-2026.11.27`)이 바뀌면 같은 실행이라도 원장을 새로 계산한다. 이전 원장과 V번호는 남는다. **finding ID**는 종류·원본 단위·원본 주소(셀·참조)·원문/결과 조각과 같은 서명의 발생 순번으로 만든 `F` + 16진수 12자다(결과에만 있는 지점은 결과 줄도 넣는다). 같은 원본 영역에 같은 종류의 문제가 둘이면 발생 순번으로 구별한다.
+
+### 판정 상태 `gate`
+
+순서대로 본다. ① 실행 실패는 문서 상태·이벤트에 남는다. ② 원장이 없으면 `pending`(미평가). ③ 확인하지 않은 의심점(사람이 '맞음'이라 하지 않은 것), 열린·보류 검수 요청, '틀림'이 있으면 `needs_review`(검수 필요). ④ 막는 이유(`blocking`)가 있으면 `undetermined`(판정 불가). ⑤ 나머지는 `pass_candidate`(통과 후보, `note`: 기록 모드). 일치율(coverage) 평균은 쓰지 않는다. `gate = {state, label, reasons:[{code, message, blocking}], unresolved, unresolved_high, open_reviews, wrong_reviews, note?}`.
+
+| 이유 `code` | 막음 | 뜻 |
+|---|:-:|---|
+| `findings`·`open_reviews`·`confirmed_wrong` | ○ | 확인 안 된 의심점·열린 검수 요청·틀림 확인 |
+| `no_contract` | ○ | 이 형식은 통과 후보 기준(형식 계약)을 아직 검증하지 않음. 지금은 CSV만 기준이 있다 |
+| `scan`·`source_garbled` | ○ | 글자 층 없는 쪽(OCR 결과)·깨진 글자 층 |
+| `hidden_layer` | ○ | 그림 위 보이지 않는 글자 층에서 읽은 값(화면 값 미확인) |
+| `shared_layer` | PDF ○ / XLSX × | 결과와 대조 기준이 같은 원천(pdf-text 글자 층 · openpyxl 저장 값) |
+| `unlocated` | ○ | 원문 위치가 없어 단위별로 대조하지 못함 |
+| `truncated`·`findings_capped` | ○ | 원본이 커서 앞부분만 · 의심점 2만 곳 초과 |
+| `delimiter_ambiguous`·`encoding_uncertain`·`ragged`·`no_evidence`·`grid_unavailable` | ○ | CSV 계약 미충족(아래) |
+| `chart_no_cache`·`chart_unresolved`·`chart_literal` | ○ | 차트 표시값 미확인 · 참조 해석 못 함 · 셀 참조 없는 값 |
+| `image_only` | ○ | 이미지 원본(글자 층 없음) |
+| `hidden_excluded`·`supplement`·`stale` | × | 숨긴 시트·슬라이드 제외 · 보충 추출에서만 찾음 · 이전 성공본 |
+
+`checks`는 무엇을 어떤 근거로 검사했는지다: `{id, label, state: done|partial|unverified, method?, source_layer?, derived_from: independent|same_layer|same_contract|none, units?, checked?, excluded?, unverified?, detail?}`. `preserved`(본문 글자 보존·제자리 셀 값), `visible`(PDF 화면에 보이는 값), `hidden_layer`, `csv_grid`, `chart_values`.
+
+### 판정 근거 `evidence`(실행마다)
+
+- **CSV**(`app/adapters/text.py`): `{kind:"csv", encoding, encoding_basis: bom|utf-8|ascii|cp949|declared, encoding_certain, delimiter, delimiter_basis: sniffed|declared, delimiter_certain, delimiter_candidates:[{delimiter, width, share, rows}], delimiter_alternatives, records, width, row_widths:[[열 수, 연속 행 수]…], row_widths_complete, ragged_rows, layout:{header_line:1, separator_line:2, first_record_line:3}}`. 구분자를 고르는 규칙은 예전과 같고(쉼표 우선), 다른 구분자로도 열 수가 일관되면(예: 세미콜론 구분 + 쉼표 소수점) `delimiter_certain: false`. CP949는 UTF-8이 아니어서 고른 추정이라 `encoding_certain: false`. 둘 다 원천 계약(`process`의 바디)으로 지정하면 확정된다. TXT·MD·LOG도 `{kind:"text", encoding…}`.
+- **PDF**(`pdf-text`): `{kind:"pdf", pages, hidden_layer_pages, hidden_regions:{쪽:[{bbox, text, numbers, chars}]}}`.
+- **EML**: `{kind:"eml", bodies, attachments, nested, inline_images}`.
+
+### CSV 주소별 양방향 대조(통과 후보 기준)
+
+원본 레코드를 **실행에 기록된 인코딩·구분자**로 다시 읽고(빈 칸 포함), 결과 Markdown 표를 콘솔 writer의 문법(`\\`·`\|`·`<br>`·문자 참조)으로 되돌려 행 수·열 수·모든 칸을 비교한다. 같은 앞·뒤 행은 빠르게 넘기고 차이 구간만 정렬(최대 2만 행)한다. 원본에서 출발하는 예전 대조가 놓치던 같은 행 두 칸 맞바꿈, 빈 칸에 생긴 값, 결과에만 있는 행·중복 행을 잡는다. 통과 후보 조건: 실행에 근거가 있고, 구분자·인코딩이 확정되고, 열 수가 모자란 레코드(빈 줄 포함, `x`와 `x,`가 같은 Markdown이 됨)가 없고, 원본 전체를 대조함. 의심점이 있으면 조건과 별개로 검수 필요다.
+
+### PDF 보이지 않는 글자 층·통합문서 차트
+
+- `app/pdf_layers.py`: 쪽마다 글자 객체의 렌더 모드와 그림 상자를 같은 좌표(회전 전 PDF 사용자 공간)에서 보고, 그림과 절반 이상 겹치는 렌더 모드 3 글자를 '그림 위 숨은 층'으로 묶는다. 판정 가능한 글자의 절반 이상이면 쪽 `kind: hidden_text`. 숨은 층은 지우지 않는다. 같은 쪽에 그림 OCR 결과(`[그림 속 글자]`)가 있으면 두 값을 대조해 다르면 `hidden_conflict`. `source-text`의 단위에 `hidden_regions`.
+- `app/xlsx_charts.py`: 통합문서 → 시트 → 그리기 → 차트 관계를 따라 차트가 놓인 시트를 찾고, 계열마다 값 참조(한 행·한 열 연속 범위)의 셀 값과 차트에 저장된 표시값(`numCache`)을 점마다 비교한다. 다르면 `chart_conflict`(두 값·계열·범주·셀 주소). 캐시가 없으면 `chart_no_cache`(셀 값만 확인), 여러 영역·외부 통합문서·이름 정의는 `chart_unresolved`. 축 눈금으로 값을 추정하지 않는다. `source-text`의 차트 단위(`kind: chart`)에 `chart`.
+
+### PDF 네이티브 호출 직렬화
+
+pypdfium2는 한 프로세스의 여러 스레드에서 동시에 부르면 안 된다. PDF 파싱(Docling PDF 경로·`pdf-text`)과 원본 읽기(`source-text`·자동 대조)는 `app/pdf_layers.PDFIUM` 잠금 안에서 한다. 큰 PDF를 파싱하는 동안 다른 PDF의 원본 읽기는 기다린다(자동 대조는 파싱 직후 같은 작업자가 계산해 두므로 화면 조회는 대개 원장만 읽는다). 프로세스 격리는 아직 하지 않았다.

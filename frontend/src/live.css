@@ -213,6 +213,8 @@
 .lw-status.is-no_text { color: var(--ink-3); }
 .lw-message.is-neutral { color: var(--ink-2); background: var(--surface-3); border-left-color: var(--rule-strong); }
 
+/* 거르기 선택: 내림 표시가 글자에 붙지 않게 */
+.lw-filter select { min-width: 7.5em; padding-right: 4px; }
 /* 처리 상태 칸: 파싱 상태 아래에 자동 대조 판정 상태(완료 문서) */
 .lw-status-cell { display: grid; justify-items: start; gap: 4px; min-width: 0; }
 /* 더 보기(서버 쪽 목록) */

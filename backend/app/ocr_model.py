@@ -25,6 +25,7 @@ import time
 from urllib import error, request
 
 from app.llm import _context
+from app.textnorm import to_script
 
 MODES = ("region", "page")
 DEFAULTS = {"mode": "region", "text_prompt": "OCR:", "table_prompt": "Table Recognition:", "page_prompt": "document parsing."}
@@ -289,10 +290,31 @@ def delatex(text: str) -> str:
         for key in sorted(_SYMBOLS, key=len, reverse=True):
             body = body.replace(key, _SYMBOLS[key])
         body = re.sub(r"\\(?:mathrm|text|mathbf)\{([^}]*)\}", r"\1", body)
-        body = re.sub(r"\^\{?([0-9])\}?", lambda m: "⁰¹²³⁴⁵⁶⁷⁸⁹"[int(m.group(1))], body)
-        body = re.sub(r"_\{?([0-9])\}?", lambda m: "₀₁₂₃₄₅₆₇₈₉"[int(m.group(1))], body)
+        # 10^{-3} → 10⁻³, m^2 → m², CO_2 → CO₂. 유니코드 첨자로 다 바꿀 수 없는 것은 그대로 둔다(부분 변환은 뜻을 흐린다).
+        body = re.sub(r"\^\{([^{}]{1,8})\}|\^([0-9])", lambda m: to_script(m.group(1) or m.group(2), "sup") or m.group(0), body)
+        body = re.sub(r"_\{([^{}]{1,8})\}|_([0-9])", lambda m: to_script(m.group(1) or m.group(2), "sub") or m.group(0), body)
         return body.replace("{", "").replace("}", "").strip()
     return re.sub(r"\\\((.{1,60}?)\\\)|\$([^$\n]{1,60})\$", lambda m: inline(m.group(1) if m.group(1) is not None else m.group(2)), text)
+
+
+_SCRIPT = re.compile(r"(\d?)<(sup|sub)\b[^>]*>(.{1,12}?)</\2\s*>", re.I | re.S)
+_ORDINAL = re.compile(r"(?:st|nd|rd|th)", re.I)
+
+
+def scripts(text: str) -> str:
+    """모델 출력의 <sup>·<sub>를 태그를 지우기 전에 처리한다(파서 품질 검수 고도화 계획 §4.3).
+    - 숫자·부호 첨자(m<sup>2</sup>, 10<sup>-3</sup>, CO<sub>2</sub>) → 유니코드 첨자(m², 10⁻³, CO₂). 지우면 단위·차수가 바뀐다.
+    - 숫자 뒤 서수 접미사(10<sup>th</sup>) → 평문 10th(검색에 충분하고 뜻이 그대로).
+    - 그 밖(각주 표시 <sup>a</sup> 등) → 태그를 남긴다. 앞 낱말에 붙여 'Assaya'처럼 만들지 않는다."""
+    def replace(match: re.Match) -> str:
+        digit, kind, body = match.group(1), match.group(2).lower(), match.group(3)
+        converted = to_script(body, kind)
+        if converted is not None:
+            return digit + converted
+        if kind == "sup" and digit and _ORDINAL.fullmatch(body.strip()):
+            return digit + body.strip()
+        return digit + f"<{kind}>{body}</{kind}>"
+    return _SCRIPT.sub(replace, text)
 
 
 _REPEAT = re.compile(r"(.{15,300}?)(?:\s*\1){4,}\s*$", re.S)
@@ -328,7 +350,8 @@ def normalize(text: str) -> str:
         text = "\n\n".join(parts)
     if _OTSL.search(text):
         text = "\n\n".join(otsl_markdown(block) if _OTSL.search(block) else block for block in re.split(r"\n\s*\n", text))
+    text = scripts(text)
     text = re.sub(r"<table\b.*?</table>", lambda m: "\n\n" + html_table_markdown(m.group(0)) + "\n\n", text, flags=re.S | re.I)
-    text = re.sub(r"</?(?:div|span|p|b|i|u|sup|sub)\b[^>]*>", "", text, flags=re.I)
+    text = re.sub(r"</?(?:div|span|p|b|i|u)\b[^>]*>", "", text, flags=re.I)
     text = delatex(text)
     return re.sub(r"\n{3,}", "\n\n", text).strip()

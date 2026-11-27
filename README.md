@@ -121,7 +121,7 @@ setup.cmd --models C:\경로\docling-pdf-models.zip
 - 실제 원본·결과·이력은 `runtime/`에 저장됩니다(`DOCOPS_RUNTIME_DIR`로 바꿀 수 있음). Git에는 올리지 않습니다.
 
 **파싱**
-- 파서는 확장자로 고릅니다. TXT·CSV·MD·LOG는 내장 파서, PDF·DOCX·PPTX·XLSX·XLSM은 Docling(PDF 모델이 없으면 PDF는 글자 층 파서), 이미지는 OCR 모델이 맡습니다. HWP/HWPX, ZIP 안 파일, 메일 첨부는 본문을 파싱하지 않고 구조 분석에서 목록만 보여 줍니다. 지원하지 않는 형식은 `unsupported`가 됩니다.
+- 파서는 확장자로 고릅니다. TXT·CSV·MD·LOG는 내장 파서, PDF·DOCX·PPTX·XLSX·XLSM은 Docling(PDF 모델이 없으면 PDF는 글자 층 파서), 이미지는 OCR 모델이 맡습니다. EML 메일은 헤더·본문·첨부 목록을 내장 파서로 읽습니다(첨부 본문은 읽지 않음). HWP/HWPX, ZIP 안 파일, 메일 첨부의 본문은 파싱하지 않고 구조 분석에서 목록만 보여 줍니다. 지원하지 않는 형식은 `unsupported`가 됩니다.
 - **파싱 성공이 품질 보증은 아닙니다.** Docling 결과는 합성 문서로만 확인했고, 실제 고객 문서 품질은 아직 평가하지 않았습니다. 복잡한 표나 원문 위치가 정확하다고 보장하지 않습니다.
 - 파서를 부르기 전에 내용 서명을 확인합니다. DRM, 암호, 확장자 불일치는 사유 코드(`error_code`)를 붙여 실패로 남깁니다. DRM은 판별만 하므로 해제본이 필요합니다.
 - DOCX·XLSX·XLSM·PPTX는 사본에서 기호 글꼴과 첨자를 보정한 뒤 파싱합니다. 원문과 대조해 특수기호 손실, 병합 셀, 흰색 글자, 읽지 않은 그림을 경고합니다.

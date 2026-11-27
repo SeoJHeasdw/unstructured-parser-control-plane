@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { AlertCircle, ArrowLeft, BookOpen, CircleAlert, CircleDashed, Scissors, CircleCheck, CircleSlash, Clock3, Download, File, FileText, FileSpreadsheet, FileImage, FileArchive, Presentation, GitCompareArrows, LoaderCircle, Play, RefreshCw, TriangleAlert, Workflow } from 'lucide-react';
+import { AlertCircle, ArrowLeft, BookOpen, CircleAlert, CircleDashed, Scissors, CircleCheck, CircleSlash, Clock3, Download, File, FileText, FileSpreadsheet, FileImage, FileArchive, Mail, Presentation, GitCompareArrows, LoaderCircle, Play, RefreshCw, TriangleAlert, Workflow } from 'lucide-react';
 import { getDocumentHistory, listParseRuns, liveSourceUrl } from './api/live';
 import type { HistoryEntry, LiveDoc, LiveResult, LiveStatus, ParseRun, ProcessOptions } from './api/live';
 import { QcPanel } from './compare/QcGate';
@@ -71,6 +71,7 @@ export function FileGlyph({ format }: { format: string }) {
   else if (['JPEG','JPG','PNG','TIF','TIFF','GIF','WEBP','HEIC','HEIF'].includes(type)) Icon = FileImage;
   else if (['PPT','PPTX'].includes(type)) Icon = Presentation;
   else if (type === 'ZIP') Icon = FileArchive;
+  else if (type === 'EML' || type === 'MSG') Icon = Mail;
   return <span className="lw-file-glyph" aria-hidden="true"><Icon size={22} strokeWidth={1.6} /></span>;
 }
 
@@ -204,7 +205,7 @@ export default function LiveDocumentView({ doc, result, resultError, resultLoadi
           </section>}
       </Tabs>
     </div>
-    {doc.status === 'unsupported' && <details id="detail-formats" className="lw-disclosure"><summary>지원 형식</summary><p>TXT·CSV·MD·LOG·SVG 벡터 글자는 기본 환경에서 읽습니다. PDF·DOCX·PPTX·XLSX·XLSM은 Docling을(PDF 모델이 없으면 PDF는 글자 층만, XLSM 매크로는 실행하지 않음), PNG·JPEG·TIFF·BMP·GIF·WebP와 스캔 글자는 모델 연결에서 연결한 OCR 모델로 읽습니다.</p></details>}
+    {doc.status === 'unsupported' && <details id="detail-formats" className="lw-disclosure"><summary>지원 형식</summary><p>TXT·CSV·MD·LOG·SVG 벡터 글자와 EML 메일(본문·첨부 목록)은 기본 환경에서 읽습니다. PDF·DOCX·PPTX·XLSX·XLSM은 Docling을(PDF 모델이 없으면 PDF는 글자 층만, XLSM 매크로는 실행하지 않음), PNG·JPEG·TIFF·BMP·GIF·WebP와 스캔 글자는 모델 연결에서 연결한 OCR 모델로 읽습니다.</p></details>}
     <details className="lw-disclosure"><summary>파일 정보</summary><dl className="lw-meta">
       <div><dt>문서 ID</dt><dd>{doc.id}</dd></div><div><dt>저장 시각</dt><dd>{displayDate(doc.created_at)}</dd></div>
       <div><dt>마지막 변경</dt><dd>{displayDate(doc.updated_at)}</dd></div><div><dt>적용 파서</dt><dd>{doc.parser || '미지정'}</dd></div>

@@ -1,9 +1,10 @@
 import { useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
-import { Pencil, Ruler } from 'lucide-react';
+import { ArrowUpRight, Pencil, Ruler } from 'lucide-react';
 import type { Chunk, ChunkSource, EmbedConnection, ModelSpec, StrategyParams, TokenMeasure } from '../api/retrieval';
 import { measureTokens } from '../api/retrieval';
 import { ListBox, Modal, Tabs } from '../ui';
+import { workspaceHref } from '../navigation';
 import { ELEMENT_META } from './elements';
 import { DocChunks, chunkElementIds, chunksByElement, elementName, kindLabel, outcomePhrase, pathText } from './chunk-board';
 import type { Column } from './chunk-board';
@@ -44,7 +45,8 @@ export function ChunkText({ text }: { text: string }) {
 }
 
 /** 목록에서 바로 보여 줄 문제 표시. 나머지 표시는 오른쪽 상세에서 설명한다. */
-const LIST_FLAGS = ['over-limit', 'table-cut', 'table-no-header', 'caption-detached'];
+const LIST_FLAGS = ['unverified', 'over-limit', 'table-cut', 'table-no-header', 'caption-detached'];
+const SEVERITY_WORD = { high: '높음', medium: '보통', low: '낮음' } as const;
 const uniqueKinds = (chunk: Chunk) => [...new Set(chunk.element_kinds ?? [])].filter(kind => kind !== 'heading');
 
 export type StrategyTab = 'chunks' | 'doc' | 'settings';
@@ -94,10 +96,21 @@ function ChunkPane({ source, column, chunk, number, byEl }: { source: ChunkSourc
   const result = column.result;
   const els = chunkElementIds(chunk, source.elements).map(id => source.elements.find(el => el.id === id)).filter((el): el is NonNullable<typeof el> => !!el);
   const parent = chunk.parent !== null && chunk.parent !== undefined ? result.parents?.[chunk.parent] : undefined;
-  const meta = [`${fmtInt(chunk.chars)}자`, `약 ${fmtInt(chunk.est_tokens)}토큰`, chunk.page ? `${chunk.page}쪽` : '', pathText(chunk.heading_path)].filter(Boolean).join(' · ');
+  const regions = (chunk.regions ?? []).map(region => 'page' in region ? `${region.page}쪽` : `시트 ${region.sheet}`);
+  const meta = [`${fmtInt(chunk.chars)}자`, `약 ${fmtInt(chunk.est_tokens)}토큰`, regions.length ? regions.slice(0, 4).join('·') + (regions.length > 4 ? ` 외 ${regions.length - 4}` : '') : chunk.page ? `${chunk.page}쪽` : '', pathText(chunk.heading_path)].filter(Boolean).join(' · ');
   return <div className="cb-pane" aria-label={`${number}번 청크`}>
     <h3 className="cb-pane-title">{number}번 청크</h3>
     <p className="cb-pane-meta">{meta}</p>
+    {source.run_id && <p className="cb-pane-meta" data-tip={`본문 SHA-256 ${source.text_sha256 ?? '-'}`}>실행 {source.run_id.slice(0, 8)}{source.is_stale ? ' · 이전 성공본' : ''}{source.qc?.label ? ` · 문서 판정 ${source.qc.label}` : ''}</p>}
+    {!!chunk.qc?.length && source.doc_id && <section className="cb-qc" aria-label="확인 안 된 지점">
+      <h4 className="cb-h4">확인 안 된 지점 {fmtInt(chunk.qc_total ?? chunk.qc.length)}</h4>
+      <ul>{chunk.qc.map(spot => <li key={spot.id ?? spot.key}>
+        <b className={`cb-qc-sev is-${spot.severity}`}>{spot.key} · {SEVERITY_WORD[spot.severity]}</b>
+        <span>{spot.message}{spot.source_layer === 'pdf_hidden_layer' ? ' (보이지 않는 글자 층)' : ''}</span>
+        <a href={workspaceHref({ page: 'live', doc: source.doc_id!, review: 'source', focus: { check: spot.id ?? spot.key, run: source.run_id ?? undefined,
+          page: spot.page ?? undefined, sheet: spot.sheet ?? undefined, cell: spot.cell ?? undefined, line: spot.line ?? undefined } })}>원문 대조<ArrowUpRight size={13} aria-hidden="true" /></a>
+      </li>)}</ul>
+    </section>}
     {parent && <p className="cb-pane-meta">답변 맥락 {(chunk.parent ?? 0) + 1}번 · {fmtInt(parent.chars)}자</p>}
     {chunk.flags.length > 0 && <ul className="cb-flag-list">{chunk.flags.map(flag => {
       const m = flagMeta(flag);

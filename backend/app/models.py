@@ -96,6 +96,8 @@ class ParseResult(BaseModel):
     warnings: list[str]
     # 원문 충실도 보고서(OOXML만). 없으면 None.
     fidelity: dict | None = None
+    # 이 결과를 만든 성공 실행(청크·검수 요청이 같은 실행을 가리키게 한다). 예전 응답에는 없다.
+    run_id: str | None = None
 
 class ResultLocation(BaseModel):
     start_line: int

@@ -51,9 +51,13 @@ class SourceUnit:
     label: str
     page: int | None = None       # PDF 쪽·PPTX 슬라이드 번호(파싱 결과 위치의 page와 같은 뜻)
     sheet: str | None = None
-    kind: str = "text"            # text | scan(글자 층 없음) | garbled(글자 층 깨짐) | empty | hidden
+    kind: str = "text"            # text | scan(글자 층 없음) | garbled(글자 층 깨짐) | empty | hidden | hidden_text(그림 위 숨은 글자 층)
     note: str = ""
     lines: list[SourceLine] = field(default_factory=list)
+    # PDF: 그림 위의 보이지 않는 글자 묶음(pdf_layers.HiddenRegion.as_dict). 화면에 보이는 값으로 확인되지 않은 글자다.
+    regions: list[dict] = field(default_factory=list)
+    # XLSX·XLSM 차트(kind='chart'): 계열마다 참조 셀의 저장 값과 차트에 저장된 표시값(numCache). 대조는 verify가 한다.
+    chart: dict | None = None
 
     @property
     def chars(self) -> int:
@@ -83,7 +87,8 @@ class SourceText:
 
     def unit_dict(self, unit: SourceUnit) -> dict:
         return {"key": unit.key, "label": unit.label, "page": unit.page, "sheet": unit.sheet, "kind": unit.kind,
-                "note": unit.note, "chars": unit.chars, "lines": [_line_dict(line) for line in unit.lines]}
+                "note": unit.note, "chars": unit.chars, "lines": [_line_dict(line) for line in unit.lines],
+                **({"hidden_regions": unit.regions} if unit.regions else {}), **({"chart": unit.chart} if unit.chart else {})}
 
     def find(self, needle: str, limit: int = 50) -> list[dict]:
         key = _fold(needle).casefold()
@@ -138,10 +143,11 @@ def _pdf(path, budget: _Budget) -> SourceText:
         import pypdfium2 as pdfium
     except ImportError as exc:
         raise SourceUnavailable("PDF 글자 층을 읽을 구성 요소(pypdfium2)가 없습니다. setup을 --lite 없이 실행해 주세요.") from exc
+    from app.pdf_layers import PDFIUM, observe
     units: list[SourceUnit] = []
     notes: list[str] = []
     try:
-        with pdfium.PdfDocument(path) as pdf:
+        with PDFIUM, pdfium.PdfDocument(path) as pdf:
             count = len(pdf)
             if count > MAX_PAGES:
                 notes.append(f"쪽이 {count:,}개라 앞 {MAX_PAGES:,}쪽만 읽었습니다.")
@@ -151,16 +157,21 @@ def _pdf(path, budget: _Budget) -> SourceText:
                 textpage = page.get_textpage()
                 try:
                     text = _clean(textpage.get_text_range())
+                    layers = observe(page, textpage)
                 finally:
                     textpage.close()
                     page.close()
                 number = index + 1
                 unit = SourceUnit(key=f"p{number}", label=f"{number}쪽", page=number)
+                unit.regions = [region.as_dict() for region in layers.regions]
                 visible = [ch for ch in text if not ch.isspace()]
                 if not visible:
                     unit.kind, unit.note = "scan", "글자 층 없음(스캔·그림 쪽): 결과 글자가 있다면 OCR 모델이 읽은 것이라 사람이 원본과 대조해야 합니다."
                 elif len(visible) >= 20 and len(_GARBLED.findall(text)) / len(visible) > 0.1:
                     unit.kind, unit.note = "garbled", "글자 층이 깨져 있음(글꼴의 유니코드 대응 없음): 자동 대조를 믿을 수 없어 사람이 봐야 합니다."
+                elif layers.hidden_page:
+                    unit.kind, unit.note = "hidden_text", ("그림 위의 보이지 않는 글자 층(스캔 + OCR 층으로 보임): 파서와 대조가 같은 숨은 층을 읽어 "
+                                                           "화면에 보이는 값과 같은지 확인되지 않습니다.")
                 if unit.kind != "scan":
                     for line_no, line in enumerate(text.split("\n"), 1):
                         if line.strip() and budget.take(line):
@@ -433,6 +444,19 @@ def _xlsx(path, fmt: str, budget: _Budget) -> SourceText:
     units: list[SourceUnit] = []
     notes: list[str] = []
     rows_total = 0
+    from app.xlsx_charts import read_charts
+    try:
+        charts = read_charts(path)
+    except Exception:  # noqa: BLE001 — 차트는 보조 근거다. 읽지 못하면 판정 불가로 남긴다
+        charts = []
+        notes.append("차트 정의를 읽지 못해 차트 표시값 대조를 하지 않았습니다.")
+    wanted: dict[str, set[str]] = {}
+    for chart in charts:
+        for series in chart["series"]:
+            for ref in (series["ref"], series["categories"], series.get("name_ref")):
+                if ref:
+                    wanted.setdefault(ref[0], set()).update(ref[1])
+    found: dict[tuple[str, str], object] = {}
     try:
         book = load_workbook(path, read_only=True, data_only=True, keep_links=False)
     except Exception as exc:  # noqa: BLE001 — 손상·암호 통합문서
@@ -451,8 +475,13 @@ def _xlsx(path, fmt: str, budget: _Budget) -> SourceText:
             for row in sheet.iter_rows():
                 cells = []
                 row_number = None
+                need = wanted.get(title)
                 for cell in row:
                     value = getattr(cell, "value", None)
+                    if need:
+                        coordinate = getattr(cell, "coordinate", None)
+                        if coordinate in need:
+                            found[(title, coordinate)] = value
                     if value is None or (isinstance(value, str) and not value.strip()):
                         continue
                     row_number = cell.row
@@ -480,7 +509,38 @@ def _xlsx(path, fmt: str, budget: _Budget) -> SourceText:
                 break
     finally:
         book.close()
+    sheet_names = {unit.sheet for unit in units}
+    for number, chart in enumerate(charts, start=1):
+        title = chart["title"] or f"{number}"
+        unit = SourceUnit(key=f"chart:{chart['part']}", label=f"차트 '{title}'" if chart["title"] else f"차트 {number}",
+                          sheet=chart["host"] or None, kind="chart",
+                          note="차트에 저장된 표시값(numCache)과 참조한 셀 값을 대조합니다. 실제 Excel이 다시 계산한 화면 값은 확인하지 않습니다.")
+        series_out = []
+        for series in chart["series"]:
+            ref, cats = series["ref"], series["categories"]
+            name_ref = series.get("name_ref")
+            name = series["name"]
+            if name_ref and found.get((name_ref[0], name_ref[1][0])) not in (None, ""):
+                name = str(found[(name_ref[0], name_ref[1][0])])  # 계열 이름이 셀 참조뿐이면 그 셀 값
+            item = {"name": name, "formula": series["formula"], "literal": series["literal"], "cache": series["cache"],
+                    "cache_count": series["cache_count"], "sheet": ref[0] if ref else None, "cells": ref[1] if ref else [],
+                    "resolved": bool(ref) and ref[0] in sheet_names and not budget.truncated,
+                    "values": [_json_value(found.get((ref[0], cell))) for cell in ref[1]] if ref else [],
+                    "categories": ([_json_value(found.get((cats[0], cell))) for cell in cats[1]] if cats
+                                   else [series["category_cache"].get(i) for i in range(len(ref[1]))] if series["category_cache"] and ref else [])}
+            series_out.append(item)
+        unit.chart = {"part": chart["part"], "title": chart["title"], "host": chart["host"], "series": series_out}
+        units.append(unit)
     return SourceText(fmt, "저장된 셀 값(openpyxl, 수식은 마지막 계산 값)", units, notes, budget.truncated, layer="xlsx_values")
+
+
+def _json_value(value):
+    """셀 값 → JSON에 담을 수 있는 값(날짜·시각은 ISO 글자)."""
+    if value is None or isinstance(value, (bool, int, float, str)):
+        return value
+    if isinstance(value, (datetime, date, time)):
+        return value.isoformat()
+    return str(value)
 
 
 # ---------------------------------------------------------------- 텍스트·CSV
@@ -528,6 +588,73 @@ def _text(path, fmt: str, settings, budget: _Budget, dialect: dict | None = None
                       layer="csv_records" if fmt == "CSV" else "text")
 
 
+def _eml(path, budget: _Budget) -> SourceText:
+    """메일: 주요 헤더, 글 본문(text/plain, 없으면 HTML 태그만 걷어 낸 글), 첨부 이름. 파서의 HTML→글 변환과는 따로 읽는다."""
+    import email
+    import email.policy
+    import html as html_lib
+    message = email.message_from_bytes(path.read_bytes(), policy=email.policy.default)
+    headers = SourceUnit(key="headers", label="메일 헤더")
+    body = SourceUnit(key="body", label="본문")
+    files = SourceUnit(key="attachments", label="첨부 목록")
+    def header_lines(part, address: str) -> None:
+        for key in ("subject", "from", "to", "cc", "date"):
+            if part.get(key):
+                value = _clean(" ".join(str(part.get(key)).split()))
+                if budget.take(value):
+                    headers.lines.append(SourceLine(text=value, ref=key if address == "1" else f"첨부 메일 {address} {key}"))
+
+    header_lines(message, "1")
+
+    def text_of(part) -> str:
+        try:
+            value = part.get_content()
+        except (LookupError, ValueError, AssertionError):
+            value = (part.get_payload(decode=True) or b"").decode(part.get_content_charset() or "utf-8", "replace")
+        return value if isinstance(value, str) else ""
+
+    from app.adapters.eml import _human  # 첨부 크기 표기(결과의 첨부 목록과 같은 글자로 대조한다)
+
+    def walk(part, address: str):
+        ctype = part.get_content_type()
+        if ctype == "message/rfc822":
+            payload = part.get_payload()
+            inner = payload[0] if isinstance(payload, list) and payload else payload
+            if inner is not None and hasattr(inner, "get_content_type"):
+                files.lines.append(SourceLine(text=f"첨부 메일 (위치 {address}): {' '.join(str(inner.get('subject') or '(제목 없음)').split())}",
+                                              ref=f"첨부 메일 {address}"))
+                header_lines(inner, address)
+                walk(inner, address)
+            return
+        if part.is_multipart():
+            children = list(part.iter_parts())
+            if ctype == "multipart/alternative":
+                plain = [c for c in children if c.get_content_type() == "text/plain" and text_of(c).strip()]
+                children = plain[:1] or [c for c in children if c.get_content_type() == "text/html"][:1] or children
+            for index, child in enumerate(children, start=1):
+                walk(child, f"{address}.{index}")
+            return
+        if part.get_filename() or part.get_content_disposition() == "attachment":
+            payload = part.get_payload(decode=True)
+            size = len(payload) if isinstance(payload, (bytes, bytearray)) else 0
+            line = f"{part.get_filename() or f'이름 없는 첨부 {address}'} {ctype} {_human(size)} {address}"
+            if budget.take(line):
+                files.lines.append(SourceLine(text=line, ref=f"첨부 {address}"))
+            return
+        if ctype in ("text/plain", "text/html"):
+            text = text_of(part)
+            if ctype == "text/html":
+                text = re.sub(r"<(script|style|head)\b.*?</\1\s*>", " ", text, flags=re.S | re.I)
+                text = html_lib.unescape(re.sub(r"<[^>]+>", "\n", text))
+            for number, line in enumerate(_clean(text).split("\n"), start=1):
+                if line.strip() and budget.take(line):
+                    body.lines.append(SourceLine(text=" ".join(line.split()), ref=f"본문 {address} {number}줄"))
+
+    walk(message, "1")
+    units = [unit for unit in (headers, body, files) if unit.lines] or [body]
+    return SourceText("EML", "메일 MIME 직접 읽기(헤더·글 본문·첨부 이름, 파서의 HTML 변환과 별개)", units, [], budget.truncated, layer="mime_parts")
+
+
 def _delimiter_name(delimiter: str) -> str:
     from app.adapters.text import DELIMITERS
     return DELIMITERS.get(delimiter, repr(delimiter))
@@ -550,6 +677,8 @@ def read_source(path, fmt: str, settings, dialect: dict | None = None) -> Source
         return _xlsx(path, fmt, budget)
     if fmt in TEXT_FORMATS:
         return _text(path, fmt, settings, budget, dialect)
+    if fmt == "EML":
+        return _eml(path, budget)
     if fmt in IMAGE_FORMATS or fmt == "SVG":
         raise SourceUnavailable("이미지 원본에는 읽을 글자 층이 없습니다. 원문 대조 화면에서 사람이 원본 그림과 결과를 대조해야 합니다.")
     raise SourceUnavailable("이 형식은 원본 글자를 직접 읽는 방법이 없습니다. 원본 파일을 열어 확인해 주세요.")

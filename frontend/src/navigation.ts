@@ -35,7 +35,9 @@ function readFocus(params: URLSearchParams): ReviewFocus | undefined {
     page: positive(params.get('page')), line: positive(params.get('line')),
     sheet: params.get('sheet')?.slice(0, 64) || undefined,
     cell: /^[A-Za-z]{1,3}\d{1,7}$/.test(params.get('cell') ?? '') ? params.get('cell')!.toUpperCase() : undefined,
-    check: /^[VS]\d{1,6}$/i.test(params.get('check') ?? '') ? params.get('check')!.toUpperCase() : undefined,
+    // V12·S3 또는 자동 대조 원장의 finding ID(F + 16진수 12자리: 규칙이 바뀌어도 같은 사실)
+    check: /^[VS]\d{1,6}$/i.test(params.get('check') ?? '') ? params.get('check')!.toUpperCase()
+      : /^F[0-9a-f]{12}$/i.test(params.get('check') ?? '') ? 'F' + params.get('check')!.slice(1).toLowerCase() : undefined,
     run: /^[0-9a-f]{32}$/.test(params.get('run') ?? '') ? params.get('run')! : undefined,
   };
   return Object.values(focus).some(value => value !== undefined) ? focus : undefined;

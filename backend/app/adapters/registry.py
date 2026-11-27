@@ -17,6 +17,7 @@ PARSER_BY_EXTENSION = {
     "CSV": "python-csv",
     **dict.fromkeys(sorted(IMAGE_FORMATS), "ocr-model"),
     "SVG": "python-svg",
+    "EML": "python-eml",   # 2026-11-27: 메일 본문·헤더·첨부 목록(첨부 본문은 읽지 않음)
 }
 
 class ParserRegistry:
@@ -43,13 +44,21 @@ class ParserRegistry:
         """options: 텍스트·CSV의 원천 계약(encoding, csv_delimiter). 다른 형식은 받지 않는다(서비스가 미리 거른다)."""
         if extension == "SVG":
             return parse_svg(path, self.settings)
+        if extension == "EML":
+            from app.adapters.eml import parse_eml
+            return parse_eml(path, self.settings)
         if extension in IMAGE_FORMATS:
             return parse_image(path, extension, self.settings)
         if extension in TEXT_FORMATS:
             return self.text.parse(path, extension, options)
-        if extension == "PDF" and not self.pdf_models_ready():
-            from app.adapters.pdf_text import parse_pdf_text
-            return parse_pdf_text(path, self.settings)
+        if extension == "PDF":
+            # PDFium(pypdfium2·Docling PDF 백엔드)은 스레드 안전하지 않다: 원본 읽기 API와 겹치지 않게 잠근다.
+            from app.pdf_layers import PDFIUM
+            with PDFIUM:
+                if not self.pdf_models_ready():
+                    from app.adapters.pdf_text import parse_pdf_text
+                    return parse_pdf_text(path, self.settings)
+                return self.docling.parse(path, extension)
         if extension in DOCLING_FORMATS:
             return self.docling.parse(path, extension)
         raise UnsupportedFormat("이 파일 형식은 아직 처리 경로가 없습니다.")

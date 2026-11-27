@@ -99,10 +99,10 @@ flowchart LR
 | `wait` | `batch`(선택, B번호) | 진행 중인 묶음을 기다리고 진행 상황 또는 요약 |
 | `docs` | `state`(all·ok·warn·empty·fail·unsup·run·new), `before`(D번호) | 최신순 문서 목록을 40건씩 표시 |
 | `doc` | `id` | 문서 하나의 원인·경고 원문·처리 시간·이력과 원문 대조 링크 |
-| `verify` | `id`, `page` / `sheet`(선택) | **자동 대조.** 원본 글자와 결과를 대조해 의심 지점(S번호)을 높음→보통→낮음으로. 단위(쪽·슬라이드·시트)별 원본 글자 포함률, 이미 올린 검수 요청 표시 |
+| `verify` | `id`, `page` / `sheet` / `severity`(선택), `offset`(선택) | **자동 대조 원장.** 원본 글자와 결과를 대조한 의심 지점(S번호)을 **우선순위 순(높음 먼저) 20곳씩**. 전체 수·다음 `offset`, 문서 판정 상태(검수 필요·판정 불가·통과 후보)와 막는 이유, 단위(쪽·슬라이드·시트)별 원본 글자 포함률, 이미 올린 검수 요청 표시(2026-11-27: 문서 순서 앞 400곳으로 잘려 고위험 지점이 빠지던 문제를 고침) |
 | `source` | `id`, `page` / `sheet` / `find`, `line` | **원본 읽기.** 파서와 별개로 원본에서 직접 읽은 글자(PDF 글자 층, Office XML, 시트 셀 값과 주소). 스캔·이미지는 글자 층이 없다고 알린다 |
 | `read` | `id`, `page` / `sheet` / `find`, `line` | **결과 읽기.** 파싱 결과를 결과 줄 번호와 함께. 빈 줄은 번호만 건너뛴다 |
-| `flag` | `id`(필수), `spot` 또는 `note`, `page`·`sheet`·`cell`·`line`·`source_text`·`result_text` | **검수 요청 올리기(V번호).** `spot=S3`이면 위치와 원본·결과 글자를 서버가 채운다. 같은 실행의 같은 S번호는 한 번만 생긴다. 원문 대조 링크를 돌려준다 |
+| `flag` | `id`(필수), `spot` 또는 `note`, `page`·`sheet`·`cell`·`line`·`source_text`·`result_text` | **검수 요청 올리기(V번호).** `spot`에 S번호(`S3`)나 finding ID(`F…` 13자)를 주면 서버가 **원장 전체에서** 그 지점을 찾아 위치와 원본·결과 글자를 채운다(받은 20곳 밖도 된다). 같은 실행의 같은 의심점(finding ID)은 한 번만 생긴다. 원문 대조 링크를 돌려준다 |
 | `verdicts` | `state`(all·open·correct·wrong·unclear), `id`(선택) | **사람 판정 읽기.** 검수 요청과 사람이 누른 맞음·틀림·보류와 메모. 그 뒤 다시 파싱했으면 표시 |
 | `compare` | `id` | 직전 성공 실행과 최신 실행 비교, 바뀐 줄 20줄까지 |
 | `chunk` | `id`, `strategy`, `size` | 기본 512 추정 토큰. 고정 길이·재귀·요소 단위 비교, 또는 한 전략 측정. 원문 포함률과 표 분할 수 |
@@ -113,7 +113,7 @@ flowchart LR
 
 ## 5. 검수 흐름
 
-1. `verify(id="D12")` → 의심 지점 목록. 예: `S3 [높음] 3쪽 2줄 → 결과 줄 120: 원본 '0.5'이(가) 결과에서 '05'(으)로 다릅니다.` 아래에 원본 줄과 결과 줄을 함께 보인다.
+1. `verify(id="D12")` → 판정 상태와 의심 지점(우선순위 순 20곳). 예: `S3 [높음] 3쪽 2줄 → 결과 줄 120: 원본 '0.5'이(가) 결과에서 '05'(으)로 다릅니다.` 아래에 원본 줄과 결과 줄을 함께 보인다. 더 있으면 마지막 줄의 `verify(id="D12", offset=20)`으로 이어 보고, `severity="high"`·`page=3`으로 좁힌다.
 2. 의심 지점의 같은 위치를 `source(id="D12", page=3)`와 `read(id="D12", page=3)`로 읽어 직접 비교한다. 원본에서 글자 찾기는 `source(..., find="0.5 mL")`.
 3. 사람이 볼 곳을 `flag(id="D12", spot="S3", note="소수점이 빠진 것으로 보임")`으로 올린다. 직접 찾은 곳이면 `flag(id="D12", page=3, line=120, note="…", source_text="…", result_text="…")`. 결과: `검수 요청을 올렸습니다 — V7 · D12 3쪽 결과 줄 120`과 원문 대조 링크(`?view=live&doc=<ID>&review=source&page=3&line=120&check=V7`).
 4. 사람은 링크나 **에이전트 작업 → 검수 요청**에서 원문 대조를 그 위치로 열고(원본 칸은 그 쪽·셀, 결과 칸은 그 줄 강조) 맞음·틀림·보류를 누른다. 원문 대조 화면의 **확인할 곳** 막대에서도 같은 일을 한다.
@@ -123,7 +123,8 @@ flowchart LR
 
 - **원본 글자**(`app/source_text.py`, `GET /api/live/documents/{id}/source-text`): PDF 쪽마다 글자 층(pypdfium2), DOCX 본문 순서의 문단·표 행·글상자와 머리말·꼬리말·각주(기호 글꼴·첨자는 사본 보정과 같은 기준으로 유니코드, 숨김 서식 글자는 뺌), PPTX 슬라이드마다 도형 순서의 글자·표 행·발표자 메모, XLSX·XLSM 시트마다 저장된 셀 값과 주소(표기 후보: 정수·백분율·날짜, Docling이 있으면 같은 서식 표기), TXT·MD·LOG 원본 줄, CSV 행·칸. 이미지·SVG는 글자 층이 없다(409).
 - **대조**(`app/verify.py`, `GET /api/live/documents/{id}/verify`): 결과의 원문 위치(쪽·시트·행·열)로 같은 단위끼리 비교한다. 줄은 공백·표 칸 구분·글머리 기호·Markdown 꾸밈·이스케이프를 빼고 찾고, 없으면 가장 비슷한 결과 줄과 낱말 단위로 맞춰 빠지거나 바뀐 부분만 고른다. 같은 단위의 다른 곳에 있으면(줄바꿈·표 칸·순서 차이) 빼고, 같은 글이 원본에 여러 번 나오면 그 개수까지 본다. 표는 칸 대 칸으로 본다. 쪽의 위·아래 끝에 되풀이되는 줄(머리말·꼬리말·쪽 번호)과 원본에서 숨긴 시트·슬라이드(결과에 없으면 안내만)는 의심 지점으로 올리지 않는다. 숫자·`%`·부등호·특수기호가 바뀌거나 빠지면 높음.
-- **의심 지점 종류**: `changed`(바뀜) · `missing`(빠짐, 반복 문단 하나가 빠진 경우 포함) · `moved`(다른 단위에만 있음) · `symbol`(기호 개수 차이) · `extra_number`(결과에만 있는 숫자) · `garbled`(깨진 글자) · `cell_changed`·`cell_missing`·`cell_moved`(표 칸) · `unit_missing`(쪽·슬라이드 대부분 없음) · `scan_ocr`·`scan_empty`(글자 층 없는 쪽) · `source_garbled`(원본 글자 층 깨짐) · `image_ocr`(그림 OCR 줄·이미지 원본).
+- **의심 지점 종류**: `changed`(바뀜) · `missing`(빠짐, 반복 문단 하나가 빠진 경우 포함) · `moved`(다른 단위에만 있음) · `symbol`(기호 개수 차이) · `extra_number`(결과에만 있는 숫자) · `garbled`(깨진 글자) · `cell_changed`·`cell_missing`·`cell_moved`(표 칸) · `unit_missing`(쪽·슬라이드 대부분 없음) · `scan_ocr`·`scan_empty`(글자 층 없는 쪽) · `source_garbled`(원본 글자 층 깨짐) · `image_ocr`(그림 OCR 줄·이미지 원본). 2026-11-27 추가: CSV 주소별 대조의 `cell_swapped`(같은 행 두 칸 맞바뀜)·`cell_added`(빈 칸에 생긴 값)·`row_extra`(결과에만 있는 행·중복 행)·`row_missing`·`row_moved`·`grid_width`(열 수 다름), PDF의 `hidden_layer`(그림 위 보이지 않는 글자 층 값: 화면 값으로 확인되지 않음)·`hidden_conflict`(숨은 층 값과 그림 OCR 값이 다름), 통합문서 차트의 `chart_conflict`(차트에 저장된 표시값과 원본 셀이 다름).
+- **판정 상태(gate, 2026-11-27)**: 확인 안 된 의심점·열린 검수 요청·틀림이 있으면 `검수 필요`, 의심점은 없어도 검사하지 못한 범위·근거(스캔 쪽, 같은 원천을 두 번 읽음, 형식 계약 없음, 숨은 글자 층, 차트 캐시 없음 등)가 있으면 `판정 불가`, 다 채우면 `통과 후보`. 통과 후보는 **기록 모드**라 자동 통과가 아니다(사람 검수를 이어 감). 지금 통과 후보 기준이 있는 형식은 구분자·인코딩이 확정된 직사각 CSV뿐이다.
 - **보지 않는 것**: 표의 구조(칸 합치기·머리글)와 읽는 순서, 그림 속 글자, 글꼴·서식. PDF를 `pdf-text`로 파싱했으면 원본과 같은 글자 층이라 글자 누락은 거의 드러나지 않는다(안내 문구로 알림). 그래서 의심 지점이 없어도 '맞다'가 아니다.
 - **측정(2026-11-26, 합성 말뭉치 56개, Docling 2.150.0 Office 경로·pdf-text):** 정상 파싱 문서 30건에서 의심 지점은 실제 스캔 쪽 1곳뿐이었다(오탐 0). 결과에 무작위 변조를 넣으면(시드 3개) 숫자 한 자리 바꾸기 88~91%, 줄 지우기 79~81%, 특수기호 지우기 100%를 ±4줄 안에서 잡았다. 놓친 것은 대부분 쪽마다 되풀이되는 머리말과 여러 번 나오는 같은 문장이다. 실제 고객 문서로는 재지 않았다.
 
@@ -175,6 +176,7 @@ flowchart LR
 | `pic-skip` | PDF 쪽의 큰 그림 속 글자를 OCR 모델 미연결로 읽지 않음 | pdf-text 어댑터 |
 | `text-only` | PDF 모델 없이 글자 층만 읽음(표 칸 구조 없음, 여러 단 순서 섞임 가능) | `adapters/pdf_text.FALLBACK_WARNING` |
 | `text-broken` | PDF 글자 층이 깨진 쪽(글꼴 대응표 없음) | pdf-text 어댑터 |
+| `hidden-layer` | 그림 위의 보이지 않는 글자 층(스캔 + OCR 층)에서 읽은 쪽(`doc`에서 쪽 번호). 화면에 보이는 값과 같은지 확인되지 않음 | `adapters/pdf_text.HIDDEN_LAYER_WARNING` |
 | `notes-added` | PPTX 발표자 메모를 슬라이드 끝에 덧붙임 | Docling 어댑터(PPTX) |
 | `title-row` | XLSX 표 맨 위 병합 제목 행을 표 위 문단으로 옮김 | Docling 어댑터(XLSX) |
 | `ocr-fallback` | (이전 기록) OCR 포함 변환 실패 → 텍스트 층으로 재처리 | 2026-11-24 이전 Docling 어댑터 |
@@ -207,6 +209,8 @@ flowchart LR
 | `bad-arg`·`not-found`·`outside`·`server-down`·`busy`·`api`·`internal` | 에이전트 호출 오류(잘못된 인자, 대상 없음, 허용 폴더 밖, 서버 꺼짐, 409·503, 그 밖의 API 오류, 도구 내부 오류) |
 
 ## 8. 확인한 것과 하지 않은 것
+
+- 확인(2026-11-27, macOS 개발 환경, 임시 저장소): 12시트 통합문서에 열 밀림 440곳과 마지막 시트의 고위험 1곳(17→999)을 넣은 결과로 `verify`가 S441을 첫 상세로 내고, `flag(spot="S441")`이 V번호를 만드는 것(예전에는 HTTP 409)을 API 테스트로 확인했다(`backend/tests/test_qc_ledger.py`). 작업 도구 회귀 `backend/tests/test_agent_tools.py`. 고객사 OpenCode·사내 모델로 새 인자(`severity`·`offset`)를 쓰는지는 확인하지 않았다.
 
 - 확인(2026-11-26, Linux 개발 환경): 임시 저장소 서버를 띄우고 합성 문서 5건(DOCX·PPTX·XLSX·PDF 2)으로 CLI `status → parse → verify → source → read → flag → verdicts`를 돌렸다. 스캔 쪽이 있는 PDF는 4쪽이 의심 지점으로 나오고, 결과 파일을 일부러 바꾼 DOCX는 빠진 문단과 깨진 글자를 짚었다. 같은 S번호를 두 번 올리면 기존 V번호를 돌려주는 것, 사람이 화면 API로 '틀림'을 누르면 `verdicts`가 메모와 함께 보이는 것을 확인했다. 회귀 테스트: `backend/tests/test_agent_tools.py`, `backend/tests/test_verify.py`.
 - 하지 않음: 고객사 Windows PC와 사내 모델로 새 도구(`source`·`verify`·`flag`·`verdicts`) 호출, 실제 고객 문서의 자동 대조 품질, Docling PDF 모델 경로(이 환경은 PDF 모델이 없어 `pdf-text`), OCR 모델을 붙인 스캔 쪽 대조.

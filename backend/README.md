@@ -39,7 +39,9 @@ export DOCOPS_DOCLING_ARTIFACTS=/path/to/prepared/models
 - `GET /api/live/documents/{id}/result`: 마지막 성공 결과와 파서 정보, `is_stale`, `warnings`를 반환합니다. 재처리 중이거나 실패한 경우에도 이전 성공 결과가 있으면 `is_stale: true`로 반환하고, 성공 이력이 없으면 `409`입니다. OCR 없이 처리한 PDF에는 미적용 경고를 남깁니다.
 - `GET /api/live/documents/{id}/history`: 로컬 처리 이력
 - `GET /api/live/documents/{id}/source-text`: 파서와 별개로 원본에서 직접 읽은 글자(단위 목록, `?unit=`, `?find=`). 이미지·SVG처럼 글자 층이 없으면 `409`
-- `GET /api/live/documents/{id}/verify?run=`: 결과와 원본 글자의 자동 대조. 사람이 원문 대조로 볼 의심 지점(S번호)이며 판정이 아닙니다
+- `GET /api/live/documents/{id}/verify?run=`: 결과와 원본 글자의 자동 대조 원장. 사람이 원문 대조로 볼 의심 지점(S번호)을 우선순위 순으로 한 쪽씩(`severity`·`unit`·`offset`·`limit`·`unreviewed`)과 문서 판정 상태(검수 필요·판정 불가·통과 후보, 기록 모드). 판정이 아니라 후보입니다. 단건은 `…/verify/spots/{S번호|finding ID}`
+- `GET /api/live/qc-summary`: 반입 전체 → 파싱 완료 → 자동 대조 → 판정 상태 깔때기
+- `GET /api/live/documents?q=&status=&format=&sort=&cursor=&limit=`: 문서함 한 쪽과 확장자·상태별 수(조건이 없으면 예전처럼 전체 목록). `POST …/process`의 바디로 텍스트·CSV의 구분자·인코딩을 지정할 수 있습니다
 - `GET·POST /api/live/reviews`, `PATCH /api/live/reviews/{n}`: 검수 요청(V번호)과 사람의 판정(맞음·틀림·보류·메모). 작업 에이전트의 `flag`와 원문 대조 화면이 만듭니다
 - `GET /api/agent/activity`: 작업 에이전트의 묶음·호출 기록(결과 전체 포함)과 에이전트가 다룬 문서
 

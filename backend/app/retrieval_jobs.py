@@ -228,7 +228,9 @@ def load_source(service, doc_id: str) -> tuple[dict, Source]:
         src = Source(result["markdown"], line_pages(result.get("locations"), result["markdown"]))
     except ChunkingError as exc:
         raise PlanError(f"{doc['name']}: {exc}") from None
-    return {"id": doc_id, "name": doc["name"]}, src
+    from app.chunk_qc import text_hash  # 평가 결과가 어느 실행·본문으로 나눈 것인지 남긴다
+    return {"id": doc_id, "name": doc["name"], "run_id": result.get("run_id"), "text_sha256": text_hash(result["markdown"]),
+            "is_stale": result.get("is_stale", False)}, src
 
 
 def preview_plan(body: dict, service, questions: list[dict], embedder_for=None) -> dict:

@@ -382,3 +382,14 @@
 .ui-dialog-foot .cb-parallel { margin-right:8px; font-size:12.5px; }
 .ui-dialog-foot .cb-parallel select { min-height:32px; border:1px solid var(--rule-strong); border-radius:6px; padding:0 6px; background:var(--surface); color:var(--ink-1); font:inherit; }
 @media(max-width:760px) { .cb-kind-group { grid-template-columns:1fr 1fr; } .cb-picks { grid-template-columns:1fr; } }
+
+/* 청크와 겹치는 확인 안 된 자동 대조 지점(실제 문서) */
+.cb-qc { margin: 10px 0 12px; padding: 8px 10px; border: 1px solid #f1d2d9; border-left: 3px solid var(--bad); border-radius: 8px; background: var(--bad-soft); }
+.cb-qc .cb-h4 { margin: 0 0 6px; color: var(--bad); }
+.cb-qc ul { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.cb-qc li { display: grid; grid-template-columns: max-content minmax(0, 1fr) max-content; gap: 8px; align-items: baseline; font-size: 12.5px; line-height: 1.5; color: var(--ink-1); }
+.cb-qc li > span { overflow-wrap: anywhere; }
+.cb-qc a { display: inline-flex; align-items: center; gap: 2px; color: var(--accent); font-weight: 650; white-space: nowrap; }
+.cb-qc-sev { padding: 0 6px; border-radius: 5px; background: var(--surface); color: var(--ink-2); font-size: 11.5px; white-space: nowrap; }
+.cb-qc-sev.is-high { color: var(--bad); } .cb-qc-sev.is-medium { color: var(--warn); }
+@media (max-width: 640px) { .cb-qc li { grid-template-columns: minmax(0, 1fr); } }

@@ -292,6 +292,11 @@ class DocumentService:
             path = self.settings.uploads / source_name
             extension = doc["format"]
             if self.parsers.parser_name(extension) is None:
+                from app.structure import FAMILY
+                if extension in FAMILY:
+                    # 구조 분석만 되는 형식: 본문 파서가 없다는 것과, 보호(암호·DRM) 여부는 확인하지 않았다는 것을 함께 알린다.
+                    raise UnsupportedFormat("이 형식은 본문 파서가 없습니다. 하위 문서·링크는 문서 상세의 '구조·참조'에서 구조 분석으로 볼 수 있습니다"
+                                            "(암호·보호 여부는 확인하지 않았습니다).")
                 raise UnsupportedFormat("이 파일 형식은 아직 처리 경로가 없습니다.")
             # 확장자가 아니라 내용으로 먼저 확인한다: DRM 래핑·암호·형식 불일치는 파서 오류로 뭉뚱그리지 않는다.
             gate = check_format(path, extension, self.settings.drm_signatures, self.settings.max_upload_bytes)
@@ -705,4 +710,5 @@ class DocumentService:
                 fidelity = json.loads(run["fidelity"])
             except ValueError:
                 fidelity = None
-        return {"id": doc_id, "markdown": markdown, "parser": parser, "parser_version": parser_version, "is_stale": doc["status"] != "completed", "warnings": warnings, "fidelity": fidelity}
+        return {"id": doc_id, "markdown": markdown, "parser": parser, "parser_version": parser_version, "is_stale": doc["status"] != "completed", "warnings": warnings, "fidelity": fidelity,
+                "run_id": name[33:65], "locations": json.loads(run["locations"]) if run and run.get("locations") else []}

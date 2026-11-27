@@ -43,7 +43,13 @@ export type Chunk = {
   elements: string[]; element_kinds: ElementKind[]; page: number | null;
   /** parent_child: 부모 청크 번호(StrategyResult.parents의 index) */
   parent: number | null;
+  /** 실제 문서: 이 청크와 겹치는, 사람이 아직 판정하지 않은 자동 대조 의심점(우선순위 순, 최대 12)과 전체 수. 예전 서버·예시 문서는 없다. */
+  qc?: ChunkFinding[]; qc_total?: number;
+  /** 이 청크가 덮는 원본 영역(쪽·시트) */
+  regions?: ({ page: number } | { sheet: string })[];
 };
+export type ChunkFinding = { key: string; id?: string; severity: 'high' | 'medium' | 'low'; kind: string; message: string; page: number | null; sheet: string | null;
+  cell: string | null; line: number | null; line_end: number | null; source_hit?: string; result_hit?: string; source_layer?: string };
 export type ParentChunk = { index: number; start: number; end: number; chars: number; est_tokens: number; heading_path: string[] };
 export type Dist = { min: number; median: number; p95: number; max: number; mean: number };
 export type ChunkStats = { count: number; chars: Dist; tokens: Dist; over_limit: number; coverage: number; duplication: number; tables_total: number; tables_split: number; total_chars: number; total_tokens: number; flags: Record<string, number> };
@@ -56,6 +62,8 @@ export type StrategyResult = {
 };
 export type ChunkSource = {
   doc_id: string | null; sample: string | null; name: string; is_stale: boolean; chars: number; est_tokens: number; tables: number; headings: number; sections: number; text: string;
+  /** 실제 문서: 나눈 본문의 성공 실행·본문 해시와 그 실행의 자동 대조 판정(예전 서버는 없다) */
+  run_id?: string | null; text_sha256?: string; qc?: { rule_version?: string; state?: string; label?: string; unresolved?: number; attached?: number } | null;
   elements: DocElement[]; pages: number | null; composition: Partial<Record<ElementKind, number>>;
 };
 /** 합성 예시 문서. 실제 조직·제품과 무관하다. */

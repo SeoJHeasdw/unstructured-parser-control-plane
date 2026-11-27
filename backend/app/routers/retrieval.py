@@ -11,6 +11,7 @@ from app.chunking import (EXAMPLE_QUESTIONS, MAX_CHUNKS, MAX_SOURCE_CHARS, SAMPL
 from app.embedding import MODEL_SPECS, EmbedError, embed_batch, embed_connections, find_connection, semantic_embedder
 from app.retrieval_jobs import (CAPS, Busy, PlanError, QuestionError, QuestionStore, RunManager, build_plan, export_rows, parse_import,
                                 preview_plan)
+from app.chunk_qc import MAX_FINDINGS as MAX_QC_FINDINGS, annotate, text_hash
 from app.service import Conflict, MissingDocument
 
 
@@ -108,7 +109,9 @@ def _load_source(source, request: Request) -> tuple[Source, dict]:
         except Conflict as exc:
             raise HTTPException(409, str(exc)) from None
         text, pages = result["markdown"], line_pages(result.get("locations"), result["markdown"])
-        meta = {"doc_id": doc["id"], "sample": None, "name": doc["name"], "is_stale": result["is_stale"]}
+        # 청크가 어느 실행·본문에서 나왔는지 남긴다(원장 의심점·원본 영역을 청크에 잇는 기준).
+        meta = {"doc_id": doc["id"], "sample": None, "name": doc["name"], "is_stale": result["is_stale"],
+                "run_id": result.get("run_id"), "text_sha256": text_hash(text), "_locations": result.get("locations") or []}
     else:
         text = source.get("text")
         if not isinstance(text, str) or not text.strip():
@@ -185,9 +188,26 @@ def chunk(request: Request, body: dict = Body(...)):
     for start in range(0, len(strategies), parallelism):
         batch = range(start, min(start + parallelism, len(strategies)))
         results.extend(request.app.state.chunk_pool.map(evaluate, batch))
+    locations = meta.pop("_locations", None)
     if body.get("summary_only") is True:
         return {"source": meta, "results": results}
+    if meta.get("doc_id") and meta.get("run_id"):
+        meta["qc"] = _annotate_qc(request, meta, src.text, locations, results)
     return {"source": {**meta, **describe_source(src), "text": src.text}, "results": results}
+
+
+def _annotate_qc(request: Request, meta: dict, text: str, locations, results: list[dict]) -> dict | None:
+    """청크마다 덮는 쪽·시트와 사람이 아직 판정하지 않은 의심점을 붙인다. 원장이 없으면(원본을 못 읽음 등) 위치만 붙인다."""
+    service = request.app.state.documents
+    try:
+        data = service.verify(meta["doc_id"], meta["run_id"], unreviewed=True, limit=MAX_QC_FINDINGS)
+    except Exception:  # noqa: BLE001 — 대조를 못 해도 청킹 결과는 준다
+        annotate(results, text, [], locations)
+        return None
+    annotate(results, text, data["spots"], locations)
+    gate = data.get("gate") or {}
+    return {"rule_version": data.get("rule_version"), "state": gate.get("state"), "label": gate.get("label"),
+            "unresolved": gate.get("unresolved"), "attached": min(len(data["spots"]), MAX_QC_FINDINGS)}
 
 
 @router.post("/tokens")
