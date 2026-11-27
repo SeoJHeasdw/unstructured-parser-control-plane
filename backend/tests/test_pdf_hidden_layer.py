@@ -106,6 +106,8 @@ def test_hidden_value_reaches_the_chunk_with_its_source_location(tmp_path, monke
         assert entry["kind"] == "hidden_layer" and entry["source_hit"] == "71" and entry["page"] == 1 and entry["line"] == 1
         assert entry["review"]["id"] == review["id"] and entry["review"]["status"] == "wrong" and entry["review"]["comment"] == "화면은 17 bar"
         assert wrong["qc_counts"] == {"wrong": 1, "unclear": 0, "open": 0} and meta["wrong"] == 1
+        listed = client.get("/api/live/documents", params={"limit": 5}).json()["documents"][0]["qc"]
+        assert listed["state"] == "needs_review" and listed["unresolved"] == 0 and listed["wrong"] == 1  # 목록에도 '틀림 1' 
         client.patch(f"/api/live/reviews/{review['id']}", json={"status": "unclear"})
         meta, unclear = chunk_71()
         assert "unverified" in unclear["flags"] and "confirmed-wrong" not in unclear["flags"]

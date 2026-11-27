@@ -17,12 +17,13 @@ const checkState: Record<string, string> = { done: '검사함', partial: '일부
 const derived: Record<string, string> = { independent: '파서와 별개로 읽음', same_layer: '파서와 같은 원천', same_contract: '파서와 같은 계약으로 읽음', none: '근거 없음' };
 
 /** 목록·막대에 붙는 작은 상태 표시. */
-export function QcStateBadge({ state, unresolved, label, previous }: { state: QcState; unresolved?: number | null; label?: string; previous?: boolean }) {
+export function QcStateBadge({ state, unresolved, label, previous, wrong }: { state: QcState; unresolved?: number | null; label?: string; previous?: boolean; wrong?: number }) {
   const Icon = stateIcon[state];
   const tip = previous ? `지금 처리 중이거나 실패했습니다. 이 판정은 이전 성공본의 것이며 현재 판정 수에 들어가지 않습니다. ${qcStateText[state].tip}` : qcStateText[state].tip;
   return <span className={`qc-badge is-${state}${previous ? ' is-previous' : ''}`} data-tip={tip}><Icon size={13} aria-hidden="true" />
     {previous ? label ?? `이전 성공본 · ${qcStateText[state].label}` : label && label !== qcStateText[state].label ? label : qcStateText[state].label}
-    {state === 'needs_review' && unresolved ? <b className="ui-num">{unresolved.toLocaleString('ko-KR')}</b> : null}</span>;
+    {state === 'needs_review' && unresolved ? <b className="ui-num">{unresolved.toLocaleString('ko-KR')}</b> : null}
+    {state === 'needs_review' && wrong ? <b className="qc-badge-wrong" data-tip="사람이 원문 대조로 '틀림'을 확인한 곳">틀림 {wrong.toLocaleString('ko-KR')}</b> : null}</span>;
 }
 
 function Reasons({ gate, checks, ruleVersion }: { gate: QcGate; checks?: QcCheck[]; ruleVersion?: string }) {

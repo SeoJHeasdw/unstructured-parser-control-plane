@@ -218,6 +218,7 @@ class Verifier:
         self.unlocated: list[str] = []
         self._result_spots: set[tuple[str, int]] = set()  # (종류, 결과 줄): 결과 쪽 점검은 줄마다 한 번만
         self._line_spot: dict[int, dict] = {}              # 결과 줄 → 그 줄의 원본 줄 차이 지점
+        self._dropped: set[int] = set()                    # 묶음 처리로 뺀 지점(id): 한 쪽이 통째로 빠진 경우 등
         self.hidden_missing: list[str] = []
 
     # ------------------------------------------------------------ 결과 줄 → 원본 단위
@@ -282,6 +283,13 @@ class Verifier:
                  "result_hit": result_hit, "result_role": result_role}
         self.spots.append(entry)
         return entry
+
+    def _drop(self, entries) -> None:
+        """지점 여러 개를 한 번에 뺀다(하나씩 list.remove 하면 지점이 수만 곳일 때 제곱 시간)."""
+        drop = {id(entry) for entry in entries}
+        if drop:
+            self._dropped |= drop
+            self.spots = [entry for entry in self.spots if id(entry) not in drop]
 
     def result_text(self, line: int | None, center_text: str = "") -> str:
         if not line:
@@ -561,8 +569,7 @@ class Verifier:
         stats["source_chars"], stats["matched_chars"] = total, matched
         stats["coverage"] = round(matched / total, 4) if total else None
         if unit.kind == "hidden" and total and matched / total < 0.5:
-            for entry in flagged.values():
-                self.spots.remove(entry)
+            self._drop(flagged.values())
             self.hidden_missing.append(unit.label)
             stats["state"] = "hidden"
             stats["spots"] = len(self.spots) - before
@@ -570,8 +577,7 @@ class Verifier:
         collapsed = total >= 40 and matched / total < 0.4
         if collapsed:
             # 단위 대부분이 결과에 없다: 줄마다 올리지 않고 하나로 묶는다(기호·숫자 지점도 따로 올리지 않는다).
-            for entry in flagged.values():
-                self.spots.remove(entry)
+            self._drop(flagged.values())
             flagged.clear()
             sample_line, sample_plain, _ = lines[0]
             self.spot(unit, "high", "unit_missing",
@@ -630,7 +636,7 @@ class Verifier:
                 self._result_spots.add(("garbled", line_no))
                 found = _GARBLED.search(self.raw[line_no - 1]).group(0)
                 existing = self._line_spot.get(line_no)
-                if existing is not None and existing in self.spots:
+                if existing is not None and id(existing) not in self._dropped:
                     existing["severity"] = "high"
                     existing["message"] += f" 결과에 깨진 글자(U+{ord(found):04X})가 있습니다."
                     continue

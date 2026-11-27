@@ -198,3 +198,79 @@ describe('청크의 검수 판정', () => {
     expect(screen.getAllByText('틀림 확인').length).toBeGreaterThan(0);  // 목록·표시 설명에도 '틀림 확인'
   });
 });
+
+
+describe('리뷰 후 점검에서 찾은 것', () => {
+  it('받은 지점 일부를 판정한 뒤 더 보기를 눌러도 다음 지점을 건너뛰지 않는다', async () => {
+    const user = userEvent.setup();
+    const all = Array.from({ length: 405 }, (_, i) => ({ ...low(i + 1), rank: i, message: `지점 ${i + 1}` }));
+    const decided = new Set<string>();
+    const posted: Record<string, unknown>[] = [];
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const path = String(input);
+      if (init?.method === 'POST' && path === '/api/live/reviews') {
+        const body = JSON.parse(String(init.body));
+        posted.push(body); decided.add(body.finding_id);
+        return json({ id: posted.length, document_id: doc.id, run_id: RUN, finding_id: body.finding_id, spot: null, status: body.status, kind: 'cell_moved',
+          severity: 'low', note: 'x', origin: 'console', created_at: '', updated_at: '', decided_at: '', document_seq: 9, document_name: doc.name,
+          document_format: 'XLSX', document_status: 'completed', is_latest_run: true, page: null, sheet: 'S01', cell: null, line: 1, line_end: 1, ref: null,
+          source_text: null, source_hit: null, result_text: null, result_hit: null, comment: null, batch: null, created: true }, 201);
+      }
+      if (path.split('?')[0] === '/api/live/documents') return json({ documents: [doc] });
+      if (path === `/api/live/documents/${doc.id}`) return json(doc);
+      if (path === `/api/live/documents/${doc.id}/runs`) return json({ runs: [{ run_id: RUN, completed_at: '', parser: 'docling', parser_version: '2', ocr_enabled: null, is_latest: true }] });
+      if (path === `/api/live/documents/${doc.id}/runs/${RUN}`) return json({ run_id: RUN, completed_at: '', parser: 'docling', parser_version: '2', ocr_enabled: null, is_latest: true, markdown: '줄', warnings: [], locations: [] });
+      if (path.startsWith('/api/live/reviews?')) return json({ reviews: [], counts: {} });
+      if (path.startsWith(`/api/live/documents/${doc.id}/verify?`)) {
+        // 서버처럼: unreviewed=true면 판정한 지점을 빼고 offset부터 limit개
+        const params = new URLSearchParams(path.split('?')[1]);
+        const pool = all.filter(spot => !decided.has(spot.id));
+        const offset = Number(params.get('offset') ?? 0), limit = Number(params.get('limit') ?? 400);
+        return json({ ...base, spots: pool.slice(offset, offset + limit), spots_matched: pool.length, spots_total: 405,
+          page: { offset, limit, order: 'priority', next: offset + limit < pool.length ? offset + limit : null } });
+      }
+      if (path.endsWith('/result')) return json({ id: doc.id, markdown: '', parser: 'docling', parser_version: '2', is_stale: false, warnings: [] });
+      return json({ detail: '없음' }, 404);
+    }));
+    history.replaceState(null, '', `/?view=live&doc=${doc.id}&review=source&check=S1`);
+    render(<App />);
+    const bar = await screen.findByRole('region', { name: '확인할 곳' });
+    await within(bar).findByText('지점 1');
+    for (let i = 0; i < 3; i++) await user.click(within(within(bar).getByRole('group', { name: /판정$/ })).getByRole('button', { name: '맞음' }));
+    await waitFor(() => expect(posted).toHaveLength(3));
+    await user.click(within(bar).getByRole('button', { name: /^목록/ }));
+    const list = within(bar).getByRole('list', { name: '확인할 곳 목록' });
+    await user.click(within(list).getByRole('button', { name: /다음 5곳 더 보기/ }));
+    for (const n of [401, 402, 403, 404, 405]) expect(await within(list).findByText(`지점 ${n}`)).toBeTruthy();  // 401번째를 건너뛰지 않는다
+  });
+
+  it('처리 중 다시 읽기와 문서함 더 보기가 겹쳐도 이어 받은 행이 사라지지 않는다', async () => {
+    const user = userEvent.setup();
+    const rows = Array.from({ length: 60 }, (_, i) => ({ ...doc, id: `d${i}`, name: `문서${60 - i}.xlsx`, seq: 60 - i }));
+    let release: (() => void) | undefined;
+    let calls = 0;
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+      const path = String(input);
+      if (path === '/api/live/qc-summary') return json({ detail: '없음' }, 404);
+      if (path.split('?')[0] !== '/api/live/documents') return json({ detail: '없음' }, 404);
+      const params = new URLSearchParams(path.split('?')[1] ?? '');
+      const start = params.get('cursor') ? Number(params.get('cursor')) : 0;
+      const limit = Number(params.get('limit') ?? 50);
+      const body = { documents: rows.slice(start, start + limit), total: 60, next_cursor: start + limit < 60 ? String(start + limit) : null,
+        facets: { formats: { XLSX: 60 }, statuses: { completed: 60 } } };
+      calls += 1;
+      if (calls === 2) await new Promise<void>(resolve => { release = resolve; });  // 두 번째(새로고침) 응답을 붙잡아 둔다
+      return json(body);
+    }));
+    render(<LiveWorkspace />);
+    await screen.findByText('문서60.xlsx');
+    await user.click(screen.getByRole('button', { name: '문서 목록 새로고침' }));   // 처음 50개 범위를 다시 읽기 시작(응답 대기)
+    await waitFor(() => expect(release).toBeTruthy());
+    await user.click(screen.getByRole('button', { name: /10개 더 보기/ }));          // 그 사이 더 보기
+    await screen.findByText('문서1.xlsx');
+    release!();                                                                     // 다시 읽기 응답이 늦게 도착
+    await waitFor(() => expect(screen.getByText('60개 문서')).toBeTruthy());
+    expect(screen.getByText('문서1.xlsx')).toBeTruthy();                              // 이어 받은 행이 남아 있다
+    expect(screen.queryByRole('button', { name: /더 보기/ })).toBeNull();
+  });
+});

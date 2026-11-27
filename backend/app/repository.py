@@ -438,8 +438,9 @@ class DocumentRepository:
 
     def qc_findings(self, document_id: str, run_id: str, rule_version: str, *, severity: list[str] | None = None,
                     unit: str | None = None, kind: list[str] | None = None, order: str = "priority",
-                    offset: int = 0, limit: int = 400, exclude: set[str] | None = None) -> tuple[list[dict], int]:
-        """원장의 의심점 한 쪽(우선순위 또는 문서 순서)과 조건에 맞는 전체 수."""
+                    offset: int = 0, limit: int = 400, exclude_statuses: tuple[str, ...] | None = None) -> tuple[list[dict], int]:
+        """원장의 의심점 한 쪽(우선순위 또는 문서 순서)과 조건에 맞는 전체 수.
+        exclude_statuses: 그 판정이 있는 의심점을 뺀다(같은 실행의 검수 요청을 하위 질의로 보므로 수가 많아도 된다)."""
         where = ["document_id=?", "run_id=?", "rule_version=?"]
         params: list[Any] = [document_id, run_id, rule_version]
         if severity:
@@ -451,9 +452,10 @@ class DocumentRepository:
         if unit:
             where.append("unit=?")
             params.append(unit)
-        if exclude:
-            where.append(f"finding_id NOT IN ({', '.join('?' * len(exclude))})")
-            params += sorted(exclude)
+        if exclude_statuses:
+            where.append("finding_id NOT IN (SELECT r.finding_id FROM review_requests r WHERE r.document_id=qc_findings.document_id "
+                         f"AND r.run_id=qc_findings.run_id AND r.finding_id IS NOT NULL AND r.status IN ({', '.join('?' * len(exclude_statuses))}))")
+            params += list(exclude_statuses)
         clause = " AND ".join(where)
         sort = "rank" if order == "priority" else "seq"
         with self.connect() as conn:
@@ -518,8 +520,13 @@ class DocumentRepository:
             """, (rule_version, rule_version, *(ids or []))).fetchall()
             reviews: dict[str, dict[str, int]] = {}
             resolved: dict[str, int] = {}
+            # 해결로 세는 것: 지금 원장에 있는 의심점(finding ID)을 가리키는 '맞음'·'틀림'. 판정 상태(gate)와 같은 기준이다.
+            # 검수 요청을 만든 때의 규칙 키로 거르면, 코드가 바뀌어 규칙 키가 달라진 뒤 같은 의심점의 판정이 해결로 안 세어진다.
             for document_id, status, linked, count in conn.execute("""
-                SELECT r.document_id, r.status, r.finding_id IS NOT NULL AND r.rule_version=?, COUNT(*)
+                SELECT r.document_id, r.status,
+                    r.finding_id IS NOT NULL AND EXISTS (SELECT 1 FROM qc_findings f WHERE f.document_id=r.document_id
+                        AND f.run_id=r.run_id AND f.rule_version=? AND f.finding_id=r.finding_id),
+                    COUNT(*)
                 FROM review_requests r JOIN documents d ON d.id=r.document_id
                 WHERE d.result_file = d.id || '-' || r.run_id || '.md' GROUP BY 1, 2, 3""", (rule_version,)):
                 reviews.setdefault(document_id, {})[status] = reviews.get(document_id, {}).get(status, 0) + count

@@ -147,9 +147,14 @@ export function ReviewChecks({ doc, runId, runs, onRun, focus, show, pageUnit }:
   async function loadMore() {
     if (!verifyState?.data || verifyState.loadingMore || !remaining) return;
     const base = verifyState;
+    // 서버는 판정한 지점을 뺀 목록을 준다(unreviewed). 받은 뒤 여기서 판정한 지점만큼 서버 목록이 앞으로 당겨졌으니
+    // 받을 자리도 그만큼 당긴다. 받은 수를 그대로 쓰면 다음 쪽 앞의 지점을 건너뛰어 사람이 못 보는 지점이 생긴다.
+    const decided = new Set((reviews ?? []).filter(review => review.run_id === runId && review.status !== 'open')
+      .map(review => review.finding_id ?? review.spot ?? ''));
+    const offset = loadedSpots.filter(spot => !decided.has(spot.id ?? '') && !decided.has(spot.key)).length;
     setVerify({ ...base, loadingMore: true });
     try {
-      const next = await getVerify(doc.id, runId, undefined, { limit: PAGE, unreviewed: true, offset: loadedSpots.length,
+      const next = await getVerify(doc.id, runId, undefined, { limit: PAGE, unreviewed: true, offset,
         severity: base.severity === 'any' ? undefined : [base.severity] });
       setVerify(previous => previous && previous.run === base.run ? { ...previous, more: [...previous.more, ...next.spots], loadingMore: false } : previous);
     } catch (reason) {

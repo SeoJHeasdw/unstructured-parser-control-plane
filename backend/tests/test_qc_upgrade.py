@@ -101,3 +101,32 @@ def test_rule_key_follows_code_and_library_versions(monkeypatch):
     monkeypatch.setattr(importlib.metadata, "version", lambda name: "99.0" if name == "pypdfium2" else real(name))
     assert qc.rule_key() != first  # 원본 읽기 라이브러리가 바뀌면 다시 대조한다
     monkeypatch.setattr(qc, "_rule_key", None)
+
+
+def test_a_correct_verdict_still_counts_after_the_rule_key_changes(tmp_path, monkeypatch):
+    """규칙 키가 코드 지문이라 코드만 바뀌어도 키가 달라진다. 같은 의심점(finding ID)에 남긴 '맞음'은 목록·집계에서도
+    해결로 세어야 한다(판정 상태 gate와 같은 기준). 예전에는 검수 요청을 만든 때의 키로 걸러 목록만 '검수 필요'가 됐다."""
+    runtime = tmp_path / "runtime"
+    with TestClient(create_app(Settings(runtime_dir=runtime))) as client:
+        doc_id = client.post("/api/live/documents", files={"file": ("a.txt", "교정 주기 12개월\n".encode())}).json()["id"]
+        client.post(f"/api/live/documents/{doc_id}/process")
+        for _ in range(100):
+            if client.get(f"/api/live/documents/{doc_id}").json()["status"] != "processing":
+                break
+            time.sleep(0.05)
+    result = next((runtime / "results").glob("*.md"))
+    result.write_text("교정 주기 21개월\n", encoding="utf-8")  # 결과가 원본과 다른 실행을 흉내 낸다
+    with sqlite3.connect(runtime / "documents.sqlite3") as conn:
+        conn.execute("DELETE FROM qc_findings")
+        conn.execute("DELETE FROM qc_runs")
+    with TestClient(create_app(Settings(runtime_dir=runtime, qc_reverify=False))) as client:
+        spot = client.get(f"/api/live/documents/{doc_id}/verify").json()["spots"][0]
+        client.post("/api/live/reviews", json={"document_id": doc_id, "finding_id": spot["id"], "status": "correct", "origin": "console"})
+    monkeypatch.setattr(qc, "_rule_key", "verify-test+code-changed")
+    with TestClient(create_app(Settings(runtime_dir=runtime))) as client:
+        _wait_reverify(client)
+        gate_state = client.get(f"/api/live/documents/{doc_id}/verify").json()["gate"]["state"]
+        listed = client.get("/api/live/documents", params={"limit": 5}).json()["documents"][0]["qc"]
+        summary = client.get("/api/live/qc-summary").json()["states"]
+        assert gate_state == listed["state"] == "undetermined" and listed["unresolved"] == 0
+        assert summary["undetermined"] == 1 and summary["needs_review"] == 0

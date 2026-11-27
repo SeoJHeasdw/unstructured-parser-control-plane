@@ -117,6 +117,8 @@ export default function LiveWorkspace({ active = true, route, onRoute, onFamily,
  listQuery.current = {q: searched, status: filter, format, sort};
  const loadedCount = useRef(0);
  loadedCount.current = documents.length;
+ // 조건(검색·상태·확장자·정렬)이 바뀔 때만 올린다. '더 보기' 응답은 조건이 그대로면 처리 중 주기적 다시 읽기와 겹쳐도 버리지 않는다.
+ const queryVersion = useRef(0);
  useEffect(() => { const timer = window.setTimeout(() => setSearched(query), 250); return () => window.clearTimeout(timer); }, [query]);
  const detail = detailRead?.id === selectedId ? detailRead : undefined;
  const listed = documents.find(doc => doc.id === selectedId) ?? outside.find(doc => doc.id === selectedId);
@@ -198,11 +200,12 @@ export default function LiveWorkspace({ active = true, route, onRoute, onFamily,
   const isCurrent = () => mounted.current && latestListRequest.current === request;
   const q = listQuery.current;
   const limit = Math.min(REFRESH_MAX, Math.max(PAGE, reset ? restoreCount.current : loadedCount.current));
-  if (reset) restoreCount.current = PAGE;
+  if (reset) { restoreCount.current = PAGE; queryVersion.current += 1; }
   try {
    const body = await listDocumentPage({q: q.q, status: q.status, format: q.format, sort: q.sort, limit});
    if (!isCurrent()) return;
    const changedDuringRead = before !== mutationVersion.current;
+   let keptTail = 0;
    setDocuments(previous => {
     const known = new Map(previous.map(doc => [doc.id, doc]));
     const merged = body.documents.map(doc => {
@@ -211,9 +214,19 @@ export default function LiveWorkspace({ active = true, route, onRoute, onFamily,
      return cached && Date.parse(cached.updated_at) > Date.parse(doc.updated_at) ? {...cached, qc: doc.qc ?? cached.qc} : doc;
     });
     // A file added during this read may be absent from the server snapshot.
-    return changedDuringRead ? [...known.values(), ...merged] : merged;
+    if (reset) return changedDuringRead ? [...known.values(), ...merged] : merged;
+    // 처리 중 다시 읽기: 처음부터 limit개 범위만 새로 받았다. 그 범위 밖에서 '더 보기'로 이어 받은 행은 순서대로 남긴다
+    // (다시 읽기가 '더 보기'보다 먼저 시작해 늦게 끝나도 이어 받은 행이 사라지지 않게).
+    const inWindow = new Set(body.documents.map(doc => doc.id));
+    const tail = previous.slice(limit).filter(doc => !inWindow.has(doc.id));
+    const added = changedDuringRead ? previous.slice(0, limit).filter(doc => !inWindow.has(doc.id)) : [];
+    keptTail = tail.length;
+    return [...added, ...merged, ...tail];
    });
-   setListMeta({total: body.total, next: body.next_cursor, facets: body.facets, legacy: !!body.legacy});
+   // 이어 받은 행이 남아 있으면 다음 쪽 위치도 그 끝(앞서 '더 보기'가 받은 커서)을 그대로 쓴다.
+   // (setDocuments의 갱신 함수가 먼저 돈다: 같은 렌더에서 documents 훅이 listMeta 훅보다 앞에 있다. 받은 행 수로도 한 번 더 본다.)
+   setListMeta(meta => ({total: body.total, next: !reset && (keptTail || loadedCount.current > limit) ? meta.next : body.next_cursor,
+     facets: body.facets, legacy: !!body.legacy}));
    setListError('');
    // 지금 쪽 밖에서 처리 중인 문서(이 화면이 접수한 것)는 따로 묻는다: 완료 알림을 놓치지 않게.
    const inWindow = new Set(body.documents.map(doc => doc.id));
@@ -230,10 +243,10 @@ export default function LiveWorkspace({ active = true, route, onRoute, onFamily,
   if (!listMeta.next || loadingMore || listMeta.legacy) return;
   setLoadingMore(true);
   const q = listQuery.current;
-  const request = latestListRequest.current;
+  const version = queryVersion.current;
   try {
    const body = await listDocumentPage({q: q.q, status: q.status, format: q.format, sort: q.sort, cursor: listMeta.next, limit: PAGE});
-   if (!mounted.current || request !== latestListRequest.current) return;
+   if (!mounted.current || version !== queryVersion.current) return;  // 그 사이 조건이 바뀌었다
    setDocuments(previous => { const ids = new Set(previous.map(doc => doc.id)); return [...previous, ...body.documents.filter(doc => !ids.has(doc.id))]; });
    setListMeta(meta => ({...meta, total: body.total, next: body.next_cursor, facets: body.facets}));
   } catch (error) { if (mounted.current) setActionError(displayError(error)); }
@@ -432,7 +445,7 @@ export default function LiveWorkspace({ active = true, route, onRoute, onFamily,
              e.preventDefault(); selectDocument(doc.id);
            }}>
              <span className="lw-file"><FileGlyph format={doc.format}/><span className="lw-file-copy"><FileName name={doc.name}/><small><DocNumber seq={doc.seq}/>{statusNote(doc) ?? `${doc.format || '확장자 없음'} · ${displaySize(doc.size_bytes)}`}</small></span></span>
-             <span className="lw-status-cell"><StatusBadge status={displayStatus(doc)}/>{doc.qc?.state && <QcStateBadge state={doc.qc.state} unresolved={doc.qc.unresolved} label={doc.qc.label} previous={doc.qc.previous} />}</span>
+             <span className="lw-status-cell"><StatusBadge status={displayStatus(doc)}/>{doc.qc?.state && <QcStateBadge state={doc.qc.state} unresolved={doc.qc.unresolved} label={doc.qc.label} previous={doc.qc.previous} wrong={doc.qc.wrong} />}</span>
              <time dateTime={doc.updated_at}>{displayDate(doc.updated_at)}</time>
            </a></li>)}</ul>
            {remaining > 0 && !legacy && <div className="lw-more"><button className="lw-btn" onClick={() => void loadMore()} disabled={loadingMore || !listMeta.next}>

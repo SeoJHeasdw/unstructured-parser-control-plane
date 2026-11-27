@@ -4,7 +4,9 @@ export type LiveStatus = 'uploaded' | 'processing' | 'completed' | 'failed' | 'u
 /** 자동 대조 판정 상태(최신 성공 실행, 사람 판정 합침). pending: 미평가 · unavailable: 원본을 읽을 수 없어 대조 못 함 */
 export type QcState = 'pending' | 'needs_review' | 'undetermined' | 'pass_candidate' | 'unavailable';
 /** previous: 지금 처리 중이거나 실패해서, 이 판정은 이전 성공본의 것(label에 '이전 성공본 · …'). 현재 판정 수에 넣지 않는다. */
-export type DocQc = { state: QcState; label: string; unresolved: number | null; previous?: boolean };
+export type DocQc = { state: QcState; label: string; unresolved: number | null; previous?: boolean;
+ /** 사람이 '틀림'으로 확인한 검수 요청 수(확인된 오류). 미해결이 0이어도 검수 필요인 까닭. */
+ wrong?: number };
 /** qc: 목록 질의(쪽 단위)에만 붙는다. 전체 목록(예전 호환)에는 없다. */
 export type LiveDoc = { id: string; name: string; format: string; size_bytes: number; status: LiveStatus; created_at: string; updated_at: string; parser: string | null; error: string | null; error_code?: string | null; seq?: number | null; qc?: DocQc | null };
 export type LiveResult = { id: string; markdown: string; parser: string; parser_version: string; is_stale: boolean; fidelity?: {findings?: {message: string}[]} | null; warnings: string[] };

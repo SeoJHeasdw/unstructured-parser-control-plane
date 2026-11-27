@@ -539,9 +539,9 @@ class DocumentService:
         run = self._run_for(doc_id, run_id)
         header = self.ensure_qc(doc_id, run["run_id"])
         verdicts, counts = self.repo.review_verdicts(doc_id, run["run_id"])
-        exclude = {fid for fid, status in verdicts.items() if status != "open"} if unreviewed else None
         spots, matched = self.repo.qc_findings(doc_id, run["run_id"], qc.rule_key(), severity=severity, unit=unit, kind=kind,
-                                               order=order, offset=offset, limit=limit, exclude=exclude)
+                                               order=order, offset=offset, limit=limit,
+                                               exclude_statuses=("correct", "wrong", "unclear") if unreviewed else None)
         top_spots, _ = self.repo.qc_findings(doc_id, run["run_id"], qc.rule_key(), order="priority", limit=20)
         stale = not run["is_latest"] or doc["status"] != "completed"
         history = self.repo.qc_history(doc_id, run["run_id"], qc.rule_key())
@@ -573,7 +573,7 @@ class DocumentService:
             if review["finding_id"] and review["finding_id"] not in by_finding:
                 by_finding[review["finding_id"]] = review
         resolved = {fid for fid, review in by_finding.items() if review["status"] == "correct"}
-        spots, _ = self.repo.qc_findings(doc_id, run_id, qc.rule_key(), order="priority", limit=limit, exclude=resolved)
+        spots, _ = self.repo.qc_findings(doc_id, run_id, qc.rule_key(), order="priority", limit=limit, exclude_statuses=("correct",))
         entries: list[dict] = []
         for spot in spots:
             review = by_finding.get(spot.get("id") or "")
@@ -679,7 +679,7 @@ class DocumentService:
             if previous:
                 # 지금 처리 중·실패: 판정은 이전 성공본의 것이다. 상태 이름에 붙여 현재 결과와 구별한다.
                 label = f"이전 성공본 · {label}"
-            doc["qc"] = {"state": state, "label": label, "previous": previous,
+            doc["qc"] = {"state": state, "label": label, "previous": previous, "wrong": (row["reviews"].get("wrong", 0) if row else 0),
                          "unresolved": max(0, (row["spots_total"] or 0) - row["resolved"]) if row and state not in (None, "pending", "unavailable") else None} if state else None
 
     # ------------------------------------------------------------ 검수 요청(V번호)

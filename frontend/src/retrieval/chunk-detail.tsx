@@ -120,7 +120,9 @@ function ChunkPane({ source, column, chunk, number, byEl }: { source: ChunkSourc
             <b className={`cb-qc-sev is-${spot.severity}`}>{spot.key.startsWith('V') ? '' : `${spot.key} · `}{SEVERITY_WORD[spot.severity] ?? spot.severity}</b>
           </span>
           <span className="cb-qc-body">{spot.message}{spot.source_layer === 'pdf_hidden_layer' ? ' (보이지 않는 글자 층)' : ''}
-            {(spot.source_hit || spot.result_hit) && <small>원본 '{spot.source_hit || '—'}' → 결과 '{spot.result_hit || '없음'}'</small>}
+            {spot.source_layer === 'pdf_hidden_layer' && spot.kind === 'hidden_layer'
+              ? spot.source_hit && <small>숨은 글자 층 '{spot.source_hit}' (화면 값 미확인)</small>
+              : (spot.source_hit || spot.result_hit) && <small>원본 '{spot.source_hit || '—'}' → 결과 '{spot.result_hit || '없음'}'</small>}
             {spot.review?.comment && <small className="cb-qc-memo">검수 메모: {spot.review.comment}</small>}
             {findingWhere(spot) && <small>{findingWhere(spot)}</small>}</span>
           <a href={workspaceHref({ page: 'live', doc: source.doc_id!, review: 'source', focus: { check, run: source.run_id ?? undefined,
