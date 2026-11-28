@@ -40,7 +40,7 @@ run.cmd
 
 | 명령 | 옵션 | 하는 일 |
 |---|---|---|
-| setup | (없음) | **전체 모드.** Docling을 넣어 PDF·DOCX·PPTX·XLSX·XLSM과 TXT·CSV·MD·LOG를 모두 파싱합니다. Python 3.12가 필요합니다. |
+| setup | (없음) | **전체 모드.** Docling을 넣어 PDF·DOCX·DOCM·PPTX·XLSX·XLSM·HTM·MHT와 TXT·CSV·MD·LOG·EML·MSG를 모두 파싱합니다. Python 3.12가 필요합니다. |
 | setup | `--lite` | **가벼운 모드.** Docling 없이 TXT·CSV·MD·LOG만 파싱합니다. Python 3.12~3.15에서 되며, 화면만 볼 때나 3.12가 없는 PC용입니다. |
 | setup | `--offline` | 준비된 ZIP에 든 휠과 화면 빌드만 씁니다(네트워크 없음). |
 | setup | `--models <ZIP>` | PDF 모델을 받지 않고, 다른 PC에서 만든 모델 ZIP(또는 모델 폴더)을 검증해 설치합니다. `huggingface.co`가 막힌 PC용입니다. |
@@ -121,7 +121,7 @@ setup.cmd --models C:\경로\docling-pdf-models.zip
 - 실제 원본·결과·이력은 `runtime/`에 저장됩니다(`DOCOPS_RUNTIME_DIR`로 바꿀 수 있음). Git에는 올리지 않습니다.
 
 **파싱**
-- 파서는 확장자로 고릅니다. TXT·CSV·MD·LOG는 내장 파서, PDF·DOCX·PPTX·XLSX·XLSM은 Docling(PDF 모델이 없으면 PDF는 글자 층 파서), 이미지는 OCR 모델이 맡습니다. EML 메일은 헤더·본문·첨부 목록을 내장 파서로 읽습니다(첨부 본문은 읽지 않음). HWP/HWPX, ZIP 안 파일, 메일 첨부의 본문은 파싱하지 않고 구조 분석에서 목록만 보여 줍니다. 지원하지 않는 형식은 `unsupported`가 됩니다.
+- 파서는 확장자로 고릅니다. TXT·CSV·MD·LOG는 내장 파서, PDF·DOCX·DOCM·PPTX·XLSX·XLSM과 HTM·MHT 웹 문서는 Docling(PDF 모델이 없으면 PDF는 글자 층 파서), 이미지는 OCR 모델이 맡습니다. EML·MSG 메일은 헤더·본문·첨부 목록을 내장 파서로 읽습니다(첨부 본문은 읽지 않음, MSG의 압축 RTF 본문은 아직 읽지 않음). HWP/HWPX, 구형 Office(DOC·XLS·PPT), ZIP 안 파일, 메일 첨부의 본문은 파싱하지 않고 구조 분석에서 목록만 보여 줍니다. 지원하지 않는 형식은 `unsupported`가 됩니다.
 - **파싱 성공이 품질 보증은 아닙니다.** Docling 결과는 합성 문서로만 확인했고, 실제 고객 문서 품질은 아직 평가하지 않았습니다. 복잡한 표나 원문 위치가 정확하다고 보장하지 않습니다.
 - 파서를 부르기 전에 내용 서명을 확인합니다. DRM, 암호, 확장자 불일치는 사유 코드(`error_code`)를 붙여 실패로 남깁니다. DRM은 판별만 하므로 해제본이 필요합니다.
 - DOCX·XLSX·XLSM·PPTX는 사본에서 기호 글꼴과 첨자를 보정한 뒤 파싱합니다. 원문과 대조해 특수기호 손실, 병합 셀, 흰색 글자, 읽지 않은 그림을 경고합니다.

@@ -9,7 +9,8 @@ from app.adapters.text import TextAdapter
 from app.config import Settings
 from app.docling_models import missing_files
 
-DOCLING_FORMATS = {"PDF", "DOCX", "PPTX", "XLSX", "XLSM"}  # XLSM: 매크로 사용 통합문서. 셀만 읽고 매크로는 실행하지 않는다.
+DOCLING_FORMATS = {"PDF", "DOCX", "DOCM", "PPTX", "XLSX", "XLSM"}  # DOCM·XLSM: 매크로 사용 문서. 본문만 읽고 매크로는 실행하지 않는다.
+WEB_FORMATS = {"HTM", "HTML", "MHT", "MHTML"}  # HTML은 Docling HTML 처리기, MHT는 대표 HTML 부분을 풀어 같은 경로
 
 PARSER_BY_EXTENSION = {
     **dict.fromkeys(sorted(DOCLING_FORMATS), "docling"),
@@ -17,7 +18,9 @@ PARSER_BY_EXTENSION = {
     "CSV": "python-csv",
     **dict.fromkeys(sorted(IMAGE_FORMATS), "ocr-model"),
     "SVG": "python-svg",
-    "EML": "python-eml",   # 2026-11-27: 메일 본문·헤더·첨부 목록(첨부 본문은 읽지 않음)
+    **dict.fromkeys(sorted(WEB_FORMATS), "docling"),
+    "EML": "python-eml",   # 메일 본문·헤더·첨부 목록(첨부 본문은 읽지 않음)
+    "MSG": "python-msg",   # Outlook 메일. EML과 같은 결과 모양
 }
 
 class ParserRegistry:
@@ -47,6 +50,12 @@ class ParserRegistry:
         if extension == "EML":
             from app.adapters.eml import parse_eml
             return parse_eml(path, self.settings)
+        if extension == "MSG":
+            from app.adapters.msg import parse_msg
+            return parse_msg(path, self.settings)
+        if extension in WEB_FORMATS:
+            from app.adapters.html import parse_html
+            return parse_html(path, extension, self.settings)
         if extension in IMAGE_FORMATS:
             return parse_image(path, extension, self.settings)
         if extension in TEXT_FORMATS:

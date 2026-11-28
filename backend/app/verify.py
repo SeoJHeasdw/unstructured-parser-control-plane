@@ -373,6 +373,12 @@ class Verifier:
         if self.fmt in ("XLSX", "XLSM"):
             self.reasons.append(reason("shared_layer", "파서와 대조 기준이 같은 저장 값입니다. 빠진 시트·행·칸은 찾지만 저장 값 자체가 맞는지는 확인하지 않습니다.",
                                        blocking=False))
+        if self.fmt == "MSG":
+            self.reasons.append(reason("shared_layer", "파서와 대조 기준이 같은 MSG 속성 스트림입니다. 빠진 헤더·본문 줄·첨부는 찾지만 속성 값 자체가 맞는지는 확인하지 않습니다.",
+                                       blocking=False))
+        if self.source.unread:
+            self.reasons.append(reason("source_unread", "원본에 있지만 대조 기준으로 읽지 못한 부분: " + ", ".join(self.source.unread[:4])
+                                       + (f" 외 {len(self.source.unread) - 4}개" if len(self.source.unread) > 4 else "") + ". 사람이 원본을 열어 확인해야 합니다."))
         if not self.contract and self.fmt != "CSV":
             self.reasons.append(reason("no_contract", f"{self.fmt + ' ' if self.fmt else '이 '}형식은 아직 통과 후보 기준(형식 계약)을 검증하지 않았습니다. 기록 모드로 사람이 계속 검수합니다."))
         if self.chart_tally:
@@ -398,7 +404,7 @@ class Verifier:
         excluded = sum(1 for u in units if u["state"] in ("hidden", "empty"))
         unverified = sum(1 for u in units if u["state"] in ("scan", "garbled"))
         label = "제자리 셀 값" if self.fmt in ("CSV", "XLSX", "XLSM") else "본문 글자 보존"
-        independent = not (self.fmt == "PDF" and self.parser == "pdf-text") and self.fmt not in ("XLSX", "XLSM")
+        independent = not (self.fmt == "PDF" and self.parser == "pdf-text") and self.fmt not in ("XLSX", "XLSM", "MSG")
         self.checks.insert(0, {"id": "preserved", "label": label, "method": self.source.method, "source_layer": self.source.layer,
                                "derived_from": "independent" if independent else "same_layer",
                                "units": len(units), "checked": checked, "excluded": excluded, "unverified": unverified,

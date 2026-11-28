@@ -121,7 +121,7 @@ flowchart LR
 
 ### 자동 대조가 보는 것과 보지 않는 것
 
-- **원본 글자**(`app/source_text.py`, `GET /api/live/documents/{id}/source-text`): PDF 쪽마다 글자 층(pypdfium2), DOCX 본문 순서의 문단·표 행·글상자와 머리말·꼬리말·각주(기호 글꼴·첨자는 사본 보정과 같은 기준으로 유니코드, 숨김 서식 글자는 뺌), PPTX 슬라이드마다 도형 순서의 글자·표 행·발표자 메모, XLSX·XLSM 시트마다 저장된 셀 값과 주소(표기 후보: 정수·백분율·날짜, Docling이 있으면 같은 서식 표기), TXT·MD·LOG 원본 줄, CSV 행·칸. 이미지·SVG는 글자 층이 없다(409).
+- **원본 글자**(`app/source_text.py`, `GET /api/live/documents/{id}/source-text`): PDF 쪽마다 글자 층(pypdfium2), DOCX 본문 순서의 문단·표 행·글상자와 머리말·꼬리말·각주(기호 글꼴·첨자는 사본 보정과 같은 기준으로 유니코드, 숨김 서식 글자는 뺌), PPTX 슬라이드마다 도형 순서의 글자·표 행·발표자 메모, XLSX·XLSM 시트마다 저장된 셀 값과 주소(표기 후보: 정수·백분율·날짜, Docling이 있으면 같은 서식 표기), TXT·MD·LOG 원본 줄, CSV 행·칸, HTM·HTML·MHT 화면에 보이는 블록·표 행(표준 라이브러리 해석, 숨긴 요소는 뺌), EML·MSG 헤더·본문·첨부 이름(MSG는 파서와 같은 속성 스트림이라 `same_layer`, 압축 RTF로만 된 본문은 `source_unread`로 판정 불가). 이미지·SVG는 글자 층이 없다(409).
 - **대조**(`app/verify.py`, `GET /api/live/documents/{id}/verify`): 결과의 원문 위치(쪽·시트·행·열)로 같은 단위끼리 비교한다. 줄은 공백·표 칸 구분·글머리 기호·Markdown 꾸밈·이스케이프를 빼고 찾고, 없으면 가장 비슷한 결과 줄과 낱말 단위로 맞춰 빠지거나 바뀐 부분만 고른다. 같은 단위의 다른 곳에 있으면(줄바꿈·표 칸·순서 차이) 빼고, 같은 글이 원본에 여러 번 나오면 그 개수까지 본다. 표는 칸 대 칸으로 본다. 쪽의 위·아래 끝에 되풀이되는 줄(머리말·꼬리말·쪽 번호)과 원본에서 숨긴 시트·슬라이드(결과에 없으면 안내만)는 의심 지점으로 올리지 않는다. 숫자·`%`·부등호·특수기호가 바뀌거나 빠지면 높음.
 - **의심 지점 종류**: `changed`(바뀜) · `missing`(빠짐, 반복 문단 하나가 빠진 경우 포함) · `moved`(다른 단위에만 있음) · `symbol`(기호 개수 차이) · `extra_number`(결과에만 있는 숫자) · `garbled`(깨진 글자) · `cell_changed`·`cell_missing`·`cell_moved`(표 칸) · `unit_missing`(쪽·슬라이드 대부분 없음) · `scan_ocr`·`scan_empty`(글자 층 없는 쪽) · `source_garbled`(원본 글자 층 깨짐) · `image_ocr`(그림 OCR 줄·이미지 원본). 2026-11-27 추가: CSV 주소별 대조의 `cell_swapped`(같은 행 두 칸 맞바뀜)·`cell_added`(빈 칸에 생긴 값)·`row_extra`(결과에만 있는 행·중복 행)·`row_missing`·`row_moved`·`grid_width`(열 수 다름), PDF의 `hidden_layer`(그림 위 보이지 않는 글자 층 값: 화면 값으로 확인되지 않음)·`hidden_conflict`(숨은 층 값과 그림 OCR 값이 다름), 통합문서 차트의 `chart_conflict`(차트에 저장된 (범주, 값)과 원본 셀이 다름, 점 개수 차이). 리뷰 반영(같은 날): CSV·XLSX의 칸 차이는 칸마다 하나, 단위별 상세 상한은 없고 전체 2만 곳을 넘은 차이는 '상세 없음'으로 미해결에 센다. `hidden_conflict`는 같은 그림의 OCR과 항목·값·단위를 한 벌로 비교한 결과다.
 - **판정 상태(gate, 2026-11-27)**: 확인 안 된 의심점·열린 검수 요청·틀림이 있으면 `검수 필요`, 의심점은 없어도 검사하지 못한 범위·근거(스캔 쪽, 같은 원천을 두 번 읽음, 형식 계약 없음, 숨은 글자 층, 차트 캐시 없음 등)가 있으면 `판정 불가`, 다 채우면 `통과 후보`. 통과 후보는 **기록 모드**라 자동 통과가 아니다(사람 검수를 이어 감). 지금 통과 후보 기준이 있는 형식은 구분자·인코딩이 확정된 직사각 CSV뿐이다.
@@ -193,7 +193,15 @@ flowchart LR
 | `merged` | 병합 셀(값 반복 가능) | 충실도 `merged_cells` |
 | `supplement` | 원문에서 보충 추출해 끝에 덧붙임 | 충실도 `supplemented` |
 | `img-ocr` | 그림 OCR 검토 필요 | 충실도 `image_ocr_review` |
-| `img-skip` | OCR하지 않은 래스터 그림 | 충실도 `images_not_read` |
+| `img-skip` | OCR하지 않은 래스터 그림. 메일 본문 그림·HTML 그림(읽지 않음)도 같은 코드 | 충실도 `images_not_read`, EML·MSG·HTML 어댑터 |
+| `macro` | 매크로(VBA) 포함·읽지 못함·소스 없는 모듈. 실행하지 않음 | `vba.parse_notes`(XLSX·XLSM·DOCX·DOCM) |
+| `attach-list` | 메일 첨부는 목록만, 첨부 본문은 읽지 않음 | EML·MSG 어댑터 |
+| `mail-deep` | 첨부 메일이 3단계보다 깊어 아래는 펼치지 않음 | EML·MSG 어댑터 |
+| `rtf-skip` | 메일 본문이 압축 RTF로만 저장되어 읽지 않음 | `adapters/msg.RTF_WARNING` |
+| `no-body` | 본문 없이 첨부만 있는 메일(실패 아님) | EML·MSG 어댑터 |
+| `signed` | 서명된 메일(S/MIME). 서명 확인 안 함 | MSG 어댑터 |
+| `enc-guess` | 인코딩 선언이 없어 추정해 읽음(HTML, MSG 문자열) | `adapters/html.GUESS_WARNING`, `adapters/msg.CODEPAGE_WARNING` |
+| `enc-mis` | 선언한 인코딩으로 읽히지 않아 다른 인코딩으로 읽음 | HTML 어댑터 |
 | `svg` | SVG 처리 경고 | SVG 어댑터 |
 | `other` | 분류 안 된 경고(`doc`에서 원문 확인) | — |
 

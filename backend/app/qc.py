@@ -12,14 +12,29 @@ import unicodedata
 # 사람이 읽는 규칙 이름. 원장의 실제 키는 rule_key()다.
 RULE_VERSION = "verify-2026.11.28"
 # 원장 결과에 영향을 주는 모듈. 파서 모듈은 넣지 않는다(파싱 결과는 실행마다 저장돼 있다).
-_RULE_MODULES = ("qc.py", "verify.py", "source_text.py", "pdf_layers.py", "xlsx_charts.py", "textnorm.py",
-                 "adapters/text.py", "adapters/eml.py", "fidelity/probe.py", "fidelity/report.py", "format_gate.py")
+_RULE_MODULES = ("qc.py", "verify.py", "source_text.py", "pdf_layers.py", "xlsx_charts.py", "textnorm.py", "msg.py", "cfb.py",
+                 "adapters/text.py", "adapters/eml.py", "adapters/html.py", "fidelity/probe.py", "fidelity/report.py", "format_gate.py")
 _RULE_PACKAGES = ("pypdfium2", "openpyxl", "docling")
 _rule_key: str | None = None
 
 
+def code_fingerprint(source: bytes) -> bytes:
+    """모듈의 실행 구조(AST, docstring 제외). 주석·docstring·줄 배치만 바뀌면 같다."""
+    import ast
+    try:
+        tree = ast.parse(source)
+    except (SyntaxError, ValueError):
+        return source
+    for node in ast.walk(tree):
+        body = getattr(node, "body", None)
+        if (isinstance(node, (ast.Module, ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef)) and body
+                and isinstance(body[0], ast.Expr) and isinstance(body[0].value, ast.Constant) and isinstance(body[0].value.value, str)):
+            node.body = body[1:] or [ast.Pass()]
+    return ast.dump(tree, annotate_fields=False, include_attributes=False).encode()
+
+
 def rule_key() -> str:
-    """원장 키: RULE_VERSION + 대조 코드·원본 읽기 라이브러리 버전의 지문 10자."""
+    """원장 키: RULE_VERSION + 대조 코드(실행 구조)·원본 읽기 라이브러리 버전의 지문 10자."""
     global _rule_key
     if _rule_key is None:
         import importlib.metadata
@@ -30,7 +45,7 @@ def rule_key() -> str:
         for name in _RULE_MODULES:
             path = root / name
             digest.update(name.encode())
-            digest.update(path.read_bytes() if path.is_file() else b"-")
+            digest.update(code_fingerprint(path.read_bytes()) if path.is_file() else b"-")
         for package in _RULE_PACKAGES:
             try:
                 digest.update(f"{package}={importlib.metadata.version(package)}".encode())

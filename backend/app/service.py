@@ -356,9 +356,9 @@ class DocumentService:
                         except Exception as exc:
                             logger.warning("Fidelity check skipped (%s)", type(exc).__name__)
                             warnings.append(FIDELITY_FAILED_WARNING)
-                        if extension in WORKBOOKS:
-                            # 이름만 .xlsx로 바꾼 매크로 통합문서도 같은 경고를 받는다.
-                            warnings.extend(macro_notes(path))
+                        if extension in WORKBOOKS or extension in ("DOCX", "DOCM"):
+                            # 이름만 .xlsx·.docx로 바꾼 매크로 문서도 같은 경고를 받는다.
+                            warnings.extend(macro_notes(path, workbook=extension in WORKBOOKS))
                         if not markdown.strip():
                             raise ParserError("Office 본문·그림에서 글자를 추출하지 못했습니다. " + " ".join(warnings[:2]), code="no_text")
                     output.write(markdown)

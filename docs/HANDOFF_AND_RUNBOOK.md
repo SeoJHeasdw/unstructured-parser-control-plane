@@ -2,13 +2,13 @@
 
 이 문서는 현재 상태와 실행·점검 방법만 담는다. 세션별 작업 기록은 [작업 이력](HISTORY.md)으로 옮겼다(필요할 때만 연다). §1 이후는 2026-11-12에 쓴 실행 안내가 바탕이다. 코드·실행 상태·의존성·데이터는 바뀔 수 있으므로 새 세션에서는 §1의 확인 순서부터 진행한다. 이 문서는 요구사항이나 고객 환경이 확정되었다는 뜻이 아니다.
 
-## 0. 현재 상태 (2026-11-27)
+## 0. 현재 상태 (2026-11-28)
 
 ### 들어가 있는 것
 
 - 설치·실행: `setup`·`run`(로직은 `scripts/console.py`). 기본 설치에 Docling 포함, `--lite`에서만 빠진다. 화면 빌드는 `frontend/dist/docops-build.json`의 빌드 기록이 지금 소스와 같을 때만 다시 쓴다.
-- 파서: Docling(DOCX·PPTX·XLSX·XLSM, PDF 모델이 있으면 PDF), PDF 모델이 없으면 글자 층만 읽는 `pdf-text`, 텍스트·CSV(원천 형식 지정으로 다시 파싱), EML(`python-eml`). 스캔 쪽과 그림 글자는 연결한 문서 OCR 모델로만 읽는다.
-- 검수: 자동 대조 원장(`qc_runs`·`qc_findings`), 판정 상태(검수 필요 → 판정 불가 → 통과 후보, 자동 통과 없음), 검수 요청(V번호), 숨은 글자 층·차트 캐시 대조. 대조 규칙이 바뀌면 서버 시작 때 최신 성공 실행을 다시 대조한다(`DOCOPS_QC_REVERIFY`).
+- 파서: Docling(DOCX·DOCM·PPTX·XLSX·XLSM, HTM·MHT, PDF 모델이 있으면 PDF), PDF 모델이 없으면 글자 층만 읽는 `pdf-text`, 텍스트·CSV(원천 형식 지정으로 다시 파싱), EML(`python-eml`)·MSG(`python-msg`). 처음 받은 19개 형식 중 DOC·XLS·PPT·ZIP만 경로가 없다. 스캔 쪽과 그림 글자는 연결한 문서 OCR 모델로만 읽는다.
+- 검수: 자동 대조 원장(`qc_runs`·`qc_findings`), 판정 상태(검수 필요 → 판정 불가 → 통과 후보, 자동 통과 없음), 검수 요청(V번호), 숨은 글자 층·차트 캐시 대조. 대조 규칙이 바뀌면 서버 시작 때 최신 성공 실행을 다시 대조한다(`DOCOPS_QC_REVERIFY`). 규칙 키는 대조 코드의 실행 구조(AST) 지문이라 주석·docstring만 고친 업데이트로는 다시 대조하지 않는다.
 - 작업 에이전트 도구(MCP·CLI): 파싱 대행이 아니라 검수 보조다. [작업 에이전트 도구](AGENT_TOOLS.md).
 - 허용 폴더에서 가져오기: 브라우저 파일 첨부가 막힌 PC용. 가져오기는 저장만 하고 파싱은 사용자가 누를 때 접수한다.
 
@@ -25,7 +25,7 @@
 
 - 고객사 Windows PC와 실제 고객 문서: 시작 시 다시 대조에 걸리는 시간, 자동 대조의 오통과·오탐, 검수 시간, 사내 모델이 작업 도구를 잘 고르는지, Edge에서의 원문 대조 화면.
 - 실제 OCR 모델 출력: 숨은 글자 층 대조의 항목 이름 표기, OCR을 붙인 스캔 쪽(가짜 OCR 서버로만 확인).
-- Excel이 저장한 실제 차트(날짜 범주·여러 영역·이름 정의), 1,001시트 실제 통합문서의 원장 크기, 실제 MSG·TAR.
+- Excel이 저장한 실제 차트(날짜 범주·여러 영역·이름 정의), 1,001시트 실제 통합문서의 원장 크기, Outlook이 저장한 실제 MSG, Word·IE가 저장한 실제 HTM·MHT, 실제 DOCM, TAR.
 - 흰 글자·클리핑·덮어쓰기 같은 다른 숨김.
 - 실제 PDF 모델 파일로 모델 ZIP 묶기·설치.
 
@@ -39,6 +39,7 @@
 4. 표 헤더 계보·병합 범위, 표 구조와 읽는 순서 대조.
 5. XLSX 시트·셀 주소를 청크 위치로 쓴다.
 6. OCR 캐시 영속화와 PDF 변환 프로세스 격리(Windows 측정 후), BOM 없는 UTF-16, ZIP 목록 모드.
+6-1. 남은 형식: 구형 Office(DOC·XLS·PPT)는 LibreOffice 없이 순수 파이썬으로(XLS는 BIFF 셀 값, DOC·PPT는 글자 층부터), MSG의 압축 RTF 본문([MS-OXRTFCP] 풀기 + RTF 글 추출), ZIP 안 파일을 하위 문서로 등록할지.
 7. 작업 에이전트 2~4단계: 청킹·임베딩 평가, Milvus 적재(계획→실행 분리, 실행만 승인), 검색.
 8. 고객사 PDF를 어디서 어떤 방식으로 파싱할지 정한다.
 
@@ -87,12 +88,13 @@ Mock API 오류나 로딩 중에도 실제 처리 탭으로 이동할 수 있으
 실제 라우팅은 `backend/app/adapters/registry.py`가 정한다. 경로는 확장자로 고르고, 파서 전에 내용 서명으로 DRM·암호·형식 불일치를 걸러 `error_code`로 남긴다.
 
 - `TXT`, `MD`, `LOG`는 `python-text`, `CSV`는 `python-csv`(Markdown 표). 인코딩·구분자 판정 근거를 실행 `evidence`에 남기고, 확정하지 못하면 판정 불가로 둔다. 원천 형식(인코딩·구분자)을 지정해 다시 파싱할 수 있다.
-- `DOCX`, `PPTX`, `XLSX`, `XLSM`은 Docling. OOXML은 기호 글꼴·첨자 사본 보정과 원문 대조(`fidelity`)를 거친다. XLSM 매크로는 실행하지 않는다.
+- `DOCX`, `DOCM`, `PPTX`, `XLSX`, `XLSM`은 Docling. OOXML은 기호 글꼴·첨자 사본 보정과 원문 대조(`fidelity`)를 거친다. XLSM 매크로는 실행하지 않는다.
 - `PDF`는 PDF 모델이 있으면 Docling, 없으면 글자 층만 읽는 `pdf-text`.
-- `EML`은 `python-eml`(헤더·본문·첨부 목록, 첨부 본문은 읽지 않음), `SVG`는 `python-svg`.
+- `EML`은 `python-eml`, `MSG`는 `python-msg`(둘 다 헤더·본문·첨부 목록, 첨부 본문은 읽지 않음. MSG의 압축 RTF 본문은 아직 읽지 않음), `SVG`는 `python-svg`.
+- `DOCM`은 DOCX 경로(매크로 미실행), `HTM`·`HTML`·`MHT`·`MHTML`은 Docling HTML 처리기(인코딩 근거를 실행에 남김, 외부 자원 안 엶).
 - 스캔 쪽과 그림의 글자는 연결한 문서 OCR 모델(OpenAI 호환 비전 API)로만 읽는다. 대상은 PDF의 글자 층 없는 쪽과 큰 그림, Office·SVG 속 그림, PNG·JPEG·BMP·TIFF·GIF·WebP(`ocr-model`)다. 적용 여부는 각 실행 이력에서 확인한다.
 - 복잡한 표와 원문 쪽·시트·셀 위치가 정확하게 추출된다고 보장하지 않는다. 파싱 성공은 품질 보증이 아니며, 자동 대조와 사람 검수가 따로 있다.
-- HWP/HWPX·ZIP 내부 분리·메일 첨부 본문·kordoc·Excel 외부 참조 연결·검색 인덱싱은 실제 파서에 연결되지 않았다. 지원하지 않는 형식은 `unsupported`로 드러난다.
+- HWP/HWPX·구형 Office(DOC·XLS·PPT)·ZIP 내부 분리·메일 첨부 본문·MSG의 압축 RTF 본문·kordoc·Excel 외부 참조 연결·검색 인덱싱은 실제 파서에 연결되지 않았다. 지원하지 않는 형식은 `unsupported`로 드러난다.
 
 ### 파일과 로컬 상태
 

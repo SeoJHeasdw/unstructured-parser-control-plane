@@ -26,8 +26,30 @@ PICTURE_LABEL = "[그림 속 글자]"
 MAX_OFFICE_ENTRIES = 10_000
 # 워크시트 형식. XLSM(매크로 사용 통합문서)도 본문은 XLSX와 같은 SpreadsheetML이라 같은 Docling 경로로 읽는다.
 WORKBOOKS = {"XLSX", "XLSM"}
-OFFICE = {"DOCX", "PPTX", *WORKBOOKS}
+OFFICE = {"DOCX", "DOCM", "PPTX", *WORKBOOKS}
 LOCATED = {"PDF", "PPTX", *WORKBOOKS}  # 원문 위치를 남기는 형식: PDF 쪽, PPTX 슬라이드, 워크시트 행
+# python-docx(Docling Word 처리기)는 매크로 사용 문서의 본문 형식을 받지 않는다. 내용 형식만 DOCX로 바꾼 사본을 읽는다.
+_MACRO_WORD = b"application/vnd.ms-word.document.macroEnabled.main+xml"
+_PLAIN_WORD = b"application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"
+
+
+def _word_source(path: Path):
+    """매크로 사용 Word 문서면 내용 형식만 DOCX로 바꾼 메모리 사본(DocumentStream), 아니면 원래 경로."""
+    import io
+    with zipfile.ZipFile(path) as archive:
+        try:
+            types = archive.read("[Content_Types].xml")
+        except KeyError:
+            return path
+        if _MACRO_WORD not in types:
+            return path
+        from docling.datamodel.base_models import DocumentStream
+        buffer = io.BytesIO()
+        with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as out:
+            for item in archive.infolist():
+                out.writestr(item, types.replace(_MACRO_WORD, _PLAIN_WORD) if item.filename == "[Content_Types].xml" else archive.read(item))
+    buffer.seek(0)
+    return DocumentStream(name="document.docx", stream=buffer)
 
 
 def _pdf_pages(path: Path, scale: float) -> int:
@@ -228,11 +250,11 @@ class DoclingAdapter:
                                   ". setup을 다시 실행해 주세요. huggingface.co가 막힌 PC는 다른 PC에서 만든 모델 ZIP을 setup --models <ZIP 경로> 로 설치합니다.", code="parser_unavailable")
             converter = self._pdf()
         else:
-            fmt = {"DOCX": InputFormat.DOCX, "PPTX": InputFormat.PPTX, "XLSX": InputFormat.XLSX, "XLSM": InputFormat.XLSX}[extension]
+            fmt = {"DOCX": InputFormat.DOCX, "DOCM": InputFormat.DOCX, "PPTX": InputFormat.PPTX, "XLSX": InputFormat.XLSX, "XLSM": InputFormat.XLSX}[extension]
             converter = DocumentConverter(allowed_formats=[fmt])
         warnings = []
         try:
-            result = self._convert(converter, path, extension)
+            result = self._convert(converter, _word_source(path) if extension in ("DOCX", "DOCM") else path, extension)
             markdown = result.document.export_to_markdown()
             # Image-only PDF exports may contain a placeholder comment but no text.
             visible_text = re.sub(r"<!--.*?-->|!\[[^\]]*\]\([^)]*\)", "", markdown, flags=re.DOTALL)

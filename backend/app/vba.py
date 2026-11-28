@@ -209,19 +209,20 @@ def from_package(path_or_archive) -> Project | None:
             archive.close()
 
 
-def parse_notes(path) -> list[str]:
-    """파싱 결과에 남길 매크로 경고."""
+def parse_notes(path, workbook: bool = True) -> list[str]:
+    """파싱 결과에 남길 매크로 경고. workbook=False는 Word 문서(DOCM)."""
+    saved = "셀 값은 파일에 마지막으로 저장된 값입니다." if workbook else "본문은 파일에 마지막으로 저장된 내용입니다."
     try:
         project = from_package(path)
     except (VbaError, zipfile.BadZipFile, OSError, KeyError, ValueError):
-        return ["매크로(VBA) 프로젝트가 있지만 읽지 못했습니다. 매크로는 실행하지 않았고, 셀 값은 파일에 마지막으로 저장된 값입니다."]
+        return ["매크로(VBA) 프로젝트가 있지만 읽지 못했습니다. 매크로는 실행하지 않았고, " + saved]
     if project is None:
         return []
     stripped = sum(1 for module in project.modules if module.missing_source)
     if not project.code_modules and not stripped:
         return []
     note = (f"매크로 포함: VBA 모듈 {len(project.code_modules)}개(코드 {project.code_lines}줄)는 실행하지 않았고 결과 본문에 넣지 않았습니다. "
-            "셀 값은 파일에 마지막으로 저장된 값입니다.")
+            + saved)
     if project.auto_run:
         note += f" 열거나 닫을 때 자동 실행되는 프로시저({', '.join(project.auto_run)})가 있어, 매크로가 채우는 값은 저장 시점 이후와 다를 수 있습니다."
     notes = [note]

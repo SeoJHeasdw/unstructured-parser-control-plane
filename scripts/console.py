@@ -451,7 +451,7 @@ def model_bundle(value, full):
 def setup(args):
     full = not args.lite
     bundle = model_bundle(args.models, full)  # 오래 걸리는 설치 전에 경로부터 확인한다.
-    say("모드: " + ("전체 (Docling: PDF·DOCX·PPTX·XLSX·XLSM 파싱 포함)" if full else "lite (Docling 없음: TXT·CSV·MD·LOG만)"))
+    say("모드: " + ("전체 (Docling: PDF·DOCX·DOCM·PPTX·XLSX·XLSM·HTM·MHT 파싱 포함)" if full else "lite (Docling 없음: TXT·CSV·MD·LOG만)"))
     # 실행 중에 패키지를 바꾸면 Windows에서는 파일 잠금으로 설치가 중간에 깨진다.
     folder, port = data_folder_in_use(), running_console()
     if folder or port:
@@ -487,7 +487,7 @@ def setup(args):
 
 def summary(full, warnings):
     """setup의 마지막 몇 줄. 설치되지 않은 것이 있으면 여기서 다시 보여 준다(중간 로그는 지나가 버린다)."""
-    mode = "전체 (Docling: PDF·DOCX·PPTX·XLSX·XLSM 파싱 포함)" if full else "lite (Docling 없음: PDF·Office 파싱 안 함)"
+    mode = "전체 (Docling: PDF·DOCX·DOCM·PPTX·XLSX·XLSM·HTM·MHT 파싱 포함)" if full else "lite (Docling 없음: PDF·Office 파싱 안 함)"
     lines = ["", "=" * 72]
     if warnings:
         lines.append(f"[주의] 설치는 끝났지만 준비되지 않은 것이 {len(warnings)}건 있습니다. 모드: {mode}")

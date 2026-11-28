@@ -103,6 +103,16 @@ def test_rule_key_follows_code_and_library_versions(monkeypatch):
     monkeypatch.setattr(qc, "_rule_key", None)
 
 
+def test_comment_and_docstring_edits_do_not_trigger_reverification():
+    base = b'"""Module doc."""\nLIMIT = 3  # note\n\n\ndef judge(x):\n    """Old words."""\n    return x > LIMIT\n'
+    reworded = b'"""Other doc."""\n# new comment line\nLIMIT = 3\n\ndef judge(x):\n    """New words."""\n\n    return x > LIMIT  # why\n'
+    assert qc.code_fingerprint(base) == qc.code_fingerprint(reworded)
+    assert qc.code_fingerprint(base) != qc.code_fingerprint(base.replace(b"LIMIT = 3", b"LIMIT = 4"))
+    assert qc.code_fingerprint(base) != qc.code_fingerprint(base.replace(b"x > LIMIT", b"x >= LIMIT"))
+    message = 'def f():\n    return "안내 문구"\n'.encode()   # 결과에 나가는 문자열은 지문에 든다
+    assert qc.code_fingerprint(message) != qc.code_fingerprint(message.replace("문구".encode(), "문장".encode()))
+
+
 def test_a_correct_verdict_still_counts_after_the_rule_key_changes(tmp_path, monkeypatch):
     """규칙 키가 코드 지문이라 코드만 바뀌어도 키가 달라진다. 같은 의심점(finding ID)에 남긴 '맞음'은 목록·집계에서도
     해결로 세어야 한다(판정 상태 gate와 같은 기준). 예전에는 검수 요청을 만든 때의 키로 걸러 목록만 '검수 필요'가 됐다."""

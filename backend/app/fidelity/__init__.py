@@ -5,7 +5,7 @@ from app.fidelity.prepare import PrepareStats, prepare_copy
 from app.fidelity.probe import probe
 from app.fidelity.report import SUPPLEMENT_MARK, assess
 
-OOXML_FORMATS = {"DOCX", "XLSX", "XLSM", "PPTX"}
+OOXML_FORMATS = {"DOCX", "DOCM", "XLSX", "XLSM", "PPTX"}
 
 __all__ = ["OOXML_FORMATS", "PrepareStats", "SUPPLEMENT_MARK", "assess", "prepare_copy", "probe", "prepared_copy_path"]
 

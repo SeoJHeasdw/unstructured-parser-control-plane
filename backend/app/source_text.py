@@ -7,6 +7,8 @@
 - PPTX: 슬라이드 순서(숨긴 슬라이드 포함)마다 도형 순서의 글자·표 행, 발표자 메모.
 - XLSX·XLSM: 시트마다 저장된 셀 값(수식은 마지막 계산 값)과 셀 주소. 표기 후보(정수·백분율·날짜)를 함께 둔다.
 - TXT·MD·LOG: 같은 인코딩 판별로 읽은 원본 줄. CSV: 행마다 칸.
+- HTM·HTML·MHT: 표준 라이브러리 HTML 해석으로 화면에 보이는 글자(블록·표 행). 숨긴 요소(hidden·인라인 display:none)는 뺀다.
+- EML·MSG: 주요 헤더, 글 본문, 첨부 이름. MSG는 파서와 같은 속성 스트림을 읽는다.
 - 이미지·SVG와 그 밖의 형식: 읽을 글자 층이 없다 → 사람이 원문 대조 화면에서 본다.
 한계: 화면 배치(여러 단·글상자 위치)와 그림 속 글자는 알 수 없다. 스타일에서 상속한 숨김·색은 보지 않는다.
 """
@@ -15,6 +17,8 @@ from __future__ import annotations
 import csv
 from dataclasses import asdict, dataclass, field
 from datetime import date, datetime, time
+import html as html_lib
+from html.parser import HTMLParser
 import io
 import re
 import zipfile
@@ -74,8 +78,10 @@ class SourceText:
     # CSV: 원본 레코드의 모든 칸(빈 칸 포함, 줄바꿈 그대로)과 읽은 계약(인코딩·구분자). 주소별 양방향 대조에 쓴다.
     records: list[list[str]] | None = None
     dialect: dict | None = None
-    # 대조 기준의 계통(source_layer): pdf_text_layer · ooxml_xml · xlsx_values · text · csv_records
+    # 대조 기준의 계통(source_layer): pdf_text_layer · ooxml_xml · xlsx_values · text · csv_records · html_dom · msg_properties
     layer: str = ""
+    # 원본에 있지만 대조 기준으로 읽지 못한 부분(예: 압축 RTF로만 저장된 메일 본문). 있으면 판정 불가.
+    unread: list[str] = field(default_factory=list)
 
     def unit(self, key: str) -> SourceUnit | None:
         return next((unit for unit in self.units if unit.key == key), None)
@@ -672,6 +678,207 @@ def _eml(path, budget: _Budget) -> SourceText:
     return SourceText("EML", "메일 MIME 직접 읽기(헤더·글 본문·첨부 이름, 파서의 HTML 변환과 별개)", units, [], budget.truncated, layer="mime_parts")
 
 
+# ---------------------------------------------------------------- HTM·HTML·MHT
+
+_HIDDEN_STYLE = re.compile(r"display\s*:\s*none|visibility\s*:\s*hidden", re.I)
+
+
+class _HtmlLines(HTMLParser):
+    """화면에 보이는 글자를 블록·표 행 단위 줄로. 파서(Docling·BeautifulSoup)와 별개인 표준 라이브러리 읽기."""
+    _SKIP = {"script", "style", "head", "title", "template", "noscript"}
+    _VOID = {"br", "img", "hr", "meta", "link", "input", "wbr", "area", "base", "col", "embed", "param", "source", "track"}
+    _BLOCK = {"p", "div", "li", "dt", "dd", "h1", "h2", "h3", "h4", "h5", "h6", "blockquote", "pre", "hr", "section", "article",
+              "header", "footer", "nav", "aside", "main", "figure", "figcaption", "address", "ul", "ol", "dl", "form",
+              "fieldset", "legend", "caption", "center", "body", "html"}
+
+    def __init__(self, lines: list[SourceLine], budget: _Budget):
+        super().__init__(convert_charrefs=True)
+        self.lines, self.budget = lines, budget
+        self.block: list[str] = []
+        self.paragraphs = 0
+        self.hide: tuple[str, int] | None = None
+        self.hidden = 0
+        self.pre = 0
+        self.depth = 0          # 표 깊이
+        self.tables = 0
+        self.row: list[str] | None = None
+        self.cell: list[str] | None = None
+        self.row_number = 0
+
+    def _flush(self) -> None:
+        text = "".join(self.block)
+        self.block = []
+        rows = text.split("\n") if self.pre else [" ".join(part.split()) for part in text.split("\n")]
+        rows = [row.rstrip() for row in rows if row.strip()]
+        if rows:
+            self.paragraphs += 1
+        for row in rows:
+            row = _clean(row)
+            if self.budget.take(row):
+                self.lines.append(SourceLine(text=row, ref=f"문단 {self.paragraphs}"))
+
+    def _close_cell(self) -> None:
+        if self.cell is not None and self.row is not None:
+            self.row.append(" ".join("".join(self.cell).split()))
+        self.cell = None
+
+    def _close_row(self) -> None:
+        self._close_cell()
+        if self.row is not None and any(self.row):
+            text = _clean(" | ".join(self.row))
+            if self.budget.take(text):
+                self.lines.append(SourceLine(text=text, ref=f"표 {self.tables} · {self.row_number}행"))
+        self.row = None
+
+    def handle_starttag(self, tag, attrs):
+        if self.hide:
+            if tag == self.hide[0] and tag not in self._VOID:
+                self.hide = (tag, self.hide[1] + 1)
+            return
+        values = dict(attrs)
+        if tag in self._SKIP or "hidden" in values or _HIDDEN_STYLE.search(values.get("style") or ""):
+            if tag not in self._VOID:
+                self.hide = (tag, 1)
+                self.hidden += tag not in self._SKIP
+            return
+        if tag == "img":
+            alt = " ".join((values.get("alt") or "").split())
+            if alt:
+                (self.cell if self.cell is not None else self.block).append(" " + alt + " ")
+            return
+        if tag == "table":
+            if self.depth == 0:
+                self._flush()
+                self.tables += 1
+                self.row_number = 0
+            self.depth += 1
+            return
+        if self.depth == 1 and tag == "tr":
+            self._close_row()
+            self.row, self.row_number = [], self.row_number + 1
+            return
+        if self.depth == 1 and tag in ("td", "th"):
+            self._close_cell()
+            if self.row is None:
+                self.row, self.row_number = [], self.row_number + 1
+            self.cell = []
+            return
+        if self.depth:
+            if self.cell is not None and (tag == "br" or tag in self._BLOCK):
+                self.cell.append(" ")
+            return
+        if tag == "br":
+            self.block.append("\n")
+        elif tag in self._BLOCK:
+            self._flush()
+            self.pre += tag == "pre"
+
+    def handle_endtag(self, tag):
+        if self.hide:
+            if tag == self.hide[0]:
+                self.hide = (tag, self.hide[1] - 1) if self.hide[1] > 1 else None
+            return
+        if tag == "table" and self.depth:
+            self.depth -= 1
+            if self.depth == 0:
+                self._close_row()
+            return
+        if self.depth == 1 and tag in ("td", "th"):
+            self._close_cell()
+        elif self.depth == 1 and tag == "tr":
+            self._close_row()
+        elif not self.depth and tag in self._BLOCK:
+            self._flush()
+            if tag == "pre" and self.pre:
+                self.pre -= 1
+
+    def handle_data(self, data):
+        if self.hide:
+            return
+        if self.cell is not None:
+            self.cell.append(data)
+        elif not self.depth:
+            self.block.append(data)
+
+    def close(self):
+        super().close()
+        if self.depth:
+            self.depth = 0
+            self._close_row()
+        self._flush()
+
+
+_BASIS = {"bom": "BOM", "declared": "MIME 선언", "meta": "meta 선언", "utf-8": "UTF-8로 읽힘", "guess": "추정", "recorded": "파싱 때 기록"}
+
+
+def _html(path, fmt: str, budget: _Budget, dialect: dict | None) -> SourceText:
+    from app.adapters.base import ParserError
+    from app.adapters.html import MHT_FORMATS, convert_scripts, read_markup
+    try:
+        markup, evidence = read_markup(path, fmt, (dialect or {}).get("encoding"))
+    except ParserError as exc:
+        raise SourceUnavailable(str(exc)) from exc
+    markup, _, _ = convert_scripts(markup)
+    unit = SourceUnit(key="body", label="본문")
+    reader = _HtmlLines(unit.lines, budget)
+    reader.feed(markup)
+    reader.close()
+    notes = [f"인코딩 {evidence['encoding']}({_BASIS.get(evidence.get('encoding_basis') or '', '')})로 읽었습니다."]
+    if reader.hidden:
+        notes.append(f"화면에 보이지 않는 요소(hidden·display:none·visibility:hidden) {reader.hidden}개의 글은 원본 글자에서 뺐습니다.")
+    label = "MHT 대표 HTML" if fmt in MHT_FORMATS else "HTML"
+    return SourceText(fmt, f"{label} 직접 읽기(표준 라이브러리, 파서의 Docling 변환과 별개)", [unit], notes, budget.truncated, layer="html_dom")
+
+
+# ---------------------------------------------------------------- MSG
+
+def _msg(path, budget: _Budget) -> SourceText:
+    from app.adapters.eml import _human  # 결과의 첨부 목록과 같은 글자로 대조한다
+    from app.msg import ATT_EMBEDDED_MSG, MsgError, MsgReader
+    try:
+        message = MsgReader(path.read_bytes()).message()
+    except MsgError as exc:
+        raise SourceUnavailable(str(exc)) from exc
+    headers = SourceUnit(key="headers", label="메일 헤더")
+    body = SourceUnit(key="body", label="본문")
+    files = SourceUnit(key="attachments", label="첨부 목록")
+    unread: list[str] = []
+
+    def add(unit: SourceUnit, text: str, ref: str) -> None:
+        text = _clean(text)
+        if text.strip() and budget.take(text):
+            unit.lines.append(SourceLine(text=text, ref=ref))
+
+    def walk(item, address: str) -> None:
+        prefix = "" if address == "1" else f"첨부 메일 {address} "
+        for value, key in ((item.subject, "subject"), (item.sender, "from"), (item.to, "to"), (item.cc, "cc"), (item.date, "date")):
+            add(headers, " ".join(value.split()), prefix + key)
+        if item.body.strip():
+            text = item.body
+        else:
+            text = re.sub(r"<(script|style|head)\b.*?</\1\s*>", " ", item.html, flags=re.S | re.I)
+            text = html_lib.unescape(re.sub(r"<[^>]+>", "\n", text))
+        for number, line in enumerate(_clean(text).split("\n"), start=1):
+            add(body, " ".join(line.split()), f"본문 {address} {number}줄")
+        if item.rtf_only:
+            unread.append(f"압축 RTF로만 저장된 본문(위치 {address})")
+        for attachment in item.attachments:
+            name = attachment.name or f"이름 없는 첨부 {attachment.address}"
+            if attachment.inline_image and attachment.method != ATT_EMBEDDED_MSG:
+                add(files, f"{attachment.address} {attachment.mime} {_human(attachment.size)} cid:{attachment.content_id}", f"본문 그림 {attachment.address}")
+                continue
+            add(files, f"{name} {attachment.mime} {_human(attachment.size)} {attachment.address}", f"첨부 {attachment.address}")
+            if attachment.method == ATT_EMBEDDED_MSG and attachment.message is not None:
+                add(files, f"첨부 메일 (위치 {attachment.address}): {' '.join(attachment.message.subject.split()) or '(제목 없음)'}",
+                    f"첨부 메일 {attachment.address}")
+                walk(attachment.message, attachment.address)
+
+    walk(message, "1")
+    units = [unit for unit in (headers, body, files) if unit.lines] or [body]
+    return SourceText("MSG", "Outlook MSG 속성 직접 읽기(파서와 같은 속성 스트림)", units, [], budget.truncated, layer="msg_properties",
+                      unread=unread)
+
+
 def _delimiter_name(delimiter: str) -> str:
     from app.adapters.text import DELIMITERS
     return DELIMITERS.get(delimiter, repr(delimiter))
@@ -696,6 +903,10 @@ def read_source(path, fmt: str, settings, dialect: dict | None = None) -> Source
         return _text(path, fmt, settings, budget, dialect)
     if fmt == "EML":
         return _eml(path, budget)
+    if fmt in ("HTM", "HTML", "MHT", "MHTML"):
+        return _html(path, fmt, budget, dialect)
+    if fmt == "MSG":
+        return _msg(path, budget)
     if fmt in IMAGE_FORMATS or fmt == "SVG":
         raise SourceUnavailable("이미지 원본에는 읽을 글자 층이 없습니다. 원문 대조 화면에서 사람이 원본 그림과 결과를 대조해야 합니다.")
     raise SourceUnavailable("이 형식은 원본 글자를 직접 읽는 방법이 없습니다. 원본 파일을 열어 확인해 주세요.")

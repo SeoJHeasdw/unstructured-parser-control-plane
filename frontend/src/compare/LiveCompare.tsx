@@ -14,7 +14,7 @@ import type { ResultPane, ReviewLocation } from './ResultReview';
 
 // DOCX·PPTX 원본 그리기는 큰 라이브러리(docx-preview·JSZip)를 쓰므로 필요할 때만 불러온다.
 const OfficeSource = lazy(() => import('./OfficeSource'));
-const OFFICE: Readonly<Record<string, 'docx' | 'pptx'>> = Object.freeze({ DOCX: 'docx', PPTX: 'pptx' });
+const OFFICE: Readonly<Record<string, 'docx' | 'pptx'>> = Object.freeze({ DOCX: 'docx', DOCM: 'docx', PPTX: 'pptx' });
 
 type Request<T> = (signal: AbortSignal) => Promise<T>;
 function useLoad<T>(request: Request<T>, enabled: boolean, revision = 0) {

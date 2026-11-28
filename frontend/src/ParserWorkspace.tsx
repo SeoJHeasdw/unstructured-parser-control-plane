@@ -16,6 +16,7 @@ const engines = new Map([
   ['easyocr', { name: 'EasyOCR(사용 중단)', icon: ScanText }],
   ['python-svg', { name: 'SVG', icon: FileCode2 }],
   ['python-eml', { name: '메일(EML)', icon: Mail }],
+  ['python-msg', { name: '메일(MSG)', icon: Mail }],
 ]);
 const formatName = (ext: string) => ext || '확장자 없음';
 
@@ -25,6 +26,8 @@ function extraction(format: string, engine: string) {
       if (format === 'PDF') return ['페이지 분석', '페이지의 본문·표를 추출합니다. 스캔 쪽은 OCR 모델을 연결한 뒤 읽습니다.'];
       if (format === 'XLSX') return ['워크시트 추출', '시트의 셀과 표를 읽고 원본 행·열 위치를 대조합니다.'];
       if (format === 'XLSM') return ['워크시트 추출 · 매크로 미실행', '셀과 표를 XLSX와 같이 읽습니다. 매크로는 실행하지 않고, 모듈 수와 자동 실행 여부를 경고로 남깁니다.'];
+      if (format === 'DOCM') return ['Word 구조 추출 · 매크로 미실행', '본문·표를 DOCX와 같이 읽습니다. 매크로는 실행하지 않고, 모듈 수와 자동 실행 여부를 경고로 남깁니다.'];
+      if (['HTM', 'HTML', 'MHT', 'MHTML'].includes(format)) return ['웹 문서 구조 추출', '선언된 인코딩으로 HTML을 읽어 제목·문단·목록·표를 변환합니다. MHT는 대표 HTML 부분을 풀어 읽고, 외부 그림·링크는 열지 않습니다.'];
       return ['Office 구조 추출', '본문·표를 변환하고 원본의 기호, 첨자와 내장 그림을 점검합니다.'];
     case 'pdf-text': return ['글자 층 읽기', 'PDF 모델 없이 쪽마다 글자 층을 줄 단위로 읽습니다. 표 구조는 복원하지 않고, 글자 층이 없는 쪽은 OCR 모델로 읽습니다.'];
     case 'ocr-model': return ['이미지 문자 인식', '문서 OCR 모델로 글자를 읽습니다. 모델이 연결되지 않으면 처리하지 않습니다.'];
@@ -32,6 +35,7 @@ function extraction(format: string, engine: string) {
     case 'python-svg': return ['벡터 글자 추출', 'SVG의 텍스트를 읽고 내장 이미지에서 추출 가능한 글자를 보충합니다.'];
     case 'python-csv': return ['행·열 복원', '인코딩과 구분자를 판별한 뒤 행과 열을 Markdown 표로 변환합니다. 구분자 후보·원래 열 수를 근거로 남기고, 모호하면 원천 형식을 지정해 다시 파싱합니다.'];
     case 'python-eml': return ['메일 본문·첨부 목록', '주요 헤더와 대표 본문(글 본문이 있으면 그것만, 없으면 HTML)을 읽고 첨부는 이름·형식·크기만 남깁니다. 첨부 본문은 읽지 않습니다.'];
+    case 'python-msg': return ['Outlook 메일 본문·첨부 목록', 'EML과 같은 모양으로 헤더·본문·첨부 목록을 남깁니다. 압축 RTF로만 저장된 본문은 아직 읽지 않고 경고합니다.'];
     case 'python-text': return ['텍스트 읽기', '인코딩을 판별해 본문의 줄바꿈과 문자 순서를 보존합니다.'];
     default: return ['본문 추출', '이 형식에 등록된 파서가 원본을 처리합니다.'];
   }

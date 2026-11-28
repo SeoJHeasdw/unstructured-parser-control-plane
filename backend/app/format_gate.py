@@ -21,7 +21,7 @@ _FOLDER_KIND = {"word": "docx", "xl": "xlsx", "ppt": "pptx"}
 _FALLBACK_MAIN = {"word/document.xml": "docx", "xl/workbook.xml": "xlsx", "ppt/presentation.xml": "pptx"}
 LABEL = {
     "zip": "일반 ZIP 압축", "cfb": "OLE 복합 문서", "pdf": "PDF", "image": "이미지", "text": "텍스트", "html": "HTML",
-    "xml": "XML", "mime": "메일(MIME)", "docx": "Word(DOCX)", "xlsx": "Excel(XLSX)", "pptx": "PowerPoint(PPTX)",
+    "xml": "XML", "mime": "메일·웹 보관 파일(MIME, EML·MHT)", "docx": "Word(DOCX)", "xlsx": "Excel(XLSX)", "pptx": "PowerPoint(PPTX)",
     "doc": "구형 Word(DOC)", "xls": "구형 Excel(XLS)", "ppt": "구형 PowerPoint(PPT)", "hwp": "한글(HWP)",
     "msg": "Outlook 메일(MSG)", "ole": "OLE 개체", "unknown": "알 수 없는 이진 파일",
 }
@@ -197,6 +197,17 @@ def check(path: Path, extension: str, signatures: tuple[DrmSignature, ...] = (),
         if detected == "unknown":
             return _opaque(extension, head, evidence)
         return _mismatch(extension, detected, evidence)
+    if extension == "MSG":
+        if detected != "cfb":
+            return _opaque(extension, head, evidence) if detected == "unknown" else _mismatch(extension, detected, evidence)
+        with open(path, "rb") as handle:
+            kind, _ = _cfb_kind(handle.read(max_bytes))
+        return GateResult(None, "msg", evidence=evidence) if kind == "msg" else _mismatch(extension, kind, evidence)
+    # 웹 보관 파일(MHT)은 MIME 메시지, 웹 문서(HTM)는 HTML이다. 서로 바뀐 확장자는 억지로 읽지 않는다.
+    if extension in ("HTM", "HTML") and detected == "mime":
+        return _mismatch(extension, "mime", evidence)
+    if extension in ("MHT", "MHTML") and detected == "html":
+        return _mismatch(extension, "html", evidence)
     if extension == "SVG" and detected in {"xml", "text", "unknown"}:
         return GateResult(None, "xml", evidence=evidence)
     if extension in IMAGE_FORMATS:

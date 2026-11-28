@@ -236,3 +236,64 @@ def msg(subject: str, body: str, attachments: dict) -> bytes:
     for i, (name, data) in enumerate(dict(attachments).items()):
         tree[f"__attach_version1.0_#{i:08X}"] = {"__properties_version1.0": b"\0" * 16, "__substg1.0_3707001F": name.encode("utf-16-le"), "__substg1.0_37010102": data}
     return cfb(tree)
+
+
+def msg_props(header: int, fixed: dict = ()) -> bytes:
+    """[MS-OXMSG] 2.4 속성 스트림. fixed: {(속성 ID, 형식): 값}. 형식 0x0003(LONG)·0x000B(BOOLEAN)·0x0040(SYSTIME)."""
+    out = b"\0" * header
+    for (prop, kind), value in dict(fixed).items():
+        raw = struct.pack("<q" if kind == 0x0040 else "<i", int(value)).ljust(8, b"\0")
+        out += struct.pack("<II", (prop << 16) | kind, 0x06) + raw
+    return out
+
+
+def outlook_message(subject: str, *, sender=("", ""), recipients=(), body: str | None = None, html: bytes | None = None,
+                    rtf: bool = False, attachments=(), codepage: int | None = None, string8: bool = False,
+                    headers: str | None = None, message_class: str = "IPM.Note", embedded: bool = False) -> dict:
+    """MSG 저장소 트리 한 벌. recipients: [(이름, 주소, 1=받는 사람·2=참조)].
+    attachments: [{'name','data','mime','cid','hidden'} 또는 {'name','message': outlook_message(..., embedded=True)}]"""
+    encoding, suffix = ("cp949", "001E") if string8 else ("utf-16-le", "001F")
+
+    def text(prop: int, value: str) -> tuple[str, bytes]:
+        return f"__substg1.0_{prop:04X}{suffix}", value.encode(encoding)
+
+    fixed = {(0x3FFD, 0x0003): codepage} if codepage else {}
+    tree = dict([text(0x001A, message_class), text(0x0037, subject)])
+    if sender[0]:
+        tree.update([text(0x0C1A, sender[0])])
+    if sender[1]:
+        tree.update([text(0x5D01, sender[1])])
+    if body is not None:
+        tree.update([text(0x1000, body)])
+    if html is not None:
+        tree["__substg1.0_10130102"] = html
+    if rtf:
+        tree["__substg1.0_10090102"] = b"\x10\0\0\0\x08\0\0\0MELA\0\0\0\0{\\rtf1}"
+    if headers:
+        tree.update([text(0x007D, headers)])
+    for index, (name, address, kind) in enumerate(recipients):
+        tree[f"__recip_version1.0_#{index:08X}"] = {"__properties_version1.0": msg_props(8, {(0x0C15, 0x0003): kind}),
+                                                     **dict([text(0x3001, name), text(0x39FE, address)])}
+    for index, item in enumerate(attachments):
+        node = dict([text(0x3707, item["name"])])
+        props = {}
+        if "message" in item:
+            props[(0x3705, 0x0003)] = 5
+            node["__substg1.0_3701000D"] = item["message"]
+        else:
+            props[(0x3705, 0x0003)] = 1
+            node["__substg1.0_37010102"] = item["data"]
+            if item.get("mime"):
+                node.update([text(0x370E, item["mime"])])
+            if item.get("cid"):
+                node.update([text(0x3712, item["cid"])])
+            if item.get("hidden"):
+                props[(0x7FFE, 0x000B)] = 1
+        node["__properties_version1.0"] = msg_props(8, props)
+        tree[f"__attach_version1.0_#{index:08X}"] = node
+    tree["__properties_version1.0"] = msg_props(24 if embedded else 32, fixed)
+    return tree
+
+
+def outlook_msg(subject: str, **kwargs) -> bytes:
+    return cfb(outlook_message(subject, **kwargs))
