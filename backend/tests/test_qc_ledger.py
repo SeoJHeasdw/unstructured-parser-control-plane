@@ -120,6 +120,25 @@ def test_qc_is_registered_with_the_run_and_survives_restart(tmp_path):
         assert checked["checks"][0]["id"] == "preserved" and any(c["id"] == "csv_grid" for c in checked["checks"])
 
 
+def test_image_result_goes_through_the_ledger_as_ocr_that_needs_review(tmp_path, monkeypatch):
+    from tests.edge_case_files import png
+    settings = Settings(runtime_dir=tmp_path / "runtime")
+    with TestClient(create_app(settings)) as client:
+        service = client.app.state.documents
+        monkeypatch.setattr(service.parsers, "parse",
+                            lambda p, ext, options=None: ParsedDocument("명판 글자 EQ-UF-03\n정격 220V", "ocr-model", "test"))
+        doc_id = client.post("/api/live/documents", files={"file": ("명판.png", png(8, 8))}).json()["id"]
+        client.post(f"/api/live/documents/{doc_id}/process")
+        assert _wait(client, doc_id)["status"] == "completed"
+        response = client.get(f"/api/live/documents/{doc_id}/verify")
+        assert response.status_code == 200
+        checked = response.json()
+        assert checked["rule_version"] == rule_key() and checked["qc_state"] == "done"
+        assert [(s["key"], s["kind"], s["source_layer"]) for s in checked["spots"]] == [("S1", "image_ocr", "ocr_model")]
+        assert checked["gate"]["state"] == "needs_review" and any(r["code"] == "image_only" for r in checked["reasons"])
+        assert client.get(f"/api/live/documents/{doc_id}/verify/spots/{checked['spots'][0]['id']}").json()["key"] == "S1"
+
+
 def test_pending_qc_is_shown_as_not_evaluated_until_computed(tmp_path, monkeypatch):
     settings = Settings(runtime_dir=tmp_path / "runtime")
     with TestClient(create_app(settings)) as client:
