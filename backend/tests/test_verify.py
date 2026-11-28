@@ -127,6 +127,38 @@ def test_cells_compare_by_located_rows_and_hidden_sheets_become_notes():
     assert states == {"sheet:장비": "checked", "sheet:기준": "hidden"}
 
 
+def test_unlocated_line_between_pages_belongs_to_both_neighbouring_pages():
+    source = SourceText("PDF", "test", [_unit("p1", "1쪽", ["첫 쪽 본문 내용입니다"], page=1),
+                                         _unit("p2", "2쪽", ["2. 결과 판정", "합격 기준은 98.0 % 이상이다"], page=2)])
+    markdown = "첫 쪽 본문 내용입니다\n\n## 2. 결과 판정\n합격 기준은 98.0 % 이상이다"
+    locations = [{"start_line": 1, "end_line": 1, "page": 1}, {"start_line": 4, "end_line": 4, "page": 2}]
+    assert verify(source, markdown, locations, "docling", "PDF")["spots"] == []
+
+
+def test_text_repeated_in_the_source_must_appear_as_often_in_the_result():
+    source = SourceText("DOCX", "test", [_unit("body", "본문", ["시료를 냉장 보관하고 기록한다", "중간 문단입니다", "시료를 냉장 보관하고 기록한다"])])
+    result = verify(source, "시료를 냉장 보관하고 기록한다\n중간 문단입니다", [], "docling", "DOCX")
+    assert [s["kind"] for s in result["spots"]] == ["missing"]
+    assert "원본에는 2번, 결과에는 1번" in result["spots"][0]["message"]
+
+
+def test_a_mostly_missing_page_is_one_finding_instead_of_one_per_line():
+    source = SourceText("PDF", "test", [_unit("p1", "1쪽", ["검체 0.5 mL를 취한다", "보관 온도 2~8℃ 유지", "허용 오차 ±0.5 이내",
+                                                           "결과 판정 기준 98.0 % 이상", "기록 보관 기간 5년"], page=1)])
+    markdown, locations = _paged([["검체 0.5 mL를 취한다"]])
+    result = verify(source, markdown, locations, "docling", "PDF")
+    assert [(s["kind"], s["severity"]) for s in result["spots"]] == [("unit_missing", "high")]
+
+
+def test_two_changed_cells_in_one_sheet_row_are_two_findings():
+    cells = [("A2", "압력", "압력"), ("B2", "정상", "이상"), ("C2", "17", "71")]
+    sheet = SourceUnit(key="sheet:기록", label="시트 기록", sheet="기록", lines=[
+        SourceLine(text="압력 · 정상 · 17", ref="2행", row=2, cells=[{"cell": c, "value": v, "alts": []} for c, v, _ in cells])])
+    markdown = "## 시트: 기록\n| " + " | ".join(shown for _, _, shown in cells) + " |"
+    result = verify(SourceText("XLSX", "test", [sheet]), markdown, [{"start_line": 2, "end_line": 2, "sheet": "기록", "row": 2}], "docling", "XLSX")
+    assert sorted((s["cell"], s["severity"]) for s in result["spots"]) == [("B2", "medium"), ("C2", "high")]
+
+
 def test_supplement_section_counts_as_present_and_image_ocr_lines_are_spotted():
     source = SourceText("PPTX", "test", [_unit("p1", "슬라이드 1", ["분기 지표 검토", "글상자 메모: 담당 확인"], page=1)])
     markdown = "\n".join(["분기 지표 검토", "", "<!-- docops:supplement -->", "## 보충 추출: 파서 결과에 없던 원본 글자", "",

@@ -1,21 +1,16 @@
-/** 작업 에이전트(MCP·CLI) 활동 조회. 서버가 runtime/agent/ 기록과 문서·검수 요청을 읽어 돌려준다. 모든 목록은 최신이 먼저다. */
 export type AgentBatch = {
   n: number; target: string; reparse: boolean; started: string | null; finished: string | null; error: string;
-  /** 항목 상태별 수: file(등록 전) · pending(접수 전) · queued(처리 대기·중) · done(처리 끝) · error */
+  /** counts 키: file(등록 전) · pending(접수 전) · queued(처리 대기·중) · done(처리 끝) · error */
   total: number; counts: Record<string, number>;
-  /** 묶음에 든 문서의 D번호 */
   docs: number[];
-  /** 등록하지 않은 파일의 사유 코드별 수(lock, hidden, empty, too-big, ext-<확장자>) */
   skips: Record<string, number>;
   /** 오류 항목의 짧은 메모(missing, upload-413 등) */
   errors: string[];
 };
-/** 에이전트가 다룬 문서(묶음·도구 호출·검수 요청) */
 export type AgentDocument = {
   id: string; seq: number | null; name: string; format: string; status: string; error_code: string | null; updated_at: string;
   last_agent_at: string | null; batches: number[]; calls: number; reviews: { open: number; correct: number; wrong: number; unclear: number };
 };
-/** text: 에이전트가 받은 결과(앞 12,000자), docs: 다룬 문서의 D번호, session: 연결(MCP 프로세스·CLI 실행) 표식 */
 export type AgentCall = { ts: string; tool: string; args: Record<string, unknown>; kind: string | null; repeat: boolean; ms: number | null; result: string;
   text: string; docs: number[]; session: string | null };
 export type AgentActivity = { available: boolean; batches: AgentBatch[]; documents: AgentDocument[]; calls: AgentCall[] };
@@ -25,7 +20,7 @@ const list = <T,>(value: unknown): T[] => Array.isArray(value) ? value as T[] : 
 const record = (value: unknown): Record<string, number> => value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, number> : {};
 const count = (value: unknown) => typeof value === 'number' && Number.isFinite(value) ? value : 0;
 
-/** 기록 파일이 일부 깨져 있어도 화면이 멈추지 않게 빠진 값을 채운다(예전 서버는 documents가 없다). */
+/** 서버 기록 파일이 일부 깨져 있을 수 있어 빠진 값을 채운다. */
 function normalize(body: Partial<AgentActivity>): AgentActivity {
   return {
     available: !!body.available,

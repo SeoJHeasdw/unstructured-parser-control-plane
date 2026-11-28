@@ -42,7 +42,6 @@ const clock = new Intl.DateTimeFormat('ko-KR', { hour: '2-digit', minute: '2-dig
 const dayClock = new Intl.DateTimeFormat('ko-KR', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false });
 const fullClock = new Intl.DateTimeFormat('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
 const parse = (iso: string | null) => { const date = iso ? new Date(iso) : null; return date && Number.isFinite(+date) ? date : null; };
-/** 오늘이면 시:분:초, 아니면 월.일 시:분 */
 function shortTime(iso: string | null) {
   const date = parse(iso);
   if (!date) return '—';
@@ -58,14 +57,12 @@ function elapsed(from: string | null, to: string | null) {
   return `${Math.floor(seconds / 3600)}시간 ${Math.floor(seconds % 3600 / 60)}분`;
 }
 const tally = (values: string[]) => [...values.reduce((map, value) => map.set(value, (map.get(value) ?? 0) + 1), new Map<string, number>())];
-/** 인자를 'target=D12 reparse=true'처럼 한 줄로. */
 const compactArgs = (args: Record<string, unknown>) => Object.entries(args)
   .map(([key, value]) => `${key}=${typeof value === 'string' ? value : JSON.stringify(value)}`).join(' ');
 const numberArg = (value: unknown) => {
   const number = typeof value === 'number' ? value : typeof value === 'string' && /^\d{1,6}$/.test(value) ? Number(value) : NaN;
   return number > 0 ? number : undefined;
 };
-/** 원문 대조 주소(위치·검수 요청을 짚어 연다) */
 const reviewRoute = (id: string, focus?: ReviewFocus): WorkspaceRoute => ({ page: 'live', doc: id, review: 'source', focus });
 /** 원문 대조는 성공한 파싱 결과가 있어야 연다(목록에서는 완료 상태로 가늠한다). */
 const canReview = (doc: { status: string } | undefined) => doc?.status === 'completed';
@@ -100,12 +97,11 @@ async function copyText(text: string, target: HTMLElement | null): Promise<'copi
     const selection = window.getSelection();
     selection?.removeAllRanges();
     selection?.addRange(range);
-    try { if (typeof document.execCommand === 'function' && document.execCommand('copy')) return 'copied'; } catch { /* 선택만 남긴다 */ }
+    try { if (typeof document.execCommand === 'function' && document.execCommand('copy')) return 'copied'; } catch { }
   }
   return 'selected';
 }
 
-// ---------------------------------------------------------------- 검수 요청
 function wrongSummary(reviews: Review[]) {
   const wrong = reviews.filter(review => review.status === 'wrong');
   const lines = [`파싱 오류(사람이 원문 대조로 확인) ${wrong.length}건 — ${fullClock.format(new Date())}`];
@@ -188,7 +184,6 @@ function Reviews({ reviews, counts, error, onNavigate, onChanged }: {
   </div>;
 }
 
-// ---------------------------------------------------------------- 문서
 function HandledDocs({ documents, docs, onNavigate }: { documents: AgentDocument[]; docs: DocIndex; onNavigate: Navigate }) {
   if (!documents.length) return <p className="ag-empty-tab">에이전트가 다룬 문서가 없습니다. 에이전트가 파싱하거나 원본을 읽고 대조한 문서가 여기에 모입니다.</p>;
   return <div className="ag-table-wrap" role="region" aria-label="에이전트가 다룬 문서" tabIndex={0}><table className="ag-table ag-docs">
@@ -215,7 +210,6 @@ function HandledDocs({ documents, docs, onNavigate }: { documents: AgentDocument
   </table></div>;
 }
 
-// ---------------------------------------------------------------- 묶음
 function batchState(batch: AgentBatch, failed: number) {
   if (batch.error) return { tone: 'bad', label: '중단' };
   if (!batch.finished) return { tone: 'accent', label: '진행 중' };
@@ -254,9 +248,7 @@ function BatchRow({ batch, docs, onNavigate }: { batch: AgentBatch; docs: DocInd
   </li>;
 }
 
-// ---------------------------------------------------------------- 호출 기록
 type CallGroup = { key: string; session: string | null; calls: AgentCall[] };
-/** 연결(MCP 프로세스·CLI 실행)마다, 표식이 없는 예전 기록은 10분 넘게 쉬면 나눈다. 목록은 최신이 먼저다. */
 function groupCalls(calls: AgentCall[]): CallGroup[] {
   const groups: CallGroup[] = [];
   let last: AgentCall | null = null;
@@ -328,7 +320,6 @@ function Calls({ calls, docs, onNavigate }: { calls: AgentCall[]; docs: DocIndex
   </div>;
 }
 
-/** 작업 에이전트가 올린 검수 요청과 다룬 문서·묶음·호출 기록. 화면이 보일 때만 10초마다 다시 읽는다. 판정은 원문 대조나 검수 요청 목록에서 사람이 남긴다. */
 export default function AgentActivity({ active = true, onNavigate }: { active?: boolean; onNavigate: Navigate }) {
   const [activity, setActivity] = useState<Activity | null>(null);
   const [docs, setDocs] = useState<LiveDoc[] | null>(null);
@@ -345,7 +336,6 @@ export default function AgentActivity({ active = true, onNavigate }: { active?: 
     request.current = controller;
     setLoading(true);
     try {
-      // 문서 목록은 D번호를 문서로 잇는 데만 쓴다. 검수 요청을 못 읽어도 활동은 보여 준다.
       const [next, documents, listed] = await Promise.all([getAgentActivity(controller.signal), listLiveDocuments(controller.signal).catch(() => null),
         listReviews({}, controller.signal).then(body => ({ ...body, error: '' })).catch((reason: unknown) => ({ reviews: [] as Review[], counts: {}, error: reason instanceof Error ? reason.message : '검수 요청을 불러오지 못했습니다.' }))]);
       if (controller.signal.aborted) return;

@@ -330,6 +330,14 @@ Docling 실행 시 `HF_HUB_OFFLINE=1`, `TRANSFORMERS_OFFLINE=1`을 설정하며 
 
 `POST /api/retrieval/chunk`는 선택적으로 `summary_only: true`를 받는다. 이때 source는 문서 식별 정보와 이전 성공본 여부만 포함한다. 성공한 전략별 응답은 id·kind·stats만 포함한다. 생략하면 기존 벤치 화면용 전체 응답을 반환한다. 작업 도구 `chunk`는 `embed: false`로 로컬 분할을 요청한다. 길이는 추정 토큰 수다.
 
+### 청크 위치(`start`·`end`·`text`)
+
+- `start`·`end`는 응답 `source.text`의 문자 위치다(파이썬 문자열 인덱스, `end` 미포함). 원문 요소(`elements`)의 위치도 같은 기준이며 앞뒤 공백을 뺀 범위다.
+- 기준선 전략(고정·재귀·문장·제목 구조)과 의미 기반 전략에서 `text`는 원문 `[start:end]`와 같고, 앞뒤 공백을 걷어 낸 만큼 위치도 옮긴다. 예외는 제목 구조·의미 기반 전략이 큰 표를 행 단위로 나눌 때 하나다. 이때 두 번째 조각부터 머리행(머리+구분선)을 앞에 다시 붙이며, `start`·`end`는 실제 행 범위이고 `flags`에 `table-split`이 붙는다.
+- 요소 인식 전략(`element`·`parent_child`·`page`)은 요소를 이어 붙여 `text`를 만든다. 버린 반복 머리말·그림은 빠지고, 표는 머리행 반복이나 '열: 값' 문장으로 바뀔 수 있다. `start`·`end`는 청크가 덮는 원문 범위다.
+- 길이 단위는 글자(`chars`) 또는 추정 토큰(`est_tokens`)이다. 추정 토큰은 대상 PC에 토크나이저가 없어 문자별 가중치로 센 값이며, 화면에도 '추정'으로 표시한다.
+- 확인: `backend/tests/test_chunking.py::test_every_strategy_covers_the_source_and_keeps_offsets`(기준선 4종), `test_elements.py`(요소 위치).
+
 ## 검수 요청(Review, 2026-11-26)
 
 `runtime/documents.sqlite3`의 `review_requests` 테이블(서버 시작 때 없으면 만든다. 기존 문서·실행은 건드리지 않는다). 사람이 원문 대조 화면에서 눈으로 확인할 곳과 그 판정이다. 수천 개 파일의 정답 텍스트를 사람이 만들 수 없으므로, 에이전트·자동 대조가 고른 곳에 사람이 맞음·틀림을 남기는 것이 정답셋을 대신한다.

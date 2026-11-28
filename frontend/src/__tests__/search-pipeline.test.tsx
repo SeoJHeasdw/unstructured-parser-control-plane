@@ -3,7 +3,23 @@ import { cleanup, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import SearchPipeline from '../SearchPipeline';
 
-afterEach(cleanup);
+afterEach(() => { cleanup(); Reflect.deleteProperty(window, 'matchMedia'); });
+
+it('흐름은 처음 열 때 차례로 켜고, 동작 줄이기 설정이면 처음부터 다 켜 둔다', () => {
+  const lit = () => [...document.querySelectorAll('.sp-node, .sp-loop-label')].map(el => el.hasAttribute('data-lit'));
+  const replay = () => screen.getByRole('button', {name: /흐름 다시 보기/}) as HTMLButtonElement;
+  const { unmount } = render(<SearchPipeline active onNavigate={vi.fn()}/>);
+  expect(replay().disabled).toBe(true);
+  expect(lit()).toContain(false);
+  unmount();
+  const media = (query: string) => ({ matches: query === '(prefers-reduced-motion: reduce)', media: query, onchange: null,
+    addEventListener() {}, removeEventListener() {}, addListener() {}, removeListener() {}, dispatchEvent: () => false });
+  Object.defineProperty(window, 'matchMedia', { configurable: true, writable: true, value: media });
+  render(<SearchPipeline active onNavigate={vi.fn()}/>);
+  expect(replay().disabled).toBe(false);
+  expect(lit().length).toBeGreaterThan(5);
+  expect(lit()).not.toContain(false);
+});
 
 it('흐름 지도에서 단계를 누르면 하는 일 · 후보 · 재는 것 · 정할 것과 관련 도구가 보인다', async () => {
   const user = userEvent.setup(), navigate = vi.fn();

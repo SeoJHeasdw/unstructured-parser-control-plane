@@ -1,8 +1,4 @@
-"""파싱 결과를 원본 글자(source_text)와 자동으로 대조해 사람이 봐야 할 곳(의심 지점, S번호)을 고른다. 판정이 아니라 후보다.
-
-- 위치가 없는 결과 줄은 바로 앞(없으면 뒤) 위치의 단위로 보고, 위치 기록이 전혀 없으면 문서 전체와 비교한다.
-- Docling은 쪽 머리말을 본문에 넣지 않는다.
-"""
+"""파싱 결과를 원본 글자(source_text)와 자동으로 대조해 사람이 봐야 할 곳(의심 지점, S번호)을 고른다. 판정이 아니라 후보다."""
 from __future__ import annotations
 
 from collections import Counter, defaultdict
@@ -20,9 +16,9 @@ from app.source_text import SourceText, SourceUnit
 from app.textnorm import is_special
 
 SEVERITY = ("high", "medium", "low")
-MAX_SPOTS = 400            # 화면·에이전트가 한 번에 받는 상세 수
-MAX_FINDINGS = 20_000      # 한 실행의 원장에 남기는 의심점 상한(넘으면 우선순위 높은 것부터 남기고 판정 불가)
-_GRID_DIFF_ROWS = 20_000   # 행 정렬(diff)을 하는 최대 행 수
+MAX_SPOTS = 400
+MAX_FINDINGS = 20_000
+_GRID_DIFF_ROWS = 20_000
 
 _HTML_COMMENT = re.compile(r"<!--.*?-->")
 _BR = re.compile(r"<br\s*/?>", re.IGNORECASE)
@@ -64,7 +60,6 @@ def compact(text: str) -> str:
 
 
 def result_plain(line: str) -> str:
-    """결과 Markdown 한 줄에서 사람이 보는 글자만."""
     if _SEPARATOR.match(line):
         return ""
     text = _HTML_COMMENT.sub(" ", line)
@@ -98,7 +93,6 @@ _CSV_COLUMN = re.compile(r"(\d+)열")
 
 
 def _cells(raw: str) -> list[str]:
-    """Markdown 표 줄의 칸(비교용 글자)."""
     parts = _CELL_SPLIT.split(raw.strip())
     if parts and not parts[0].strip():
         parts = parts[1:]
@@ -147,8 +141,6 @@ def _clip(text: str, center: int = 0, width: int = 160) -> str:
 
 
 class _Index:
-    """결과 줄 묶음의 비교용 글자와 글자 → 결과 줄 번호."""
-
     def __init__(self, numbers_: list[int], plain: dict[int, str]):
         self.numbers = numbers_
         self.plain = plain
@@ -209,7 +201,6 @@ class Verifier:
         self._dropped: set[int] = set()                    # 묶음 처리로 뺀 지점의 id()
         self.hidden_missing: list[str] = []
 
-    # ------------------------------------------------------------ 결과 줄 → 원본 단위
     def _map_regions(self, locations: list[dict]):
         mark = next((n for n, line in enumerate(self.raw, start=1) if line.strip() == SUPPLEMENT_MARK), None)
         self._supplement = set(range(mark, len(self.raw) + 1)) if mark else set()
@@ -247,7 +238,6 @@ class Verifier:
             if keys:
                 previous = keys
             else:
-                # 위치 없는 줄(제목·빈 줄·시트 이름)은 앞뒤 위치의 단위 모두에 넣는다(단위 경계의 제목을 놓치지 않게).
                 keys = previous | following.get(n, set())
             for key in keys:
                 regions[key].append(n)
@@ -260,7 +250,6 @@ class Verifier:
             self.unlocated.append(unit.label)
         return self.whole, False
 
-    # ------------------------------------------------------------ 의심 지점
     def spot(self, unit: SourceUnit, severity: str, kind: str, message: str, ref: str = "", line: int | None = None,
              line_end: int | None = None, source: str = "", source_hit: str = "", result: str = "", result_hit: str = "",
              cell: str | None = None, result_role: str = "same") -> dict:
@@ -272,7 +261,7 @@ class Verifier:
         return entry
 
     def _drop(self, entries) -> None:
-        """지점 여러 개를 한 번에 뺀다(하나씩 list.remove 하면 제곱 시간)."""
+        # 지점마다 list.remove 하면 제곱 시간이 든다.
         drop = {id(entry) for entry in entries}
         if drop:
             self._dropped |= drop
@@ -285,7 +274,6 @@ class Verifier:
         position = raw.find(center_text) if center_text else 0
         return _clip(raw, max(position, 0))
 
-    # ------------------------------------------------------------ 실행
     def run(self) -> dict:
         furniture = self._furniture()
         for unit in self.source.units:
@@ -353,13 +341,11 @@ class Verifier:
                 "reasons": self.reasons, "checks": self.checks, "contract": self.contract}
 
     def _layer_of(self, spot: dict) -> str:
-        """지점이 기댄 원본 계통."""
         if spot["kind"] == "image_ocr" or spot["kind"] == "scan_ocr":
             return "ocr_model"
         return self.source.layer
 
     def _judge(self) -> None:
-        """판정 근거와 검사 항목."""
         units = self.units
         scans = [u["label"] for u in units if u["state"] == "scan"]
         garbled = [u["label"] for u in units if u["state"] == "garbled"]
@@ -433,7 +419,7 @@ class Verifier:
         return len(self.source.units)
 
     def _furniture(self) -> set[str]:
-        """쪽(슬라이드)마다 위·아래 끝에 되풀이되는 줄의 모양(숫자는 #)."""
+        # Docling은 쪽 머리말을 결과 본문에 넣지 않는다.
         if self.fmt not in ("PDF", "PPTX", "PPTM"):
             return set()
         units = [unit for unit in self.source.units if unit.lines]
@@ -450,7 +436,6 @@ class Verifier:
         shapes = [shape for shape in shapes if shape]
         return set(shapes[:3] + shapes[-3:])
 
-    # ------------------------------------------------------------ 글자 단위(PDF·DOCX·PPTX·텍스트)
     def _check_text(self, unit: SourceUnit, furniture: set[str]) -> dict:
         stats = {"key": unit.key, "label": unit.label, "page": unit.page, "sheet": unit.sheet, "kind": unit.kind,
                  "note": unit.note, "source_chars": 0, "matched_chars": 0, "coverage": None, "numbers_missing": 0,
@@ -516,7 +501,6 @@ class Verifier:
                 continue
             anywhere = found if found >= 0 else index.text.find(c)
             if anywhere >= 0:
-                # 같은 글이 원본에 여러 번 나오면 결과에도 그만큼 있어야 한다.
                 if len(c) >= 8 and c not in needed:
                     needed[c] = source_compact.count(c) - index.text.count(c)
                 deficit = needed.get(c, 0)
@@ -562,7 +546,6 @@ class Verifier:
             return stats
         collapsed = total >= 40 and matched / total < 0.4
         if collapsed:
-            # 단위 대부분이 결과에 없으면 줄·기호·숫자 지점을 따로 올리지 않고 하나로 묶는다.
             self._drop(flagged.values())
             flagged.clear()
             sample_line, sample_plain, _ = lines[0]
@@ -571,7 +554,6 @@ class Verifier:
                       f"(원본 {total:,}자 · 결과에서 찾은 {matched:,}자). 쪽 전체가 빠졌거나 순서·글자가 크게 다를 수 있습니다.",
                       ref=sample_line.ref, line=unit_lines[0] if unit_lines else None, line_end=unit_lines[-1] if unit_lines else None,
                       source=_clip(sample_plain))
-        # 숫자
         source_numbers = Counter(n for _, plain, _ in lines for n in numbers(plain))
         result_numbers = Counter(n for line_no in index.numbers for n in numbers(self.plain[line_no]))
         missing_numbers = source_numbers - result_numbers
@@ -597,7 +579,6 @@ class Verifier:
                     self.spot(unit, "medium", "extra_number", f"결과의 숫자 '{value}'가 원본 {unit.label}에 없습니다(OCR 오인·글자 붙음·다른 쪽 내용일 수 있음).",
                               line=line_no, result=self.result_text(line_no, value), result_hit=value)
         stats["numbers_extra"] = extra
-        # 특수기호
         lost = specials("".join(plain for _, plain, _ in lines)) - specials("".join(self.plain[n] for n in index.numbers))
         for ch, count in lost.items() if not collapsed else ():
             position = next((p for p, (_, plain, _) in enumerate(lines) if ch in fold(plain)), None)
@@ -613,7 +594,6 @@ class Verifier:
             self.spot(unit, "high", "symbol", f"기호 '{ch}'가 원본 {unit.label}에 {count}건 더 있습니다(결과에서 빠지거나 다른 글자로 바뀜).",
                       ref=line.ref, line=best, source=_clip(plain, fold(plain).find(ch)), source_hit=ch,
                       result=self.result_text(best))
-        # 결과의 깨진 글자
         broken = 0
         for line_no in index.numbers:
             if ("garbled", line_no) in self._result_spots:
@@ -635,7 +615,6 @@ class Verifier:
         return stats
 
     def _hidden_layer(self, unit: SourceUnit, lines: list[int]) -> None:
-        """그림 위의 보이지 않는 글자 층(PDF 렌더 모드 3)을 같은 그림의 OCR 결과와 항목·값·단위로 대조한다."""
         if not unit.regions:
             return
         self.hidden_pages.append(unit.label)
@@ -723,7 +702,7 @@ class Verifier:
         matcher = SequenceMatcher(None, [t.norm for t in tokens], [t.norm for t, _ in result_tokens], autojunk=False)
         opcodes = matcher.get_opcodes()
         aligned = sum(i2 - i1 for tag, i1, i2, _, _ in opcodes if tag == "equal")
-        trusted = len(tokens) >= 3 and aligned / len(tokens) >= 0.6  # 잘 맞춰진 줄이면 짧은 차이도 믿는다
+        trusted = len(tokens) >= 3 and aligned / len(tokens) >= 0.6
         segments = []
         folded = fold(plain)
         for tag, i1, i2, j1, j2 in opcodes:
@@ -794,9 +773,7 @@ class Verifier:
                 "source": _clip(source, max(center, 0)), "source_hit": source_hit, "result": result, "result_hit": result_hit,
                 "result_role": result_role}
 
-    # ------------------------------------------------------------ 셀 단위(XLSX·XLSM·CSV)
     def _check_cells(self, unit: SourceUnit) -> dict:
-        """원본 행과 결과 행을 짝지어 칸 대 칸으로 비교한다."""
         stats = {"key": unit.key, "label": unit.label, "page": unit.page, "sheet": unit.sheet, "kind": unit.kind,
                  "note": unit.note, "source_chars": 0, "matched_chars": 0, "coverage": None, "numbers_missing": 0,
                  "numbers_extra": 0, "spots": 0, "state": "checked", "result_lines": []}
@@ -851,7 +828,6 @@ class Verifier:
                 continue
             row_spots += 1
             line_no = target or last_line
-            # 바뀐·빠진 칸은 칸마다 의심점 하나(행으로 묶으면 한 번의 '맞음'이 같은 행의 다른 오류까지 해결한다).
             for cell, produced in missing:
                 ref = f"{unit.sheet}!{cell['cell']}" if unit.sheet else f"{line.ref} {cell['cell'].split()[-1]}"
                 message = (f"{unit.label} {line.ref}: 원본 칸 {cell['cell']} '{_clip(cell['value'], 0, 40)}'"
@@ -877,9 +853,7 @@ class Verifier:
         stats["spots"] = len(self.spots) - before
         return stats
 
-    # ------------------------------------------------------------ 차트: 저장된 표시값(numCache) ↔ 참조 셀
     def _check_chart(self, unit: SourceUnit) -> dict:
-        """계열마다 차트에 저장된 표시(캐시)와 원본 셀을 (범주, 값) 쌍과 점 개수로 대조한다. 축 눈금으로 값을 추정하지 않는다."""
         stats = {"key": unit.key, "label": unit.label, "page": None, "sheet": unit.sheet, "kind": "chart", "note": unit.note,
                  "source_chars": 0, "matched_chars": 0, "coverage": None, "numbers_missing": 0, "numbers_extra": 0, "spots": 0,
                  "state": "checked", "result_lines": [], "series": []}
@@ -950,9 +924,7 @@ class Verifier:
         stats["spots"] = len(self.spots) - before
         return stats
 
-    # ------------------------------------------------------------ CSV: 원본 레코드 ↔ 결과 칸, 주소별 양방향
     def _check_csv_grid(self, unit: SourceUnit) -> dict | None:
-        """원본 레코드와 결과 표의 모든 칸을 주소(레코드, 열)로 양방향 비교한다. 결과가 콘솔 CSV 표 문법이 아니면 None."""
         grid = decode_table(self.markdown)
         if grid is None:
             self.reasons.append(reason("grid_unavailable", "결과가 콘솔 CSV 표 문법이 아니어서 주소별 칸 대조를 하지 못했습니다(값 기준 대조로 바꿈)."))
@@ -971,7 +943,6 @@ class Verifier:
         if width != result_width and records and grid:
             self.spot(unit, "high", "grid_width", f"원본 표는 {width}열인데 결과 표는 {result_width}열입니다(구분자·칸 나눔이 다름).",
                       ref="머리 행", line=1, source=_clip(" | ".join(records[0])), result=self.result_text(1))
-        # 같은 앞·뒤를 빼고 차이 구간만 정렬한다(큰 표에서 빠르게).
         n, m = len(source_rows), len(result_rows)
         head = 0
         while head < min(n, m) and source_rows[head] == result_rows[head]:
@@ -1060,7 +1031,6 @@ class Verifier:
         return stats
 
     def _grid_pair_spot(self, unit, i, j, record, diff, source_count, result_count, a, b) -> None:
-        """짝지은 원본 레코드 i와 결과 행 j의 다른 칸들 → 의심점."""
         line = _record_line(j, None)
         row_text = _clip(" | ".join(record))
         if a in result_count and b in source_count and a != b and source_count[a] == result_count[a] and source_count[b] == result_count[b]:
@@ -1089,7 +1059,6 @@ class Verifier:
                       source=row_text, source_hit=x or "", result=self.result_text(line), result_hit=y or "", cell=f"{i + 1}행 {c + 1}열")
 
     def _csv_contract(self, records, width, row_spots, matched_rows, n) -> None:
-        """CSV 통과 후보 조건(형식 계약)."""
         evidence = self.evidence if self.evidence.get("kind") == "csv" else {}
         names = DELIMITERS
         if not evidence:
@@ -1128,7 +1097,6 @@ class Verifier:
             self.contract = True
 
     def _best_row(self, table_lines: list[int], options: list[list[str]]) -> int | None:
-        """원본 칸 값과 같은 칸이 가장 많은 결과 표 줄."""
         wanted = [choices for choices in options if choices]
         if not wanted or not table_lines:
             return None
@@ -1144,9 +1112,7 @@ class Verifier:
                 best, score = n, hits
         return best
 
-    # ------------------------------------------------------------ 그림 OCR 줄
     def _image_ocr_lines(self) -> None:
-        """그림 OCR로 넣은 결과 줄. 원본 글자 층에는 없는 글이다."""
         count = 0
         pseudo = SourceUnit(key="ocr", label="그림 속 글자")
         for n, raw in enumerate(self.raw, start=1):
@@ -1160,7 +1126,6 @@ class Verifier:
 
 def verify(source: SourceText, markdown: str, locations: list[dict], parser: str | None, fmt: str,
            evidence: dict | None = None) -> dict:
-    """의심점 전부(문서 순서, S번호)와 우선순위·finding ID·판정 근거."""
     return Verifier(source, markdown, locations, parser, fmt, evidence).run()
 
 
@@ -1170,7 +1135,6 @@ _LABEL_WORD = re.compile(r"[^\W\d_][\w\-]*")
 
 
 def measurements(text: str) -> list[dict]:
-    """글에서 (항목, 값, 단위) 벌을 순서대로 뽑는다."""
     folded = fold(text)
     out, cursor = [], 0
     for match in _MEASURE.finditer(folded):
@@ -1194,7 +1158,7 @@ def _same_number(a: str, b: str) -> bool:
 
 
 def measure_match(hidden_text: str, ocr_text: str) -> tuple[str, list[dict]]:
-    """같은 그림의 숨은 층 글과 OCR 글을 항목·값·단위 한 벌로 대조한다. agree · conflict(차이 목록) · unaligned · no_values."""
+    """돌려주는 값: agree · conflict(차이 목록) · unaligned · no_values."""
     left, right = measurements(hidden_text), measurements(ocr_text)
     if not left:
         return "no_values", []
@@ -1218,7 +1182,7 @@ def _overlap_share(a, b) -> float:
 
 
 def _same_picture(region: dict, by_box: list[dict], blocks: list[str], regions: int) -> tuple[str | None, str]:
-    """숨은 층 묶음과 같은 그림의 OCR 글. (글 또는 None, 짝지은 방법)"""
+    """돌려주는 값: (같은 그림의 OCR 글 또는 None, 짝지은 방법)."""
     box = region.get("bbox")
     if by_box and box:
         best = max(by_box, key=lambda item: _overlap_share(box, item.get("bbox") or (0, 0, 0, 0)))
@@ -1237,7 +1201,7 @@ def _value_text(value) -> str:
 
 
 def _same_category(cell, cached) -> bool:
-    """범주 셀 값과 차트에 저장된 범주 이름. 날짜 셀은 캐시가 날짜 일련번호(1900 체계)로 저장될 수 있다."""
+    """날짜 범주는 차트 캐시에 Excel 날짜 일련번호(1900 체계)로 저장될 수 있다."""
     if cached in (None, "") or cell in (None, ""):
         return (cached in (None, "")) == (cell in (None, ""))
     if isinstance(cell, str) and re.fullmatch(r"\d{4}-\d{2}-\d{2}(?:[T ][\d:.]+)?", cell):
@@ -1251,7 +1215,7 @@ def _same_category(cell, cached) -> bool:
 
 
 def _same_value(cell, cached) -> bool:
-    """차트 캐시 글자와 셀 값이 같은 값인지(캐시는 보통 전체 자릿수로 저장)."""
+    """차트 캐시는 보통 전체 자릿수로 저장된다."""
     if cached in (None, ""):
         return cell in (None, "")
     if cell in (None, ""):
@@ -1267,7 +1231,7 @@ def _newlines(value: str) -> str:
 
 
 def _record_line(index: int | None, rows: int | None) -> int:
-    """결과 표의 행 번호(0부터) → 결과 줄. 0행(머리 행)은 1줄, 그 뒤는 구분선(2줄) 때문에 한 줄 밀린다."""
+    """결과 표의 행 번호(0부터) → 결과 줄. 2줄은 구분선이다."""
     if index is None:
         return 1
     if rows is not None:
@@ -1280,7 +1244,6 @@ def _names(labels: list[str]) -> str:
 
 
 def image_only(markdown: str, fmt: str, parser: str | None) -> dict:
-    """글자 층이 없는 이미지 원본: 결과 전체가 OCR 결과다."""
     lines = [n for n, line in enumerate(markdown.split("\n"), start=1) if compact(result_plain(line))]
     spots = []
     if lines:

@@ -176,6 +176,8 @@ python -m pytest -q
 
 프론트 빌드의 번들 500kB 초과 안내는 React Flow 포함 때문이다.
 
+Node.js 25는 내장 `localStorage`를 전역에 두어 jsdom의 것을 가린다. `frontend/vite.config.ts`가 테스트 작업자에 `--no-experimental-webstorage`를 넘기므로(그 플래그를 아는 Node에서만) 따로 설정할 것은 없다. 프론트 테스트가 `localStorage.clear is not a function`으로 무더기로 실패하면 이 설정이 빠졌는지 본다.
+
 ### 자주 보는 증상
 
 | 증상 | 먼저 확인할 것 |

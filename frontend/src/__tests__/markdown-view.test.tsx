@@ -92,6 +92,19 @@ describe('읽기 보기', () => {
     expect(screen.getByText('위험').closest('[data-tip]')?.getAttribute('data-tip')).toBe('javascript:alert');
   });
 
+  it('같은 깊이에서 번호와 글머리표가 섞이면 원래 표지를 보이고, 번호만 있으면 번호 목록으로 그린다', () => {
+    const { unmount } = render(<MarkdownView markdown={'- 가 항목\n3. 나 항목\n- 다 항목'} />);
+    const mixed = screen.getByText('나 항목').closest('li');
+    expect(mixed?.parentElement?.tagName).toBe('UL');
+    expect(mixed?.getAttribute('data-marker')).toBe('3.');
+    expect(screen.getByText('가 항목').closest('li')?.hasAttribute('data-marker')).toBe(false);
+    unmount();
+    render(<MarkdownView markdown={'3. 나 항목\n4. 다 항목'} />);
+    const list = screen.getByText('나 항목').closest('ol');
+    expect(list?.getAttribute('start')).toBe('3');
+    expect(list?.querySelector('[data-marker]')).toBeNull();
+  });
+
   it('숫자만 든 열은 오른쪽 정렬한다', () => {
     render(<MarkdownView markdown={'| 항목 | 값 |\n|---|---|\n| 온도 | 12.5 |\n| 면적 | 25 m² |'} />);
     expect((screen.getByRole('cell', { name: '12.5' }) as HTMLElement).style.textAlign).toBe('right');

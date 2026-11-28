@@ -104,6 +104,23 @@ def test_markdown_keeps_heading_path_and_small_tables_whole():
     assert "merged-sections" in first["flags"]
 
 
+def test_markdown_heading_only_section_joins_its_subsection_not_the_previous_body():
+    text = "## 1장\n\n본문 하나.\n\n## 2장\n\n### 2.1 절\n\n둘째 본문."
+    chunks = run_strategy(Source(text), {"kind": "markdown", "params": {"unit": "chars", "size": 400, "merge_small": True, "min_size": 200}})["chunks"]
+    assert [c["text"] for c in chunks] == ["## 1장\n\n본문 하나.", "## 2장\n\n### 2.1 절\n\n둘째 본문."]
+
+
+def test_chunking_imports_only_the_standard_library():
+    import ast
+    import sys
+    from pathlib import Path
+    import app.chunking
+    tree = ast.parse(Path(app.chunking.__file__).read_text(encoding="utf-8"))
+    imported = {alias.name for node in ast.walk(tree) if isinstance(node, ast.Import) for alias in node.names}
+    imported |= {node.module for node in ast.walk(tree) if isinstance(node, ast.ImportFrom) and node.module}
+    assert {name.split(".")[0] for name in imported} <= set(sys.stdlib_module_names)
+
+
 def test_markdown_splits_large_tables_by_rows_and_repeats_header():
     rows = "\n".join(f"| 장비 {i:02d} | {i}.5 °C | 1일 {i % 3 + 1}회 |" for i in range(40))
     text = f"## 보관 조건\n\n| 장비 | 온도 | 주기 |\n| --- | --- | --- |\n{rows}\n\n표 아래 문장."
@@ -240,6 +257,10 @@ def test_semantic_chunking_needs_an_embedder_and_caps_size():
 def test_semantic_units_window_does_not_cross_sections():
     units = semantic_units(Source(SEMANTIC_DOC))
     assert sum(u.atomic for u in units) == 1 and units[0].hard
+    calls = []
+    text = "## A\n\n펌프 문장 하나다. 펌프 문장 둘이다.\n\n## B\n\n배관 문장 하나다. 배관 문장 둘이다."
+    run_strategy(Source(text), {"kind": "semantic", "params": {"unit": "chars", "size": 400, "buffer": 1}}, embed=topic_embed(calls))
+    assert calls and not any("펌프" in window and "배관" in window for window in calls)
 
 
 def test_semantic_chunking_keeps_figures_and_table_captions_with_their_targets():
@@ -261,3 +282,20 @@ def test_semantic_chunking_keeps_figures_and_table_captions_with_their_targets()
         assert semantic["by_kind"].get("caption") == element["by_kind"].get("caption")   # 캡션은 대상과 같은 청크
         assert set(semantic["by_kind"].get("table", {})) <= {"whole"}                      # 표는 통째
         assert semantic["stats"]["coverage"] == 1.0
+
+
+@pytest.mark.parametrize("text, expected", [
+    # 표 위에 제목이 붙으면 그 앞 캡션은 앞 절(그림)의 것이다
+    ("<!-- image -->\n그림 1. 펌프 사진\n\n## 2장\n\n| a | b |\n| --- | --- |\n| 1 | 2 |\n",
+     ["<!-- image -->\n그림 1. 펌프 사진", "## 2장\n\n| a | b |\n| --- | --- |\n| 1 | 2 |"]),
+    # 쪼개진 캡션은 제목에서 시작한 조각까지만 표에 붙는다
+    ("<!-- image -->\n그림 1. 펌프 사진\n\n## 2장\n\n표 1. 압력 기록\n측정 조건\n\n| a | b |\n| --- | --- |\n| 1 | 2 |\n",
+     ["<!-- image -->\n그림 1. 펌프 사진", "## 2장\n\n표 1. 압력 기록\n측정 조건\n\n| a | b |\n| --- | --- |\n| 1 | 2 |"]),
+    # 표 바로 아래 캡션은 표와 한 덩어리
+    ("| a | b |\n| --- | --- |\n| 1 | 2 |\n\n표 1. 압력 기록\n\n배관 점검 문단이다.\n",
+     ["| a | b |\n| --- | --- |\n| 1 | 2 |\n\n표 1. 압력 기록", "배관 점검 문단이다."]),
+])
+def test_semantic_table_captions_belong_to_their_own_section(text, expected):
+    params = {"unit": "chars", "size": 400, "min_size": 0, "buffer": 0, "breakpoint": 90}
+    chunks = run_strategy(Source(text), {"kind": "semantic", "params": params}, embed=topic_embed())["chunks"]
+    assert [c["text"] for c in chunks] == expected

@@ -14,18 +14,12 @@ import { ResultModal } from './retrieval/eval-result';
 import './retrieval.css';
 import './embedding.css';
 
-/**
- * 임베딩 평가: 모델을 행으로 놓고 본문·표·그림 질문별 정확도를 나란히 본다.
- * 청킹은 청킹 벤치의 방식 하나로 고정한다. 입력 한도 초과·벡터 용량 열은 실행 전에도 실제 계산값이다.
- * 문서·질문·모델 설정과 질문별 결과는 팝업으로 연다.
- */
 type Ui = { metric: MetricKey; basis: Basis; sort?: 'setup' | 'score'; pinnedModel?: string };
 type Setup = EvalSetup;
 type Pick = { candidateId: string; kind: KindKey };
 type PlanState = { key: string; data: PlanResult | null; error: string | null };
 type Dialog = 'conditions' | 'connection' | null;
 
-/** 기본 모델이 다섯으로 바뀌어 저장 키를 올렸다. 이전 구성은 읽지 않는다. */
 const SETUP_KEY = `${STORE.candidates}:v3`;
 const POLL_MS = 1500;
 const PLAN_DELAY = 300;
@@ -64,7 +58,6 @@ export default function EmbeddingEval({ active }: { active: boolean }) {
   useEffect(() => { if (active && !loaded.current) { loaded.current = true; void load(); } }, [active, load]);
   useEffect(() => { if (active) setPresets(loadPresets()); }, [active]);
 
-  /* 실행 중이고 화면이 보일 때만 진행 상태를 묻는다. */
   const running = run?.status === 'running';
   useEffect(() => {
     if (!active || !running) return;
@@ -85,7 +78,6 @@ export default function EmbeddingEval({ active }: { active: boolean }) {
     return () => { stopped = true; clearTimeout(timer); controller.abort(); };
   }, [active, running]);
 
-  /* ---------- 현재 구성 ---------- */
   const caps = config?.caps ?? run?.caps ?? null;
   const candidates = useMemo<Candidate[]>(() => Array.isArray(setup.candidates) ? setup.candidates.filter(isCandidate).map(normalizeCandidate) : defaultCandidates(config), [setup.candidates, config]);
   const preset = presets.find(p => p.id === setup.presetId) ?? presets.find(p => p.kind === 'element') ?? presets[0] ?? null;
@@ -98,7 +90,6 @@ export default function EmbeddingEval({ active }: { active: boolean }) {
   const sampleCount = docIds.filter(id => id.startsWith('sample:')).length;
   const models = [...new Set(candidates.map(c => c.model.trim()).filter(Boolean))];
 
-  /* ---------- 계획: 고른 청킹으로 나눈 청크 수, 모델별 입력 한도 초과, 벡터 용량(외부 호출 없음) ---------- */
   const planBody = useMemo(() => preset && docIds.length && models.length ? { doc_ids: docIds, preset, models } : null, [preset, docIds, models.join('\n')]); // eslint-disable-line react-hooks/exhaustive-deps
   const planKey = JSON.stringify([planBody, questions?.map(q => [q.doc_id, q.answer, q.kind])]);
   useEffect(() => {
@@ -119,7 +110,6 @@ export default function EmbeddingEval({ active }: { active: boolean }) {
   const activeQuestions = (questions ?? []).filter(q => docSet.has(q.doc_id));
   const questionTotal = activeQuestions.length;
 
-  /* ---------- 실행 ---------- */
   const connOk = (c: Candidate) => !!config?.connections.find(x => x.key === c.connection && x.configured);
   const reason = !config ? (loadError ?? (ready ? '설정을 불러오지 못했습니다' : null))
     : !config.configured ? '임베딩 연결이 없습니다'
@@ -145,7 +135,6 @@ export default function EmbeddingEval({ active }: { active: boolean }) {
     finally { setBusy(false); }
   };
 
-  /* ---------- 결과: 지금 고른 청킹과 같은 실행일 때만 칸을 채운다. ---------- */
   const runPreset = run?.request.presets[0] ?? null;
   const shown = run && runPreset && samePreset(runPreset, preset) ? run : null;
   const comboOf = useCallback((candidate: Candidate): Combo | undefined => {
@@ -182,7 +171,6 @@ export default function EmbeddingEval({ active }: { active: boolean }) {
   const rows = [...sortedRows.filter(c => c.id === ui.pinnedModel), ...sortedRows.filter(c => c.id !== ui.pinnedModel)];
   const runPresetLocal = runPreset ? presets.find(p => samePreset(p, runPreset)) ?? null : null;
 
-  /* 상태는 한 자리에 하나만. */
   let status: { tone: '' | 'bad' | 'warn' | 'ok'; body: ReactNode };
   if (actionError) status = { tone: 'bad', body: actionError };
   else if (running && run) {

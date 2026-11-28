@@ -11,7 +11,6 @@ import Overview from './vectordb/Overview';
 import PartitionModal, { type PartRef } from './vectordb/PartitionModal';
 import './vectordb.css';
 
-/** 벡터 DB(읽기 전용). 화면이 처음 열릴 때 한 번 불러온다. */
 export default function VectorDbWorkspace({ active }: { active: boolean }) {
   const [started, setStarted] = useState(active);
   useEffect(() => { if (active) setStarted(true); }, [active]);

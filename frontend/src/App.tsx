@@ -24,8 +24,7 @@ const EmbeddingEval = lazy(() => import('./EmbeddingEval'));
 const VectorDbWorkspace = lazy(() => import('./VectorDbWorkspace'));
 const AgentActivity = lazy(() => import('./AgentActivity'));
 
-/** 사이드바 접기·펼치기 아이콘. 둥근 막대가 사이드바, 화살표가 누를 때 갈 방향이다.
- * 상태가 바뀌면 막대가 줄고 늘며 화살표가 뒤집히고, 마우스를 올리면 누른 뒤 모습을 미리 보여 준다(shell.css). */
+/** 둥근 막대가 사이드바, 화살표가 누를 때 갈 방향이다(움직임은 shell.css). */
 function SidebarGlyph() {
   return <svg className="shell-glyph" viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
     <rect className="shell-glyph-frame" x="2.75" y="3.75" width="14.5" height="12.5" rx="3.25"/>
@@ -35,7 +34,6 @@ function SidebarGlyph() {
 }
 
 const finderItems = (Object.keys(destinations) as Page[]).map(id => ({ id, ...destinations[id] }));
-/** 사이드바를 접어 두었는지(이 브라우저에만 기억). 저장소를 못 쓰면 펼친 상태로 시작한다. */
 const SIDEBAR_KEY = 'docops.sidebar';
 function readSidebarOpen() {
   try { return localStorage.getItem(SIDEBAR_KEY) !== 'collapsed'; } catch { return true; }
@@ -46,7 +44,7 @@ function keyboardFocusInside(element: HTMLElement) {
   try { return focused.matches(':focus-visible'); } catch { return false; }
 }
 function saveSidebarOpen(open: boolean) {
-  try { localStorage.setItem(SIDEBAR_KEY, open ? 'open' : 'collapsed'); } catch { /* 기억하지 못해도 동작은 같다 */ }
+  try { localStorage.setItem(SIDEBAR_KEY, open ? 'open' : 'collapsed'); } catch { }
 }
 const shortcut = /Mac|iPhone|iPad/.test(navigator.platform) ? '⌘ K' : 'Ctrl K';
 
@@ -64,7 +62,6 @@ export default function App() {
   const example = examples.includes(active) || active === 'pipeline';
   const [visited, setVisited] = useState<Page[]>([active]);
   const [sidebarOpen, setSidebarOpenState] = useState(readSidebarOpen);
-  // 접힌 사이드바에 마우스를 올리거나 키보드 초점이 들어가면 본문을 밀지 않고 겹쳐 펼친다(고정 아님). 벗어나면 다시 접힌다.
   const [peek, setPeek] = useState(false);
   const peekTimer = useRef<number | undefined>(undefined);
   const peekBlocked = useRef(false);
@@ -104,7 +101,7 @@ export default function App() {
     onPointerLeave: (event: PointerEvent<HTMLElement>) => {
       peekBlocked.current = false;
       if (event.pointerType === 'touch' || event.pointerType === 'pen') return;
-      if (keyboardFocusInside(event.currentTarget)) return; // 키보드로 메뉴를 고르는 중이면 그대로 둔다
+      if (keyboardFocusInside(event.currentTarget)) return;
       schedulePeek(false, 220);
     },
     onFocus: () => { window.clearTimeout(peekTimer.current); setPeek(true); },

@@ -19,13 +19,12 @@ const filterOptions: {id:Filter; label:string}[] = [
 ];
 const sortOptions: {id: DocSort; label: string}[] = [{id:'recent', label:'올린 순'}, {id:'updated', label:'마지막 변경 순'}, {id:'name', label:'이름 순'}];
 const needsAttention = (status: DisplayStatus) => status === 'failed' || status === 'unsupported';
-/** 끝난 작업의 안내. 글자 없는 이미지는 실패가 아니므로 오류로 띄우지 않는다. */
+/** 글자 없는 이미지는 실패가 아니므로 오류로 띄우지 않는다. */
 const outcome = (doc: LiveDoc) => isNoTextImage(doc) ? {notice:`${doc.name}: 이미지에서 글자를 찾지 못했습니다. 상세에서 확인해 주세요.`}
   : doc.status === 'completed' ? {notice:`${doc.name} 파싱이 완료되었습니다. 결과를 확인해 주세요.`}
   : doc.status === 'failed' || doc.status === 'unsupported' ? {error:`${doc.name}: ${doc.status === 'failed' ? '파싱에 실패했습니다.' : '지원하지 않는 형식입니다.'} 상세 상태를 확인해 주세요.`} : null;
 const POLL_INTERVAL_MS = 2000;
 const MAX_POLL_ATTEMPTS = 120;
-/** 한 번에 받는 문서 수. 더 보기로 이어 받는다. 처리 중 다시 읽을 때는 받은 만큼(최대 500)을 한 번에 다시 읽는다. */
 const PAGE = 50;
 const REFRESH_MAX = 500;
 const formatLabel = (format: string) => format || '확장자 없음';
@@ -46,7 +45,6 @@ const savedFilter = (saved: Saved) => filterOptions.find(f => f.id === saved.fil
 const savedFormat = (saved: Saved) => typeof saved.format === 'string' ? saved.format : null;
 const savedSort = (saved: Saved) => sortOptions.find(option => option.id === saved.sort)?.id ?? 'recent';
 
-/** 예전 서버(전체 목록만 줌): 화면이 거르고 정렬하고 센다. */
 function legacyView(documents: LiveDoc[], query: string, filter: Filter, format: string | null, sort: DocSort) {
  const byStatus = (doc: LiveDoc) => { const status = displayStatus(doc); return filter === 'all' || (filter === 'attention' ? needsAttention(status) : status === filter); };
  const byFormat = (doc: LiveDoc) => format === null || (doc.format || '').toUpperCase() === format;
@@ -85,7 +83,7 @@ export default function LiveWorkspace({ active = true, route, onRoute, onFamily,
  const [bulkProcessing,setBulkProcessing]=useState(false);
  const [filter,setFilter]=useState<Filter>(() => savedFilter(readSaved()));
  const [query,setQuery]=useState<string>(() => typeof readSaved().query === 'string' ? readSaved().query as string : '');
- const [searched, setSearched] = useState(query); // 입력을 잠시 멈췄을 때 서버에 묻는다
+ const [searched, setSearched] = useState(query);
  const [format, setFormat] = useState<string | null>(() => savedFormat(readSaved()));
  const [sort, setSort] = useState<DocSort>(() => savedSort(readSaved()));
  const [localRoute, setLocalRoute] = useState<WorkspaceRoute>({page:'live'});
@@ -117,13 +115,11 @@ export default function LiveWorkspace({ active = true, route, onRoute, onFamily,
  listQuery.current = {q: searched, status: filter, format, sort};
  const loadedCount = useRef(0);
  loadedCount.current = documents.length;
- // 조건(검색·상태·확장자·정렬)이 바뀔 때만 올린다. '더 보기' 응답은 조건이 그대로면 처리 중 주기적 다시 읽기와 겹쳐도 버리지 않는다.
  const queryVersion = useRef(0);
  useEffect(() => { const timer = window.setTimeout(() => setSearched(query), 250); return () => window.clearTimeout(timer); }, [query]);
  const detail = detailRead?.id === selectedId ? detailRead : undefined;
  const listed = documents.find(doc => doc.id === selectedId) ?? outside.find(doc => doc.id === selectedId);
  const current = detail?.missing ? null : listed ?? detail?.doc ?? null;
- // 예전 서버는 화면이 거른다: 서버에 묻지 않으니 입력을 기다리지 않고 바로 거른다.
  const legacy = useMemo(() => listMeta.legacy ? legacyView(documents, query, filter, format, sort) : null, [listMeta.legacy, documents, query, filter, format, sort]);
  const shown = legacy ? legacy.shown : documents;
  const facets = legacy ? legacy.facets : listMeta.facets;
@@ -213,26 +209,22 @@ export default function LiveWorkspace({ active = true, route, onRoute, onFamily,
      known.delete(doc.id);
      return cached && Date.parse(cached.updated_at) > Date.parse(doc.updated_at) ? {...cached, qc: doc.qc ?? cached.qc} : doc;
     });
-    // A file added during this read may be absent from the server snapshot.
     if (reset) return changedDuringRead ? [...known.values(), ...merged] : merged;
-    // 처리 중 다시 읽기: 처음부터 limit개 범위만 새로 받았다. 그 범위 밖에서 '더 보기'로 이어 받은 행은 순서대로 남긴다
-    // (다시 읽기가 '더 보기'보다 먼저 시작해 늦게 끝나도 이어 받은 행이 사라지지 않게).
     const inWindow = new Set(body.documents.map(doc => doc.id));
     const tail = previous.slice(limit).filter(doc => !inWindow.has(doc.id));
     const added = changedDuringRead ? previous.slice(0, limit).filter(doc => !inWindow.has(doc.id)) : [];
     keptTail = tail.length;
     return [...added, ...merged, ...tail];
    });
-   // 이어 받은 행이 남아 있으면 다음 쪽 위치도 그 끝(앞서 '더 보기'가 받은 커서)을 그대로 쓴다.
-   // (setDocuments의 갱신 함수가 먼저 돈다: 같은 렌더에서 documents 훅이 listMeta 훅보다 앞에 있다. 받은 행 수로도 한 번 더 본다.)
+   // keptTail은 setDocuments 갱신 함수가 먼저 돌며 채운다(documents 훅이 listMeta 훅보다 앞). 받은 행 수로도 한 번 더 본다.
    setListMeta(meta => ({total: body.total, next: !reset && (keptTail || loadedCount.current > limit) ? meta.next : body.next_cursor,
      facets: body.facets, legacy: !!body.legacy}));
    setListError('');
-   // 지금 쪽 밖에서 처리 중인 문서(이 화면이 접수한 것)는 따로 묻는다: 완료 알림을 놓치지 않게.
+   // 쪽 밖에서 처리 중인 접수 문서는 따로 묻는다: 완료 알림을 놓치지 않게.
    const inWindow = new Set(body.documents.map(doc => doc.id));
    const missing = [...watchedJobs.current].filter(id => !inWindow.has(id));
    if (missing.length && !body.legacy) {
-    try { const extra = await getDocumentsByIds(missing); if (isCurrent()) setOutside(extra); } catch { /* 다음 확인에서 다시 묻는다 */ }
+    try { const extra = await getDocumentsByIds(missing); if (isCurrent()) setOutside(extra); } catch { }
    } else if (isCurrent()) setOutside([]);
   } catch(error) { if (isCurrent()) setListError(displayError(error)); }
   finally { if (isCurrent()) setLoading(false); }
@@ -246,7 +238,7 @@ export default function LiveWorkspace({ active = true, route, onRoute, onFamily,
   const version = queryVersion.current;
   try {
    const body = await listDocumentPage({q: q.q, status: q.status, format: q.format, sort: q.sort, cursor: listMeta.next, limit: PAGE});
-   if (!mounted.current || version !== queryVersion.current) return;  // 그 사이 조건이 바뀌었다
+   if (!mounted.current || version !== queryVersion.current) return;
    setDocuments(previous => { const ids = new Set(previous.map(doc => doc.id)); return [...previous, ...body.documents.filter(doc => !ids.has(doc.id))]; });
    setListMeta(meta => ({...meta, total: body.total, next: body.next_cursor, facets: body.facets}));
   } catch (error) { if (mounted.current) setActionError(displayError(error)); }
@@ -348,7 +340,6 @@ export default function LiveWorkspace({ active = true, route, onRoute, onFamily,
   } catch(error){if(mounted.current)setActionError(displayError(error))}
   finally{if(mounted.current)setProcessingId(null)}
  }
- /** 허용 폴더에서 가져온 문서를 목록에 넣는다. 파싱은 하지 않는다. */
  function addImported(docs: LiveDoc[]) {
   if (!mounted.current || !docs.length) return;
   mutationVersion.current += 1;
@@ -358,7 +349,6 @@ export default function LiveWorkspace({ active = true, route, onRoute, onFamily,
   setSummaryRevision(n => n + 1);
   setNotice(`${docs.length}개 문서를 허용 폴더에서 가져와 이 컴퓨터의 로컬 저장소에 두었습니다. 파싱은 별도로 실행해 주세요.`);
  }
- /** 가져오기 결과에서 사용자가 누른 일괄 파싱. 하나씩 접수하고, 접수하지 못한 문서는 이유를 모아 보여 준다. */
  async function processMany(docs: LiveDoc[]) {
   if (bulkProcessing || !docs.length) return;
   setBulkProcessing(true); setActionError(''); setNotice('');

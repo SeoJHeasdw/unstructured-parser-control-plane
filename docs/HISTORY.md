@@ -11,6 +11,17 @@
 
 [인수인계와 실행 안내](HANDOFF_AND_RUNBOOK.md) 앞부분에 쌓여 있던 세션별 기록을 2026-11-27에 그대로 옮겼다(최신이 위).
 
+### 2026-11-28 주석 정리 2차(verify·chunking·화면), 이미지 자동 대조 복구, Node 25 테스트 설정
+
+- **요청(사용자):** 주석 정리를 이어서. 커밋 안 된 frontend 변경 때문에 프론트 테스트 33개가 실패하는지 확인하고 원인이면 버린다. AGENTS.md '주석과 이력' 기준으로 `verify.py`·`chunking.py` 주석을 정리하고 지운 경위는 §2에 둔다. 이어서 남은 것(1차 정리의 경위, 청크 위치 계약, Node 25 설정)까지 처리해 main에 올리고 불필요한 원격 브랜치를 지운다.
+- **프론트 테스트 33개 실패는 커밋 안 된 변경 탓이 아니다:** 작업 트리의 frontend 변경(22개 파일, 주석을 지우거나 줄이기만 함)을 stash한 HEAD에서도 같은 33개(4개 파일)가 `localStorage.clear is not a function`으로 실패했다. 개발 Mac의 Node.js 25.9.0이 내장 `localStorage`를 전역에 두어 jsdom의 것을 가린다. 그래서 변경은 버리지 않고 이 정리와 함께 커밋했다. `frontend/vite.config.ts`가 테스트 작업자에 `--no-experimental-webstorage`를 넘기게 했다(그 플래그를 아는 Node에서만, Node 20에서는 넘기지 않음).
+- **`vectordb.test.tsx` 간헐 실패(11-27 기록에도 있음):** 청크 목록이 먼저 그려지고 첫 청크 선택은 다음 effect에서 붙는데, 테스트가 그 사이에 선택 상태를 읽었다. 선택이 붙을 때까지 기다리게 고쳤다(전체 실행 6회 모두 통과).
+- **이미지 자동 대조 복구:** `verify.py` 끝에 `measurements`부터 `image_only`까지가 한 벌 더 있었다. `f7f7ebb`(11-27)에서 새 판을 앞에 넣으면서 `acd7ce8`(11-26)의 옛 판이 남은 것이다. 겹친 함수 10개는 글자까지 같았지만 `image_only`는 옛 모양(`reasons`·`checks`·`contract`·`rule_version`·finding ID 없음)이었고, 파이썬은 뒤 정의를 쓴다. 그래서 PNG·JPG·SVG 같은 이미지 문서는 `ensure_qc`에서 `KeyError: 'reasons'`가 나서 원장을 만들지 못했다. 원문 대조와 `GET …/verify`는 500이었고 깔때기에는 '미평가'로 남았다. 옛 판을 지우고 API 경로 회귀 테스트 `test_qc_ledger.py::test_image_result_goes_through_the_ledger_as_ocr_that_needs_review`를 더했다(고치기 전 코드에서 같은 KeyError로 실패). 실패한 계산은 원장에 저장되지 않았으므로, 업데이트 뒤 조회하거나 시작 시 다시 대조할 때 계산된다.
+- **주석 정리:** 기준과 지운 경위는 §2(화면, `verify`·`chunking`, 1차 정리의 다른 모듈). 주석으로만 있던 규칙을 테스트로 고정했다(백엔드 12개, 화면 4개, 화면이 서버 값을 따로 든 곳 2개는 `test_frontend_mirrors.py`). 규칙을 하나씩 깨면 해당 테스트가 실패하는 것을 확인했다. `verify.py`·`chunking.py`는 docstring을 뺀 AST를 정리 전과 비교해 주석만 바뀐 것을 확인했다. 청크 위치 규칙은 [API·데이터 계약](API_AND_DATA_CONTRACT.md) '청크 위치'로 옮겼다.
+- **브랜치:** 원격 `ccr-23f5b2fb-ouvb49`(`e66e190`)·`ccr-32aeeb51-ksbsji`(`f5c64e3`)·`ccr-5167992f-whgl0f`(`acd7ce8`)·`ccr-e549082e-ta1etq`(`c18138c`)는 모두 main에 이미 들어간 커밋을 가리켜(main보다 앞선 커밋 0개) 지웠다. 괄호 안은 지울 때의 끝 커밋이다.
+- **검증:** 백엔드 `pytest` 372개 통과(새 13개). 프론트 `npm test` 189개 통과(새 4개, 플래그 없이)·빌드.
+- **고객사 PC 반영:** 이미지 문서가 있으면 업데이트 뒤 원문 대조가 열린다. DB 변경은 없다.
+
 ### 2026-11-27 (오후) 반입 리뷰 8건 반영
 
 - **리뷰(다른 에이전트, `f7f7ebb`·`9ec49da`를 따로 꺼내 합성 문서로 재현):** 1차 반입 보류. 필수 수정 1~3번과 추가 5건. 원칙은 '사람이 볼 수 없는 차이·확인하지 않은 범위는 해결로 세지 않는다'로 묶었다. 결정 기록: [결정](DECISIONS.md) '반입 리뷰 8건 반영'. 계약: [API·데이터 계약](API_AND_DATA_CONTRACT.md) §11 '리뷰 반영'.
@@ -338,5 +349,121 @@
 
 ## 2. 코드 주석에서 옮긴 경위
 
-2026-11-27 주석 정리 때 코드 주석·docstring에서 뺀 경위다. 위치는 옮길 당시의 모듈과 함수 이름이다.
+주석 정리 때 코드 주석·docstring에서 뺀 경위다(최신이 위). 위치는 옮길 당시의 모듈과 함수 이름이다.
+
+### 2026-11-28 `frontend/src`
+
+기준은 아래 `verify`·`chunking` 항목과 같다. 규칙을 적은 주석은 테스트가 있는지 확인했고, 없던 것은 테스트를 더했다(규칙을 깨면 실패하는 것을 확인).
+
+**주석으로만 있던 규칙 → 테스트**
+
+- `AgentActivity.groupCalls`: 연결(MCP 프로세스·CLI 실행)마다 묶고, 연결 표식이 없는 예전 기록은 10분 넘게 쉬면 나눈다 → `agent-activity.test.tsx` '연결 표식이 없는 예전 호출 기록은 10분 넘게 쉰 곳에서 나눈다'.
+- `MarkdownView.List`: 같은 깊이에서 번호 목록과 글머리표가 섞이면 원래 표지(1. · -)를 그대로 보인다 → `markdown-view.test.tsx` '같은 깊이에서 번호와 글머리표가 섞이면…'.
+- `SearchPipeline.useFlow`: 처음 열 때 흐름을 차례로 켜고, 동작 줄이기 설정이면 바로 다 켠다 → `search-pipeline.test.tsx` '흐름은 처음 열 때 차례로 켜고…'.
+- `ChunkBench`: 한도 초과는 알려진 모델 가운데 가장 작은 입력 한도로 센다(기존 테스트는 모델이 하나뿐이었다) → `chunk-bench.test.tsx` '한도 초과는 알려진 모델 가운데 가장 작은 입력 한도로 센다'.
+- 화면이 서버 값을 따로 든 곳: `LiveDocumentView.IMAGE_FORMATS`(= `app/formats.py`), `ModelWorkspace.OCR_DEFAULTS`(= `app/ocr_model.py` `DEFAULTS`, 예전 서버가 defaults를 보내지 않을 때만 씀) → `backend/tests/test_frontend_mirrors.py`. 주석은 대응하는 서버 위치로 남겼다.
+
+**이미 테스트가 있던 규칙**
+
+- 사이드바: 접힌 채 마우스·키보드 초점이 들어가면 본문을 밀지 않고 겹쳐 펼치고 벗어나면 접힌다, 접힘은 이 브라우저에만 기억한다 → `review-desk.test.tsx`. 저장소를 못 쓰면 펼친 상태로 시작한다는 것은 테스트하지 않는다(`readSidebarOpen`의 `catch`).
+- 에이전트 작업: 화면이 보일 때만 10초마다 다시 읽는다, 검수 요청을 못 읽어도 활동은 보인다 → `agent-activity.test.tsx`.
+- 이미지에서 글자를 찾지 못한 경우(서버 `failed` + `no_text`)는 실패가 아니라 '글자 없음', D번호는 'D12'·'d12'·'D-12'·'#12'·'12'로 읽는다 → `live-labels.test.tsx`.
+- 문서함: 조건(검색·상태·확장자·정렬)이 바뀔 때만 늦게 온 응답을 버린다. 처리 중 다시 읽기는 처음부터 받은 만큼(최대 500)만 다시 받고, 그 범위 밖에서 '더 보기'로 이어 받은 행과 다음 쪽 위치는 남긴다(다시 읽기가 먼저 시작해 늦게 끝나도 사라지지 않게) → `qc-ledger.test.tsx`.
+- '모두 선택'은 파서가 있고 문서함에 아직 없는 파일만 고른다 → `folder-import.test.tsx`.
+- OCR 지시문이 기본값과 같으면 빈 칸으로 두고 자리 표시에 기본값을 보인다(비워 저장하면 서버가 기본값), API 키를 비워 두면 저장된 키를 유지한다 → `model-workspace.test.tsx`.
+- 임베딩 평가: 지금 고른 청킹과 같은 실행일 때만 결과 칸을 채운다 → `embedding-eval.test.tsx`. 의미 기반 전략은 사용자가 '나누기'를 누를 때만 문장 임베딩을 계산한다 → `chunk-bench.test.tsx`.
+
+**옮긴 경위·설명**
+
+- `EmbeddingEval.SETUP_KEY`(`…:v3`): 기본 모델이 다섯으로 바뀌어 저장 키를 올렸고 이전 구성은 읽지 않는다.
+- `api/live.ts` 원장 필드: "원장(2026-11-27). 예전 서버에는 없다."
+- 예전 서버 호환 메모(그 값이 없으면 화면이 빈 값을 채우거나 그리지 않는다): 문서 `seq`(D번호), 의심점 `id`·`rank`, `ocr_model`, 원장 필드, 목록의 `qc`(쪽 단위 질의에만 붙음), 검수 요청 `finding_id`·`rule_version`, 에이전트 활동의 `documents`, 처리 깔때기(`qc-summary`가 없으면 그리지 않음), 다시 대조 진행·`qc_stale`, 청크의 `qc`와 `source.run_id`, 조건 없는 전체 목록(화면이 거르고 정렬하고 센다).
+- `QcFunnel`: 마지막 단계(통과 후보)만 보고 처리율을 말하면 스캔·미지원 파일이 통계에서 사라지므로 분모를 차례로 보인다. 통과 후보도 기록 모드라 사람 검수를 이어 간다.
+- `EmbeddingEval`: 청킹은 청킹 벤치의 방식 하나로 고정한다. 입력 한도 초과·벡터 용량 열은 실행 전에도 실제 계산값이다(외부 호출 없는 계획).
+- `ModelWorkspace`: 바꾼 지시문이 있으면 지시문 칸을 처음부터 펼치고, 이후 열고 닫기는 사용자에게 맡긴다.
+- `LiveWorkspace`: 검색어는 입력을 250ms 멈췄을 때 서버에 묻는다(예전 서버는 화면이 거르므로 기다리지 않는다). 지금 쪽 밖에서 처리 중인 접수 문서는 `ids=`로 따로 물어 완료 알림을 놓치지 않는다.
+- `SearchPipeline`: 에이전트 개발 측·운영자·현업과 같은 그림을 보며 이야기하려고 만든 화면이다. 흐름 지도 한 장(에이전트 → 검색 엔드포인트 → 저장소 ← 색인 파이프라인)에 단계와 결정 상태를 올리고, 좌표는 1060 × 548이다. 검색 엔드포인트 줄은 늘 펼쳐 두고, 접은 줄은 캡슐 하나로 서며 다른 줄의 선은 그 캡슐에 닿는다. 단계를 누르면 정한 것과 정할 것을 보이고 원래 설명 글은 '자세히'로 접는다.
+- 그 밖에 이름·화면 설명을 되풀이한 JSDoc, 구획선, `catch { /* … */ }` 안의 설명은 옮기지 않고 지웠다.
+
+### 2026-11-28 `app/verify.py`·`app/chunking.py`
+
+남긴 것은 외부 사실(파일 형식·Docling 동작), 임계값 근거, 데이터 뜻(필드 값 목록, 0부터·1부터, 튜플 반환 구성)뿐이다. 이름을 되풀이하거나 코드 순서를 풀어 쓴 docstring과 구획선(`# ---- …`)은 옮기지 않고 지웠다. `chunking.py`는 1차 정리(`f87a0b4`)에서 지운 내용도 여기 함께 옮긴다(1차 표시).
+
+**코드와 어긋나 있던 주석**
+
+- `verify` 모듈 docstring: "위치가 없는 결과 줄은 바로 앞(없으면 뒤) 위치의 단위로 본다." `Verifier._map_regions`는 앞뒤 단위 모두에 넣는다. 그 자리 주석이 이유를 적고 있었다: 단위 경계에 걸린 제목(빈 줄·시트 이름 포함)을 놓치지 않으려고. 주석대로 바꾸면 `test_verify.py::test_unlocated_line_between_pages_belongs_to_both_neighbouring_pages`가 실패한다.
+- `verify.MAX_SPOTS`: "화면·에이전트가 한 번에 받는 상세 수." `service.verify`의 기본 `limit`이지만, 작업 도구 `verify`는 20곳씩 받는다(`app/agent/ops.py`).
+- `chunking._Unit`: 단위를 "문단·표 행 묶음·그림"이라 했지만 `heading` 단위도 있다. 값 목록(heading · prose · table · image)으로 고쳐 남겼다.
+- `test_chunking.py::test_semantic_units_window_does_not_cross_sections`는 이름과 달리 창을 검사하지 않았다(창이 절을 넘게 바꿔도 통과). 창 검사를 더했다.
+
+**주석으로만 있던 규칙 → 테스트**(사본에서 그 규칙을 깨면 테스트가 실패하는 것을 확인했다)
+
+- `verify.Verifier._map_regions`: 위 첫 항목.
+- `verify.Verifier._check_text`: 같은 글이 원본에 여러 번 나오면 결과에도 그만큼 있어야 한다 → `test_verify.py::test_text_repeated_in_the_source_must_appear_as_often_in_the_result`.
+- 같은 함수: 40자 이상 단위에서 결과에 보이는 글자가 40% 미만이면 줄·기호·숫자 지점을 따로 올리지 않고 `unit_missing` 하나로 묶는다 → `test_a_mostly_missing_page_is_one_finding_instead_of_one_per_line`.
+- `verify.Verifier._check_cells`: 바뀐·빠진 칸은 같은 행이어도 칸마다 의심점 하나다. 행으로 묶으면 한 번의 '맞음'이 같은 행의 다른 오류까지 해결한다. CSV 주소별 대조는 이미 `test_qc_ledger.py::test_a_row_with_a_whitespace_change_and_a_value_change_gives_two_findings`가 있었다 → XLSX는 `test_two_changed_cells_in_one_sheet_row_are_two_findings`.
+- `chunking._line_kinds`: `<!-- formula-not-decoded -->` 같은 Docling 자리 표시는 반복돼도 머리말이 아니다(외부 사실이라 주석도 남김) → `test_elements.py::test_repeated_docling_placeholders_are_not_page_furniture`.
+- `chunking._markdown`: 제목만 있는 절은 본문이 있는 앞 청크에 붙이지 않는다. 뒤의 하위 절과 합쳐지게 하려는 것 → `test_chunking.py::test_markdown_heading_only_section_joins_its_subsection_not_the_previous_body`.
+- `chunking.semantic_units`: 표 위에 제목이 붙어 있으면(새 절) 그 앞 캡션은 앞 절의 것이다. 쪼개진 캡션('표 1.' / 설명)은 제목에서 시작한 조각까지 붙인다. 표 바로 아래 캡션은 표와 한 덩어리다(1차) → `test_semantic_table_captions_belong_to_their_own_section`(세 경우). 기존 견본 테스트로는 셋 다 깨도 통과했다.
+- `chunking._windows`(1차): 표·코드·제목이 끼면 다른 절로 보고 창이 넘어가지 않는다 → `test_semantic_units_window_does_not_cross_sections`.
+- `chunking._norm_phrase`: `embedding.normalize_phrase`와 같은 규칙(NFKC, 대소문자 무시, 공백·표·강조 기호 제거). `chunking`이 `embedding`을 가져오지 않아 두 벌이다 → `test_embedding.py::test_phrase_normalization_and_cosine_top_k`.
+- `chunking` 모듈 docstring: 표준 라이브러리만 쓰는 순수 함수 → `test_chunking.py::test_chunking_imports_only_the_standard_library`(가져오기만 검사한다).
+
+**이미 테스트가 있어 지운 규칙**
+
+- `verify.MAX_FINDINGS`: 넘으면 우선순위 높은 것부터 남기고 판정 불가 → `test_qc_ledger.py::test_differences_beyond_the_global_cap_block_the_pass_candidate`.
+- `verify.Verifier._check_chart`: 축 눈금으로 값을 추정하지 않는다. 캐시가 없으면 의심점 없이 '미확인', 막는 이유 `chart_no_cache` → `test_xlsx_charts.py::test_chart_cache_matches_conflicts_or_is_missing`.
+- `chunking._table_pieces`: 두 번째 조각부터 머리행을 반복한다 → `test_markdown_splits_large_tables_by_rows_and_repeats_header`.
+- `chunking.normalize_params`: 범위를 벗어난 값은 가까운 허용값으로 맞춘다 → `test_parameters_are_clamped_and_invalid_input_rejected`.
+- `chunking.sentence_bounds`(1차): 목록 번호(1. )와 흔한 약어(Rev. 등)는 끊지 않는다 → `test_korean_sentence_boundaries_skip_list_numbers_and_abbreviations`.
+- `chunking.semantic_units`(1차): 표·코드는 통째 한 단위, 바로 위 제목은 표와 함께(제목만 떨어진 청크를 만들지 않게), 연달아 나온 제목은 함께 다음 문장에 붙는다 → `test_semantic_chunking_breaks_where_meaning_changes_and_respects_structure`.
+- `chunking._semantic`(1차): 그림과 캡션, 한 캡션의 조각 사이는 나누지 않는다 → `test_semantic_chunking_keeps_figures_and_table_captions_with_their_targets`.
+- `chunking.parse_elements`(1차): 문서가 캡션으로 번호를 매겼으면 그 번호를 쓰고 캡션 없는 것은 번호 없이 둔다(겹침 방지). 캡션이 하나도 없으면 순서 번호 → `test_elements.py`(규칙을 깨면 2개 실패).
+- `chunking.NeedsEmbedding`(1차): 사용자가 누른 요청에서만 모델을 부른다 → `test_embedding.py::test_semantic_strategy_only_calls_the_model_when_the_user_asks_and_reuses_the_cache`.
+
+**옮긴 설명**(테스트로 고정하지 않은 것)
+
+- `chunking` 모듈 docstring(1차), 청크 위치: 모든 청크는 원문 문자 위치 start/end(파이썬 문자열 인덱스, end 미포함)를 가진다. text는 원문[start:end]와 같다(앞뒤 공백을 걷어 내고 위치도 그만큼 옮긴다). 예외는 문서 구조 전략이 큰 표를 행 단위로 나눌 때 두 번째 조각부터 머리행(머리+구분선)을 앞에 다시 붙이는 경우로, start/end는 실제 행 범위이고 flags에 `table-split`이 붙는다. 요소 인식 전략(element·parent_child·page)은 요소를 이어 붙여 text를 만든다(버린 머리말·그림은 빠지고, 표는 머리행 반복·'열: 값' 문장으로 바뀔 수 있다). 이때 start/end는 청크가 덮는 원문 범위다. 앞의 두 문장과 `table-split` 예외는 `test_chunking.py::test_every_strategy_covers_the_source_and_keeps_offsets`가 고정·재귀·문서 구조·문장 전략에서 검사한다. 같은 날 [API·데이터 계약](API_AND_DATA_CONTRACT.md) '청크 위치'로 옮겼다(의미 기반 전략도 같은 규칙이고 큰 표에서 `table-split`이 생기는 것을 견본 문서로 확인).
+- `chunking` 모듈 docstring(1차), 토큰 추정: 한글 음절·자모, 한자·가나 1자 = 1토큰(근거는 `token_weights` docstring에 남김). 영문 단어 첫 글자 0.5, 이후 글자 0.25(약 4글자당 1토큰, 짧은 단어도 최소 0.5토큰). 숫자 1자리 0.5(토크나이저에 따라 한 자리씩 또는 몇 자리씩 묶는다). 문장부호·기호 1자 1, 바로 앞과 같은 기호가 이어지면 0.25('---', '|||'). 그 밖의 문자(라틴 확장·키릴 등) 0.5, 공백·줄바꿈 0. 청크의 추정 토큰은 가중치 합의 올림이고 특수 토큰(BOS/EOS, 지시문)은 넣지 않는다. 화면에도 '추정'으로 표시한다. 실제 값은 게이트웨이 응답의 `usage.prompt_tokens`로 표본을 재어 비교할 수 있다.
+- `chunking._markdown`(1차): 첫 조각에서 제목 몫을 덜어 낸 나머지가 크기의 30% 미만이면(제목이 지나치게 길면) 덜어 내지 않는다.
+- `chunking._semantic`(1차·2차): 이웃 문장(앞뒤 문장을 묶은 창)의 임베딩 거리가 문서 안에서 상위 구간이면 경계로 삼고 크기로 다듬는다. 거리는 같은 절 안에서 이어지는 두 내용 문장 사이에서만 재고, 경계는 뒤 문장 앞에 두며 사이의 머리말은 앞 청크에 남는다. 최소 크기보다 작은 묶음은 같은 절의 다음 묶음과, 안 되면 앞 묶음과 합친다(최대 크기를 넘지 않을 때만). 쪽 표시·반복 머리말만 든 묶음은 절·표와 상관없이 앞 묶음에(문서 맨 앞이면 뒤 묶음에) 붙인다. 쪽 표시와 반복 머리말은 뜻 비교에서 빼고 앞 청크에 그대로 붙인다(`_noise`).
+- `chunking._recursive`: 문단 → 줄 → 문장 → 띄어쓰기 → 글자 순서로 크기 안에 들 때까지 나누고 이웃 조각을 다시 합친다. `_table_pieces`(1차): 한 행이 너무 길면 그 행만 다시 나눈다. `Source`(1차): 누적 합으로 구간 길이를 O(1)에 잰다. `Source.fit_end`: 최소 한 글자는 전진한다. `parse_elements`(1차): 캡션은 표·그림 바로 앞뒤(빈 줄 하나 이내)의 짧은 '그림 N'·'표 N' 문단이다.
+- `verify.Verifier._hidden_layer`: 보이지 않는 글자 층은 PDF 렌더 모드 3이다(`app/pdf_layers.py` 모듈 설명에 있다).
+- `verify._GRID_DIFF_ROWS`: CSV 차이 구간의 원본·결과 행 수 합이 이보다 크면 행 정렬(`SequenceMatcher`) 없이 순서대로 비교한다.
+
+### 2026-11-27 1차 정리(`f87a0b4`): 백엔드 다른 모듈
+
+1차 정리는 경위를 옮기지 않고 지웠다. 2026-11-28에 그 커밋의 변경분을 다시 읽고, 날짜·리뷰 경위·계획서 절 번호와 규칙·근거를 적은 것만 여기 옮긴다. 이름을 되풀이한 docstring은 옮기지 않았다. `chunking`·`verify`의 1차 분은 위 항목에 있다. 여기 적힌 규칙이 테스트로 고정돼 있는지는 이번에 하나씩 확인하지 않았다.
+
+**경위**(날짜·리뷰·계획서)
+
+- `qc.RULE_VERSION`: 2026-11-27 두 번째 커밋에서 대조 규칙(숨은 글자 층·차트)이 바뀌었는데 이름을 올리지 않아, 첫 커밋 때 만든 원장이 그대로 쓰였다(의심점 0). 그래서 이름에 기대지 않고 코드 지문으로 바뀜을 감지한다(`rule_key()` = 이름 + 대조 코드·원본 읽기 라이브러리 지문 10자, 바뀌면 기존 실행을 다시 대조).
+- `verify`(모듈 상단): 단위별 상세 상한은 두지 않는다. 2026-11-27 리뷰에서 CSV 201번째 차이가 원장에서 빠져, 앞 200곳을 '맞음'으로 처리하자 압력 오류가 남은 채 통과 후보가 됐다. 찾은 차이는 모두 의심점이 되고, 전체 상한(`MAX_FINDINGS`)을 넘은 것은 '상세 없음'으로 세어 미해결로 남긴다.
+- `verify._grid_pair_spot`: 한 행의 차이를 하나로 묶으면 공백 차이만 보고 '맞음'을 눌러 같은 행의 수치 오류(17 bar → 71 bar)까지 해결로 처리될 수 있다(2026-11-27 리뷰). 행 순서 바뀜은 행 하나, 두 칸 맞바뀜은 그 쌍 하나, 그 밖의 다른 칸은 칸마다 하나.
+- `verify._hidden_layer`: 숫자 모음만 비교하면 A·B 값 맞바꿈이나 bar → kPa를 놓친다(2026-11-27 리뷰). 그래서 같은 그림의 OCR과 항목·값·단위를 한 벌로 대조한다. 모두 같으면 '다른 표현과 일치'(의심점 없음, 판정 불가 근거는 남음), 값·단위가 다르면 `hidden_conflict`, 같은 그림의 OCR이 없거나 항목 대응을 정할 수 없으면 `hidden_layer`(화면 값 미확인).
+- `service.qc_summary`: 지금 처리 중·실패지만 이전 성공본이 있는 문서의 판정은 그 실행에 남지만 지금 유효한 결과가 아니다. 현재 처리 결과로 세면 재처리에 실패한 문서가 통과 후보로 남는다(2026-11-27 리뷰). 그래서 `previous_results`로 따로 세고 상태 이름에 '이전 성공본'을 붙인다.
+- `chunk_qc`(모듈): 파서 품질 검수 고도화 계획 §3.2.4. 청크가 어느 실행의 어느 본문에서 나왔는지(run ID·본문 해시), 어느 원본 영역을 덮는지, 그 안에 해결되지 않은 검수 항목이 있는지를 남긴다. '71 bar' 청크를 누르면 원본 위치와 후보 값을 보는 근거다. 청킹 벤치는 미검수 결과를 그대로 실험할 수 있다(막지 않는다). 검색용 발행 정책은 아직 정하지 않았다.
+- `qc`(모듈): 판정 순서(계획 §3.1). ① 실행 실패는 원인을 기록한다(이 모듈 밖). ② 성공 실행에 대조가 아직 도달하지 않았으면 '미평가'. ③ 확인 안 된 의심점이나 열린 사람 검수가 있으면 '검수 필요'. ④ 필수 검사의 미완료·잘림·공유 원천·미지원 표현이 있으면 '판정 불가'. ⑤ 모든 필수 조건을 채운 형식군만 '통과 후보'이며, 현장 검증 전이라 자동 통과는 하지 않고 사람 검수를 이어 간다(기록 모드). 지금 통과 후보 기준이 있는 형식은 구분자·인코딩이 확정된 직사각 CSV뿐이다.
+- `folder_import`(모듈): 브라우저 파일 첨부·전송이 보안 프로그램으로 막힌 PC에서도 쓰려고 만든 경로다(2026-11-25 고객사).
+- `models` 검수 요청 구획: V번호 도입은 2026-11-26. `fidelity/pictures`: `low_confidence`는 모델 OCR에 믿을 만한 신뢰도 값이 없어 0으로 둔다(이전 형식 호환).
+
+**규칙·근거**
+
+- `qc`: finding ID(F + 12자리)는 종류·원본 단위·원본 주소·원문/결과 조각과 같은 서명의 발생 순번으로 만든다. 결과에만 있는 것(숫자·깨진 글자·OCR 줄)은 결과 줄로 구별한다. 우선순위는 심각도 → 원본 단위 순서 → 결과 줄 → 문서 순서. 판정 '틀림'은 오류가 확인된 것이라 검수 필요로 남는다. `reason`의 `blocking`이면 그것만으로 통과 후보가 될 수 없다. 중요 오류나 확인 안 된 필수 범위가 문서 평균에 묻히지 않도록 일치율은 쓰지 않는다. 상세를 남기지 못한 차이는 사람이 볼 수 없으니 해결될 수 없고, 남은 수만큼 통과 후보를 막는다.
+- `chunk_qc`·`service`: 청크의 판정은 '틀림'(확인된 오류, `confirmed-wrong`) → '보류'·확인 전·판정 없음(`unverified`) 순이고 '맞음'만 해결이라 오지 않는다. 검수 요청은 화면 상세 목록(한 쪽)이 아니라 원장 전체에서 찾는다(우선순위 밖으로 잘린 지점도 V가 된다).
+- `models`: S번호는 표시 순번이라 규칙 버전이 바뀌면 달라질 수 있고 finding ID가 안정적이다. 문서 번호(D번호)는 올린 순서로 매기며 바뀌지 않는다. 목록의 `qc` 상태는 pending·needs_review·undetermined·pass_candidate·unavailable. 가져오기 파일 상태 ready(파서 있음)·no_parser(저장만)·empty·too_large(가져오지 않음). 이름·크기가 같은 기존 문서 중 원본 SHA-256까지 같으면 새로 만들지 않는다.
+- `folder_import`: 허용 폴더는 작업 도구와 같은 `DOCOPS_AGENT_ROOTS`로만 정하고 화면에서는 바꿀 수 없다. 비우면 프로젝트의 `samples`를 쓴다. 여러 개는 OS 경로 구분자(Windows `;`)나 줄바꿈으로 나눈다. 폴더 밖(`..`, 절대 경로, 밖을 가리키는 링크)과 숨김·잠금 파일은 읽지 않고, 밖을 가리키는 링크는 목록에서도 뺀다. 가져오기는 저장만 하고 파싱은 사용자가 따로 실행한다.
+- `format_gate`·`config`: DRM 서명은 `DOCOPS_DRM_SIGNATURES`에 `이름=hex:0A0B0C0D; 이름=ascii:<확인한 문자열>` 형식으로 등록한다. `hex:`는 파일 맨 앞(0번째 바이트)부터, `ascii:`는 앞 4 KiB 안 어디서든 일치. 잘못된 항목은 무시하지 않고 오류로 알린다(조용한 미탐 방지). 알려진 서명이 없는 이진 파일은 암호문처럼 보이면 DRM 의심, 아니면 미확인. 글자로 읽히는 파일은 'BMR-…'·'%PDF-' 같은 서명 문자열로 시작해도 텍스트다.
+- `service`: 업로드 이름은 표시용일 뿐 저장 경로로 쓰지 않는다(저장 이름은 서버가 만든다). macOS 분해형 한글(NFD)은 조합형으로 바꾸고 방향 제어 글자는 지우되 ℃·±·− 같은 기호는 남긴다. 확장자가 아니라 내용으로 먼저 확인해 DRM 래핑·암호·형식 불일치를 파서 오류로 뭉뚱그리지 않는다. 구조 분석만 되는 형식은 본문 파서가 없다는 것과 보호 여부를 확인하지 않았다는 것을 함께 알린다. 매크로는 실행하지 않고, 있으면 셀 값이 저장 시점의 값이라는 경고를 남긴다. OOXML은 원본 대신 보정 사본을 파서에 넣고, 사본을 만들기 전에 압축 폭탄·위험 경로를 거른다. 파싱을 마친 작업자가 이어서 원장을 만들며(외부 호출 없음) 실패해도 파싱 결과는 그대로다. 서버 시작 때 다시 대조는 원본만 다시 읽고(파싱·외부 호출 없음), 이전 규칙의 원장과 검수 요청(V번호·판정·메모)은 지우지 않는다. 구조 분석은 원본을 바꾸지 않고 사용자가 요청할 때만 한다.
+- `middleware`·`routers`: 실제 파일·외부 모델 호출 경로(`/api/live`, `/api/retrieval`, `/api/vectordb`)와 작업 에이전트 기록(`/api/agent`, 파일 경로·인자가 들어 있음)은 로컬 화면에서 온 요청만 받는다. 마지막에 더한 미들웨어가 가장 바깥이라 403·413 응답에도 저장소 표식이 붙는다. API 키는 받기만 하고 응답에는 설정 여부(`api_key_set`)만, Milvus 토큰은 응답에 나오지 않는다. 생성 모델 연결은 primary·secondary 두 자리, 임베딩은 embed 한 자리. 모델 연결 확인에서 키를 새로 넣지 않았으면 저장된 키로 확인한다. 계보 API는 업로드 목록과 사용자가 이미 실행해 둔 구조 분석 결과만 읽고 새로 분석하지 않는다. 검수 요청은 작업 에이전트(`flag`)와 원문 대조 화면이 만들고 판정은 사람이 남긴다.
+- `routers/live`: 조건 없는 목록은 예전처럼 전체(파서 화면·에이전트·구조 분석이 쓴다). PDF 모델이 없으면 PDF는 `pdf-text`로 가므로 고정 표가 아니라 지금 경로를 돌려준다. OCR 모델은 설정 여부만 보고 호출하지 않는다.
+- `routers/retrieval`: 의미 기반 전략은 캐시의 문장 임베딩만 쓰고, 사용자가 '나누기'를 눌러 `embed=true`로 보낸 요청에서만 모델을 부른다. 모델을 비워 두면 연결의 첫 모델을 쓴다. 질문 가져오기는 읽기만 하고 저장은 화면에서 확인한 뒤 PUT.
+- `pdf_layers`: 픽셀에 '17 bar'가 보여도 숨은 층의 '71 bar'를 파서와 대조가 같은 값으로 확인해 버린다(같은 계통을 두 번 읽음). 숨은 층은 지우지 않는다(올바른 숨은 층도 많다). 화면 표시용 좌표가 필요하면 쪽 크기와 회전(`rotation`·`width`·`height`)으로 바꾼다. 글자 객체를 읽지 못한 쪽은 판정하지 않는다(`measured=False`).
+- `xlsx_charts`: 셀 값과 numCache는 한 파일 안의 다른 저장 표현이라 서로 다르면 모델 없이 충돌을 찾을 수 있다. 해석하는 참조는 같은 통합문서 안의 연속 범위(한 행 또는 한 열)이고, 여러 영역·외부 통합문서·이름 정의는 '해석 못 함'. 문서 관계(통합문서 → 시트 → 그리기 → 차트)를 따라 차트가 놓인 시트를 찾는다. 계열 이름 캐시가 없으면 셀에서 읽는다.
+- `verify`(1차): 숨은 층 묶음과 같은 그림의 OCR은 실행 근거의 그림 상자가 겹치면(IoU ≥ 0.5), 상자가 없으면 그 쪽에 숨은 층 묶음과 OCR 묶음이 하나씩일 때만 짝짓는다. 차트 캐시와 셀 값은 숫자면 상대 오차 1e-9 안에서 같다. 점이 많아 앞 `xlsx_charts.MAX_POINTS`개만 대조했으면 '부분 검증'이고 완료로 표시하지 않는다. CSV 통과 후보 조건은 실행에 기록된 계약(인코딩·구분자 확정), 모든 레코드의 열 수 보존, 전체 범위 대조, 차이 없음. 원본에서 출발하는 비교만으로는 같은 행의 두 칸 맞바꿈, 빈 칸에 생긴 값, 결과에만 있는 행·복제 행을 놓친다. 비슷한 결과 줄이 없으면 엉뚱한 줄과 '바뀜'으로 짝짓지 않고 있어야 할 자리의 '없음'으로 본다. 글머리 기호는 지우되 번호(1. 2) …)는 남겨 번호 변경을 본다.
+- `fidelity`: 기준은 파서와 무관한 OOXML 원본이라 Docling을 다른 파서로 바꿔도 같은 점검을 쓴다. 사본 보정은 해당 XML 조각만 정규식으로 바꾸고(나머지 바이트·네임스페이스 접두어는 그대로), 첨자는 모든 글자를 유니코드 첨자로 바꿀 수 있을 때만 바꾸며 한 run에서 하나라도 실패하면 바꾸지 않는다. 보충 추출은 원래 위치가 아니라 결과 끝에 붙이고 원문 위치를 함께 남긴다. 파싱 성공이 품질 보증이 아니라는 원칙에 따라 고친 것과 고치지 못한 것을 모두 드러낸다. 원본 점검은 보이는 글자의 특수기호, 기호 글꼴·첨자 변환 가능 여부, 병합 셀, 떠 있는 글상자, 흰색에 가까운 글자, 숨김 글자, 그림 종류(래스터·SVG·메타파일)와 겹침, SVG 안의 벡터 글자를 센다. 그림 '속' 글자는 OCR 없이는 알 수 없다.
+- `model_bundle`: manifest 없이 손으로 압축한 ZIP도 받되 크기만 확인한다. 빈 파일(받다 만 흔적)만 바꿔 쓴다. 빠진 필수 파일이 있으면 묶지 않고, 설치는 빠진 파일·크기 불일치·기존 파일과의 충돌이 있으면 쓰기 전에 멈춘다.
+- `vba`: [MS-OVBA]의 dir 스트림에서 모듈 목록을 얻고 압축된 소스를 풀어 모듈 이름·종류·코드 줄 수와 자동 실행 프로시저를 알린다. 소스 글은 구조 분석이 경로·URL·문서번호 후보를 찾는 데만 쓰고 결과 본문에는 넣지 않는다(문서 내용이 아니라 동작이다). 자동 실행 프로시저는 셀 값이 저장 이후 매크로로 바뀌는 문서를 가려내는 데 쓴다. 빈 시트·통합문서 모듈만 있는 XLSM은 경고하지 않는다.
+- `llm`: 환경변수(`MODEL_*`, `MODEL2_*`, `MODEL_CA_BUNDLE`, `MODEL_TIMEOUT` 기본 30초)는 `.env.example`에 있다. API 키는 응답·로그에 내보내지 않는다. `connection_store`: 화면에서 보낸 `api_key`가 문자열이면 바꾸고, `clear_api_key`면 비우고, 없으면 그대로 둔다. OCR 지시문은 비우면 기본값.
+- `main`: 새 빌드를 올린 뒤에도 브라우저가 캐시한 옛 `index.html`을 쓰지 않게 매번 다시 확인시키고, `/assets` 파일은 이름에 내용 지문이 있어 캐시해도 된다. 개발 중에는 Vite(5173)를 쓴다.
 

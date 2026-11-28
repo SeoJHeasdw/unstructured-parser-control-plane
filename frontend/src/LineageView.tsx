@@ -21,12 +21,11 @@ function loadSource(): LineageSource {
   try { return localStorage.getItem(SOURCE_KEY) === 'example' ? 'example' : 'live'; } catch { return 'live'; }
 }
 function saveSource(source: LineageSource) {
-  try { localStorage.setItem(SOURCE_KEY, source); } catch { /* 저장할 수 없어도 화면은 동작한다. */ }
+  try { localStorage.setItem(SOURCE_KEY, source); } catch { }
 }
 
 type Load = { status: 'idle' | 'loading' | 'ready' | 'error'; data: LineageData | null; error: string };
 
-/** 문서 계보: 문서군 목록 · 선택한 문서군의 판과 포함·참조 관계 · 클릭으로 고정하는 상세. */
 export default function LineageView({ active, onOpenLive, documentId }: { active: boolean; documentId?: string; onOpenLive?: (doc?: string) => void }) {
   return <TipProvider><LineageScreen documentId={documentId} active={active} onOpenLive={onOpenLive} /></TipProvider>;
 }

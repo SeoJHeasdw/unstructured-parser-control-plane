@@ -70,6 +70,11 @@ def test_element_rules_for_lists_code_captions_and_pages():
     assert [el.page for el in breaks.elements] == [1, 2]
 
 
+def test_repeated_docling_placeholders_are_not_page_furniture():
+    text = "\n\n".join(f"식 {n}의 설명\n<!-- formula-not-decoded -->" for n in range(4))
+    assert [el.kind for el in Source(text).elements] == ["text"] * 4
+
+
 def test_baseline_outcomes_mark_split_tables_and_bare_image_placeholders():
     coa = sample_source("coa")
     fixed = run(coa, "fixed", size=400, overlap=0)

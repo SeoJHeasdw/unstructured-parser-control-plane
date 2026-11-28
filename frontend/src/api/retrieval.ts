@@ -1,7 +1,5 @@
 /** 청킹 벤치·임베딩 평가 API. 외부 모델 호출(토큰 측정·평가 실행)은 사용자가 누를 때만 보낸다. */
 export type Unit = 'chars' | 'tokens';
-/** fixed·recursive·markdown·sentence는 텍스트만 보는 기준선. element·parent_child·page는 비정형 요소(표·그림·캡션·반복 머리말)를 구분한다.
- * semantic은 문장 임베딩으로 의미가 바뀌는 곳에서 나눈다(임베딩 연결 필요). */
 export type StrategyKind = 'fixed' | 'recursive' | 'markdown' | 'sentence' | 'element' | 'parent_child' | 'page' | 'semantic';
 export type TablePolicy = 'whole' | 'rows' | 'row_text';
 export type ImagePolicy = 'drop' | 'caption';
@@ -9,7 +7,6 @@ export type StrategyParams = {
   unit: Unit; size: number; overlap?: number; merge_small?: boolean; min_size?: number; overlap_sentences?: number;
   /** element·parent_child·page: 표는 통째(넘치면 행 묶음) / 행 묶음마다 머리행 반복 / 행마다 '열: 값' 문장 */
   table?: TablePolicy; table_rows?: number;
-  /** element·parent_child·page: 그림은 버림 / 캡션·대체 텍스트로 청크 */
   image?: ImagePolicy; attach_caption?: boolean; drop_furniture?: boolean;
   /** parent_child: 검색은 size(자식), 답변 맥락은 parent_size(부모) */
   parent_size?: number;
@@ -18,11 +15,10 @@ export type StrategyParams = {
 };
 export type Preset = { id: string; name: string; kind: StrategyKind; params: StrategyParams };
 export type ChunkKind = 'text' | 'table' | 'mixed';
-/** 원문을 이루는 요소. 위치는 원문 텍스트(source.text)의 문자 오프셋. */
 export type ElementKind = 'heading' | 'text' | 'list' | 'table' | 'image' | 'caption' | 'code' | 'furniture';
+/** start·end: 원문 텍스트(source.text)의 문자 오프셋 */
 export type DocElement = {
   id: string; kind: ElementKind; start: number; end: number; page: number | null; heading_path: string[];
-  /** 사람이 읽는 이름: '표 2 · 14행 × 5열', '그림 1 · 냉장고 배치도', '반복 머리말' */
   label: string; chars: number; est_tokens: number;
   rows?: number; cols?: number;
   /** caption: 설명하는 표·그림의 id. image: 딸린 캡션 id */
@@ -30,27 +26,19 @@ export type DocElement = {
   /** image: 대체 텍스트·캡션 없이 자리 표시만 있음(OCR 꺼짐 등) */
   empty?: boolean;
 };
-/**
- * whole 한 청크에 온전히 / rows 행 묶음마다 머리행을 붙여 의도적으로 나눔 / split 머리행 없이 잘림
- * caption 그림이 캡션·대체 텍스트로 들어감 / attached·detached 캡션이 대상과 같은 청크·다른 청크
- * missing 어느 청크에도 의미 있게 들어가지 않음(버린 그림, 제거한 머리말, 자리 표시만 남은 그림)
- */
+/** whole 한 청크에 온전히 / rows 행 묶음마다 머리행을 붙여 나눔 / split 머리행 없이 잘림 / caption 그림이 캡션·대체 텍스트로 들어감
+ * attached·detached 캡션이 대상과 같은 청크·다른 청크 / missing 어느 청크에도 의미 있게 들어가지 않음(버린 그림, 제거한 머리말, 자리 표시만 남은 그림) */
 export type ElementOutcome = 'whole' | 'rows' | 'split' | 'caption' | 'attached' | 'detached' | 'missing';
 export type KindTally = Partial<Record<ElementKind, Partial<Record<ElementOutcome, number>>>>;
 export type Chunk = {
   index: number; text: string; start: number; end: number; heading_path: string[]; kind: ChunkKind; chars: number; est_tokens: number; flags: string[];
-  /** 이 청크가 덮는 요소 id(원문 순서) */
   elements: string[]; element_kinds: ElementKind[]; page: number | null;
-  /** parent_child: 부모 청크 번호(StrategyResult.parents의 index) */
+  /** StrategyResult.parents의 index */
   parent: number | null;
-  /** 실제 문서: 이 청크와 겹치는, 사람이 아직 판정하지 않은 자동 대조 의심점(우선순위 순, 최대 12)과 전체 수. 예전 서버·예시 문서는 없다. */
   qc?: ChunkFinding[]; qc_total?: number;
-  /** 겹치는 검수 항목의 판정별 수: 틀림(확인된 오류) · 보류 · 확인 전·판정 없음 */
   qc_counts?: { wrong: number; unclear: number; open: number };
-  /** 이 청크가 덮는 원본 영역(쪽·시트) */
   regions?: ({ page: number } | { sheet: string })[];
 };
-/** 청크에 이어진 사람 판정(검수 요청 V번호). 'correct'(맞음)는 해결이라 청크에 오지 않는다. */
 export type ChunkReview = { id: number; status: 'open' | 'wrong' | 'unclear'; comment?: string | null; origin?: string | null;
   page?: number | null; sheet?: string | null; cell?: string | null; line?: number | null; decided_at?: string | null };
 export type ChunkFinding = { key: string; id?: string; review?: ChunkReview | null; severity: 'high' | 'medium' | 'low'; kind: string; message: string; page: number | null; sheet: string | null;
@@ -61,13 +49,11 @@ export type ChunkStats = { count: number; chars: Dist; tokens: Dist; over_limit:
 export type StrategyResult = {
   id: string; name?: string; kind?: StrategyKind; params?: StrategyParams; chunks: Chunk[]; stats: ChunkStats | null; error?: string;
   parents?: ParentChunk[]; outcomes: Record<string, ElementOutcome>; by_kind: KindTally;
-  /** semantic: 캐시에 없는 문장 임베딩이 남아 아직 나누지 않음(사용자가 '나누기'를 누르면 계산) */
   pending?: { missing: number; total: number; model: string };
   semantic?: { sentences: number; breakpoints: number; size_cuts: number; threshold: number | null; model?: string };
 };
 export type ChunkSource = {
   doc_id: string | null; sample: string | null; name: string; is_stale: boolean; chars: number; est_tokens: number; tables: number; headings: number; sections: number; text: string;
-  /** 실제 문서: 나눈 본문의 성공 실행·본문 해시와 그 실행의 자동 대조 판정(예전 서버는 없다) */
   run_id?: string | null; text_sha256?: string; qc?: { state?: string; label?: string; unresolved?: number; attached?: number; wrong?: number; unclear?: number; open_reviews?: number } | null;
   elements: DocElement[]; pages: number | null; composition: Partial<Record<ElementKind, number>>;
 };
@@ -91,14 +77,12 @@ export type QuestionOutcome = { failed?: boolean; doc_rank: number | null; span_
 export type Combo = {
   key: string; candidate_id: string; preset_id: string; model: string; connection: string; connection_label: string; preset_name: string; preset_kind: StrategyKind;
   status: 'ok' | 'failed'; error: string | null; errors?: string[]; doc: Metrics | null; span: Metrics | null; questions?: number; span_questions?: number; phrase_missing?: number;
-  /** 질문 유형별 지표. 해당 유형 질문이 없으면 questions 0, 지표 null */
   by_kind?: Record<QuestionKind, { questions: number; doc: Metrics | null; span: Metrics | null }>;
   chunks: number; documents: number; dims?: number | null; dims_consistent?: boolean; latency_ms?: number | null; requests?: number; chunks_per_sec?: number | null;
   throughput_source?: 'measured' | 'previous' | null; embedded?: number; cached?: number; failures?: number; query_failures?: number; over_limit?: number;
   over_limit_failed?: number; max_tokens?: number | null; token_ratio?: number | null; storage_bytes?: number; per_question: QuestionOutcome[];
 };
 export type RunQuestion = { index: number; id: string; question: string; doc_id: string; answer: string; kind: QuestionKind };
-/** 실행 전 계획: 고른 청킹으로 나눈 결과와 모델별 입력 한도 초과·벡터 용량. 외부 호출 없음. */
 export type PlanModel = { model: string; max_tokens: number | null; dims: number | null; over_limit: number; storage_bytes: number | null };
 export type PlanResult = {
   documents: number; chunks: number; max_chunk_tokens: number; median_chunk_tokens: number;
@@ -118,7 +102,7 @@ const BASE = '/api/retrieval';
 async function read<T>(response: Response): Promise<T> {
   if (!response.ok) {
     let message = `요청을 처리하지 못했습니다. (HTTP ${response.status})`;
-    try { const body = await response.json() as { detail?: unknown }; if (typeof body.detail === 'string') message = body.detail; } catch { /* 상태 코드만 보여 준다. */ }
+    try { const body = await response.json() as { detail?: unknown }; if (typeof body.detail === 'string') message = body.detail; } catch { }
     throw new Error(message);
   }
   return await response.json() as T;
@@ -128,9 +112,7 @@ const json = (method: string, body: unknown, signal?: AbortSignal): RequestInit 
 export const getConfig = async (): Promise<RetrievalConfig> => read(await fetch(`${BASE}/config`));
 export const listDocuments = async (): Promise<RetrievalDoc[]> => (await read<{ documents: RetrievalDoc[] }>(await fetch(`${BASE}/documents`))).documents;
 export const getSamples = async (): Promise<Sample[]> => (await read<{ samples: Sample[] }>(await fetch(`${BASE}/samples`))).samples;
-/** 평가 문서 id: 실제 문서는 그대로, 합성 예시는 'sample:<id>' */
 export const sampleDocId = (id: string) => `sample:${id}`;
-/** embed: 의미 기반 전략의 문장 임베딩을 지금 계산해도 되는지(사용자가 '나누기'를 누른 요청만 true). */
 export async function chunkSource(source: { doc_id?: string; sample?: string; text?: string; name?: string }, strategies: Preset[], limitTokens: number | null, signal?: AbortSignal, parallelism = 1, embed = false): Promise<ChunkResponse> {
   return read(await fetch(`${BASE}/chunk`, json('POST', { source, strategies, limit_tokens: limitTokens, parallelism, ...(embed ? { embed: true } : {}) }, signal)));
 }
@@ -145,7 +127,6 @@ export async function parseQuestions(format: 'csv' | 'jsonl', text: string): Pro
   return read(await fetch(`${BASE}/questions/parse`, json('POST', { format, text })));
 }
 export const exportUrl = (format: 'csv' | 'jsonl') => `${BASE}/questions/export?format=${format}`;
-/** 합성 예시 문서에 맞춘 예시 질문(저장하지 않음). */
 export const getExampleQuestions = async (): Promise<Question[]> => (await read<{ questions: Question[] }>(await fetch(`${BASE}/questions/example`))).questions;
 export async function planRun(body: { doc_ids: string[]; preset: Preset; models: string[] }, signal?: AbortSignal): Promise<PlanResult> {
   return read(await fetch(`${BASE}/plan`, json('POST', body, signal)));

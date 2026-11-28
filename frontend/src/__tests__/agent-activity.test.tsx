@@ -212,6 +212,18 @@ describe('에이전트 작업 화면', () => {
     expect(screen.getByText('표시 설명')).toBeTruthy();
   });
 
+  it('연결 표식이 없는 예전 호출 기록은 10분 넘게 쉰 곳에서 나눈다', async () => {
+    const user = userEvent.setup();
+    const call = (ts: string, tool: string) => ({ ts, tool, args: {}, kind: null, repeat: false, ms: 5, result: '결과: 끝', text: '', docs: [], session: null });
+    serve({ ...activity, calls: [call('2026-11-24T05:30:00Z', 'status'), call('2026-11-24T05:21:00Z', 'doc'),
+      call('2026-11-24T05:10:00Z', 'read'), call('2026-11-24T05:09:00Z', 'verify')] });
+    render(<AgentActivity onNavigate={vi.fn()} />);
+    await user.click(await screen.findByRole('tab', { name: /호출 기록/ }));
+    const groups = Array.from(screen.getByRole('table').querySelectorAll('tbody'))
+      .map(body => Array.from(body.querySelectorAll('tr:not(.ag-group) code')).map(code => code.textContent));
+    expect(groups).toEqual([['status', 'doc'], ['read', 'verify']]);
+  });
+
   it('에이전트가 실행된 적이 없고 검수 요청도 없으면 안내만 보인다', async () => {
     const fetchMock = serve({ available: false, batches: [], documents: [], calls: [] });
     fetchMock.mockImplementation(async (input: RequestInfo | URL) => String(input) === ACTIVITY ? json({ available: false, batches: [], documents: [], calls: [] })

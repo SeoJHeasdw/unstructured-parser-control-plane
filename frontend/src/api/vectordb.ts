@@ -1,4 +1,3 @@
-/** 벡터 DB 읽기 전용 API. 예시 데이터(example)와 Milvus(milvus)가 같은 형태로 응답한다. */
 export type SourceKey = 'example' | 'milvus';
 export type MilvusPublic = { configured: boolean; uri: string; db: string; token_set: boolean; ca_bundle_set: boolean; timeout: number; unreachable?: { retry_in: number; error: string } | null };
 export type SourcesInfo = { default: SourceKey; sources: { key: SourceKey; label: string; available: boolean }[]; milvus: MilvusPublic; max_window: number };
@@ -40,7 +39,7 @@ async function read<T>(response: Response): Promise<T> {
       const body = await response.json() as { detail?: unknown };
       if (typeof body.detail === 'string') message = body.detail;
       else if (Array.isArray(body.detail)) message = '요청 값을 확인해 주세요.';
-    } catch { /* 상태 코드만 보여 준다 */ }
+    } catch { }
     throw new Error(message);
   }
   return await response.json() as T;

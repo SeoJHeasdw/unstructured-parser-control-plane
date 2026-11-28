@@ -14,10 +14,6 @@ import type { SourceKey } from './retrieval/chunk-source';
 import { DEFAULT_PRESETS, DEFAULT_SELECTED, STORE, defaultParams, describeParams, errorText, familyOf, fmtInt, loadPresets, savePresets, usePersistent } from './retrieval/shared';
 import './retrieval.css';
 
-/**
- * 청킹 벤치: 비정형 문서가 어떤 요소(본문·목록·표·그림·캡션·반복 머리말)로 이뤄졌고,
- * 전략마다 그 요소들이 어떤 청크가 되는지 본다. 원문과 전략 선택, 비교 결과를 한 화면에서 다룬다.
- */
 type Bench = { source: SourceKey | ''; selected: string[]; conn: string; model: string; parallelism: number };
 type View = 'compare' | 'elements';
 type Open = { id: string; tab: StrategyTab; index: number };
@@ -36,7 +32,6 @@ export default function ChunkBench({ active, requestedSource, onSourceChange }: 
   const [loadError, setLoadError] = useState('');
   const [result, setResult] = useState<BenchResult | null>(null);
   const [loadAttempt, setLoadAttempt] = useState(0);
-  /* 사용자가 '나누기'를 누를 때만 의미 기반 전략의 문장 임베딩을 계산한다(key: 누른 시점의 비교 조건). */
   const [trigger, setTrigger] = useState<{ n: number; embed: boolean; key: string }>({ n: 0, embed: false, key: '' });
   const nonce = trigger.n;
   const [open, setOpen] = useState<Open | null>(null);
@@ -80,7 +75,6 @@ export default function ChunkBench({ active, requestedSource, onSourceChange }: 
   const chosen = useMemo(() => presets.filter(p => bench.selected.includes(p.id)).slice(0, MAX_SELECTED), [bench.selected, presets]);
   const maxParallel = config?.caps?.max_parallel_strategies ?? 1;
   const parallelism = Number.isInteger(bench.parallelism) ? Math.max(1, Math.min(maxParallel, bench.parallelism)) : 1;
-  /* 한도 초과는 알려진 모델 가운데 가장 작은 입력 한도로 센다. */
   const limit = useMemo(() => { const caps = (config?.specs ?? []).map(s => s.max_tokens).filter(n => n > 0); return caps.length ? Math.min(...caps) : null; }, [config]);
   const runKey = sourceKey && chosen.length ? JSON.stringify({ sourceKey, chosen, limit, parallelism, updatedAt: doc?.updated_at ?? null }) : '';
 

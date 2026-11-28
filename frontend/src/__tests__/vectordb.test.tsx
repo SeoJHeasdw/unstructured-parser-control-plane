@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, render, screen, within } from '@testing-library/react';
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import VectorDbWorkspace from '../VectorDbWorkspace';
 import { memoryStorage } from './flowTestEnv';
@@ -234,7 +234,7 @@ describe('벡터 DB 개요와 파티션 팝업', () => {
     const list = await within(dialog).findByRole('listbox', { name: '청크 목록' });
     expect(lastBrowse().partition).toBe('qc');
     expect(within(list).getAllByRole('option')).toHaveLength(3);
-    expect(within(list).getAllByRole('option')[0].getAttribute('aria-selected')).toBe('true');
+    await waitFor(() => expect(within(list).getAllByRole('option')[0].getAttribute('aria-selected')).toBe('true'));
     expect(await within(dialog).findByText('알파 문단 시작. 겹침구간', { selector: '.vdb-fulltext' })).toBeTruthy();
     await user.click(within(list).getByText('감마 문서의 단독 청크.'));
     expect(await within(dialog).findByText('감마 문서의 단독 청크.', { selector: '.vdb-fulltext' })).toBeTruthy();

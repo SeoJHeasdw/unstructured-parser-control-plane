@@ -3,11 +3,8 @@ import { ArrowRight, Braces, ChevronDown, ChevronRight, Database, Play, X } from
 import type { Page } from './types';
 import './searchPipeline.css';
 
-/** 검색 설계 참고. 에이전트 개발 측·운영자·현업과 같은 그림을 보며 이야기하려고 만든 화면이다.
- *  글을 늘어놓지 않고, 흐름 지도 한 장(에이전트 → 검색 엔드포인트 → 저장소 ← 색인 파이프라인)에 단계와 결정 상태를 올린다.
- *  그림의 문법(키커 + 두 줄 결론 제목, 흐르는 선, 짧은 말)은 udemy-agent 강의 덱에서 가져오고, 색과 바탕은 콘솔 토큰을 그대로 쓴다.
- *  단계를 누르면 그 단계에서 정한 것과 정할 것을 보이고, 원래 설명 글은 '자세히'로 접어 둔다.
- *  상태(확정·후보·미정)는 설계 초안이다. 수치나 실행 상태가 아니다. */
+/** 상태(확정·후보·미정)는 설계 초안이다. 수치나 실행 상태가 아니다.
+ *  그림 문법(키커 + 두 줄 결론 제목, 흐르는 선, 짧은 말)은 udemy-agent 강의 덱, 색과 바탕은 콘솔 토큰. */
 
 type Status = 'fixed' | 'candidate' | 'open' | 'agent';
 type Lane = 'agent' | 'query' | 'index';
@@ -45,11 +42,10 @@ const STAGES: Stage[] = [
 ];
 const BY_ID = Object.fromEntries(STAGES.map(s => [s.id, s])) as Record<string, Stage>;
 
-/* ── 흐름 지도: 1060 × 548 좌표. 칸이 좁으면 줄이되, 너무 작아지면 줄이지 않고 옆으로 넘긴다. ── */
+/* 칸이 좁으면 줄이되 MIN_SCALE 아래로는 줄이지 않고 옆으로 넘긴다. */
 const MW = 1060, MH = 548, NW = 128, NH = 44, MIN_SCALE = .74;
 const COL = [28, 174, 320, 466, 612, 758, 904];
 type Box = { x: number; y: number; w: number; h: number };
-/** 가운데 높이(cy) 기준 상자 */
 const box = (x: number, cy: number, h = NH, w = NW): Box => ({ x, y: cy - h / 2, w, h });
 const CY: Record<Lane, number> = { agent: 189, query: 306, index: 487 };
 const POS: Record<string, Box> = {
@@ -59,7 +55,6 @@ const POS: Record<string, Box> = {
 };
 const BAR: Box = { x: 28, y: 384, w: 1004, h: 32 };
 const LANE_Y: Record<Lane, number> = { agent: 138, query: 240, index: 436 };
-/** 줄 안에서 몇 번째인지. 줄을 펼칠 때 차례로 나타나는 데 쓴다. */
 const LANE_INDEX = Object.fromEntries(STAGES.map(s => [s.id, STAGES.filter(o => o.lane === s.lane).indexOf(s)]));
 
 const R = (b: Box) => [b.x + b.w, b.y + b.h / 2] as const;
@@ -69,7 +64,6 @@ const B = (b: Box, dx = b.w / 2) => [b.x + dx, b.y + b.h] as const;
 const across = ([ax, ay]: readonly number[], [bx, by]: readonly number[]) => { const m = (ax + bx) / 2; return `M${ax},${ay} C${m},${ay} ${m},${by} ${bx},${by}`; };
 const down = ([ax, ay]: readonly number[], [bx, by]: readonly number[]) => { const m = (ay + by) / 2; return `M${ax},${ay} C${ax},${m} ${bx},${m} ${bx},${by}`; };
 
-/** 흐름을 보여 줄 때 켜지는 차례. 문서가 먼저 쌓이고, 질문이 그 위를 지나간다. */
 const SEQ: Record<string, number> = { i1: 1, i2: 2, i3: 3, i4: 4, i5: 5, i6: 6, i7: 7, bar: 8, a1: 9, a2: 10, a3: 11, q1: 12, q2: 13, q3a: 14, q3b: 14, q4: 15, q5: 16, q6: 17, q7: 18, a4: 19, a5: 20 };
 const LAST = 21;
 type Edge = { from: string; to: string; d: string; tone: 'query' | 'index' | 'store' | 'loop'; seq: number };
@@ -95,13 +89,10 @@ const EDGES: Edge[] = [
   edge('a4', 'a3', `M${POS.a4.x},${POS.a4.y + 20} C${POS.a4.x - 90},${POS.a4.y - 34} ${POS.a3.x + NW + 90},${POS.a3.y - 34} ${POS.a3.x + NW},${POS.a3.y + 20}`, 'loop', LAST),
 ];
 const NAME = (id: string) => id === 'bar' ? 'Milvus' : BY_ID[id].title;
-/** 앞 단계 · 다음 단계. 다시 찾는 고리는 따로 적는다. */
 const prevOf = (id: string) => EDGES.filter(e => e.to === id).map(e => e.tone === 'loop' ? `${NAME(e.from)}(다시 찾을 때)` : NAME(e.from));
 const nextOf = (id: string) => EDGES.filter(e => e.from === id).map(e => e.tone === 'loop' ? `${NAME(e.to)}(다시 찾을 때)` : NAME(e.to));
 const neighbors = (id: string) => EDGES.flatMap(e => e.from === id ? [e.to] : e.to === id ? [e.from] : []);
 
-/* 에이전트 줄과 색인 줄은 접을 수 있다. 접으면 단계 이름이 이어진 캡슐 하나(에이전트는 묻는 쪽 · 답하는 쪽 둘)가 같은 자리에 서고,
-   다른 줄과 잇는 선은 그 캡슐에 그대로 닿는다. 검색 엔드포인트 줄은 이 화면의 주인공이라 늘 펼쳐 둔다. */
 type Foldable = 'agent' | 'index';
 type Open = Record<Foldable, boolean>;
 const isFoldable = (lane: Lane): lane is Foldable => lane !== 'query';
@@ -140,7 +131,6 @@ function useFit(width: number) {
   return { ref, scale };
 }
 
-/** 처음 열 때 한 번 흐름을 켜며 보여 주고, 다시 볼 수 있다. 동작 줄이기 설정이면 바로 다 켠다. */
 function useFlow() {
   const reduced = typeof window !== 'undefined' && typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   const [t, setT] = useState(reduced ? LAST : 0);
@@ -153,7 +143,6 @@ function useFlow() {
   return { t, running: run, replay: () => { setT(0); setRun(true); } };
 }
 
-/** 단계에 올리면 뜨는 작은 카드: 하는 일과 앞·다음 단계. 색인 줄은 위로, 나머지는 아래로 띄운다. */
 function HoverCard({ id }: { id: string }) {
   const s = BY_ID[id], p = POS[id], below = s.lane !== 'index';
   const left = Math.min(Math.max(p.x + p.w / 2 - 132, 12), MW - 276);
@@ -180,7 +169,6 @@ function FlowMap({ lens, onLens, open, onFold, selected, onSelect, hot }: {
   const focus = view.ids ? new Set(view.ids) : undefined;
   const dim = (id: string) => focus ? !focus.has(id) : false;
   const folded = (id: string) => { const lane = laneOf(id); return !!lane && isFoldable(lane) && !open[lane]; };
-  /* 짚는 중: 단계에 올렸으면 그 단계와 앞뒤, 아래 판에서 올렸으면 그 단계들. 나머지는 물러난다. */
   const trace = hover ? new Set([hover, ...neighbors(hover)]) : hot.length ? new Set(hot) : undefined;
   const ring = (id: string) => hover ? hover === id : hot.includes(id);
   const traceEdge = (e: Edge) => !!hover && (e.from === hover || e.to === hover);
@@ -292,7 +280,6 @@ function Inspector({ id, onNavigate, onClose, onHot }: { id?: string; onNavigate
   </div>;
 }
 
-/* ── 아래 판: 책임 경계 · API 계약 · 재는 순서 · 정할 것 ───────────────── */
 function Panel({ kicker, title, wide, children }: { kicker: string; title: [string, string]; wide?: boolean; children: ReactNode }) {
   return <section className="sp-panel" data-wide={wide || undefined}>
     <div className="sp-panel-kicker">{kicker}</div>

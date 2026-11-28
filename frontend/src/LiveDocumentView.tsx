@@ -9,7 +9,6 @@ import { Tabs } from './ui';
 import { StructurePanel } from './StructurePanel';
 import { MarkdownView, ResultModeSwitch, useResultMode } from './MarkdownView';
 
-/** 화면에 보이는 상태. 글자 없는 이미지는 서버에서 failed지만 실패로 보이지 않는다(no_text). */
 export type DisplayStatus = LiveStatus | 'no_text';
 export const statusLabels: Record<DisplayStatus, string> = {
   uploaded: '실행 전', processing: '처리 중 / 대기', completed: '처리 완료', failed: '처리 실패', unsupported: '지원 안 됨', no_text: '글자 없음',
@@ -19,19 +18,15 @@ const statusIcons = { uploaded: Clock3, processing: LoaderCircle, completed: Cir
 /** 서버의 이미지 형식 목록(app/formats.py IMAGE_FORMATS)과 같다. */
 const IMAGE_FORMATS = ['PNG', 'JPG', 'JPEG', 'BMP', 'TIFF', 'TIF', 'GIF', 'WEBP'];
 export const NO_TEXT_NOTE = '이미지에서 글자를 찾지 못했습니다. 글자 없는 사진이면 정상이고, 글자가 보이는 이미지라면 OCR이 놓친 것입니다.';
-/** 이미지에서 글자를 찾지 못한 경우는 실패가 아니라 '글자 없음'이다. 다른 실패는 그대로 실패다. */
 export const isNoTextImage = (doc: Pick<LiveDoc, 'status' | 'error_code' | 'format'>) =>
   doc.status === 'failed' && doc.error_code === 'no_text' && IMAGE_FORMATS.includes((doc.format || '').toUpperCase());
 export const displayStatus = (doc: LiveDoc): DisplayStatus => isNoTextImage(doc) ? 'no_text' : doc.status;
 
-/** 문서 번호 'D12'. 예전 서버처럼 번호가 없으면 빈 문자열. */
 export const docNumber = (seq?: number | null) => typeof seq === 'number' && Number.isInteger(seq) && seq > 0 ? `D${seq}` : '';
-/** 'D12'·'d12'·'D-12'·'#12'·'12'를 번호로 읽는다. 번호 모양이 아니면 null. */
 export function parseDocNumber(query: string): number | null {
   const match = /^(?:d\s*-?\s*|#)?0*(\d{1,9})$/i.exec(query.trim());
   return match ? Number(match[1]) : null;
 }
-/** 검색어가 이름·형식·ID에 들어 있거나, 번호 모양이면 문서 번호와 같을 때 맞는다. */
 export function matchesDocQuery(doc: LiveDoc, query: string) {
   const search = query.trim().toLowerCase();
   if (`${doc.name} ${doc.format} ${doc.id}`.toLowerCase().includes(search)) return true;
@@ -82,7 +77,6 @@ const failureLabels: Record<string, string> = {
   no_text: '추출할 수 있는 텍스트를 찾지 못했습니다.', interrupted: '서버 중단으로 처리가 끝나지 않았습니다.',
 };
 export const failureReason = (doc: LiveDoc) => failureLabels[doc.error_code ?? ''] || doc.error || '처리 상태를 확인하세요.';
-/** 목록 행의 둘째 줄: 실패·미지원은 사유, 글자 없음은 설명, 나머지는 기본 정보. */
 export const statusNote = (doc: LiveDoc) => isNoTextImage(doc) ? NO_TEXT_NOTE : doc.status === 'failed' || doc.status === 'unsupported' ? failureReason(doc) : null;
 
 const tabs = [{ id: 'result', label: '추출 결과' }, { id: 'history', label: '처리 이력' }, { id: 'structure', label: '구조·참조' }] as const;
@@ -112,7 +106,6 @@ function History({ doc }: { doc: LiveDoc }) {
 
 const RAW_ONLY = 4 * 1024 * 1024; // 이보다 큰 결과는 읽기 보기를 만들지 않고 원문으로 보인다(브라우저 부담).
 
-/** 추출 결과 본문. 읽기 보기(표·제목·목록을 그림)와 저장된 Markdown 원문을 오간다. */
 export function ResultBody({ markdown }: { markdown: string }) {
   const [mode, setMode] = useResultMode();
   const tooLarge = markdown.length > RAW_ONLY;
@@ -130,7 +123,6 @@ export function ResultBody({ markdown }: { markdown: string }) {
 type Props = {
   doc: LiveDoc; result: LiveResult | null; resultError: string; resultLoading: boolean; submittingId: string | null;
   onNavigate?: (route: WorkspaceRoute) => void;
-  /** options: 텍스트·CSV의 원천 계약(구분자·인코딩). 없으면 파서가 고른다. */
   onBack: () => void; onProcess: (options?: ProcessOptions) => void; tab: DetailTab; onTab: (tab: DetailTab) => void; onCompare: () => void; onFamily?: () => void; onPickFile: () => void;
 };
 

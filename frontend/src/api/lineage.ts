@@ -1,4 +1,3 @@
-/** 문서 계보 조회(읽기 전용). 실제 파일 또는 예시 데이터로 계산한 버전·포함·참조 관계를 받는다. */
 export type LineageSource = 'live' | 'example';
 export type RefState = 'linked' | 'outdated' | 'missing' | 'ambiguous' | 'external';
 export type StateCounts = Record<RefState, number>;
@@ -34,7 +33,6 @@ export type LineageData = {
 
 const isObject = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value);
 
-/** 화면이 깨지지 않도록 서로 가리키는 식별자까지 확인한다. */
 export function isLineageData(body: unknown): body is LineageData {
   if (!isObject(body) || !Array.isArray(body.families) || !isObject(body.entries) || !isObject(body.instances) || !Array.isArray(body.references) || !isObject(body.summary) || !isObject(body.documents)) return false;
   const entries = body.entries as Record<string, unknown>; const instances = body.instances as Record<string, unknown>;
@@ -57,7 +55,7 @@ export async function getLineage(source: LineageSource, signal?: AbortSignal): P
   const response = await fetch(`/api/lineage?source=${source}`, { signal });
   if (!response.ok) {
     let message = `문서 계보를 불러오지 못했습니다. (HTTP ${response.status})`;
-    try { const body = await response.json() as { detail?: unknown }; if (typeof body.detail === 'string') message = body.detail; } catch { /* 상태 코드만 표시한다. */ }
+    try { const body = await response.json() as { detail?: unknown }; if (typeof body.detail === 'string') message = body.detail; } catch { }
     throw new Error(message);
   }
   let body: unknown;

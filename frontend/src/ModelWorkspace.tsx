@@ -15,7 +15,7 @@ type Tab = 'chat' | 'embed' | 'ocr';
 
 const timeFormat = new Intl.DateTimeFormat('ko-KR', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
 const SLOT_NAME: Record<Slot, string> = { primary: '기본 연결', secondary: '보조 연결', embedding: '임베딩 게이트웨이', ocr: 'OCR 모델' };
-/** 서버(app/ocr_model.py DEFAULTS)와 같은 기본 지시문. 예전 서버가 defaults를 보내지 않을 때만 쓴다. */
+/** 서버(app/ocr_model.py DEFAULTS)와 같은 기본 지시문. */
 const OCR_DEFAULTS: OcrPrompts = { text_prompt: 'OCR:', table_prompt: 'Table Recognition:', page_prompt: 'document parsing.' };
 const OCR_MODES: Record<OcrMode, { name: string; detail: string }> = {
   region: { name: '영역 방식', detail: '레이아웃으로 나눠 영역마다 호출 · PaddleOCR-VL 등' },
@@ -317,16 +317,13 @@ export default function ModelWorkspace() {
   </div>;
 }
 
-/** 연결 편집 팝업. 입력한 값으로 저장 전에 확인할 수 있고, 키를 비워 두면 저장된 키를 유지한다. */
 function ConnectionEditor({ value, onClose, onSaved }: { value: Editing; onClose: () => void; onSaved: (listing: Listing, message: string) => void }) {
   const embed = value.slot === 'embedding';
   const ocr = value.ocr;
-  // OCR 지시문이 기본값과 같으면 빈 칸으로 두고 자리 표시에 기본값을 보인다(비워 저장하면 서버가 기본값을 쓴다).
   const custom = (key: keyof OcrPrompts) => ocr && ocr[key] !== ocr.defaults[key] ? ocr[key] : '';
   const [draft, setDraft] = useState<Draft>({ label: value.label, base_url: value.base_url, model_id: value.model_id, models: value.models, api_key: '', clear_api_key: false,
     ...(ocr ? { mode: ocr.mode, text_prompt: custom('text_prompt'), table_prompt: custom('table_prompt'), page_prompt: custom('page_prompt') } : {}) });
   const [modelInput, setModelInput] = useState('');
-  // 바꾼 지시문이 있으면 처음부터 펼친다. 이후 열고 닫기는 사용자에게 맡긴다.
   const [promptsOpen] = useState(() => !!ocr && (Object.keys(OCR_DEFAULTS) as (keyof OcrPrompts)[]).some(key => !!custom(key)));
   const [check, setCheck] = useState<Outcome | null>(null);
   const [listed, setListed] = useState<Outcome | null>(null);

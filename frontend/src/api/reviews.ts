@@ -1,4 +1,3 @@
-/** 검수 요청(V번호): 사람이 원문 대조로 확인할 곳과 그 판정. 작업 에이전트(flag)나 원문 대조 화면이 만든다. */
 export type ReviewStatus = 'open' | 'correct' | 'wrong' | 'unclear';
 export const reviewStatusLabels: Record<ReviewStatus, string> = { open: '확인 전', correct: '맞음', wrong: '틀림', unclear: '보류' };
 export type Review = {
@@ -8,7 +7,6 @@ export type Review = {
   page: number | null; sheet: string | null; cell: string | null; line: number | null; line_end: number | null; ref: string | null;
   note: string; source_text: string | null; source_hit: string | null; result_text: string | null; result_hit: string | null;
   status: ReviewStatus; comment: string | null; batch: number | null;
-  /** 자동 대조 원장의 finding ID와 규칙 버전(V를 만들 때의 스냅샷). 예전 서버·직접 올린 요청은 없다. */
   finding_id?: string | null; rule_version?: string | null;
 };
 export type ReviewList = { reviews: Review[]; counts: Partial<Record<ReviewStatus, number>> };
@@ -23,7 +21,7 @@ async function read<T>(response: Response): Promise<T> {
     try {
       const body = await response.json() as { detail?: unknown };
       if (typeof body.detail === 'string') message = body.detail;
-    } catch { /* 상태 번호만 남긴다 */ }
+    } catch { }
     if (response.status === 404 && message.startsWith('검수 요청을 처리하지')) message = '이 서버에는 검수 요청 기능이 없습니다. 서버를 최신 버전으로 다시 시작해 주세요.';
     throw new Error(message);
   }
@@ -48,7 +46,6 @@ export async function updateReview(id: number, patch: { status?: ReviewStatus; c
   return read(await fetch(`${URL_BASE}/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(patch) }));
 }
 
-/** V12 → 사람이 읽는 위치 이름: '3쪽 · 결과 줄 120', '시트 요약!B5' */
 export function reviewWhere(item: { page?: number | null; sheet?: string | null; cell?: string | null; line?: number | null; line_end?: number | null; ref?: string | null },
   unit: 'page' | 'slide' = 'page') {
   const parts = [] as string[];

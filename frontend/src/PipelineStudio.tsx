@@ -100,14 +100,13 @@ function Studio({ fullscreenControl, formats, onOpenDocuments, onOpenLiveDocumen
   const showGraph = design || monitorView === 'graph';
   const routes = useMemo(() => formatRoutes(library), [library]);
 
-  /* ----- 저장 · 동기화 ----- */
   useEffect(() => { const timer = window.setTimeout(() => saveLibrary(library), 250); return () => window.clearTimeout(timer); }, [library]);
   useEffect(() => () => saveLibrary(libRef.current), []);
   const structure = useMemo(() => JSON.stringify(library.order.map(id => { const doc = library.flows[id]; return [id, doc.title, doc.nodes.map(node => [node.id, node.data]), doc.edges.map(edge => [edge.id, edge.source, edge.target, edge.data])]; })), [library]);
   useEffect(() => { sim.setLibrary(libRef.current); }, [structure, sim]);
   useEffect(() => { if (!active || mode !== 'monitor') return; return sim.acquire(); }, [active, mode, sim]);
   useEffect(() => { if (!library.flows[flowId]) setFlowId(OVERVIEW_ID); }, [library, flowId]);
-  useEffect(() => { try { localStorage.setItem(MANUAL_KEY, JSON.stringify(manual)); } catch { /* 선택 사항 */ } }, [manual]);
+  useEffect(() => { try { localStorage.setItem(MANUAL_KEY, JSON.stringify(manual)); } catch { } }, [manual]);
   useEffect(() => {
     if (!active) return;
     let alive = true;
@@ -125,7 +124,6 @@ function Studio({ fullscreenControl, formats, onOpenDocuments, onOpenLiveDocumen
   }, [active, flowId]);
   useEffect(() => { if (!notice) return; const timer = window.setTimeout(() => setNotice(''), 4200); return () => window.clearTimeout(timer); }, [notice]);
 
-  /* ----- 화면 맞춤 ----- */
   const alignViewport = useCallback(() => {
     const canvas = canvasRef.current;
     const doc = libRef.current.flows[flowRef.current];
@@ -140,7 +138,6 @@ function Studio({ fullscreenControl, formats, onOpenDocuments, onOpenLiveDocumen
     const { w, h } = sizeOf(entry);
     const zoom = MIN_READABLE_ZOOM;
     const vertical = doc.direction === 'TB';
-    // 전체를 맞추면 읽기 어려운 경우 시작 단계부터 탐색할 수 있게 보여 준다.
     const entryX = vertical ? width / 2 : Math.min(145, width * 0.32);
     const entryY = vertical ? Math.min(80, height * 0.26) : height / 2;
     void rf.setViewport({ x: entryX - (entry.position.x + w / 2) * zoom, y: entryY - (entry.position.y + h / 2) * zoom, zoom });
@@ -166,7 +163,6 @@ function Studio({ fullscreenControl, formats, onOpenDocuments, onOpenLiveDocumen
     return () => observer.disconnect();
   }, [active, showGraph, alignViewport]);
 
-  /* ----- 변경 · 기록 ----- */
   const apply = useCallback((next: FlowLibrary) => { libRef.current = next; setLibraryState(next); }, []);
   const record = useCallback((previous: FlowLibrary) => { const h = history.current; h.past.push(previous); if (h.past.length > 80) h.past.shift(); h.future = []; bump(); }, []);
   const commit = useCallback((updater: (lib: FlowLibrary) => FlowLibrary, recordHistory = true) => {
@@ -224,7 +220,6 @@ function Studio({ fullscreenControl, formats, onOpenDocuments, onOpenLiveDocumen
     setInspectorOpen(true);
   }, [updateFlow, viewportCenter]);
 
-  /** 연결선 중간에 단계를 끼워 넣고, 뒤쪽 노드를 밀어 자리를 만든다. */
   const insertOnEdge = useCallback((edgeId: string, kind: NodeKind) => {
     updateFlow(doc => {
       const edge = doc.edges.find(item => item.id === edgeId); if (!edge) return doc;
@@ -370,7 +365,6 @@ function Studio({ fullscreenControl, formats, onOpenDocuments, onOpenLiveDocumen
     return () => document.removeEventListener('pointerdown', closeOutside);
   }, [insertMenu]);
 
-  /* ----- 단축키 ----- */
   useEffect(() => {
     if (!active) return;
     const handler = (event: KeyboardEvent) => {
@@ -400,7 +394,6 @@ function Studio({ fullscreenControl, formats, onOpenDocuments, onOpenLiveDocumen
     return () => window.removeEventListener('keydown', handler);
   }, [active, canGoBack, duplicate, editingId, formatsOpen, insertMenu, openFlow, redo, removeSelection, undo]);
 
-  /* ----- 드래그 앤 드롭 ----- */
   const nearestEdge = useCallback((point: XYPosition) => {
     let best: { id: string; distance: number } | null = null;
     for (const edge of flow.edges) {
@@ -426,7 +419,6 @@ function Studio({ fullscreenControl, formats, onOpenDocuments, onOpenLiveDocumen
     if (edge) insertOnEdge(edge, kind); else addNode(kind, point);
   };
 
-  /* ----- 운영 지표 ----- */
   const viewMetrics = useMemo(() => {
     const result: Record<string, NodeMetric | undefined> = {};
     for (const node of flow.nodes) result[node.id] = node.data.kind === 'subflow' && node.data.subflow ? aggregate(snapshot.metrics, node.data.subflow) : snapshot.metrics[rid(flow.id, node.id)];
@@ -663,7 +655,6 @@ function MonitorStageList({ flow, metrics, selectedId, onSelect, onSubflow }: {
   </section>;
 }
 
-/** 새 도형이 기존 노드와 겹치지 않는 가까운 자리를 찾는다. */
 function freeSpot(start: XYPosition, size: { w: number; h: number }, nodes: FlowNode[]): XYPosition {
   const hits = (x: number, y: number) => nodes.some(node => { const s = sizeOf(node); return x < node.position.x + s.w + 16 && x + size.w + 16 > node.position.x && y < node.position.y + s.h + 16 && y + size.h + 16 > node.position.y; });
   for (let ring = 0; ring < 8; ring++) for (const [dx, dy] of ring ? [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [-1, 1], [1, -1], [-1, -1]] : [[0, 0]]) {

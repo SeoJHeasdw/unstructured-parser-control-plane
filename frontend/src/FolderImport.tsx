@@ -6,16 +6,11 @@ import type { ImportFile, ImportItem, ImportListing, ImportRoots, LiveDoc } from
 import { DocNumber, FileGlyph, displaySize } from './LiveDocumentView';
 import './folderImport.css';
 
-/**
- * 허용 폴더에서 가져오기. 브라우저 파일 첨부·전송이 보안 프로그램으로 막힌 PC용.
- * 화면은 허용 폴더 기준 상대 경로만 보내고, 콘솔 서버가 이 컴퓨터의 파일을 직접 읽어 로컬 저장소에 복사한다.
- * 가져오기는 저장만 하며, 파싱은 사용자가 결과 화면이나 문서 상세에서 따로 실행한다.
- */
+/** 브라우저 파일 첨부·전송이 보안 프로그램으로 막힌 PC용. */
 type Props = { onClose: () => void; onImported: (docs: LiveDoc[]) => void; onParse: (docs: LiveDoc[]) => void };
 
 const CHUNK = 500;
 const selectable = (file: ImportFile) => file.state === 'ready' || file.state === 'no_parser';
-/** '모두 선택'은 파서가 있고 문서함에 아직 없는 파일만 고른다. */
 const pickedByDefault = (file: ImportFile) => file.state === 'ready' && !file.existing.length;
 const message = (error: unknown) => error instanceof Error ? error.message : '요청을 처리하지 못했습니다.';
 const folderOf = (path: string) => path.includes('/') ? path.slice(0, path.lastIndexOf('/')) : '';

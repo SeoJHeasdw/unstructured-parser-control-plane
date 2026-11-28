@@ -4,7 +4,6 @@ import { getQcSummary } from './api/live';
 import type { QcSummary } from './api/live';
 import { qcStateText } from './compare/QcGate';
 
-/** 파싱하지 못한 사유(오류 코드·상태) → 짧은 이름. 모르는 코드는 그대로 보인다. */
 const notParsedLabels: Record<string, string> = {
   uploaded: '실행 전', unsupported_format: '미지원', unsupported: '미지원', parser_unavailable: '파서·모델 없음', no_text: '본문 없음',
   encrypted: '암호', drm_protected: '문서 보안', drm_suspected: '보안 의심', format_mismatch: '형식 불일치', format_unrecognized: '형식 인식 실패',
@@ -12,16 +11,12 @@ const notParsedLabels: Record<string, string> = {
   failed: '실패', queue_full: '대기열 가득',
 };
 
-/**
- * 처리 깔때기: 반입 전체 → 파싱 완료 → 자동 대조 → 판정 상태. 마지막 단계(통과 후보)만 보고 처리율을 말하면 스캔·미지원 파일이
- * 통계에서 사라지므로 분모를 차례로 보인다. 통과 후보도 기록 모드라 사람 검수를 이어 간다.
- */
 export function QcFunnel({ revision, active }: { revision: number; active: boolean }) {
   const [summary, setSummary] = useState<QcSummary | null>(null);
   useEffect(() => {
     if (!active) return;
     const controller = new AbortController();
-    getQcSummary(controller.signal).then(body => { if (!controller.signal.aborted) setSummary(body); }).catch(() => { /* 예전 서버: 깔때기를 그리지 않는다 */ });
+    getQcSummary(controller.signal).then(body => { if (!controller.signal.aborted) setSummary(body); }).catch(() => { });
     return () => controller.abort();
   }, [revision, active]);
   if (!summary || !summary.documents || typeof summary.states !== 'object') return null;

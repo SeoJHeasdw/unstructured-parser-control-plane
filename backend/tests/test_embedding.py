@@ -154,6 +154,9 @@ def test_rank_metrics_definitions():
 
 def test_phrase_normalization_and_cosine_top_k():
     assert normalize_phrase("１２.５ ｍL") == normalize_phrase("| 12.5 | mL |") == "12.5ml"
+    from app.chunking import _norm_phrase
+    for phrase in ("１２.５ ｍL", "| 12.5 | mL |", "**압력** `17` bar", "Ⅳ단계 ＣＯ₂ ﬁlter", "İSTANBUL ǅ", "", None):
+        assert _norm_phrase(phrase) == normalize_phrase(phrase), phrase
     q = unit_vector([1.0, 0.0])
     ranked = top_k(q, [unit_vector([0.0, 1.0]), None, unit_vector([1.0, 1.0]), unit_vector([2.0, 0.1])], 2)
     assert [i for i, _ in ranked] == [3, 2] and ranked[0][1] == pytest.approx(0.99875, abs=1e-4)

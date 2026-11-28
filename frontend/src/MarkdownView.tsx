@@ -9,10 +9,9 @@ import './markdownView.css';
 export type ResultMode = 'read' | 'raw';
 const MODE_KEY = 'document-ops:result-view';
 
-/** 추출 결과를 그려 볼지(읽기 보기) 저장된 글자 그대로 볼지. 이 브라우저에만 기억한다. */
 export function useResultMode(): [ResultMode, (mode: ResultMode) => void] {
   const [mode, setMode] = useState<ResultMode>(() => { try { return localStorage.getItem(MODE_KEY) === 'raw' ? 'raw' : 'read'; } catch { return 'read'; } });
-  return [mode, next => { setMode(next); try { localStorage.setItem(MODE_KEY, next); } catch { /* 저장이 막혀도 화면 전환은 된다 */ } }];
+  return [mode, next => { setMode(next); try { localStorage.setItem(MODE_KEY, next); } catch { } }];
 }
 
 export function ResultModeSwitch({ value, onChange }: { value: ResultMode; onChange: (mode: ResultMode) => void }) {
@@ -20,7 +19,7 @@ export function ResultModeSwitch({ value, onChange }: { value: ResultMode; onCha
     options={[{ id: 'read', label: '읽기 보기' }, { id: 'raw', label: 'Markdown 원문' }]} />;
 }
 
-const PAGE = 400; // 한 번에 그리는 블록 수. 큰 결과도 화면이 멈추지 않게 나눠 그린다.
+const PAGE = 400; // 큰 결과도 화면이 멈추지 않게 나눠 그린다.
 
 function Inline({ text }: { text: string }) {
   return <>{parseInline(text).map((span, index) => {
@@ -49,7 +48,6 @@ function nest(items: ListItem[]): Tree[] {
 }
 
 function List({ nodes }: { nodes: Tree[] }) {
-  // 같은 깊이에서 번호 목록과 글머리표가 섞이면 원래 표지(1. · -)를 그대로 보여 준다.
   const ordered = nodes.every(node => node.item.ordered);
   const start = ordered ? parseInt(nodes[0]?.item.marker ?? '1', 10) : undefined;
   const items = nodes.map((node, index) => <li key={index} data-marker={ordered ? undefined : node.item.ordered ? node.item.marker : undefined}>
@@ -92,7 +90,6 @@ function render(block: Block, key: number): ReactNode {
   }
 }
 
-/** 파싱 결과의 읽기 보기. 표는 표로, 제목·목록은 단계대로 그린다. 원문은 'Markdown 원문'에서 그대로 본다. */
 export function MarkdownView({ markdown }: { markdown: string }) {
   const blocks = useMemo(() => parseMarkdown(markdown), [markdown]);
   const [shown, setShown] = useState(PAGE);

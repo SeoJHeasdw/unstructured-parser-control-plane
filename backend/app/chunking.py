@@ -1,8 +1,4 @@
-"""청킹 벤치의 분할 전략. 표준 라이브러리만 쓰는 순수 함수다.
-
-토큰은 대상 PC에 토크나이저가 없어 문자별 가중치로 추정한다. 다국어 BPE/SentencePiece에서 한글은 음절당
-대략 0.4~1.0토큰인데, 한도 초과를 놓치지 않도록 한글·한자·가나는 보수적으로 1토큰으로 센다.
-"""
+"""청킹 벤치의 분할 전략."""
 from bisect import bisect_left, bisect_right
 from collections import Counter
 from dataclasses import dataclass, field
@@ -33,14 +29,10 @@ class ChunkingError(ValueError):
 
 
 class NeedsEmbedding(ChunkingError):
-    """의미 기반 청킹에 아직 캐시에 없는 문장 임베딩이 필요하다."""
-
     def __init__(self, missing: int, total: int):
         super().__init__(f"문장 창 {total:,}개 중 {missing:,}개의 임베딩이 아직 없습니다.")
         self.missing, self.total = missing, total
 
-
-# ---------------------------------------------------------------- 토큰 추정
 
 def _hangul(o: int) -> bool:
     return 0xAC00 <= o <= 0xD7A3 or 0x1100 <= o <= 0x11FF or 0x3130 <= o <= 0x318F or 0xA960 <= o <= 0xA97F or 0xD7B0 <= o <= 0xD7FF
@@ -51,7 +43,7 @@ def _cjk(o: int) -> bool:
 
 
 def token_weights(text: str) -> list[float]:
-    """문자별 추정 토큰 가중치. 합이 추정 토큰 수다."""
+    """대상 PC에 토크나이저가 없어 추정한다. 다국어 BPE에서 한글은 음절당 0.4~1.0토큰이라 한도 초과를 놓치지 않게 한글·한자·가나를 1토큰으로 센다."""
     out: list[float] = []
     append = out.append
     prev = ""
@@ -85,8 +77,6 @@ def token_weights(text: str) -> list[float]:
 def estimate_tokens(text: str) -> int:
     return max(0, math.ceil(sum(token_weights(text)) - 1e-9))
 
-
-# ---------------------------------------------------------------- 마크다운 블록
 
 _HEADING = re.compile(r"^ {0,3}(#{1,6})[ \t]+(.+?)(?:[ \t]+#+)?[ \t]*$")
 _FENCE = re.compile(r"^ {0,3}(`{3,}|~{3,})")
@@ -193,8 +183,6 @@ def build_sections(blocks: list[Block]) -> list[Section]:
     return sections
 
 
-# ---------------------------------------------------------------- 비정형 요소
-
 ELEMENT_KINDS = ("heading", "text", "list", "table", "image", "caption", "code", "furniture")
 _PAGE_MARK = re.compile(r"^[ \t]*<!--[ \t]*page[ \t]*(?:(\d{1,5})|break)[ \t]*-->[ \t]*$", re.I)
 _IMAGE_LINE = re.compile(r"^[ \t]*(?:<!--[ \t]*image[ \t]*-->|!\[([^\]\n]*)\]\([^)\n]*\))[ \t]*$", re.I)
@@ -211,7 +199,7 @@ CAPTION_MAX_CHARS = 200
 
 @dataclass
 class Element:
-    """원문의 한 요소. start/end는 앞뒤 공백을 뺀 원문 위치다."""
+    """start/end는 앞뒤 공백을 뺀 원문 위치다."""
     id: str
     kind: str
     start: int
@@ -262,7 +250,6 @@ def _short(text: str, limit: int) -> str:
 
 
 def _line_kinds(lines: list) -> tuple[list[str], dict]:
-    """줄마다 종류를 정한다."""
     n = len(lines)
     kinds = [""] * n
     code: dict[int, tuple[int, bool]] = {}
@@ -316,7 +303,6 @@ def _line_kinds(lines: list) -> tuple[list[str], dict]:
 
 
 def _line_pages(lines: list, kinds: list[str], line_pages: list | None) -> list:
-    """줄마다 쪽 번호."""
     n = len(lines)
     pages: list = [None] * n
     marks = [i for i in range(n) if kinds[i] == "page"]
@@ -339,7 +325,7 @@ def _line_pages(lines: list, kinds: list[str], line_pages: list | None) -> list:
 
 
 def line_pages(locations, text: str) -> list | None:
-    """저장된 결과의 locations(1부터 세는 줄 범위 → 쪽)를 줄별 쪽 목록으로 바꾼다."""
+    """locations의 줄 범위는 1부터 센다."""
     if not isinstance(locations, list) or not locations:
         return None
     n = text.count("\n") + 1
@@ -361,7 +347,7 @@ def _target_kind(prefix: str) -> str:
 
 
 def parse_elements(text: str, pages_by_line: list | None = None) -> tuple[list[Element], list, list[int]]:
-    """원문을 요소로 나눈다. 돌려주는 값: 요소 목록, 줄별 쪽 번호, 줄 시작 위치."""
+    """돌려주는 값: 요소 목록, 줄별 쪽 번호, 줄 시작 위치."""
     lines = _lines(text)
     n = len(lines)
     kinds, code = _line_kinds(lines)
@@ -433,7 +419,6 @@ def parse_elements(text: str, pages_by_line: list | None = None) -> tuple[list[E
             add("text", i, j)
             i = j + 1
 
-    # 캡션 연결
     def adjacent(a: Element, b: Element) -> bool:
         gap = text[a.end:b.start]
         return not gap.strip() and gap.count("\n") <= 2
@@ -503,11 +488,7 @@ def parse_elements(text: str, pages_by_line: list | None = None) -> tuple[list[E
     return raw, pages, [s for s, _, _ in lines]
 
 
-# ---------------------------------------------------------------- 원문 분석
-
 class Source:
-    """한 문서의 분석 결과. 여러 전략이 함께 쓴다."""
-
     def __init__(self, text: str, pages_by_line: list | None = None):
         if not isinstance(text, str):
             raise ChunkingError("원문 텍스트가 필요합니다.")
@@ -569,7 +550,6 @@ class Source:
         return self.ns[e] > self.ns[s]
 
     def fit_end(self, s: int, limit: float, hard_end: int, unit: str) -> int:
-        """s에서 시작해 limit을 넘지 않는 가장 먼 끝(최소 한 글자는 전진)."""
         if unit == "chars":
             end = s + int(limit)
         else:
@@ -589,14 +569,11 @@ class Source:
             i += 1
 
 
-# ---------------------------------------------------------------- 문장 경계
-
 _SENT = re.compile(r"(?:[.?!…。？！]+[\"'”’)\]」』]*[ \t　]+)|(?:[ \t]*\n\s*)")
 _ABBREVIATIONS = {"e.g", "i.e", "vs", "no", "rev", "fig", "dr", "mr", "ms", "st", "vol", "pp", "p", "co", "inc", "ltd", "approx", "ref", "sec"}
 
 
 def sentence_bounds(text: str, s: int, e: int) -> list[int]:
-    """한국어 문장 끝과 줄바꿈 위치."""
     out = []
     for m in _SENT.finditer(text, s, e):
         punct = text[m.start()]
@@ -614,8 +591,6 @@ def sentence_bounds(text: str, s: int, e: int) -> list[int]:
         out.append(m.end())
     return out
 
-
-# ---------------------------------------------------------------- 조각과 분할
 
 class _Piece:
     __slots__ = ("s", "e", "flags", "text", "path", "whole", "content", "last_path", "roles", "page", "parent", "kind")
@@ -699,7 +674,6 @@ def _merge(src: Source, pieces: list[_Piece], unit: str, size: float, overlap: f
 
 
 def _recursive(src: Source, s: int, e: int, unit: str, size: float, overlap: float, level: int = 0) -> list[_Piece]:
-    """문단 → 줄 → 문장 → 띄어쓰기 → 글자 순서로, 크기 안에 들 때까지 나누고 이웃 조각을 다시 합친다."""
     if src.measure(s, e, unit) <= size or not src.has_text(s, e):
         return [_Piece(s, e)]
     if level >= 4:
@@ -770,8 +744,6 @@ def _sentence(src: Source, unit: str, size: float, overlap_sentences: int) -> li
     return out
 
 
-# ---------------------------------------------------------------- 의미 기반
-
 SEMANTIC_WINDOW_CHARS = 1500  # 창 하나의 최대 길이(작은 임베딩 모델의 입력 한도 안쪽)
 
 
@@ -783,7 +755,6 @@ class _SemUnit:
 
 
 def semantic_units(src: Source) -> list[_SemUnit]:
-    """의미 기반 청킹의 문장 단위."""
     units: list[_SemUnit] = []
     heading_start: int | None = None
     for block in src.blocks:
@@ -810,7 +781,6 @@ def semantic_units(src: Source) -> list[_SemUnit]:
     merged: list[_SemUnit] = []
     for u in units:
         if u.atomic and u.block is not None and u.block.kind == "table":
-            # 표 위에 제목이 붙어 있으면 그 앞 캡션은 앞 절의 것이다. 쪼개진 캡션은 제목에서 시작한 조각까지 붙인다.
             if u.s >= u.block.start:
                 while merged and is_caption(merged[-1]):
                     prev = merged.pop()
@@ -825,13 +795,12 @@ def semantic_units(src: Source) -> list[_SemUnit]:
 
 
 def _noise(src: Source, u: _SemUnit) -> bool:
-    """쪽 표시(<!-- page N -->)와 반복 머리말·쪽 번호."""
     el = src.element_at(u.s)
     return (el is not None and el.kind == "furniture") or bool(_PAGE_MARK.match(src.text[u.s:u.e]))
 
 
 def _windows(src: Source, units: list[_SemUnit], ids: list[int], buffer: int) -> tuple[list[str], list[int]]:
-    """내용 문장마다 같은 절 안의 앞뒤 buffer개 문장을 이은 글, 그리고 문장마다 절 번호."""
+    """돌려주는 값: 내용 문장마다 같은 절 안의 앞뒤 buffer개 문장을 이은 글, 문장마다 절 번호."""
     seg, current = [], 0
     for k, i in enumerate(ids):
         if k and any(units[m].hard or units[m].atomic for m in range(ids[k - 1] + 1, i + 1)):
@@ -864,7 +833,6 @@ def _percentile(values: list[float], pct: int) -> float:
 
 
 def _semantic(src: Source, p: dict, embed) -> tuple[list[_Piece], dict]:
-    """이웃 문장(앞뒤 문장을 묶은 창)의 임베딩 거리가 문서 안에서 상위 구간이면 경계로 삼고, 크기로 다듬는다."""
     if embed is None:
         raise ChunkingError("의미 기반 청킹에는 임베딩 모델이 필요합니다. 설정에서 임베딩 연결을 확인하세요.")
     unit, size, min_size = p["unit"], p["size"], p["min_size"]
@@ -949,7 +917,6 @@ def _semantic(src: Source, p: dict, embed) -> tuple[list[_Piece], dict]:
 
 
 def _table_pieces(src: Source, table: Block, unit: str, size: float, first_limit: float) -> list[_Piece]:
-    """표를 행 단위로 나눈다. 두 번째 조각부터 머리행을 반복한다."""
     rows = table.rows
     if not rows:
         return _recursive(src, table.start, table.end, unit, size, 0, level=1)
@@ -1020,7 +987,6 @@ def _markdown(src: Source, unit: str, size: float, merge_small: bool, min_size: 
         for idx, block in enumerate(sec.blocks):
             limit = size
             if idx == 0 and head:
-                # 제목이 첫 조각과 함께 들어가도록 그만큼 덜어 낸다.
                 reserved = src.measure(head.start, block.start, unit)
                 limit = size - reserved if size - reserved >= size * 0.3 else size
             if src.measure(block.start, block.end, unit) <= limit:
@@ -1054,7 +1020,6 @@ def _markdown(src: Source, unit: str, size: float, merge_small: bool, min_size: 
     merged: list[_Piece] = []
     for p in pieces:
         prev = merged[-1] if merged else None
-        # 제목만 있는 절은 본문이 있는 앞 청크에 붙이지 않는다(뒤의 하위 절과 합쳐지게).
         if prev is not None and prev.whole and p.whole and (p.content or not prev.content) and src.measure(prev.s, p.e, unit) <= size \
                 and (src.measure(prev.s, prev.e, unit) < min_size or src.measure(p.s, p.e, unit) < min_size):
             parent = prev.last_path[:-1]
@@ -1071,13 +1036,11 @@ def _markdown(src: Source, unit: str, size: float, merge_small: bool, min_size: 
     return merged
 
 
-# ---------------------------------------------------------------- 요소 인식 전략
-
 _ROLE_RANK = {"full": 4, "img": 3, "part-h": 2, "part": 1, "placeholder": 0}
 
 
 class _Unit:
-    """청크를 이루는 최소 단위: 문단 하나, 표 행 묶음 하나, 그림 하나."""
+    """청크를 이루는 최소 단위. kind: heading · prose(표·그림 밖의 요소 하나) · table(행 묶음 하나) · image(그림 하나)."""
     __slots__ = ("kind", "s", "e", "text", "roles", "el", "r0", "r1", "cap", "flags", "m", "page")
 
     def __init__(self, kind: str, s: int, e: int, text: str, roles: dict, unit: str, el: Element, r0: int = 0, r1: int = 0,
@@ -1146,7 +1109,6 @@ def _table_unit(src: Source, el: Element, r0: int, r1: int, cap: Element | None,
 
 def _table_groups(src: Source, el: Element, policy: str, table_rows: int, unit: str, size: float, cap: Element | None,
                   lo: int, hi: int) -> list[tuple[int, int]]:
-    """표 행 범위 [lo, hi)를 정책에 맞는 행 묶음으로 나눈다."""
     if hi <= lo:
         return [(lo, hi)]
     text_mode = policy == "row_text"
@@ -1182,7 +1144,7 @@ def _image_unit(src: Source, el: Element, cap: Element | None, unit: str) -> _Un
 
 
 def _element_units(src: Source, p: dict, size: float) -> tuple[list[_Unit], int]:
-    """요소를 원문 순서의 단위로 바꾼다. 돌려주는 값: 단위 목록, 글자 없는 그림 수."""
+    """돌려주는 값: 원문 순서의 단위 목록, 글자 없는 그림 수."""
     unit = p["unit"]
     consumed = set()
     for el in src.elements:
@@ -1212,7 +1174,6 @@ def _element_units(src: Source, p: dict, size: float) -> tuple[list[_Unit], int]
 
 
 def _fit(src: Source, units: list[_Unit], p: dict, size: float) -> list[_Unit]:
-    """size를 넘는 단위를 나눈다."""
     unit = p["unit"]
     out: list[_Unit] = []
     for u in units:
@@ -1246,7 +1207,6 @@ def _fit(src: Source, units: list[_Unit], p: dict, size: float) -> list[_Unit]:
 
 
 def _pack(units: list[_Unit], unit: str, size: float, overlap: float, by_kind: bool = True) -> list[list[_Unit]]:
-    """단위를 size까지 묶는다."""
     groups: list[list[_Unit]] = []
     cur: list[_Unit] = []
     for u in units:
@@ -1348,7 +1308,6 @@ def _strip_span(text: str, s: int, e: int) -> tuple[int, int]:
 
 
 def _span_roles(src: Source, s: int, e: int, body: str, transformed: bool) -> dict:
-    """기준선 청크가 원문 범위로 덮는 요소와 그 정도."""
     roles: dict[str, str] = {}
     for el in src.elements_near(s, e):
         if not src.has_text(max(s, el.start), min(e, el.end)):
@@ -1401,8 +1360,6 @@ def element_outcomes(src: Source, roles_by_chunk: list[dict]) -> tuple[dict, dic
     return outcomes, tally
 
 
-# ---------------------------------------------------------------- 파라미터와 실행
-
 def _int(value, default: int, name: str) -> int:
     if value is None or value == "":
         return default
@@ -1418,7 +1375,6 @@ def _int(value, default: int, name: str) -> int:
 
 
 def normalize_params(kind: str, params: dict | None) -> dict:
-    """범위를 벗어난 값은 가까운 허용값으로 맞춘다."""
     if kind not in STRATEGY_KINDS:
         raise ChunkingError("알 수 없는 청킹 방식입니다.")
     params = params or {}
@@ -1469,7 +1425,7 @@ def normalize_strategy(spec: dict) -> dict:
 
 
 def _pieces(src: Source, kind: str, p: dict) -> tuple[list[_Piece], list[dict] | None, dict]:
-    """조각, 부모 목록(parent_child), 통계에 더할 표시."""
+    """돌려주는 값: 조각, 부모 목록(parent_child), 통계에 더할 표시."""
     if kind == "fixed":
         return _fixed(src, p["unit"], p["size"], p["overlap"]), None, {}
     if kind == "recursive":
@@ -1498,7 +1454,7 @@ def _kind(src: Source, s: int, e: int) -> str:
 
 
 def _build(src: Source, pieces: list[_Piece], limit_tokens: int | None = None) -> tuple[list[dict], list[dict]]:
-    """청크 목록과, 청크마다 덮는 요소의 역할(요소 결과 계산용)."""
+    """돌려주는 값: 청크 목록, 청크마다 덮는 요소의 역할."""
     chunks: list[dict] = []
     roles_by_chunk: list[dict] = []
     text = src.text
@@ -1560,7 +1516,6 @@ def _dist(values: list[int]) -> dict:
 
 
 def summarize(src: Source, chunks: list[dict], limit_tokens: int | None = None) -> dict:
-    """청크 수·길이 분포·한도 초과·원문 포함률·중복률·표 분할."""
     spans = sorted((c["start"], c["end"]) for c in chunks)
     covered = 0
     cur_s = cur_e = -1
@@ -1636,8 +1591,6 @@ def describe_source(src: Source) -> dict:
             "elements": [el.public(src) for el in src.elements], "pages": src.pages, "composition": src.composition()}
 
 
-# ---------------------------------------------------------------- 합성 예시
-#
 # Docling이 PDF·오피스 문서에서 뽑는 마크다운을 흉내 낸 가상의 문서다. 실제 조직·제품·설비·인물과 관계가 없다.
 # <!-- page N --> 는 예시 전용 쪽 경계, <!-- image --> 는 Docling의 그림 자리 표시다(OCR이 꺼져 있으면 스캔 쪽도 빈 그림).
 
@@ -2020,13 +1973,10 @@ EXAMPLE_QUESTIONS: tuple[dict, ...] = (
 )
 
 
-# ---------------------------------------------------------------- 정답 위치로 질문 유형 판단
-
 _PHRASE_STRIP = re.compile(r"[\s|*`]+")
 
 
 def _norm_phrase(text: str) -> str:
-    """embedding.normalize_phrase와 같은 규칙(NFKC, 대소문자 무시, 공백·표·강조 기호 제거)."""
     return _PHRASE_STRIP.sub("", unicodedata.normalize("NFKC", text or "").casefold())
 
 
@@ -2045,7 +1995,6 @@ def _normalized(src: Source) -> tuple[str, list[int]]:
 
 
 def answer_offset(src: Source, answer: str) -> int | None:
-    """정답 문구가 처음 나오는 원문 위치. 없으면 None."""
     phrase = _norm_phrase(answer)
     if not phrase:
         return None
@@ -2055,7 +2004,6 @@ def answer_offset(src: Source, answer: str) -> int | None:
 
 
 def infer_question_kind(src: Source, answer: str) -> str:
-    """정답 위치로 질문 유형(table·image·text)을 정한다."""
     offset = answer_offset(src, answer)
     el = src.element_at(offset) if offset is not None else None
     if el is None:

@@ -97,6 +97,17 @@ async function ready() {
 }
 
 describe('청킹 벤치', () => {
+  it('한도 초과는 알려진 모델 가운데 가장 작은 입력 한도로 센다(한도를 모르는 모델은 빼고)', async () => {
+    const base = fetchMock.getMockImplementation()!;
+    const spec = CONFIG.specs[0];
+    fetchMock.mockImplementation(async (url, init) => url.endsWith('/config')
+      ? new Response(JSON.stringify({ ...CONFIG, specs: [{ ...spec, id: '큰 모델', max_tokens: 8192 }, { ...spec, id: '작은 모델', max_tokens: 256 }, { ...spec, id: '한도 모름', max_tokens: 0 }] }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } })
+      : base(url, init));
+    await ready();
+    await waitFor(() => expect(lastChunkBody().limit_tokens).toBe(256));
+  });
+
   it('첫 화면은 머리줄과 비교 표 하나이고, 표에는 요소 종류별 보존 수가 나온다', async () => {
     await ready();
     expect(lastChunkBody().source).toEqual({ sample: 'report' });
