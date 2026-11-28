@@ -45,7 +45,28 @@ def markdown_locations(document, markdown: str, extension: str, parts=None) -> l
                 locations.extend(_pdf_spans(items, text, text_lines, line))
         elif len(items) == 1 and isinstance(items[0], TableItem):
             locations.extend(_worksheet_rows(document, items[0], text_lines, line))
+        elif any(isinstance(item, TableItem) for item in items):
+            # 한 시트에 표가 여럿이면(빈 행으로 나뉜 블록, 따로 떨어진 병합 비고 행) 직렬화기가 시트 묶음 하나로 낸다.
+            locations.extend(_grouped_tables(document, [item for item in items if isinstance(item, TableItem)], text_lines, line))
     return locations
+
+
+def _grouped_tables(document, tables, lines: list[str], first_line: int) -> list[ResultLocation]:
+    """조각 안의 표 블록(빈 줄로 나뉜 '|' 블록)을 문서 순서의 표 항목과 짝짓는다. 수가 다르면 짝을 정할 수 없어 위치를 남기지 않는다."""
+    blocks, start = [], None
+    for index, text in enumerate(lines + [""]):
+        if text.strip():
+            start = index if start is None else start
+            continue
+        if start is not None and lines[start].lstrip().startswith("|") and any(_TABLE_SEPARATOR.fullmatch(t) for t in lines[start:index]):
+            blocks.append((start, index))
+        start = None
+    if len(blocks) != len(tables):
+        return []
+    result = []
+    for table, (begin, end) in zip(tables, blocks):
+        result.extend(_worksheet_rows(document, table, lines[begin:end], first_line + begin))
+    return result
 
 
 def sheet_of(document, item) -> str | None:

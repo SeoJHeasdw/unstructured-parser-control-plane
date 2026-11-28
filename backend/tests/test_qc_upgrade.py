@@ -140,3 +140,21 @@ def test_a_correct_verdict_still_counts_after_the_rule_key_changes(tmp_path, mon
         summary = client.get("/api/live/qc-summary").json()["states"]
         assert gate_state == listed["state"] == "undetermined" and listed["unresolved"] == 0
         assert summary["undetermined"] == 1 and summary["needs_review"] == 0
+
+
+def test_reverification_waits_while_a_requested_parse_is_queued(tmp_path, monkeypatch):
+    import threading
+    from app.service import DocumentService
+    service = DocumentService(Settings(runtime_dir=tmp_path / "runtime"))
+    monkeypatch.setattr(service.repo, "qc_needed", lambda key: [("d1", "r1", False), ("d2", "r2", False)])
+    done = []
+    monkeypatch.setattr(service, "ensure_qc", lambda doc_id, run_id: done.append(doc_id))
+    service._jobs.put_nowait(("parse-me", "run"))          # 사용자가 요청한 파싱(접수됨, 아직 끝나지 않음)
+    worker = threading.Thread(target=service._reverify, daemon=True)
+    worker.start()
+    time.sleep(0.5)
+    assert done == [] and service.reverify_state["state"] == "running"
+    service._jobs.get_nowait()
+    service._jobs.task_done()
+    worker.join(timeout=5)
+    assert done == ["d1", "d2"] and service.reverify_state["state"] == "done"

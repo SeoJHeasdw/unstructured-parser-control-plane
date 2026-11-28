@@ -568,6 +568,8 @@ def _text(path, fmt: str, settings, budget: _Budget, dialect: dict | None = None
         raise SourceUnavailable(f"원본을 기록된 인코딩({encoding})으로 다시 읽을 수 없습니다.") from exc
     if len(text) > MAX_CHARS:
         text, budget.truncated = text[:MAX_CHARS], True
+        if "\n" in text:
+            text = text[:text.rfind("\n") + 1]  # 다른 형식처럼 온전한 줄까지만(줄 중간에서 자른 글은 대조 기준이 아니다)
     unit = SourceUnit(key="body", label="본문")
     records = None
     used = None

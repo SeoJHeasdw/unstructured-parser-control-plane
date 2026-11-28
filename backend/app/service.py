@@ -163,6 +163,9 @@ class DocumentService:
             return
         state.update(state="running" if needed else "done", total=len(needed), stale=sum(1 for _, _, stale in needed if stale))
         for doc_id, run_id, _ in needed:
+            # 사용자가 요청한 파싱이 대기·진행 중이면 먼저 보낸다(한 프로세스라 둘이 겹치면 파싱이 몇 배 느려진다).
+            while self._jobs.unfinished_tasks and not self._stopping.is_set():
+                self._stopping.wait(0.2)
             if self._stopping.is_set():
                 state["state"] = "stopped"
                 return

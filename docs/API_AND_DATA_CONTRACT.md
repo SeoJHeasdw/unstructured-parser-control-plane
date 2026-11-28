@@ -388,9 +388,10 @@ Docling 실행 시 `HF_HUB_OFFLINE=1`, `TRANSFORMERS_OFFLINE=1`을 설정하며 
 | `no_contract` | ○ | 이 형식은 통과 후보 기준(형식 계약)을 아직 검증하지 않음. 지금은 CSV만 기준이 있다 |
 | `scan`·`source_garbled` | ○ | 글자 층 없는 쪽(OCR 결과)·깨진 글자 층 |
 | `hidden_layer` | ○ | 그림 위 보이지 않는 글자 층에서 읽은 값(화면 값 미확인) |
-| `shared_layer` | PDF ○ / XLSX × | 결과와 대조 기준이 같은 원천(pdf-text 글자 층 · openpyxl 저장 값) |
+| `shared_layer` | PDF ○ / XLSX·MSG × | 결과와 대조 기준이 같은 원천(pdf-text 글자 층 · openpyxl 저장 값 · MSG 속성 스트림) |
+| `source_unread` | ○ | 원본에 있지만 대조 기준으로 읽지 못한 부분(2026-11-28: 압축 RTF로만 저장된 MSG 본문) |
 | `unlocated` | ○ | 원문 위치가 없어 단위별로 대조하지 못함 |
-| `truncated`·`findings_capped` | ○ | 원본이 커서 앞부분만 · 의심점 2만 곳 초과 |
+| `truncated`·`findings_capped` | ○ | 원본이 커서 앞부분만(`unread`: 대조하지 않은 결과 줄·행 수) · 의심점 2만 곳 초과. 2026-11-28부터 원본을 상한(400만 자)까지 온전한 줄·레코드만 읽고, 위치 없는 결과도 **읽은 범위까지만** 대조한다. 그 뒤 결과는 의심점으로도 확인으로도 세지 않는다(예전에는 읽지 않은 CSV 행이 모두 `row_extra`, TXT 숫자가 모두 `extra_number`였고, 뒤쪽의 같은 글 때문에 앞의 차이를 놓쳤다) |
 | `delimiter_ambiguous`·`encoding_uncertain`·`ragged`·`no_evidence`·`grid_unavailable` | ○ | CSV 계약 미충족(아래) |
 | `chart_no_cache`·`chart_unresolved`·`chart_literal` | ○ | 차트 표시값 미확인 · 참조 해석 못 함 · 셀 참조 없는 값 |
 | `image_only` | ○ | 이미지 원본(글자 층 없음) |
@@ -424,8 +425,8 @@ pypdfium2는 한 프로세스의 여러 스레드에서 동시에 부르면 안 
 
 | 항목 | 바뀐 계약 |
 |---|---|
-| 규칙 키 | 원장의 `rule_version`은 `verify-2026.11.28+<지문 10자>`다. 지문은 대조·원본 읽기 모듈(`qc.py`·`verify.py`·`source_text.py`·`pdf_layers.py`·`xlsx_charts.py`·`textnorm.py`·`adapters/text.py`·`adapters/eml.py`·`fidelity/probe.py`·`fidelity/report.py`·`format_gate.py`) 내용과 `pypdfium2`·`openpyxl`·`docling` 버전, Python 버전이다. 이름만 쓰던 첫 커밋은 규칙이 바뀌어도 같은 이름이라 옛 원장(의심점 0)을 계속 썼다. |
-| 다시 대조 | 서버가 시작할 때 현재 키의 원장이 없는 **최신 성공 실행**을 백그라운드에서 다시 대조한다(`DOCOPS_QC_REVERIFY`, 기본 켬, 원본만 다시 읽음). 그 사이 조회하면 그 자리에서 계산한다. 이전 키의 원장 행과 검수 요청(V번호·판정·메모·근거)은 지우지 않는다. `verify` 응답에 `rule_history`(같은 실행의 이전 원장: 규칙·의심점 수·시각)와 막지 않는 이유 `rules_changed`. `qc-summary`에 `qc_stale`(이전 규칙 원장만 있는 실행)·`reverify:{state, total, stale, done, failed, rule_version}`. 목록의 `qc.label`은 '규칙 변경 · 다시 대조 대기'. |
+| 규칙 키 | 원장의 `rule_version`은 `verify-2026.11.28+<지문 10자>`다. 지문은 대조·원본 읽기 모듈(`qc._RULE_MODULES`: `qc.py`·`verify.py`·`source_text.py`·`pdf_layers.py`·`xlsx_charts.py`·`textnorm.py`·`msg.py`·`cfb.py`·`adapters/text.py`·`adapters/eml.py`·`adapters/html.py`·`fidelity/probe.py`·`fidelity/report.py`·`format_gate.py`)의 실행 구조(2026-11-28부터 docstring을 뺀 AST, 주석·docstring만 바꾸면 같은 키)와 `pypdfium2`·`openpyxl`·`docling` 버전, Python 버전이다. 이름만 쓰던 첫 커밋은 규칙이 바뀌어도 같은 이름이라 옛 원장(의심점 0)을 계속 썼다. |
+| 다시 대조 | 서버가 시작할 때 현재 키의 원장이 없는 **최신 성공 실행**을 백그라운드에서 다시 대조한다(`DOCOPS_QC_REVERIFY`, 기본 켬, 원본만 다시 읽음). 사용자가 요청한 파싱이 대기·진행 중이면 문서 사이에서 기다렸다가 이어 간다(2026-11-28, 한 프로세스라 겹치면 파싱이 2~3배 느려졌다). 그 사이 조회하면 그 자리에서 계산한다. 이전 키의 원장 행과 검수 요청(V번호·판정·메모·근거)은 지우지 않는다. `verify` 응답에 `rule_history`(같은 실행의 이전 원장: 규칙·의심점 수·시각)와 막지 않는 이유 `rules_changed`. `qc-summary`에 `qc_stale`(이전 규칙 원장만 있는 실행)·`reverify:{state, total, stale, done, failed, rule_version}`. 목록의 `qc.label`은 '규칙 변경 · 다시 대조 대기'. |
 | 상세 없는 차이 | 단위별 상세 상한(CSV 200행·글·셀 40곳·결과에만 있는 숫자 8·깨진 글자 5·그림 OCR 줄 10)을 없앴다. 찾은 차이는 모두 의심점이다. 전체 상한 2만 곳을 넘으면 우선순위 순으로 남기고 나머지를 `omitted`로 세며(`findings_capped`, 막음), `gate.unresolved`에 더하고 이유 `findings_omitted`를 단다. 앞의 지점을 모두 '맞음'으로 해도 통과 후보가 되지 않는다. |
 | 칸 단위 의심점 | CSV·XLSX의 바뀐·빠진·생긴 칸은 **칸마다** 의심점 하나다(두 칸 맞바꿈은 그 쌍 하나, 행 순서·행 빠짐·결과에만 있는 행은 행 하나, XLSX 열 밀림은 행 하나). 한 행을 묶으면 공백 차이만 보고 '맞음'을 눌러 같은 행의 수치 오류까지 해결될 수 있었다. |
 | 청크의 판정 | 청크 `qc`는 원장 의심점 중 '맞음'이 아닌 것과 의심점 없이 올린 검수 요청(결과 줄이 있고 '맞음'이 아닌 것)이다. 항목마다 `review:{id, status, comment, origin, page, sheet, cell, line, decided_at}`(없으면 `null`). 청크 `qc_counts:{wrong, unclear, open}`, 표시 `confirmed-wrong`(틀림 확인)·`unverified`(보류·확인 전·판정 없음). `source.qc`에 `wrong`·`unclear`. 순서는 틀림 → 보류 → 확인 전 → 판정 없음. |

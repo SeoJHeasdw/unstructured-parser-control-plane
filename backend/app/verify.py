@@ -55,8 +55,14 @@ def fold(text: str) -> str:
     return unicodedata.normalize("NFC", text).translate(_FOLD)
 
 
+# str.isspace()가 참인 글자 전부(Python 3.12·3.13 유니코드 표 기준, 테스트가 전체 범위와 대조).
+_WHITESPACE = "\t\n\x0b\x0c\r\x1c\x1d\x1e\x1f \x85\xa0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000"
+_COMPACT = {**_FOLD, **{ord(ch): None for ch in _WHITESPACE}, **{ord(ch): None for ch in _IGNORED}}
+
+
 def compact(text: str) -> str:
-    return "".join(ch for ch in fold(text) if not ch.isspace() and ch not in _IGNORED)
+    """fold 뒤 공백·표 꾸밈 글자를 뺀 글(대조의 기준 형태)."""
+    return unicodedata.normalize("NFC", text).translate(_COMPACT)
 
 
 def result_plain(line: str) -> str:
@@ -200,6 +206,14 @@ class Verifier:
         self._line_spot: dict[int, dict] = {}              # 결과 줄 → 그 줄의 원본 줄 차이 지점
         self._dropped: set[int] = set()                    # 묶음 처리로 뺀 지점의 id()
         self.hidden_missing: list[str] = []
+        self.unread_result_lines = 0                       # 원본을 상한까지만 읽어 대조하지 않은 결과 줄·행
+        self._table_rows: dict[int, tuple[str, list[str]]] = {}  # 결과 표 줄 → (압축한 글, 칸) — 위치 없는 표 대조에서 줄마다 한 번만 계산
+        if source.truncated and not self.located:
+            # 원본을 앞부분만 읽었으면 결과도 그 범위까지만 본다. 결과 전체와 세면 뒤쪽의 같은 글 때문에 앞의 차이를 놓친다.
+            cut = self._read_cut()
+            if cut is not None:
+                self.unread_result_lines = sum(1 for n in self.plain if n > cut and compact(self.plain[n]))
+                self.whole = _Index([n for n in self.plain if n <= cut], self.plain)
 
     def _map_regions(self, locations: list[dict]):
         mark = next((n for n, line in enumerate(self.raw, start=1) if line.strip() == SUPPLEMENT_MARK), None)
@@ -242,6 +256,15 @@ class Verifier:
             for key in keys:
                 regions[key].append(n)
         return regions, rows, True
+
+    def _read_cut(self) -> int | None:
+        """원본에서 읽은 마지막 줄들이 끝나는 결과 줄. 찾지 못하면 None(결과 전체와 대조)."""
+        tail = [c for c in (compact(self.source_plain(line.text)) for unit in self.source.units for line in unit.lines[-3:]) if c][-3:]
+        probe = "".join(tail)
+        if len(probe) < 8:
+            return None
+        at = self.whole.text.rfind(probe)
+        return self.whole.line_at(at + len(probe) - 1) if at >= 0 else None
 
     def _index_for(self, unit: SourceUnit) -> tuple[_Index, bool]:
         if self.located and unit.key in self._regions:
@@ -307,7 +330,8 @@ class Verifier:
         if self.located is False and self.fmt in ("PDF", "PPTX", "PPTM", "XLSX", "XLSM") and any(u.lines for u in self.source.units):
             self.notes.append("결과에 원문 위치(쪽·시트)가 기록되지 않아 단위 구분 없이 문서 전체와 대조했습니다.")
         if self.source.truncated:
-            self.notes.append("원본이 커서 앞부분만 대조했습니다.")
+            self.notes.append("원본이 커서 앞부분만 대조했습니다." + (f" 결과의 뒤쪽 {self.unread_result_lines:,}줄(행)은 대조하지 않았습니다(의심점으로도, 확인으로도 세지 않음)."
+                                                               if self.unread_result_lines else ""))
         self.notes.extend(self.source.notes)
         self._judge()
         unit_rank = {unit.key: index for index, unit in enumerate(self.source.units)}
@@ -359,7 +383,8 @@ class Verifier:
             self.reasons.append(reason("hidden_layer", f"그림 위의 보이지 않는 글자 층에서 읽은 {_names(hidden_layer)}: 결과와 대조 기준이 같은 숨은 층이라 "
                                        "화면에 보이는 값과 같은지 확인되지 않았습니다." + agreed))
         if self.source.truncated:
-            self.reasons.append(reason("truncated", "원본이 커서 앞부분만 대조했습니다."))
+            self.reasons.append(reason("truncated", "원본이 커서 앞부분만 대조했습니다." + (f" 결과의 뒤쪽 {self.unread_result_lines:,}줄(행)은 확인하지 않은 범위입니다."
+                                                                                 if self.unread_result_lines else ""), unread=self.unread_result_lines))
         if self.unlocated or (self.located is False and self.fmt in ("PDF", "PPTX", "PPTM", "XLSX", "XLSM") and any(u.lines for u in self.source.units)):
             self.reasons.append(reason("unlocated", "결과 줄의 원문 위치가 없는 단위는 문서 전체와 대조해 빠짐·순서를 단위별로 확인하지 못했습니다."))
         if self.hidden_missing:
@@ -560,6 +585,11 @@ class Verifier:
                       f"(원본 {total:,}자 · 결과에서 찾은 {matched:,}자). 쪽 전체가 빠졌거나 순서·글자가 크게 다를 수 있습니다.",
                       ref=sample_line.ref, line=unit_lines[0] if unit_lines else None, line_end=unit_lines[-1] if unit_lines else None,
                       source=_clip(sample_plain))
+        read_until = None
+        if self.source.truncated:
+            # 원본을 상한까지만 읽었다: 마지막으로 맞춘 결과 줄 뒤는 대조하지 않은 범위다(차이로 세지도, 해결로 세지도 않는다).
+            read_until = max((n for n in best_for.values() if n is not None), default=0)
+            self.unread_result_lines = max(self.unread_result_lines, sum(1 for n in index.numbers if n > read_until and compact(self.plain[n])))
         source_numbers = Counter(n for _, plain, _ in lines for n in numbers(plain))
         result_numbers = Counter(n for line_no in index.numbers for n in numbers(self.plain[line_no]))
         missing_numbers = source_numbers - result_numbers
@@ -568,6 +598,8 @@ class Verifier:
         extra = 0
         for line_no in index.numbers if not collapsed else ():
             if line_no in self._supplement or ("number", line_no) in self._result_spots:
+                continue
+            if read_until is not None and line_no > read_until:
                 continue
             raw = self.raw[line_no - 1]
             if PICTURE_LABEL in raw or SUPPLEMENT_OCR in raw:
@@ -939,10 +971,15 @@ class Verifier:
                  "note": unit.note, "source_chars": 0, "matched_chars": 0, "coverage": None, "numbers_missing": 0,
                  "numbers_extra": 0, "spots": 0, "state": "checked", "result_lines": [1, len(grid) + 1] if grid else []}
         records = [[_newlines(value) for value in row] for row in self.source.records or []]
+        if self.source.truncated and records:
+            records = records[:-1]  # 글자 상한에서 잘린 마지막 레코드는 온전하지 않을 수 있다
         width = max((len(row) for row in records), default=0)
         result_width = max((len(row) for row in grid), default=0)
         source_rows = [tuple(row + [""] * (width - len(row))) for row in records]
         result_rows = [tuple(row) for row in grid]
+        if self.source.truncated:
+            self.unread_result_lines += max(0, len(result_rows) - len(source_rows))
+            result_rows = result_rows[:len(source_rows)]
         before = len(self.spots)
         total = sum(len(compact(value)) for row in records for value in row)
         stats["source_chars"] = total
@@ -965,6 +1002,10 @@ class Verifier:
             else:
                 opcodes = [("replace", 0, len(s_mid), 0, len(r_mid))]
                 self.notes.append(f"차이 나는 행이 {len(s_mid):,}행이 넘어 행 정렬 없이 순서대로 비교했습니다.")
+            if self.source.truncated and tail == 0 and (len(opcodes) > 1 or head) and opcodes[-1][0] != "equal":
+                # 잘린 경계에서는 결과 창과 원본이 한두 행 어긋날 수 있다(앞에서 빠지거나 생긴 행만큼). 경계의 차이는 판단하지 않는다.
+                tag, i1, i2, j1, j2 = opcodes.pop()
+                self.unread_result_lines += max(i2 - i1, j2 - j1)
             for tag, i1, i2, j1, j2 in opcodes:
                 if tag == "equal":
                     matched_rows += i2 - i1
@@ -1108,11 +1149,15 @@ class Verifier:
             return None
         anchor = max(wanted, key=lambda choices: len(choices[0]))[0]
         best, score = None, 0
+        rows = self._table_rows
         for n in table_lines:
-            raw = self.raw[n - 1]
-            if anchor not in compact(raw.replace("\\|", "")):
+            row = rows.get(n)
+            if row is None:
+                raw = self.raw[n - 1]
+                row = rows[n] = (compact(raw.replace("\\|", "")), _cells(raw))
+            if anchor not in row[0]:
                 continue
-            cells = _cells(raw)
+            cells = row[1]
             hits = sum(1 for choices in wanted if any(choice in cells for choice in choices))
             if hits > score:
                 best, score = n, hits
